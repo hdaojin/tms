@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ post.title }}{% endblock %}
+
+{% block content %}
+<div>
+    <article class="post-detail">
+        <h1>{{ post.title }}</h1>
+        
+        <div class="post-meta">
+            <span>发布时间: {{ post.created|date:"Y-m-d H:i" }}</span>
+            <span>更新时间: {{ post.updated|date:"Y-m-d H:i" }}</span>
+        </div>
+        
+        <div class="post-content">
+            {{ post.context|linebreaks }}
+        </div>
+    </article>
+    
+    <div class="post-navigation">
+        <a href="{% url 'cms:post-list' %}">返回文章列表</a>
+    </div>
+</div>
+{% endblock %}

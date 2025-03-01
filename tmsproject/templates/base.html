@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-hans">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TMS系统{% endblock %}</title>
+    <!-- 引入CSS文件 -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <nav>
+            <div class="logo">
+                <h1>TMS系统</h1>
+            </div>
+            <div class="navigation">
+                <ul>
+                    <li><a href="/">首页</a></li>
+                    <li><a href="/about/">关于</a></li>
+                    <li><a href="/contact/">联系我们</a></li>
+                    {% if user.is_authenticated %}
+                    <li><a href="/profile/">个人中心</a></li>
+                    <li><a href="/logout/">退出</a></li>
+                    {% else %}
+                    <li><a href="/login/">登录</a></li>
+                    <li><a href="/register/">注册</a></li>
+                    {% endif %}
+                </ul>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}
+        <!-- 页面内容将在这里被替换 -->
+        {% endblock %}
+    </main>
+
+    <footer>
+        <p>&copy; {% now "Y" %} TMS系统. 保留所有权利.</p>
+    </footer>
+
+    <!-- 引入JavaScript文件 -->
+    <script src="/static/js/main.js"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
