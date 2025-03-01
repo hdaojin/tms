@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}文章列表{% endblock %}
+
+{% block content %}
+<div>
+    <h1>文章列表</h1>
+    
+    {% if posts %}
+        <div class="post-list">
+            {% for post in posts %}
+                <article class="post-item">
+                    <h2>{{ post.title }}</h2>
+                    <div class="post-meta">
+                        <span>发布时间: {{ post.created|date:"Y-m-d H:i" }}</span>
+                        <span>更新时间: {{ post.updated|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <div class="post-excerpt">
+                        {{ post.context|truncatewords:30 }}
+                    </div>
+                    <a href="{% url 'cms:post-detail' post.pk %}">阅读全文</a>
+                </article>
+                <hr>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>暂无文章</p>
+    {% endif %}
+</div>
+{% endblock %}
