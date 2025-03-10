@@ -39,7 +39,6 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 # Application definition
 
 INSTALLED_APPS = [
-    'cms.apps.CmsConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -48,8 +47,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sites',
     'django.contrib.flatpages',
-    'allauth',
-    'allauth.account',
+    'homepage',
+    'accounts',
+    'cms',
 ]
 
 SITE_ID = 1
@@ -60,11 +60,12 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    # 启用将所有未认证请求重定向到登录页面
+    'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # 启用简单页面
     'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',
-    # Add the account middleware
-    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'tmsproject.urls'
@@ -85,14 +86,6 @@ TEMPLATES = [
     },
 ]
 
-
-AUTHENTICATION_BACKENDS = [
-    # Needed to login by username in Django admin, regardless of `allauth`
-    'django.contrib.auth.backends.ModelBackend',
-
-    # `allauth` specific authentication methods, such as login by e-mail
-    'allauth.account.auth_backends.AuthenticationBackend',
-]
 
 WSGI_APPLICATION = 'tmsproject.wsgi.application'
 
@@ -158,6 +151,6 @@ STATICFILES_DIRS = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # 认证相关设置
-LOGIN_REDIRECT_URL = '/'  # 登录成功后跳转的页面
-LOGOUT_REDIRECT_URL = '/'  # 登出后跳转的页面
-LOGIN_URL = '/login/'  # 登录页面的URL
+# LOGIN_URL = '/accounts/login/'
+LOGIN_REDIRECT_URL = '/cms/posts/'  # 登录成功后跳转的页面
+LOGOUT_REDIRECT_URL = '/accounts/login/'

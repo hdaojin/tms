@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+  <div class="hero min-h-screen" style="background-image: url('{% static 'images/competition_3_HQ1.jpg' %}');">
+    <div class="hero-overlay"></div>
+    <div class="hero-content text-neutral-content text-center">
+      <div class="max-w-md">
+        <h1 class="mb-5 text-5xl font-bold">IT 技术日常</h1>
+        <p class="mb-5">“IT 技术日常(ITNSA)”是一个面向学生和教育工作者的专业平台，专注于分享与IT教学和实验实践相关的优质内容。我们提供丰富的学习资源、实用的教学案例，以及前沿的技术实验指导，覆盖编程、网络系统、人工智能、自动化运维等多个领域。通过系统化的知识分享和实验实践支持，我们致力于帮助学生加深对IT技术的理解，培养动手实践能力，为未来的职业发展打下坚实基础。让“IT技术日常”成为你学习和探索技术世界的得力助手！</p>
+        <button class="btn btn-primary">
+            <a href="{% url 'cms:post-list' %}">Get Started</a>
+        </button>
+      </div>
+    </div>
+  </div>
+{% endblock %}
