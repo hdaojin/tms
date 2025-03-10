@@ -1,0 +1,90 @@
+{% load static %}
+
+<div class="navbar bg-neutral text-neutral-content shadow-sm">
+  {% comment %}网站Logo{% endcomment %}
+  <div class="flex-1">
+    <a class="btn btn-ghost text-xl" href="{% url 'home' %}">
+        <img src="{% static 'images/computer-laptop-color-icon.png' %}" alt="Logo" class="inline-block mr-2 h-8 w-8" />
+        ITNSA
+    </a>
+  </div>
+
+  {% comment %}主题切换{% endcomment %}
+  <label class="toggle text-base-content">
+    <input type="checkbox" value="dark" class="theme-controller" />
+
+    <svg aria-label="sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2"></path>
+        <path d="M12 20v2"></path>
+        <path d="m4.93 4.93 1.41 1.41"></path>
+        <path d="m17.66 17.66 1.41 1.41"></path>
+        <path d="M2 12h2"></path>
+        <path d="M20 12h2"></path>
+        <path d="m6.34 17.66-1.41 1.41"></path>
+        <path d="m19.07 4.93-1.41 1.41"></path>
+      </g>
+    </svg>
+
+    <svg aria-label="moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor">
+        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+      </g>
+    </svg>
+  </label>
+
+  {% comment %}主菜单{% endcomment %}
+  <div class="flex-none">
+    <ul class="menu menu-horizontal px-1">
+      <li>
+        <a>Link</a>
+      </li>
+      <li>
+        <details>
+          <summary>Parent</summary>
+          <ul class="bg-neutral-800 rounded-t-none p-2">
+            <li>
+              <a>Link 1</a>
+            </li>
+            <li>
+              <a>Link 2</a>
+            </li>
+          </ul>
+        </details>
+      </li>
+    </ul>
+  </div>
+
+  {% comment %}用户菜单{% endcomment %}
+  <div class="flex gap-2">
+    {% comment %} <input type="text" placeholder="Search" class="input input-bordered w-24 md:w-auto" /> {% endcomment %}
+    <div class="dropdown dropdown-end">
+      <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
+        <div class="w-10 rounded-full">
+          <img alt="Tailwind CSS Navbar component" src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp" />
+        </div>
+      </div>
+      <ul tabindex="0" class="menu menu-sm dropdown-content bg-neutral-800 rounded-box z-1 mt-3 w-32 p-2 shadow">
+        <li>
+          <a class="justify-between">
+            Profile
+            {% comment %} <span class="badge">New</span> {% endcomment %}
+          </a>
+        </li>
+        {% if user.is_staff %}
+        <li>
+          <a href="{% url 'admin:index'  %}">管理后台</a>
+        </li>
+        {% endif %}
+        <li>
+          <form action="{% url 'accounts:logout' %}" method="post">
+            {% csrf_token %}
+            <button type="submit" class="badge">注销</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+  {% comment %}用户菜单{% endcomment %}
+</div>

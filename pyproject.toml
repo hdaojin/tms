@@ -5,7 +5,6 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "django-allauth>=65.4.1",
     "django>=5.1.6",
     "django-environ>=0.12.0",
 ]

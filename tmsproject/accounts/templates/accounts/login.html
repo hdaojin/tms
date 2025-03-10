@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+  {% if form.errors %}
+    <div class="toast toast-top toast-center">
+      <div class="alert alert-warning">
+        <span>你的用户名和密码不匹配，请重试。</span>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if next %}
+    {% if user.is_authenticated %}
+      <div class="toast toast-top toast-center">
+        <div class="alert alert-warning">
+          <span>你的账户没有访问此页面的权限。请登录具有访问权限的账户。</span>
+        </div>
+      </div>
+    {% else %}
+      <div class="toast toast-top toast-center">
+        <div class="alert alert-warning">
+          <span>请登录以查看此页面。</span>
+        </div>
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <div class="flex min-h-screen items-center justify-center">
+    <div>
+      <form method="post" action="{% url 'accounts:login' %}">
+        {% csrf_token %}
+        <fieldset class="fieldset w-xs bg-base-200 border border-base-300 p-4 rounded-box shadow-2xl">
+          <legend class="fieldset-legend">登录</legend>
+          <label class="fieldset-label">用户名</label>
+          <input type="text" class="input" name="username" placeholder="用户名" required />
+          <label class="fieldset-label">密码</label>
+          <input type="password" class="input" name="password" placeholder="密码" required />
+          <button class="btn btn-neutral mt-4" value="login">登录</button>
+          <input type="hidden" name="next" value="{{ next }}" />
+        </fieldset>
+      </form>
+    </div>
+  </div>
+{% endblock %}
