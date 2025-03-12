@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'homepage',
     'accounts',
     'cms',
+    'training_logs',
 ]
 
 SITE_ID = 1
@@ -81,6 +82,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # 自定义上下文处理器
+                'libs.context_processors.custom_context',
             ],
         },
     },
@@ -160,3 +163,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 #     form_template_name = BASE_DIR /  'templates' / 'form_snippet.html'
 
 # FORM_RENDERER = 'tmsproject.settings.CustomFormRenderer'
+
+# 自定义变量
+MY_SITE_NAME = "ITNSA"

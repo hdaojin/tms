@@ -1,5 +1,5 @@
 {% load static %}
-<p class="text-sm text-decoration-none">&copy; 2024-{% now 'Y' %} <a href="{% url 'home' %}">itnsa.cn</a> 版权所有.</p>
+<p class="text-sm text-decoration-none">&copy; 2024-{% now 'Y' %} <a href="{% url 'home' %}">{{ my_site_name }}.cn</a> 版权所有.</p>
 <p class="flex items-center justify-center space-x-1">
   <img src="{% static 'images/gong_an_bu_bei_an.png' %}" alt="公安部备案图标" width="16" height="16" />
   <span>

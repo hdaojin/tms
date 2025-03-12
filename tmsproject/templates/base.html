@@ -7,10 +7,10 @@
     <link rel="icon" type="image/png" href="{% static 'images/computer-laptop-color-icon.png' %}" />
     <title>
       {% if title %}
-        {{ title }} | ITNSA
+        {{ title }} | {{ my_site_name }}
       {% else %}
         {% block title %}
-          ITNSA
+          {{ my_site_name }}
         {% endblock %}
       {% endif %}
     </title>
