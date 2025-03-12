@@ -1,9 +1,21 @@
-# itnsa-website
-itnsa website
+# Training Management System (TMS)
+
+## Introduction
+
+Training Management System (TMS) is a web application that helps organizations manage their competition training programs.
+
+It is built using Django, Tailwind CSS, DaisyUI, HTMX, and more.
+
+## Features
+
+- User management
+
+And more features to come.
 
 
 
-## Development
+## Usage （Development）
+
 ### Prerequisites
 - Python development environment
 - uv (Python virtual environment manager)

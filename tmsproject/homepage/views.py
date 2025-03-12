@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_not_required
 def home(request):
     context = {
         'is_homepage': True,
-        'title': 'ITNSA',
+        'title': 'TMS Project',
         'content': 'Welcome to the homepage of the TMS project.'
     }
 
