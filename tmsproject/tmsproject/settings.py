@@ -11,6 +11,9 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 
 from pathlib import Path
+
+# from django.forms.renderers import TemplatesSetting
+
 import environ
 
 env = environ.Env(DEBUG=(bool, False))
@@ -45,8 +48,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.sites',
-    'django.contrib.flatpages',
+    # Custom apps
     'homepage',
     'accounts',
     'cms',
@@ -64,8 +66,6 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 启用简单页面
-    'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',
 ]
 
 ROOT_URLCONF = 'tmsproject.urls'
@@ -152,5 +152,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # 认证相关设置
 # LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/cms/posts/'  # 登录成功后跳转的页面
-LOGOUT_REDIRECT_URL = '/accounts/login/'
+# LOGIN_REDIRECT_URL = '/cms/posts/'  # 登录成功后跳转的页面
+# LOGOUT_REDIRECT_URL = '/accounts/login/'
+
+
+# class CustomFormRenderer(TemplatesSetting):
+#     form_template_name = BASE_DIR /  'templates' / 'form_snippet.html'
+
+# FORM_RENDERER = 'tmsproject.settings.CustomFormRenderer'

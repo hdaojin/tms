@@ -22,33 +22,26 @@
   </head>
 
   <body class="min-h-screen flex flex-col">
-    {% if not is_homepage and not is_login_page %}
+    {% if not is_homepage %}
       <header>
         {% include 'navbar.html' %}
       </header>
     {% endif %}
 
-    <main class="flex-1 {% if is_homepage %}relative{% endif %}">
+    <main class="flex-1 {% if is_homepage %}relative {% else %} p-4 {% endif %}">
       {% block content %}
         <!-- 页面内容将在这里被替换 -->
       {% endblock %}
     </main>
 
-    {% if not is_login_page %}
-      <footer class="text-center text-neutral-content p-4 {% if is_homepage %}
-          
-        bg-neutral/60 absolute bottom-0 w-full z-10
-
-        {% else %}
-          
-        bg-neutral
-
-        {% endif %}">
-        <p>
-          &copy; 2024-{% now 'Y' %}itnsa.cn 版权所有.
-        </p>
-      </footer>
-    {% endif %}
+    <footer class="text-center p-2
+      {% if is_homepage %}
+        bg-neutral/60 text-neutral-content absolute bottom-0 w-full z-10
+      {% else %}
+        bg-neutral text-neutral-content
+      {% endif %}">
+      {% include 'footer.html' %}
+    </footer>
 
     <!-- 引入JavaScript文件 -->
     <script src="{% static 'js/htmx.min.js' %}"></script>

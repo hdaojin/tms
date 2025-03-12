@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <div class="flex items-center justify-center min-h-[calc(100vh-11rem)]">
+    <div class="w-full max-w-xs">
+      <div class="alert alert-success alert-outline text-center">
+        <p>注册成功！欢迎 <span class="text-base-content">{{ user.username }}</span> 加入我们！</br>请等待管理员激活后才能登录您的账户。</p>
+      </div>
+      <div class="text-center mt-4">
+        <p>
+          已有账号? <a href="{% url 'accounts:login' %}" class="link link-primary">立即登录</a>
+        </p>
+      </div>
+    </div>
+  </div>
+{% endblock %}

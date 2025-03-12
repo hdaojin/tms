@@ -2,13 +2,37 @@
 {% load static %}
 
 {% block content %}
-  {% if form.errors %}
-    <div class="toast toast-top toast-center">
-      <div class="alert alert-warning">
-        <span>你的用户名和密码不匹配，请重试。</span>
-      </div>
+  <div class="flex items-center justify-center min-h-[calc(100vh-11rem)]">
+    <div class="w-full max-w-xs">
+      {% if form.errors %}
+        <div class="alert alert-error alert-outline">
+          <span>你的用户名和密码不匹配，请重试。</span>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'accounts:login' %}">
+        {% csrf_token %}
+        <fieldset class="fieldset bg-base-200 border border-base-300 p-4 rounded-box shadow-2xl">
+          <legend class="fieldset-legend">登录</legend>
+
+          {% for field in form %}
+            {% if field.errors %}
+              <div class="alert alert-error alert-outline">{{ field.errors }}</div>
+            {% endif %}
+            <label class="fieldset-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {% comment %} <input type="{{ field.field.widget.input_type }}" class="input" name="{{ field.html_name }}" placeholder="{{ field.label }}" required /> {% endcomment %}
+            <div class="input">{{ field }}</div>
+            {% if field.help_text %}
+              <div class="text-info" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</div>
+            {% endif %}
+          {% endfor %}
+
+          <button class="btn btn-neutral mt-4" type="submit" value="login">登录</button>
+          <input type="hidden" name="next" value="{{ next }}" />
+        </fieldset>
+      </form>
     </div>
-  {% endif %}
+  </div>
 
   {% if next %}
     {% if user.is_authenticated %}
@@ -25,21 +49,4 @@
       </div>
     {% endif %}
   {% endif %}
-
-  <div class="flex min-h-screen items-center justify-center">
-    <div>
-      <form method="post" action="{% url 'accounts:login' %}">
-        {% csrf_token %}
-        <fieldset class="fieldset w-xs bg-base-200 border border-base-300 p-4 rounded-box shadow-2xl">
-          <legend class="fieldset-legend">登录</legend>
-          <label class="fieldset-label">用户名</label>
-          <input type="text" class="input" name="username" placeholder="用户名" required />
-          <label class="fieldset-label">密码</label>
-          <input type="password" class="input" name="password" placeholder="密码" required />
-          <button class="btn btn-neutral mt-4" value="login">登录</button>
-          <input type="hidden" name="next" value="{{ next }}" />
-        </fieldset>
-      </form>
-    </div>
-  </div>
 {% endblock %}

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+  <div class="flex items-center justify-center min-h-[calc(100vh-11rem)]">
+    <div class="w-full max-w-xs">
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <fieldset class="fieldset bg-base-200 border border-base-300 p-4 rounded-box shadow-2xl">
+          <legend class="fieldset-legend">注册</legend>
+          {% for field in form %}
+            {% if field.errors %}
+              <div class="alert alert-error alert-outline">{{ field.errors }}</div>
+            {% endif %}
+            <label class="fieldset-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            <div class="input">{{ field }}</div>
+            {% if field.help_text %}
+              <div class="text-info" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</div>
+            {% endif %}
+          {% endfor %}
+
+          <button class="btn btn-neutral mt-4" type="submit">注册</button>
+        </fieldset>
+      </form>
+      <div class="text-center mt-4">
+        <p>
+          已有账号? <a href="{% url 'accounts:login' %}" class="link link-primary">立即登录</a>
+        </p>
+      </div>
+    </div>
+  </div>
+{% endblock %}
