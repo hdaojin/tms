@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'accounts',
     'cms',
     'training_logs',
+    'reports',
 ]
 
 SITE_ID = 1
