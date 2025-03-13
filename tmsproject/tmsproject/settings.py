@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'accounts',
     'cms',
     'training_logs',
+    'training_plans',
     'reports',
 ]
 
