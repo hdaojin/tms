@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class WeeklyReportsConfig(AppConfig):
+class TrainingPlansConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'weekly_reports'
+    name = 'training_plans'

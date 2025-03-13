@@ -26,4 +26,7 @@ urlpatterns = [
     path("", views.home, name="home"),
     path("accounts/", include("accounts.urls")),
     path("cms/", include("cms.urls")),
+    path("training_plans/", include("training_plans.urls")),
+    path("training_logs/", include("training_logs.urls")),
+    path("reports/", include("reports.urls")),
 ]
