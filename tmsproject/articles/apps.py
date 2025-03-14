@@ -1,6 +1,7 @@
 from django.apps import AppConfig
 
 
-class WeeklyReportsConfig(AppConfig):
+class CmsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'weekly_reports'
+    name = 'articles'
+    verbose_name = '文章管理'
