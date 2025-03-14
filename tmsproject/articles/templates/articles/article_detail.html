@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ article.title }} | {{ my_site_name }} {% endblock %}
+
+{% block content %}
+<div>
+    <article class="article-detail">
+        <h1>{{ article.title }}</h1>
+        
+        <div class="article-meta">
+            <span>发布时间: {{ article.publish_date|date:"Y-m-d H:i" }}</span>
+            <span>更新时间: {{ article.updated_at|date:"Y-m-d H:i" }}</span>
+        </div>
+        
+        <div class="article-content">
+            <!-- 更新字段名称 -->
+            {{ article.content|linebreaks }}
+        </div>
+        
+        <div class="article-extra">
+            <!-- 显示分类 -->
+            {% if article.category.all %}
+                <div class="categories">
+                    <strong>分类:</strong>
+                    {% for cat in article.category.all %}
+                        <span>{{ cat.name }}</span>{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+            <!-- 显示标签 -->
+            {% if article.tags.all %}
+                <div class="tags">
+                    <strong>标签:</strong>
+                    {% for tag in article.tags.all %}
+                        <span>{{ tag.name }}</span>{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    </article>
+    
+    <div class="article-navigation">
+        <a href="{% url 'articles:list' %}">返回文章列表</a>
+    </div>
+</div>
+{% endblock %}
