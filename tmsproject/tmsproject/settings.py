@@ -51,8 +51,7 @@ INSTALLED_APPS = [
     # Custom apps
     'homepage',
     'accounts',
-    'cms',
-    'training_logs',
+    'articles',
 ]
 
 SITE_ID = 1
