@@ -21,6 +21,11 @@ from django.urls import path, include
 from homepage import views as homepage_views
 
 
+admin.site.site_header = "TMS 管理后台"
+admin.site.site_title = "TMS 管理后台"
+admin.site.index_title = "欢迎来到 TMS 管理后台"
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", homepage_views.home, name="home"),
