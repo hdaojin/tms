@@ -31,4 +31,5 @@ urlpatterns = [
     path("", homepage_views.home, name="home"),
     path("accounts/", include("accounts.urls")),
     path("articles/", include("articles.urls")),
+    # path('skills/', include('skills.urls', namespace='skills')),
 ]
