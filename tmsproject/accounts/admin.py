@@ -1,10 +1,20 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
+from .models import UserProfile
+
+
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    verbose_name = '用户信息'
+    verbose_name_plural = '用户信息'
+
 
 class CustomUserAdmin(DefaultUserAdmin):
     # 修改列表字段，使用 full_name 作为姓名显示
     list_display = ('username', 'full_name', 'is_staff', 'is_active', 'date_joined')
+    inlines =[UserProfileInline]
     
     def full_name(self, obj):
         return obj.first_name
@@ -32,7 +42,7 @@ class CustomUserAdmin(DefaultUserAdmin):
     # search_fields = ('username', 'first_name', 'email')
 
 
-
 # 先注销默认的 UserAdmin 再用自定义的重新注册
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
+# admin.site.register(UserProfile)
