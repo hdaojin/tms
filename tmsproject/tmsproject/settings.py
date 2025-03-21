@@ -52,9 +52,6 @@ INSTALLED_APPS = [
     'homepage',
     'accounts',
     'articles',
-    'competitions',
-    'skills',
-    'trainning',
 ]
 
 SITE_ID = 1
