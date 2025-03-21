@@ -17,6 +17,7 @@ class Competition(models.Model):
 
     name = models.CharField("名称", max_length=100, unique=True)
     level = models.CharField("级别", max_length=3, choices=Level.choices, default=Level.OTHER)
+    weight = models.FloatField("权重", default=1.0, help_text="比赛的权重，用于计算考点的重要性")
     
     class Meta:
         verbose_name = '竞赛'
@@ -29,10 +30,10 @@ class Competition(models.Model):
 
 class CompetitionDetail(models.Model):
     competition = models.OneToOneField(Competition, on_delete=models.CASCADE, related_name='detail', verbose_name='竞赛')
-    start_date = models.DateField("开始日期", help_text="比赛开始日期")
-    end_date = models.DateField("结束日期", help_text="比赛结束日期")
-    location = models.CharField("地点", max_length=100, help_text="比赛举办城市", blank=True)
-    description = models.TextField("描述", blank=True)  
+    start_date = models.DateField("开始日期", help_text="比赛开始日期", blank=True, null=True)
+    end_date = models.DateField("结束日期", help_text="比赛结束日期", blank=True, null=True)
+    location = models.CharField("地点", max_length=100, help_text="比赛举办城市", blank=True, null=True)
+    description = models.TextField("描述", blank=True, null=True, help_text="比赛的详细描述")  
 
     class Meta:
         verbose_name = '竞赛详情'
@@ -61,7 +62,9 @@ class CompetitionTeamRelation(models.Model):
     class Meta:
         verbose_name = '竞赛-参赛队关系'
         verbose_name_plural = '竞赛-参赛队关系'
-        unique_together = (('competition', 'team'),)  # 确保一个队在一个竞赛中只能出现一次
+        constraints = [
+            models.UniqueConstraint(fields=['competition', 'team'], name='unique_competition_team')
+        ]
 
     def __str__(self):
         return f"{self.competition.name} - {self.team.name}"
