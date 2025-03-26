@@ -1,6 +1,7 @@
 from django.apps import AppConfig
 
 
-class TrainningConfig(AppConfig):
+class TrainingConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'trainning'
+    name = 'training'
+    verbose_name = '训练管理'
