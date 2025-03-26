@@ -54,7 +54,7 @@ INSTALLED_APPS = [
     'articles',
     'competitions',
     'skills',
-    'trainning',
+    'training',
 ]
 
 SITE_ID = 1
@@ -150,6 +150,13 @@ STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
 
+
+# Media files (user uploaded files)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -168,3 +175,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # 自定义变量
 MY_SITE_NAME = "ITNSA"
+
+LOGS_DIR = env('LOGS_DIR', default='logs')
+WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目')
