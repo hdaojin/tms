@@ -13,12 +13,16 @@ class UserProfileInline(admin.StackedInline):
 
 class CustomUserAdmin(DefaultUserAdmin):
     # 修改列表字段，使用 full_name 作为姓名显示
-    list_display = ('username', 'full_name', 'is_staff', 'is_active', 'date_joined')
+    list_display = ('username', 'full_name', 'groups_name', 'is_staff', 'is_active', 'date_joined')
     inlines =[UserProfileInline]
     
     def full_name(self, obj):
         return obj.first_name
     full_name.short_description = '姓名'
+
+    def groups_name(self, obj):
+        return ", ".join([group.name for group in obj.groups.all()])
+    groups_name.short_description = '角色'
 
 
     # # 修改详情页展示字段，移除 last_name
