@@ -312,3 +312,6 @@ dist
 .yarn/install-state.gz
 .pnp.*
 
+# Uploads directory
+media/
+
