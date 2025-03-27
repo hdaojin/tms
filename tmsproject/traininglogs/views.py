@@ -1,17 +1,19 @@
 from pathlib import Path
+from datetime import date
+import calendar
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.contrib import messages
-from django.http import FileResponse, Http404
-from .forms import TrainingLogUploadForm
-from .models import TrainingLog
 from django.core.files.base import ContentFile
-from datetime import date
-import calendar
 from django.contrib.auth.models import User
 from django.db.models import Q
 from django.utils import timezone
+from django.http import FileResponse
+
+from .forms import TrainingLogUploadForm
+from .models import TrainingLog
 
 
 # Create your views here.
@@ -48,17 +50,17 @@ def upload_training_log(request):
             #     for chunk in uploaded_file.chunks():
             #         destination.write(chunk)
             messages.success(request, '训练日志上传成功!')
-            return redirect('training:training_logs')
+            return redirect('traininglogs:training_logs')
     else:
         form = TrainingLogUploadForm()
-    return render(request, 'training/upload_training_log.html', {'form': form, 'title': '上传训练日志'})
+    return render(request, 'traininglogs/upload_training_log.html', {'form': form, 'title': '上传训练日志'})
 
 
 @login_required
 def training_logs(request):
     training_logs = TrainingLog.objects.filter(uploaded_by=request.user).order_by('-training_date')
     title = '训练日志列表 - 我的日志'
-    return render(request, 'training/training_logs.html', {'title': title, 'training_logs': training_logs})
+    return render(request, 'traininglogs/training_logs.html', {'title': title, 'training_logs': training_logs})
 
 
 @login_required
@@ -78,10 +80,10 @@ def view_training_log(request, log_id):
                 messages.error(request, '没有上传文件或文件路径无效!')
         else:
             messages.error(request, '只能下载自己上传的训练日志!')
-        return redirect('training:training_logs')
+        return redirect('traininglogs:training_logs')
     except Exception as e:
         messages.error(request, f'下载日志时发生错误: {str(e)}')
-        return redirect('training:training_logs')
+        return redirect('traininglogs:training_logs')
 
 
 @login_required
@@ -98,7 +100,7 @@ def delete_training_log(request, log_id):
         messages.success(request, '训练日志删除成功!')
     else:
         messages.error(request, '只能删除自己上传的训练日志!')
-    return redirect('training:training_logs')
+    return redirect('traininglogs:training_logs')
 
 
 @login_required
@@ -182,6 +184,6 @@ def training_log_statistics(request):
         'selected_month': selected_month,
     }
     
-    return render(request, 'training/training_log_statistics.html', context)
+    return render(request, 'traininglogs/training_log_statistics.html', context)
 
 
