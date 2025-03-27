@@ -1,62 +1,133 @@
 {% load static %}
+<div class="navbar bg-base-100 shadow-sm">
+  <div class="navbar-start">
+    <!-- mobile menu -->
+    <div class="dropdown">
+      <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
+        </svg>
+      </div>
+      <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
+        <li>
+          <a>Item 1</a>
+        </li>
+        <li>
+          <a>Parent</a>
+          <ul class="p-2">
+            <li>
+              <a>Submenu 1</a>
+            </li>
+            <li>
+              <a>Submenu 2</a>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <a>Item 3</a>
+        </li>
+      </ul>
+    </div>
+    <!-- mobile menu end -->
 
-<div class="navbar bg-neutral text-neutral-content shadow-sm">
-  {% comment %}网站Logo{% endcomment %}
-  <div class="flex-1">
-    <a class="btn btn-ghost text-xl" href="{% url 'home' %}">
+    <!-- logo -->
+    <a class="flex-1 lg:flex-none btn btn-ghost text-xl" href="{% url 'home' %}">
       <img src="{% static 'images/computer-laptop-color-icon.png' %}" alt="Logo" class="inline-block mr-2 h-8 w-8" />
       {{ my_site_name }}
     </a>
   </div>
+  <!-- logo end -->
 
-  {% comment %}主题切换{% endcomment %}
-  <label class="toggle text-base-content mx-2">
-    <input type="checkbox" value="dark" class="theme-controller" />
-
-    <svg aria-label="sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-      <g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor">
-        <circle cx="12" cy="12" r="4"></circle>
-        <path d="M12 2v2"></path>
-        <path d="M12 20v2"></path>
-        <path d="m4.93 4.93 1.41 1.41"></path>
-        <path d="m17.66 17.66 1.41 1.41"></path>
-        <path d="M2 12h2"></path>
-        <path d="M20 12h2"></path>
-        <path d="m6.34 17.66-1.41 1.41"></path>
-        <path d="m19.07 4.93-1.41 1.41"></path>
-      </g>
-    </svg>
-
-    <svg aria-label="moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-      <g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor">
-        <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
-      </g>
-    </svg>
-  </label>
-
+  <!-- 用户菜单 -->
   {% if user.is_authenticated %}
-    {% comment %}主菜单{% endcomment %}
-    <div class="flex-none">
+    <div class="navbar-center hidden lg:flex">
       <ul class="menu menu-horizontal px-1">
         <li>
-          <a>Link</a>
+          <a href="{% url 'traininglogs:list_training_logs' %}">训练日志</a>
         </li>
         <li>
           <details>
             <summary>Parent</summary>
-            <ul class="bg-neutral-800 rounded-t-none p-2">
+            <ul class="p-2">
               <li>
-                <a>Link 1</a>
+                <a>Submenu 1</a>
               </li>
               <li>
-                <a>Link 2</a>
+                <a>Submenu 2</a>
               </li>
             </ul>
           </details>
         </li>
+        <li>
+          <a>Item 3</a>
+        </li>
       </ul>
     </div>
+  {% endif %}
 
+  <div class="navbar-end">
+    <!-- right menu -->
+    <!-- theme switch -->
+    <label class="toggle text-base-content mx-2">
+      <input type="checkbox" value="dark" class="theme-controller" />
+
+      <svg aria-label="sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2"></path>
+          <path d="M12 20v2"></path>
+          <path d="m4.93 4.93 1.41 1.41"></path>
+          <path d="m17.66 17.66 1.41 1.41"></path>
+          <path d="M2 12h2"></path>
+          <path d="M20 12h2"></path>
+          <path d="m6.34 17.66-1.41 1.41"></path>
+          <path d="m19.07 4.93-1.41 1.41"></path>
+        </g>
+      </svg>
+
+      <svg aria-label="moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+        <g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+        </g>
+      </svg>
+    </label>
+    <!-- theme switch end -->
+
+    <!-- user menu -->
+  {% if user.is_authenticated %}
+    <div class="dropdown dropdown-bottom dropdown-end">
+      <div tabindex="0" role="button" class="btn btn-ghost rounded-field">
+        <div class="avatar">
+          <div class="w-8 rounded-full">
+            <img alt="User avatar" src="{% static 'images/user_avatar.png' %}" />
+          </div>
+        </div>
+        {{ user.first_name }}⬇️
+      </div>
+
+      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-1 mt-4 w-44 p-2 shadow-sm">
+        <li>
+          <a href="{% url 'accounts:profile' %}">用户信息</a>
+        </li>
+
+        <li>
+          <form action="{% url 'accounts:logout' %}" method="post">
+            {% csrf_token %}
+            <button type="submit" value="logout" class="w-28 text-left">注销</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+    {% else %}
+      <a href="{% url 'accounts:login' %}" class="btn">登录</a>
+    {% endif %}
+    <!-- user menu end -->
+  </div>
+  <!-- right menu end -->
+</div>
+
+<!--      
+   
     {% comment %}用户菜单{% endcomment %}
     <div class="flex gap-2">
       {% comment %} <input type="text" placeholder="Search" class="input input-bordered w-24 md:w-auto" /> {% endcomment %}
@@ -89,5 +160,5 @@
     <div class="flex gap-2">
       <a href="{% url 'accounts:login' %}" class="btn btn-primary">登录</a>
     </div> {% endcomment %}
-  {% endif %}
 </div>
+      -->
