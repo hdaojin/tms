@@ -1,0 +1,73 @@
+<aside class="w-48 bg-base-200 text-base-content shadow-lg h-full">
+  <div class="flex flex-col h-full border-r border-base-300 p-4">
+    <ul id="main-menu" class="menu rounded-box w-full">
+      <li>
+        <a href="{% url 'traininglogs:list_training_logs' %}" class="flex justify-center text-center">训练日志</a>
+      </li>
+      <li>
+        <a href="#" class="flex justify-center text-center">README</a>
+      </li>
+    </ul>
+
+    {% if user.is_superuser %}
+      <div class="divider"></div>
+      <ul class="menu rounded-box w-full flex">
+        <li>
+          <a href="{% url 'admin:index' %}" class="justify-center text-center">后台管理</a>
+        </li>
+      </ul>
+    {% endif %}
+    <div class="divider"></div>
+    <div class="mt-6 p-2">
+      <form method="post" action="{% url 'accounts:logout' %}">
+        {% csrf_token %}
+        <button class="btn btn-block btn-neutral" type="submit">注销</button>
+      </form>
+    </div>
+  </div>
+
+  {% comment %} <!-- 在您的边栏中 -->
+  <div class="flex flex-col h-full border-r border-base-300 p-4">
+    <ul id="main-menu" hx-boost="true" hx-target="#content" class="menu rounded-box w-full">
+      <li>
+        <a href="{% url 'homepage:index' %}" hx-on:click="handleMenuClick(this)" class="menu-active flex justify-center text-center">控制面板</a>
+      </li>
+      <li>
+        <a href="{% url 'vmm:index' %}" hx-on:click="handleMenuClick(this)" class="flex justify-center text-center">虚拟机管理</a>
+      </li>
+      <li>
+        <a href="#" hx-on:click="handleMenuClick(this)" class="flex justify-center text-center">README</a>
+      </li>
+    </ul>
+
+    {% if user.is_superuser %}
+      <div class="divider"></div>
+      <ul class="menu rounded-box w-full flex">
+        <li>
+          <a href="{% url 'admin:index' %}" class="justify-center text-center">后台管理</a>
+        </li>
+      </ul>
+    {% endif %}
+
+    <div class="divider"></div>
+
+    <div class="mt-auto mb-16 p-2">
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button class="btn btn-block btn-neutral" type="submit">注销</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function handleMenuClick(element) {
+      document.querySelectorAll('#main-menu a').forEach((el) => {
+        if (el === element) {
+          el.classList.add('menu-active')
+        } else {
+          el.classList.remove('menu-active')
+        }
+      })
+    }
+  </script> {% endcomment %}
+</aside>

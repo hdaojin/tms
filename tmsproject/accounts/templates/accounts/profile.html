@@ -1,12 +1,19 @@
 {% extends 'base.html' %}
 {% load static %}
+
 {% block content %}
-<div class="container mx-auto my-8">
-  <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
-  <p>用户名：{{ user.username }}</p>
-  <p>姓名：{{ user.first_name }}</p>
-  <p>邮箱：{{ user.email }}</p>
-  <p>角色：{{ user.groups.all.0.name }}</p>
-  <!-- 根据需求，添加更多用户信息 -->
-</div>
+  <div class="flex min-h-full">
+    {% include 'user_sidebar.html' %}
+    <div class="container bx-8 my-8">
+      {% block content_title %}
+        <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
+      {% endblock %}
+
+      <p>用户名：{{ user.username }}</p>
+      <p>姓名：{{ user.first_name }}</p>
+      <p>邮箱：{{ user.email }}</p>
+      <p>角色：{{ user.groups.all.0.name }}</p>
+      <!-- 根据需求，添加更多用户信息 -->
+    </div>
+  </div>
 {% endblock %}
