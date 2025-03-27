@@ -30,15 +30,7 @@
         </header>
       {% endif %}
 
-      <main class="flex-1 {% if is_homepage %}
-          
-           relative
-
-        {% else %}
-                     
-           p-4
-
-        {% endif %}">
+      <main class="flex-1 {% if is_homepage %}relative{% endif %}">
         {% block content %}
           {% block content_title %}
             {% if title %}

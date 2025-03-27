@@ -50,7 +50,7 @@ def upload_training_log(request):
             #     for chunk in uploaded_file.chunks():
             #         destination.write(chunk)
             messages.success(request, '训练日志上传成功!')
-            return redirect('traininglogs:training_logs')
+            return redirect('traininglogs:list_training_logs')
     else:
         form = TrainingLogUploadForm()
     return render(request, 'traininglogs/upload_training_log.html', {'form': form, 'title': '上传训练日志'})
@@ -80,10 +80,10 @@ def view_training_log(request, log_id):
                 messages.error(request, '没有上传文件或文件路径无效!')
         else:
             messages.error(request, '只能下载自己上传的训练日志!')
-        return redirect('traininglogs:training_logs')
+        return redirect('traininglogs:list_training_logs')
     except Exception as e:
         messages.error(request, f'下载日志时发生错误: {str(e)}')
-        return redirect('traininglogs:training_logs')
+        return redirect('traininglogs:list_training_logs')
 
 
 @login_required
@@ -100,7 +100,7 @@ def delete_training_log(request, log_id):
         messages.success(request, '训练日志删除成功!')
     else:
         messages.error(request, '只能删除自己上传的训练日志!')
-    return redirect('traininglogs:training_logs')
+    return redirect('traininglogs:list_training_logs')
 
 
 @login_required

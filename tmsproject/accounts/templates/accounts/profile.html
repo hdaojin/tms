@@ -2,13 +2,16 @@
 {% load static %}
 
 {% block content %}
-  <div class="flex min-h-full">
+  <div class="flex flex-row flex-wrap">
+    <div class="flex-none w-52 border-r border-base-300 bg-base-100 p-4">
+      <!-- 侧边栏内容 -->
+      {% comment %} <!-- 在您的边栏中 --> {% endcomment %}
     {% include 'user_sidebar.html' %}
-    <div class="container bx-8 my-8">
+    </div>
+    <div class="flex-auto p-4">
       {% block content_title %}
         <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
       {% endblock %}
-
       <p>用户名：{{ user.username }}</p>
       <p>姓名：{{ user.first_name }}</p>
       <p>邮箱：{{ user.email }}</p>
