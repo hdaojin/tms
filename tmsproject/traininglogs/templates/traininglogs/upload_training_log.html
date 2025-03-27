@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <fieldset class="fieldset bg-base-200 border border-base-300 p-4 rounded-box shadow-2xl">
+      <legend class="fieldset-legend">注册</legend>
+      
+      {% for field in form %}
+        {% if field.errors %}
+          <div class="alert alert-error alert-outline">{{ field.errors }}</div>
+        {% endif %}
+        <label class="fieldset-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+        <div class="input">{{ field }}</div>
+        {% if field.help_text %}
+          <div class="text-info" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</div>
+        {% endif %}
+      {% endfor %}
+
+      <button class="btn btn-neutral mt-4" type="submit">注册</button>
+    </fieldset>
+
+    <button type="submit" class="btn btn-primary">上传</button>
+  </form>
+{% endblock %}

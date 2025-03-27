@@ -7,7 +7,7 @@ app_name = 'accounts'
 urlpatterns = [
     path('login/', auth_views.LoginView.as_view(
         template_name='accounts/login.html', 
-        extra_context={'is_login_page': True, 'title': '登录'}), 
+        extra_context={'is_login_page': True, 'title': None}), 
         name="login"),
     path('profile/', views.account_profile, name="profile"),
     path('logout/', auth_views.logout_then_login, name="logout"),

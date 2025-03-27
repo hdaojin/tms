@@ -16,7 +16,7 @@ def account_signup(request):
             user.save()
             # 此处可添加发送激活邮件逻辑
             return render(request, 'accounts/signup_done.html', {
-                'title': '注册成功',
+                'title': None,
                 'user': user
             }) 
     else:
@@ -24,7 +24,7 @@ def account_signup(request):
     
     return render(request, 'accounts/signup.html', {
         'form': form,
-        'title': '注册'
+        'title': None
     })
 
 
