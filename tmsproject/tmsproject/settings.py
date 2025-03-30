@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'competitions',
     'skills',
     'traininglogs',
+    'notes',
 ]
 
 SITE_ID = 1

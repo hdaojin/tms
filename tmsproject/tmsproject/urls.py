@@ -35,6 +35,7 @@ urlpatterns = [
     path("articles/", include("articles.urls")),
     # path('skills/', include('skills.urls', namespace='skills')),
     path("traininglogs/", include("traininglogs.urls")),
+    path("notes/", include("notes.urls", namespace="notes")),
 ]
 
 # if settings.DEBUG:
