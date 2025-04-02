@@ -100,7 +100,7 @@ def delete_training_log(request, log_id):
         messages.success(request, '训练日志删除成功!')
     else:
         messages.error(request, '只能删除自己上传的训练日志!')
-    return redirect('traininglogs:training_logs')
+    return redirect('traininglogs:list_training_logs')
 
 
 @login_required

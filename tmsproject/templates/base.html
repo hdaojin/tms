@@ -1,85 +1,41 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="zh-hans" data-theme="light">
-  {% comment %} <html lang="zh-hans">
-    {% endcomment %}
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <link rel="icon" type="image/png" href="{% static 'images/computer-laptop-color-icon.png' %}" />
-      <title>
-        {% if title %}
-          {{ title }} | {{ my_site_name }}
-        {% else %}
-          {% block title %}
-            {{ my_site_name }}
-          {% endblock %}
-        {% endif %}
-      </title>
-      <!-- 引入CSS文件 -->
-      <link rel="stylesheet" href="{% static 'css/output.css' %}" />
-      {% block extra_css %}
-
-      {% endblock %}
-    </head>
-
-    <body class="min-h-screen flex flex-col">
-      {% if not is_homepage %}
-        <header>
-          {% include 'navbar.html' %}
-        </header>
-      {% endif %}
-
-      <main class="flex-1 {% if is_homepage %}
-          
-           relative
-
-        {% else %}
-                     
-           p-4
-
-        {% endif %}">
-        {% block content %}
-          {% block content_title %}
-            {% if title %}
-              <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
-            {% endif %}
-          {% endblock %}
-
-          <!-- 页面内容将在这里被替换 -->
+<html lang="zh-hans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="{% static 'images/computer-laptop-color-icon.png' %}" />
+    <title>
+      {% if title %}
+        {{ title }} | {{ my_site_name }}
+      {% else %}
+        {% block title %}
+          {{ my_site_name }}
         {% endblock %}
-      </main>
+      {% endif %}
+    </title>
+    <!-- 引入CSS文件 -->
+    <link rel="stylesheet" href="{% static 'css/output.css' %}" />
+    {% block extra_css %}
 
-      <footer class="text-center p-2
-      {% if is_homepage %}
-          
-          
-          
-          
-        bg-neutral/60 text-neutral-content absolute bottom-0 w-full z-10
+    {% endblock %}
+  </head>
 
+  <body class="flex flex-col min-h-screen">
+    <header class="navbar bg-neutral text-neutral-content md:h-15 fixed start-0 top-0 z-1 shadow-base-300/20 shadow-sm">navbar</header>
 
-
-
-        {% else %}
-          
-          
-          
-          
-        bg-neutral text-neutral-content
-
-
-
-
-        {% endif %}">
-        {% include 'footer.html' %}
-      </footer>
-
-      <!-- 引入JavaScript文件 -->
-      <script src="{% static 'js/htmx.min.js' %}"></script>
-      {% block extra_js %}
-
+    <main class="flex-1">
+      {% block content %}
+        {% block content_title %}
+          {% if title %}
+            <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
+          {% endif %}
+        {% endblock %}
       {% endblock %}
-    </body>
-  </html>
+    </main>
+
+    <footer class="footer footer-center bg-base-200/60 px-6 py-4">
+      {% include 'footer.html' %}
+    </footer>
+  </body>
 </html>
