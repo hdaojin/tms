@@ -1,10 +1,14 @@
 {
   "dependencies": {
     "@tailwindcss/cli": "^4.0.15",
+    "flyonui": "^2.0.1",
     "tailwindcss": "^4.0.15"
   },
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.16",
     "daisyui": "^5.0.9"
+  },
+  "scripts": {
+    "watch:css": "tailwindcss -i tmsproject/static/css/main.css -o tmsproject/static/css/output.css -w"
   }
 }

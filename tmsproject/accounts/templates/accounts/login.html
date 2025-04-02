@@ -2,8 +2,8 @@
 {% load static %}
 
 {% block content %}
-  <div class="flex items-center justify-center min-h-[calc(100vh-11rem)]">
-    <div class="w-full max-w-xs">
+  {% comment %} <div class="flex items-center justify-center min-h-[calc(100vh-11rem)]"> {% endcomment %}
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
       {% if form.errors %}
         <div class="alert alert-error alert-outline">
           <span>你的用户名和密码不匹配，请重试。</span>
@@ -32,8 +32,7 @@
         </fieldset>
       </form>
     </div>
-  </div>
-
+    
   {% if next %}
     {% if user.is_authenticated %}
       <div class="toast toast-top toast-center">
