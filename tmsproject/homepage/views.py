@@ -8,7 +8,10 @@ def home(request):
     context = {
         'is_homepage': True,
         'title': None,
-        'content': 'Welcome to the homepage of the TMS project.'
+        'content': {
+            'title': 'Welcome to TMS',
+            'description': 'TMS (Training Management System) is a web-based application designed to help users manage their training logs and related activities.',
+        }
     }
 
     return render(request, 'homepage/index.html', context)
