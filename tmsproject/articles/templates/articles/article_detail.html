@@ -1,8 +1,8 @@
-{% extends 'base.html' %}
+{% extends 'base_with_sidebar.html' %}
 
 {% block title %}{{ article.title }} | {{ my_site_name }} {% endblock %}
 
-{% block content %}
+{% block article %}
 <div>
     <article class="article-detail">
         <h1>{{ article.title }}</h1>
