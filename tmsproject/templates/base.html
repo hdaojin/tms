@@ -5,17 +5,16 @@
   </head>
 
   <body class="flex flex-col min-h-screen">
-    {% if not page.is_homepage %}
-      {% include 'navbar.html' %}
-    {% endif %}
 
-    <main class="flex-1">
-      {% block article %}
-        <!-- Main content goes here -->
-      {% endblock %}
+    <main class="flex-1 flex items-stretch relative">
+      <article class="w-full md:flex-1 overflow-y-auto p-2 md:p-4">
+        {% block article %}
+          <!-- Main content goes here -->
+        {% endblock %}
+      </article>
     </main>
 
-    <footer class="footer footer-center text-neutral-content p-2 absolute bottom-0 z-10 w-full">
+    <footer class="footer footer-center bg-neutral text-neutral-content p-2 absolute bottom-0 z-10 w-full">
       {% include 'footer.html' %}
     </footer>
     {% include 'foot.html' %}
