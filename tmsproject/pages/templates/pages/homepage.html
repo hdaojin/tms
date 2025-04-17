@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block article %}
+    <div class="min-h-screen w-full flex items-center bg-cover bg-center" style="background-image: url('{% static "images/bg-bit.png" %}');">
+      <div id="intro" class="w-full bg-neutral/60 p-6 flex justify-center">
+        <div class="text-neutral-content text-center max-w-2xl">
+          <h1 class="mb-5 text-5xl font-bold">{{ page.title }}</h1>
+          <p class="mb-5">{{ page.content }}</p>
+          <button class="btn glass btn-gradient"><a href="{% url 'accounts:profile' %}">Get Started</a></button>
+        </div>
+      </div>
+    </div>
+{% endblock %}

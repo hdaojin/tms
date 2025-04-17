@@ -1,5 +1,5 @@
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_not_required, login_required
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_not_required
 
 from .forms import CustomUserCreationForm
 
@@ -28,7 +28,7 @@ def account_signup(request):
     })
 
 
-@login_required
+# @login_required
 def account_profile(request):
     return render(request, 'accounts/profile.html', {
         'title': '个人信息',
