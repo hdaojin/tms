@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block left_sidebar %}
-  <div class="pt-4 gap-2 flex flex-col items-center">
+  <div class="gap-2 flex flex-col items-center">
     <ul id="main-menu" class="menu w-full text-center">
       {% for item in main_menu_items %}
         <li>
@@ -17,6 +17,9 @@
       <ul class="menu w-full text-center">
         <li>
           <a href="{% url 'admin:index' %}" class="justify-center">后台管理</a>
+        </li>
+        <li>
+          <a href="{% url 'accounts:generate_invitation' %}" class="justify-center">生成邀请码</a>
         </li>
       </ul>
     {% endif %}

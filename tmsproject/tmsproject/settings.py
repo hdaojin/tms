@@ -178,3 +178,4 @@ MY_SITE_NAME = "ITNSA"
 
 LOGS_DIR = env('LOGS_DIR', default='logs')
 WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目')
+INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=86400)  # 1天,单位为秒
