@@ -3,7 +3,6 @@ from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
 from .models import UserProfile
 
-
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
     can_delete = False
