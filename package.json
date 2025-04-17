@@ -2,13 +2,15 @@
   "dependencies": {
     "@tailwindcss/cli": "^4.0.15",
     "flyonui": "^2.0.1",
-    "tailwindcss": "^4.0.15"
+    "tailwindcss": "^4.0.15",
+    "theme-change": "^2.5.0"
   },
   "devDependencies": {
-    "@tailwindcss/typography": "^0.5.16",
-    "daisyui": "^5.0.9"
+    "@iconify-json/tabler": "^1.2.17",
+    "@iconify/tailwind4": "^1.0.6",
+    "@tailwindcss/typography": "^0.5.16"
   },
   "scripts": {
-    "watch:css": "tailwindcss -i tmsproject/static/css/main.css -o tmsproject/static/css/output.css -w"
+    "watch:css": "npx @tailwindcss/cli -i tmsproject/static/css/main.css -o tmsproject/static/css/output.css -w"
   }
 }
