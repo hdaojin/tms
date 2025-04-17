@@ -1,164 +1,75 @@
 {% load static %}
-<div class="navbar bg-base-100 shadow-sm">
-  <div class="navbar-start">
-    <!-- mobile menu -->
-    <div class="dropdown">
-      <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
-        </svg>
+
+<nav class="navbar shadow-base-300/20 shadow-md bg-no-repeat bg-size-[100%_2px] md:h-15 w-full" style="background-image: url('{% static 'images/navbar-bg.png' %}');">
+  <div class="w-full md:flex md:items-center md:gap-2">
+    <div class="flex items-center justify-between">
+      <div class="navbar-start items-center justify-between max-md:w-full">
+        <img src="{% static 'images/logo.png' %}" alt="Logo" class="size-8 mr-2" />
+        <a class="link text-base-content link-neutral text-xl font-bold no-underline" href="/">{{ my_site_name }}</a>
+        <div class="md:hidden">
+          <button type="button" class="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square" data-collapse="#default-navbar-collapse" aria-controls="default-navbar-collapse" aria-label="Toggle navigation">
+            <span class="icon-[tabler--menu-2] collapse-open:hidden size-4"></span>
+            <span class="icon-[tabler--x] collapse-open:block hidden size-4"></span>
+          </button>
+        </div>
       </div>
-      <ul tabindex="0" class="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow">
-        <li>
-          <a>Item 1</a>
-        </li>
-        <li>
-          <a>Parent</a>
-          <ul class="p-2">
+    </div>
+
+    <div id="default-navbar-collapse" class="md:navbar-end collapse hidden grow basis-full overflow-hidden transition-[height] duration-300 max-md:w-full">
+      <div class="flex items-center max-md:flex-col gap-2">
+        <label class="hidden md:flex cursor-pointer gap-2">
+          <span class="label-text">Light</span>
+          <input type="checkbox" data-toggle-theme="dark,light" class="switch theme-controller" />
+          <span class="label-text">Dark</span>
+        </label>
+
+        <ul class="menu md:menu-horizontal gap-2 p-0 text-base max-md:mt-2">
+          <!-- Add your menu items here -->
+          {% for item in main_menu_items %}
             <li>
-              <a>Submenu 1</a>
+              <a href="{{ item.url }}">{{ item.name }}</a>
+            </li>
+          {% endfor %}
+        </ul>
+
+        <div class="dropdown relative inline-flex [--auto-close:inside] [--offset:8] [--placement:bottom-end]">
+          <button id="dropdown-scrollable" type="button" class="dropdown-toggle flex items-center" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+            <div class="avatar">
+              <div class="size-9.5 rounded-full">
+                <img src="{% static 'images/avatar.png' %}" alt="avatar 1" />
+              </div>
+            </div>
+          </button>
+          <ul class="dropdown-menu dropdown-open:opacity-100 hidden min-w-60" role="menu" aria-orientation="vertical" aria-labelledby="dropdown-avatar">
+            <li class="dropdown-header gap-2">
+              <div class="avatar">
+                <div class="w-10 rounded-full">
+                  <img src="{% static 'images/avatar.png' %}" alt="avatar" />
+                </div>
+              </div>
+              <div>
+                <h6 class="text-base-content text-base font-semibold">{{ user.first_name }}</h6>
+                <small class="text-base-content/50">{{ user.groups.all.0.name }}</small>
+              </div>
             </li>
             <li>
-              <a>Submenu 2</a>
+              <a class="dropdown-item" href="{% url 'accounts:profile' %}">
+                <span class="icon-[tabler--user]"></span>
+                用户信息
+              </a>
+            </li>
+            <li class="dropdown-footer gap-2">
+              <form method="post" action="{% url 'accounts:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-error btn-soft btn-block">
+                  <span class="icon-[tabler--logout]"></span>
+                  注销
+                </button>
+              </form>
             </li>
           </ul>
-        </li>
-        <li>
-          <a>Item 3</a>
-        </li>
-      </ul>
-    </div>
-    <!-- mobile menu end -->
-
-    <!-- logo -->
-    <a class="flex-1 lg:flex-none btn btn-ghost text-xl" href="{% url 'home' %}">
-      <img src="{% static 'images/computer-laptop-color-icon.png' %}" alt="Logo" class="inline-block mr-2 h-8 w-8" />
-      {{ my_site_name }}
-    </a>
-  </div>
-  <!-- logo end -->
-
-  <!-- 用户菜单 -->
-  {% if user.is_authenticated %}
-    <div class="navbar-center hidden lg:flex">
-      <ul class="menu menu-horizontal px-1">
-        <li>
-          <a href="{% url 'traininglogs:list_training_logs' %}">训练日志</a>
-        </li>
-        <li>
-          <details>
-            <summary>Parent</summary>
-            <ul class="p-2">
-              <li>
-                <a>Submenu 1</a>
-              </li>
-              <li>
-                <a>Submenu 2</a>
-              </li>
-            </ul>
-          </details>
-        </li>
-        <li>
-          <a>Item 3</a>
-        </li>
-      </ul>
-    </div>
-  {% endif %}
-
-  <div class="navbar-end">
-    <!-- right menu -->
-    <!-- theme switch -->
-    <label class="toggle text-base-content mx-2">
-      <input type="checkbox" value="dark" class="theme-controller" />
-
-      <svg aria-label="sun" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-        <g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor">
-          <circle cx="12" cy="12" r="4"></circle>
-          <path d="M12 2v2"></path>
-          <path d="M12 20v2"></path>
-          <path d="m4.93 4.93 1.41 1.41"></path>
-          <path d="m17.66 17.66 1.41 1.41"></path>
-          <path d="M2 12h2"></path>
-          <path d="M20 12h2"></path>
-          <path d="m6.34 17.66-1.41 1.41"></path>
-          <path d="m19.07 4.93-1.41 1.41"></path>
-        </g>
-      </svg>
-
-      <svg aria-label="moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-        <g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor">
-          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
-        </g>
-      </svg>
-    </label>
-    <!-- theme switch end -->
-
-    <!-- user menu -->
-  {% if user.is_authenticated %}
-    <div class="dropdown dropdown-bottom dropdown-end">
-      <div tabindex="0" role="button" class="btn btn-ghost rounded-field">
-        <div class="avatar">
-          <div class="w-8 rounded-full">
-            <img alt="User avatar" src="{% static 'images/user_avatar.png' %}" />
-          </div>
         </div>
-        {{ user.first_name }}⬇️
-      </div>
-
-      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-1 mt-4 w-44 p-2 shadow-sm">
-        <li>
-          <a href="{% url 'accounts:profile' %}">用户信息</a>
-        </li>
-
-        <li>
-          <form action="{% url 'accounts:logout' %}" method="post">
-            {% csrf_token %}
-            <button type="submit" value="logout" class="w-28 text-left">注销</button>
-          </form>
-        </li>
-      </ul>
-    </div>
-    {% else %}
-      <a href="{% url 'accounts:login' %}" class="btn">登录</a>
-    {% endif %}
-    <!-- user menu end -->
-  </div>
-  <!-- right menu end -->
-</div>
-
-<!--      
-   
-    {% comment %}用户菜单{% endcomment %}
-    <div class="flex gap-2">
-      {% comment %} <input type="text" placeholder="Search" class="input input-bordered w-24 md:w-auto" /> {% endcomment %}
-      <div class="dropdown dropdown-end">
-        <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
-          <div class="w-10 rounded-full">
-            <img alt="Tailwind CSS Navbar component" src="{% static 'images/user_avatar.png' %}" />
-          </div>
-        </div>
-        <ul tabindex="0" class="menu menu-sm dropdown-content bg-neutral-800 rounded-box z-1 mt-3 w-32 p-2 shadow">
-          <li>
-            <a class="justify-between" href="{% url 'accounts:profile' %}" >Profile</a>
-          </li>
-          {% if user.is_staff %}
-            <li>
-              <a href="{% url 'admin:index' %}">管理后台</a>
-            </li>
-          {% endif %}
-          <li>
-            <form action="{% url 'accounts:logout' %}" method="post">
-              {% csrf_token %}
-              <button type="submit" class="badge">注销</button>
-            </form>
-          </li>
-        </ul>
       </div>
     </div>
-    {% comment %}用户菜单{% endcomment %}
-  {% comment %} {% else %}
-    <div class="flex gap-2">
-      <a href="{% url 'accounts:login' %}" class="btn btn-primary">登录</a>
-    </div> {% endcomment %}
-</div>
-      -->
+  </div>
+</nav>

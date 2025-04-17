@@ -1,0 +1,17 @@
+{% load static %}
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<link rel="icon" type="image/png" href="{% static 'images/computer-laptop-color-icon.png' %}" />
+<title>
+  {% if title %}
+    {{ title }} | {{ my_site_name }}
+  {% else %}
+    {% block title %}
+      {{ my_site_name }}
+    {% endblock %}
+  {% endif %}
+</title>
+<!-- 引入CSS文件 -->
+<link rel="stylesheet" href="{% static 'css/output.css' %}" />
+{% block extra_css %}
+{% endblock %}

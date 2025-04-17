@@ -33,6 +33,7 @@ uv sync
 npm install tailwindcss @tailwindcss/cli
 npm install -D daisyui@latest
 npm install -D @tailwindcss/typography
+cp .\node_modules\flyonui\flyonui.js  .\tmsproject\static\js\flyonui.js
 ```
 
 ### Migrate database
