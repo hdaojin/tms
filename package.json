@@ -10,6 +10,6 @@
     "@tailwindcss/typography": "^0.5.16"
   },
   "scripts": {
-    "watch:css": "npx @tailwindcss/cli -i tmsproject/static/css/main.css -o tmsproject/static/css/output.css -w"
+    "watch:css": "npx @tailwindcss/cli -i static/css/main.css -o static/css/output.css -w"
   }
 }

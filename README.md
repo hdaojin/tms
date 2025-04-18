@@ -30,15 +30,13 @@ git clone  git@github.com:hdaojin/tms.git
 ```bash
 cd tms
 uv sync
-npm install tailwindcss @tailwindcss/cli
-npm install -D daisyui@latest
-npm install -D @tailwindcss/typography
-cp .\node_modules\flyonui\flyonui.js  .\tmsproject\static\js\flyonui.js
+npm install
+# Optional: Copy flyonui.js to static/js directory
+cp node_modules/flyonui/flyonui.js static/js
 ```
 
 ### Migrate database
 ```bash
-cd tmsproject
 cp .env.example .env
 uv run manage.py migrate
 ```
@@ -48,16 +46,15 @@ uv run manage.py migrate
 uv run manage.py createsuperuser
 ```
 
-### Run the tailwindcss
-```bash
-# In the tmsproject directory
-npx @tailwindcss/cli -i static/css/input.css -o static/css/output.css --watch
-```
-
 ### Run the development server
 ```bash
 # In the tmsproject directory
 uv run manage.py runserver
+```
+
+### Run the tailwindcss
+```bash
+npm run watch:css
 ```
 
 ### Access the development server

@@ -1,0 +1,26 @@
+{% extends 'base_no_header_sidebar_footer.html' %}
+
+{% block body %}
+  <main class="min-h-screen w-full relative">
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full md:w-96">
+      <div class="alert alert-soft alert-success flex items-start gap-4">
+        <span class="icon-[tabler--check] shrink-0 size-6"></span>
+        <div class="flex flex-col gap-1">
+          <h2 class="text-lg font-semibold">注册成功！</h2>
+          <p>
+            欢迎 <span class="text-base-content">{{ user.username }}</span> 加入我们！请等待管理员激活后才能登录您的账户。
+          </p>
+        </div>
+      </div>
+      <div class="text-center mt-4">
+        <p>
+          已有账号? <a href="{% url 'accounts:login' %}" class="link link-accent mt-2">立即登录</a>
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <footer class="footer footer-center bg-base-300/15 p-2 absolute bottom-0 z-10">
+    {% include 'footer.html' %}
+  </footer>
+{% endblock %}
