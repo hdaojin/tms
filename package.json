@@ -2,8 +2,7 @@
   "dependencies": {
     "@tailwindcss/cli": "^4.0.15",
     "flyonui": "^2.0.1",
-    "tailwindcss": "^4.0.15",
-    "theme-change": "^2.5.0"
+    "tailwindcss": "^4.0.15"
   },
   "devDependencies": {
     "@iconify-json/tabler": "^1.2.17",
