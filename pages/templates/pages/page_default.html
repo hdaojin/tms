@@ -1,0 +1,14 @@
+{% extends 'base_default.html' %}
+
+{% block left_sidebar %}
+
+About
+
+{% endblock left_sidebar %}
+
+{% block article %}
+  <div class="p-4">
+    <h1 class="mb-4">{{ page.title }}</h1>
+    <div>{{ page.content|safe|linebreaks }}</div>
+  </div>
+{% endblock %}

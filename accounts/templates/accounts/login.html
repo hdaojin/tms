@@ -1,0 +1,67 @@
+{% extends 'base_no_header_sidebar_footer.html' %}
+{% load static %}
+
+{% block body %}
+  <main class="min-h-screen w-full relative">
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 md:w-96">
+      {% if form.errors %}
+        <div class="alert alert-error flex items-center gap-4 mb-2" role="alert">
+          <span class="icon-[tabler--alert-triangle] shrink-0 size-6"></span>
+          <p>
+            <span class="text-lg font-semibold">Oops!:</span>你的用户名和密码不匹配，请重试。
+          </p>
+        </div>
+      {% endif %}
+
+      <form method="post" action="{% url 'accounts:login' %}">
+        {% csrf_token %}
+        <fieldset class="fieldset border border-base-200 p-4 rounded-box shadow-2xl">
+          <legend class="fieldset-legend">登录</legend>
+
+          {% for field in form %}
+            {% if field.errors %}
+              <div class="alert alert-error alert-outline border-dashed mt-2 p-2 text-xs" role="alert">{{ field.errors }}</div>
+            {% endif %}
+            <label class="label-text" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {% comment %} <input type="{{ field.field.widget.input_type }}" class="input" name="{{ field.html_name }}" placeholder="{{ field.label }}" required /> {% endcomment %}
+            {% comment %} <input placeholder="{{ field.label }}" class="input mb-2" name="{{ field.html_name }}" id="labelAndHelperText" required /> {% endcomment %}
+            <div class="input mb-2">{{ field }}</div>
+
+            {% if field.help_text %}
+              <span class="helper-text" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</span>
+            {% endif %}
+          {% endfor %}
+
+          <button class="btn btn-accent mt-2" type="submit" value="login">登录</button>
+          <button class="btn btn-neutral mt-2 ml-2" type="reset">重置</button>
+          <input type="hidden" name="next" value="{{ next }}" />
+        </fieldset>
+      </form>
+      <div class="text-center mt-2">
+        <p>
+          还没有账户? <a href="{% url 'accounts:signup' %}" class="link link-accent mt-4">立即注册</a>
+        </p>
+      </div>
+    </div>
+
+    {% if next %}
+      {% if user.is_authenticated %}
+        <div class="absolute top-24 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full md:w-96">
+          <div class="alert alert-soft alert-warning" role="alert">
+            <span>你的账户没有访问此页面的权限。请登录具有访问权限的账户。</span>
+          </div>
+        </div>
+      {% else %}
+        <div class="absolute top-24 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full md:w-96">
+          <div class="alert alert-soft alert-warning" role="alert">
+            <span>请登录以查看此页面。</span>
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+  </main>
+
+  <footer class="footer footer-center bg-base-300/15 p-2  absolute bottom-0 z-10">
+    {% include 'footer.html' %}
+  </footer>
+{% endblock %}
