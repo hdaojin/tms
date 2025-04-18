@@ -1,0 +1,23 @@
+{% extends 'base_default.html' %}
+
+{% block title %}文章列表 | {{ my_site_name }}{% endblock %}
+
+{% block article %}
+<div class="article-list">
+    {% for article in articles %}
+        <article class="article-summary">
+            <h2><a href="{% url 'articles:detail' article.slug %}">{{ article.title }}</a></h2>
+            <div class="article-meta">
+                <span>作者: {{ article.author }}</span>
+                <span>发布时间: {{ article.publish_date|date:"Y-m-d H:i" }}</span>
+            </div>
+            <!-- 可选：显示文章摘要 -->
+            <div class="article-excerpt">
+                {{ article.content|truncatewords:50 }}
+            </div>
+        </article>
+    {% empty %}
+        <p>没有文章。</p>
+    {% endfor %}
+</div>
+{% endblock %}
