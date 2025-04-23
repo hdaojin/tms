@@ -17,7 +17,9 @@ class TrainingLogUploadForm(forms.ModelForm):
         upload = cleaned_data.get('upload')
         training_date = cleaned_data.get('training_date')
         
-        # 验证训练日期不能大于当前日期
+        # 验证训练日期不能大于当前日期,且必须是在当前月份
+        if training_date and training_date.month != datetime.date.today().month:
+            raise ValidationError({"training_date": "训练日期必须在当前月份"})
         if training_date and training_date > datetime.date.today():
             raise ValidationError({"training_date": "训练日期不能大于当前日期"})
             
