@@ -5,6 +5,7 @@ from datetime import date
 
 from skills.models import Module
 
+
 # Create your models here.
 # 训练日志上传存储模型
 class TrainingLog(models.Model):
