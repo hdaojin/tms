@@ -1,0 +1,45 @@
+<div class="w-full overflow-x-auto">
+  <table class="table">
+    <thead>
+      <tr>
+        <th>序号</th>
+        <th>姓名</th>
+        <th>角色</th>
+        <th>训练日期</th>
+        <th>训练模块</th>
+        <th>训练任务</th>
+        <th>日志文件</th>
+        <th>上传时间</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% if training_logs %}
+        {% for log in training_logs %}
+          <tr class="row-hover">
+            <td>{{ forloop.counter }}</td>
+            <td>{{ log.uploaded_by.first_name }}</td>
+            <td>{{ log.uploaded_by.groups.first.name }}</td>
+            <td>{{ log.training_date|date:'Y-m-d' }}</td>
+            <td>{{ log.module.name }}</td>
+            <td>{{ log.task }}</td>
+            <td>
+              <a href="{% url 'traininglogs:view_training_log' log.id %}" class="text-blue-500 hover:underline" target="_blank">{{ log.filename }}</a>
+            </td>
+            <td>{{ log.uploaded_at|date:'Y-m-d H:i:s' }}</td>
+            <td>
+              <a href="{% url 'traininglogs:view_training_log' log.id %}" class="btn btn-sm btn-info" target="_blank">查看</a>
+              {% if log.uploaded_by == user %}
+                <a href="{% url 'traininglogs:delete_training_log' log.id %}" class="btn btn-sm btn-danger ml-2" onclick="return confirm('确定要删除这条训练日志记录吗（会同时删除相应的文件）?')">删除</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr class="row-hover">
+          <td colspan="9" class="text-center py-4">暂无训练日志记录</td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>

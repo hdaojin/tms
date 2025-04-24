@@ -85,7 +85,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 # 自定义上下文处理器
-                'libs.context_processors.custom_context',
+                'tmsproject.context_processors.custom_context',
             ],
         },
     },
