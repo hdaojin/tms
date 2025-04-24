@@ -1,10 +1,8 @@
 {% extends 'base_default.html' %}
 
 {% block left_sidebar %}
-
-About
-
-{% endblock left_sidebar %}
+  {% include 'menu.html' with menu_items=page_menu_items show_divider=True %}
+{% endblock %}
 
 {% block article %}
   <div class="p-4">

@@ -2,6 +2,10 @@
 
 {% block title %}{{ article.title }} | {{ my_site_name }} {% endblock %}
 
+{% block left_sidebar %}
+    {% include 'menu.html' with menu_items=article_menu_items show_divider=True %}
+{% endblock left_sidebar %}
+
 {% block article %}
 <div>
     <article class="article-detail">

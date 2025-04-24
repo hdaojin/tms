@@ -3,28 +3,7 @@
 {% load static %}
 
 {% block left_sidebar %}
-  <div class="gap-2 flex flex-col items-center">
-    <ul id="main-menu" class="menu w-full text-center">
-      {% for item in main_menu_items %}
-        <li>
-          <a href="{{ item.url }}" class="justify-center">{{ item.name }}</a>
-        </li>
-      {% endfor %}
-    </ul>
-
-    {% if user.is_superuser %}
-      <div class="divider"></div>
-      <ul class="menu w-full text-center">
-        <li>
-          <a href="{% url 'admin:index' %}" class="justify-center">后台管理</a>
-        </li>
-        <li>
-          <a href="{% url 'accounts:generate_invitation' %}" class="justify-center">生成邀请码</a>
-        </li>
-      </ul>
-    {% endif %}
-    <div class="divider"></div>
-  </div>
+  {% include 'menu.html' with menu_items=user_menu_items show_divider=True %}
 {% endblock %}
 
 {% block article %}

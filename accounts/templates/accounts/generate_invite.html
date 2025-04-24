@@ -1,13 +1,19 @@
 {% extends 'base_default.html' %}
 
+{% block left_sidebar %}
+
+{% include 'menu.html' with menu_items=user_menu_items show_divider=True %}
+
+{% endblock left_sidebar %}
+
 {% block article %}
 <div class="p-4">
   <h1 class="text-2xl font-bold">{{ title }}</h1>
   <div class="mt-4">
-    <p>请将以下邀请码提供给注册用户：</p>
+    <p>请将以下邀请码提供给需要注册的用户：</p>
     <div class="flex items-center mt-2">
-      <input type="text" readonly value="{{ code }}" class="flex-1 p-2 border rounded bg-gray-100" />
-      <button id="copyBtn" class="ml-2 btn btn-sm btn-outline">复制</button>
+      <input type="text" readonly value="{{ code }}" class="flex-1 p-2 border rounded" id="inviteCode" />
+      <button id="copyBtn" class="ml-2 btn btn-info">复制</button>
     </div>
   </div>
 </div>

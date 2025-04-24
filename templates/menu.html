@@ -1,0 +1,15 @@
+{% comment %} <div class="gap-2 flex flex-col items-center"> {% endcomment %}
+  <ul id="main-menu" class="menu w-full text-center">
+    {% for item in menu_items %}
+      {% with url_length=item.url|length %}
+        <li {% if item.url == '/' and current_path == '/' %}class="active"
+            {% elif item.url != '/' and current_path|slice:":url_length" == item.url %}class="active"{% endif %}>
+          <a href="{{ item.url }}" class="justify-center">{{ item.name }}</a>
+        </li>
+      {% endwith %}
+    {% endfor %}
+  </ul>
+  {% if show_divider %}
+  <div class="divider py-2"></div>
+  {% endif %}
+{% comment %} </div> {% endcomment %}

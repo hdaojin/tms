@@ -7,7 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.contrib import messages
 from django.core.files.base import ContentFile
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.utils import timezone
 from django.http import FileResponse
@@ -80,10 +80,10 @@ def view_training_log(request, log_id):
                 messages.error(request, '没有上传文件或文件路径无效!')
         else:
             messages.error(request, '只能下载自己上传的训练日志!')
-        return redirect('traininglogs:list_trainig_logs')
+        return redirect('traininglogs:list_training_logs')
     except Exception as e:
         messages.error(request, f'下载日志时发生错误: {str(e)}')
-        return redirect('traininglogs:list_trainig_logs')
+        return redirect('traininglogs:list_training_logs')
 
 
 @login_required
@@ -185,5 +185,46 @@ def training_log_statistics(request):
     }
     
     return render(request, 'traininglogs/training_log_statistics.html', context)
+
+
+@login_required
+def athlete_logs(request):
+    # 判断用户是否为教练
+    coach_group = Group.objects.filter(name='教练').first()
+    if not coach_group or not request.user.groups.filter(id=coach_group.id).exists():
+        messages.error(request, '您没有权限查看选手日志!')
+        return redirect('traininglogs:list_training_logs')
+    
+    # 获取所有选手
+    player_group = Group.objects.filter(name='选手').first()
+    if not player_group:
+        players = []
+    else:
+        players = User.objects.filter(groups__id=player_group.id).order_by('first_name')
+    
+    # 获取指定选手的日志，如果没有选择则获取所有选手的日志
+    player_id = request.GET.get('player_id')
+    
+    if player_id:
+        try:
+            selected_player = User.objects.get(id=player_id)
+            training_logs = TrainingLog.objects.filter(uploaded_by=selected_player).order_by('-training_date')
+            title = f'训练日志列表 - {selected_player.first_name}的日志'
+        except User.DoesNotExist:
+            messages.error(request, '选择的选手不存在!')
+            training_logs = TrainingLog.objects.filter(uploaded_by__groups__id=player_group.id).order_by('-training_date')
+            title = '训练日志列表 - 所有选手日志'
+    else:
+        training_logs = TrainingLog.objects.filter(uploaded_by__groups__id=player_group.id).order_by('-training_date')
+        title = '训练日志列表 - 所有选手日志'
+    
+    context = {
+        'title': title,
+        'training_logs': training_logs,
+        'players': players,
+        'selected_player_id': int(player_id) if player_id and player_id.isdigit() else None,
+    }
+    
+    return render(request, 'traininglogs/athlete_logs.html', context)
 
 
