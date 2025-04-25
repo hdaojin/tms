@@ -12,7 +12,12 @@ def homepage(request):
     
     homepage = Page.objects.filter(slug="index").first()
     if not homepage:
-        homepage = Page(title="Welcome", content="This is the homepage.", template=Page.TEMPLATE_CHOICES[0][2])
+        homepage = Page(
+                        title="Welcome to the TMS",
+                        slug="index",
+                        content="TMS is a Training Management System.",
+                        template="no_header_sidebar_footer"
+                        )
     
     tpl_name = f"pages/page_{homepage.template}.html"
     return render(request, tpl_name, {"page": homepage, "title": homepage.title})
