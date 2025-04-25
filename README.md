@@ -4,7 +4,7 @@
 
 Training Management System (TMS) is a web application that helps organizations manage their competition training programs.
 
-It is built using Django, Tailwind CSS, DaisyUI, HTMX, and more.
+It is built using Django, Tailwind CSS, ~~DaisyUI~~, FlyonUI, HTMX, and more.
 
 ## Features
 

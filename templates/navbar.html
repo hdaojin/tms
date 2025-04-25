@@ -41,7 +41,7 @@
             </div>
             <div>
               <p class="text-sm text-warning">
-                欢迎，<span class="underline decoration-sky-500 decoration-dashed underline-offset-6">{{ user.first_name }}</span>
+                欢迎您，<span class="underline decoration-sky-500 decoration-dashed underline-offset-6">{% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}</span>
               </p>
             </div>
           </button>
@@ -53,7 +53,7 @@
                 </div>
               </div>
               <div>
-                <h6 class="text-base-content text-base font-semibold">{{ user.first_name }}</h6>
+                <h6 class="text-base-content text-base font-semibold">{% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}</h6>
                 <small class="text-base-content/50">{{ user.groups.all.0.name }}</small>
               </div>
             </li>
