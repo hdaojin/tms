@@ -1,12 +1,12 @@
 {% load static %}
 
-<nav class="navbar shadow-base-300/20 shadow-md bg-no-repeat bg-size-[100%_2px] md:h-15 w-full" style="background-image: url('{% static 'images/navbar-bg.png' %}');">
-  <div class="w-full md:flex md:items-center md:gap-2">
+<nav class="navbar shadow-base-300/20 shadow-md bg-no-repeat bg-size-[100%_2px] sm:h-15 w-full" style="background-image: url('{% static 'images/navbar-bg.png' %}');">
+  <div class="w-full sm:flex sm:items-center sm:gap-2">
     <div class="flex items-center justify-between">
-      <div class="navbar-start items-center justify-between max-md:w-full">
+      <div class="navbar-start items-center justify-between max-sm:w-full">
         <img src="{% static 'images/logo.png' %}" alt="Logo" class="size-8 mr-2" />
         <a class="link text-base-content link-neutral text-xl font-bold no-underline" href="/">{{ my_site_name }}</a>
-        <div class="md:hidden">
+        <div class="sm:hidden">
           <button type="button" class="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square" data-collapse="#default-navbar-collapse" aria-controls="default-navbar-collapse" aria-label="Toggle navigation">
             <span class="icon-[tabler--menu-2] collapse-open:hidden size-4"></span>
             <span class="icon-[tabler--x] collapse-open:block hidden size-4"></span>
@@ -15,15 +15,15 @@
       </div>
     </div>
 
-    <div id="default-navbar-collapse" class="md:navbar-end collapse hidden grow basis-full overflow-hidden transition-[height] duration-300 max-md:w-full">
-      <div class="flex items-center max-md:flex-col gap-2">
-        <label class="hidden md:flex cursor-pointer gap-2">
+    <div id="default-navbar-collapse" class="sm:navbar-end collapse hidden grow basis-full overflow-hidden transition-[height] duration-300 max-sm:w-full">
+      <div class="flex items-center max-sm:flex-col gap-2">
+        <label class="hidden sm:flex cursor-pointer gap-2">
           <span class="label-text">Light</span>
           <input type="checkbox" value="dark" class="switch theme-controller" />
           <span class="label-text">Dark</span>
         </label>
 
-        <ul class="menu md:menu-horizontal gap-2 p-0 text-base max-md:mt-2">
+        <ul class="menu sm:menu-horizontal gap-1 p-0 text-base max-sm:mt-2">
           <!-- Add your menu items here -->
           {% for item in main_menu_items %}
             <li>
@@ -63,6 +63,14 @@
                 用户信息
               </a>
             </li>
+            {% if user.is_superuser %}
+              <li>
+                <a class="dropdown-item" href="{% url 'admin:index' %}">
+                  <span class="icon-[tabler--settings]"></span>
+                  后台管理
+                </a>
+              </li>
+            {% endif %}
             <li class="dropdown-footer gap-2">
               <form method="post" action="{% url 'accounts:logout' %}">
                 {% csrf_token %}
