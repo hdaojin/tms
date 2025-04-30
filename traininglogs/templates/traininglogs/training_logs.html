@@ -7,13 +7,7 @@
 {% block article %}
   <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
 
-  <div class="mb-3">
-    <a href="{% url 'traininglogs:training_log_statistics' %}" class="btn btn-info"><i class="fas fa-chart-bar"></i> 日志统计</a>
-  </div>
 
   {% include 'traininglogs/training_log_table.html' %}
 
-  <div class="mt-4">
-    <a href="{% url 'traininglogs:upload_training_log' %}" class="btn btn-primary">上传新日志</a>
-  </div>
 {% endblock %}
