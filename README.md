@@ -4,7 +4,7 @@
 
 Training Management System (TMS) is a web application that helps organizations manage their competition training programs.
 
-It is built using Django, Tailwind CSS, DaisyUI, HTMX, and more.
+It is built using Django, TailwindCSS, FlyonUI, HTMX, and more.
 
 ## Features
 
@@ -31,13 +31,12 @@ git clone  git@github.com:hdaojin/tms.git
 cd tms
 uv sync
 npm install tailwindcss @tailwindcss/cli
-npm install -D daisyui@latest
+npm install -D flyonui@latest
 npm install -D @tailwindcss/typography
 ```
 
 ### Migrate database
 ```bash
-cd tmsproject
 cp .env.example .env
 uv run manage.py migrate
 ```
@@ -49,13 +48,11 @@ uv run manage.py createsuperuser
 
 ### Run the tailwindcss
 ```bash
-# In the tmsproject directory
-npx @tailwindcss/cli -i static/css/input.css -o static/css/output.css --watch
+npm run watch:css
 ```
 
 ### Run the development server
 ```bash
-# In the tmsproject directory
 uv run manage.py runserver
 ```
 
