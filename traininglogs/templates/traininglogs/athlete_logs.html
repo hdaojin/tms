@@ -1,8 +1,8 @@
 {% extends 'base.html' %}
 
 {% block left_sidebar %}
-{% include 'traininglogs/left_sidebar.html' %}
-{% endblock left_sidebar %}
+  {% include 'menu.html' with menu_items=custom_menus.training_log_menu_items show_divider=True %}
+{% endblock %}
 
 {% block main %}
   <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>

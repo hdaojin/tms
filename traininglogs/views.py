@@ -58,9 +58,57 @@ def upload_training_log(request):
 
 @login_required
 def training_logs(request):
-    training_logs = TrainingLog.objects.filter(uploaded_by=request.user).order_by('-training_date')
-    title = '训练日志列表 - 我的日志'
-    return render(request, 'traininglogs/training_logs.html', {'title': title, 'right_sidebar': True, 'training_logs': training_logs})
+    # 获取请求中的年份和月份参数，如果没有则使用当前年月
+    selected_year = int(request.GET.get('year', timezone.now().year))
+    selected_month = int(request.GET.get('month', timezone.now().month))
+    
+    # 创建所选月份的开始和结束日期
+    start_date = date(selected_year, selected_month, 1)
+    _, last_day = calendar.monthrange(selected_year, selected_month)
+    end_date = date(selected_year, selected_month, last_day)
+    
+    # 过滤当前用户在选定月份范围内的训练日志
+    training_logs = TrainingLog.objects.filter(
+        uploaded_by=request.user,
+        training_date__gte=start_date,
+        training_date__lte=end_date
+    ).order_by('-training_date')
+    
+    title = f'训练日志列表 - 我的日志 ({selected_year}年{selected_month}月)'
+    
+    # 准备月份选择器的数据，显示最近1年到当前月
+    months = []
+    current_date = timezone.now().date()
+    
+    # 从当前月开始，往前推12个月
+    for i in range(13):  # 当前月份及往前12个月，共13个月
+        # 计算年和月
+        year = current_date.year
+        month = current_date.month - i
+        
+        # 处理月份为负数的情况
+        while month <= 0:
+            month += 12
+            year -= 1
+            
+        months.append({
+            'year': year,
+            'month': month,
+            'name': f"{year}年{month}月"
+        })
+    
+    # 按照时间排序，最新的月份在最前面
+    months.sort(key=lambda x: (x['year'], x['month']), reverse=True)
+    
+    context = {
+        'title': title,
+        'training_logs': training_logs,
+        'months': months,
+        'selected_year': selected_year,
+        'selected_month': selected_month,
+    }
+    
+    return render(request, 'traininglogs/training_logs.html', context)
 
 
 @login_required
@@ -105,27 +153,44 @@ def delete_training_log(request, log_id):
 
 @login_required
 def training_log_statistics(request):
-    # 获取请求中的月份参数，如果没有则使用当前月份
+    # 获取请求中的年份和月份参数，如果没有则使用当前年月
     selected_year = int(request.GET.get('year', timezone.now().year))
     selected_month = int(request.GET.get('month', timezone.now().month))
     
     # 创建所选月份的开始和结束日期
     start_date = date(selected_year, selected_month, 1)
     _, last_day = calendar.monthrange(selected_year, selected_month)
-    end_date = date(selected_year, selected_month, last_day)
+    # _，的作用是忽略返回的第一个值，计算该月份的最后一天
     
-    # 获取所有教练和选手
-    coaches = User.objects.filter(groups__name='教练').distinct()
+    # 如果是当前月份，则只统计到当前日期
+    current_now = timezone.now().date()
+    if selected_year == current_now.year and selected_month == current_now.month:
+        end_date = current_now
+    else:
+        end_date = date(selected_year, selected_month, last_day)      
+    
+    # 获取所有需要提交日志的教练和选手（排除 profile.submission_training_log=False 的用户）
+    # 获取教练：包括没有个人资料的或个人资料中submission_training_log=True的
+    coaches = User.objects.filter(
+        groups__name='教练'
+    ).exclude(
+        profile__submission_training_log=False
+    ).distinct()
     coach_ids = set(coaches.values_list('id', flat=True))
     
-    players = User.objects.filter(groups__name='选手').distinct()
+    # 获取选手：包括没有个人资料的或个人资料中submission_training_log=True的
+    players = User.objects.filter(
+        groups__name='选手'
+    ).exclude(
+        profile__submission_training_log=False
+    ).distinct()
     player_ids = set(players.values_list('id', flat=True))
     
     # 获取用户ID到用户对象的映射
     all_users = User.objects.filter(Q(id__in=coach_ids) | Q(id__in=player_ids))
     user_map = {user.id: user for user in all_users}
     
-    # 获取该月份的所有日志提交情况
+    # 获取该月份的所有有效日志提交情况
     logs = TrainingLog.objects.filter(
         training_date__gte=start_date,
         training_date__lte=end_date
@@ -141,9 +206,9 @@ def training_log_statistics(request):
             date_to_users[log_date] = set()
         date_to_users[log_date].add(user_id)
     
-    # 按日期统计
+    # 按日期统计，只统计到当前日期或月末
     daily_stats = {}
-    for day in range(1, last_day + 1):
+    for day in range(1, end_date.day + 1):  # 如果是当前月，只统计到当前日期
         current_date = date(selected_year, selected_month, day)
         submitted_user_ids = date_to_users.get(current_date, set())
         
@@ -159,26 +224,45 @@ def training_log_statistics(request):
         unsubmitted_player_ids = player_ids - submitted_user_ids
         unsubmitted_players = [user_map[uid] for uid in unsubmitted_player_ids if uid in user_map]
         
+        # 添加是否为星期日的标记
+        is_sunday = current_date.weekday() == 6  # Python中0是星期一，6是星期日
+        
         daily_stats[current_date] = {
             'submitted_coaches': submitted_coaches,
             'submitted_players': submitted_players,
             'unsubmitted_players': unsubmitted_players,
+            'is_sunday': is_sunday,
         }
     
-    # 准备月份选择器的数据
+    # 准备月份选择器的数据，显示最近1年到当前月
     months = []
-    current_year = timezone.now().year
-    for year in range(current_year - 1, current_year +1):
-        for month in range(1, 13):
-            months.append({
-                'year': year,
-                'month': month,
-                'name': f"{year}年{month}月"
-            })
+    current_date = timezone.now().date()
+    
+    # 从当前月开始，往前推12个月
+    for i in range(13):  # 当前月份及往前12个月，共13个月
+        # 计算年和月
+        year = current_date.year
+        month = current_date.month - i
+        
+        # 处理月份为负数的情况
+        while month <= 0:
+            month += 12
+            year -= 1
+            
+        months.append({
+            'year': year,
+            'month': month,
+            'name': f"{year}年{month}月"
+        })
+    
+    # 按照时间排序，最新的月份在最前面
+    months.sort(key=lambda x: (x['year'], x['month']), reverse=True)
+      # 对日期进行排序
+    sorted_daily_stats = dict(sorted(daily_stats.items()))
     
     context = {
         'title': f"{selected_year}年{selected_month}月训练日志统计",
-        'daily_stats': daily_stats,
+        'daily_stats': sorted_daily_stats,
         'months': months,
         'selected_year': selected_year,
         'selected_month': selected_month,
