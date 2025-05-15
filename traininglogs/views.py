@@ -60,7 +60,7 @@ def upload_training_log(request):
 def training_logs(request):
     training_logs = TrainingLog.objects.filter(uploaded_by=request.user).order_by('-training_date')
     title = '训练日志列表 - 我的日志'
-    return render(request, 'traininglogs/training_logs.html', {'title': title, 'training_logs': training_logs})
+    return render(request, 'traininglogs/training_logs.html', {'title': title, 'right_sidebar': True, 'training_logs': training_logs})
 
 
 @login_required

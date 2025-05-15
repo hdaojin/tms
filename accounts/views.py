@@ -7,6 +7,13 @@ from .utils import generate_invitation_code
 def superuser_required(view_func):
     return user_passes_test(lambda u: u.is_superuser)(view_func)
 
+template_layout = {
+    "header": False,
+    "main": True,
+    "left_sidebar": False,
+    "right_sidebar": False,
+    "footer": True,
+}
 
 @login_not_required
 def account_signup(request):
@@ -30,6 +37,7 @@ def account_signup(request):
     return render(request, 'accounts/signup.html', {
         'form': form,
         'title': "注册",
+        'template_layout': template_layout,
     })
 
 
