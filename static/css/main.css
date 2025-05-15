@@ -7,6 +7,7 @@
 @import "tailwindcss";
 @plugin "flyonui";
 @plugin "@iconify/tailwind4";
+@plugin "tailwindcss-jun-layout";
 @import "flyonui/variants.css";
 @source "./node_modules/flyonui/flyonui.js"; 
 

@@ -20,7 +20,8 @@ base_training_log_menu_items = [
 coach_training_log_menu_items = [
     {
         "name": "选手日志",
-        "url": reverse("traininglogs:athlete_logs"),
+        # "url": reverse("traininglogs:athlete_logs"),
+        "url": "#",
     }
 ]
 

@@ -2,14 +2,14 @@
   <ul id="main-menu" class="menu w-full text-center">
     {% for item in menu_items %}
       {% with url_length=item.url|length %}
-        <li {% if item.url == '/' and current_path == '/' %}class="active"
-            {% elif item.url != '/' and current_path|slice:":url_length" == item.url %}class="active"{% endif %}>
+        <li {% if item.url == '/' and current_path == '/' %}class="menu-active"
+            {% elif item.url != '/' and current_path|slice:":url_length" == item.url %}class="menu-active"{% endif %}>
           <a href="{{ item.url }}" class="justify-center">{{ item.name }}</a>
         </li>
       {% endwith %}
     {% endfor %}
   </ul>
   {% if show_divider %}
-  <div class="divider py-2"></div>
+  <div class="divider p-2"></div>
   {% endif %}
 {% comment %} </div> {% endcomment %}
