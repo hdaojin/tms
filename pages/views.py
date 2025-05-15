@@ -12,15 +12,16 @@ def homepage(request):
     
     homepage = Page.objects.filter(slug="index").first()
     if not homepage:
-        homepage = Page(
-                        title="Welcome to the TMS",
-                        slug="index",
-                        content="TMS is a Training Management System.",
-                        template="no_header_sidebar_footer"
-                        )
-    
-    tpl_name = f"pages/page_{homepage.template}.html"
-    return render(request, tpl_name, {"page": homepage, "title": homepage.title})
+        homepage = Page(title="Welcome", content="Welcome to TMS(Training Management System)", slug="index")
+
+    template_layout = {
+        "header": False,
+        "main": True,
+        "left_sidebar": False,
+        "right_sidebar": False,
+        "footer": False,
+    } 
+    return render(request, 'pages/homepage.html', {"page": homepage, "title": homepage.title, "template_layout": template_layout})
 
 
 class PageDetailView(DetailView):

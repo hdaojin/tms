@@ -1,8 +1,8 @@
-{% extends 'base_no_header_sidebar_footer.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
-{% block body %}
-  <main class="min-h-screen w-full relative">
+{% block main %}
+  {% comment %} <main class="min-h-screen w-full relative"> {% endcomment %}
     <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 md:w-96">
       {% if form.errors %}
         <div class="alert alert-error flex items-center gap-4 mb-2" role="alert">
@@ -59,9 +59,6 @@
         </div>
       {% endif %}
     {% endif %}
-  </main>
+  {% comment %} </main> {% endcomment %}
 
-  <footer class="footer footer-center bg-base-300/15 p-2  absolute bottom-0 z-10">
-    {% include 'footer.html' %}
-  </footer>
 {% endblock %}

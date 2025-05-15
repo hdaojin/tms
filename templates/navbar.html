@@ -5,7 +5,7 @@
     <div class="flex items-center justify-between">
       <div class="navbar-start items-center justify-between max-md:w-full">
         <img src="{% static 'images/logo.png' %}" alt="Logo" class="size-8 mr-2" />
-        <a class="link text-base-content link-neutral text-xl font-bold no-underline" href="/">{{ my_site_name }}</a>
+        <a class="link text-base-content link-neutral text-xl font-bold no-underline" href="/">{{ site_info.my_site_name }}</a>
         <div class="md:hidden">
           <button type="button" class="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square" data-collapse="#default-navbar-collapse" aria-controls="default-navbar-collapse" aria-label="Toggle navigation">
             <span class="icon-[tabler--menu-2] collapse-open:hidden size-4"></span>
@@ -23,9 +23,9 @@
           <span class="label-text">Dark</span>
         </label>
 
-        <ul class="menu md:menu-horizontal gap-2 p-0 text-base max-md:mt-2">
+        <ul class="menu md:menu-horizontal gap-1 p-0 text-base max-md:mt-2">
           <!-- Add your menu items here -->
-          {% for item in main_menu_items %}
+          {% for item in custom_menus.main_menu_items %}
             <li>
               <a href="{{ item.url }}">{{ item.name }}</a>
             </li>
@@ -63,6 +63,14 @@
                 用户信息
               </a>
             </li>
+            {% if user.is_superuser %}
+              <li>
+                <a class="dropdown-item" href="{% url 'admin:index' %}">
+                  <span class="icon-[tabler--settings]"></span>
+                  后台管理
+                </a>
+              </li>
+            {% endif %}
             <li class="dropdown-footer gap-2">
               <form method="post" action="{% url 'accounts:logout' %}">
                 {% csrf_token %}

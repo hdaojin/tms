@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-hans">
+  <head>
+    {% include 'head.html' %}
+  </head>
+
+  <body class="flex flex-col min-h-screen">
+    {% if template_layout.header %}
+      <header class="w-full fixed start-0 top-0 z-10">
+        {% include 'navbar.html' %}
+      </header>
+    {% endif %}
+
+    <div class="flex grow flex-col md:flex-row {% if template_layout.header %}pt-15{% endif %}">
+      {% if template_layout.left_sidebar %}
+        <aside class="w-full md:w-64 border-r border-neutral-400/50">
+          {% block left_sidebar %}
+
+          {% endblock %}
+        </aside>
+      {% endif %}
+
+      {% if template_layout.main %}
+        <main class="grow">
+          {% block main %}
+
+          {% endblock %}
+        </main>
+      {% endif %}
+
+      {% if template_layout.right_sidebar %}
+        <aside class="w-full md:w-64 border-l border-neutral-400/50">
+          {% block right_sidebar %}
+
+          {% endblock %}
+        </aside>
+      {% endif %}
+    </div>
+
+    {% if template_layout.footer %}
+      <footer class="footer footer-center bg-base-300/15 w-full">
+        {% include 'footer.html' %}
+      </footer>
+    {% endif %}
+    {% include 'foot.html' %}
+
+    {% block extra_js %}
+
+    {% endblock %}
+  </body>
+</html>

@@ -1,4 +1,4 @@
-<div class="w-full overflow-x-auto">
+<div class="w-full overflow-x-auto h-fit">
   <table class="table">
     <thead>
       <tr>
@@ -28,9 +28,8 @@
             </td>
             <td>{{ log.uploaded_at|date:'Y-m-d H:i:s' }}</td>
             <td>
-              <a href="{% url 'traininglogs:view_training_log' log.id %}" class="btn btn-sm btn-info" target="_blank">查看</a>
               {% if log.uploaded_by == user %}
-                <a href="{% url 'traininglogs:delete_training_log' log.id %}" class="btn btn-sm btn-danger ml-2" onclick="return confirm('确定要删除这条训练日志记录吗（会同时删除相应的文件）?')">删除</a>
+                <a href="{% url 'traininglogs:delete_training_log' log.id %}" onclick="return confirm('确定要删除这条训练日志记录吗（会同时删除相应的文件）?')" class="btn btn-circle btn-text btn-sm" aria-label="Action button"><span class="icon-[tabler--trash] size-5"></span></a>
               {% endif %}
             </td>
           </tr>
