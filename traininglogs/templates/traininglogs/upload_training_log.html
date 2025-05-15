@@ -1,6 +1,6 @@
-{% extends 'base_default.html' %}
+{% extends 'base.html' %}
 
-{% block article %}
+{% block main %}
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <fieldset class="fieldset bg-base-200 border border-base-300 p-4 rounded-box shadow-2xl">

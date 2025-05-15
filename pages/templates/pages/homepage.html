@@ -1,8 +1,8 @@
-{% extends 'base_no_header_sidebar_footer.html' %}
+{% extends 'base.html' %}
 {% load static %}
 
-{% block body %}
-  <main class="min-h-screen w-full flex items-center bg-cover bg-center" style="background-image: url('{% static 'images/bg-bit.png' %}');">
+{% block main %}
+  <div class="min-h-screen w-full flex items-center bg-cover bg-center" style="background-image: url('{% static 'images/bg-bit.png' %}');">
     <article id="intro" class="w-full bg-neutral/60 p-6 flex justify-center">
       <div class="text-neutral-content text-center max-w-2xl">
         <h1 class="mb-5 text-5xl font-bold">{{ page.title }}</h1>
@@ -10,7 +10,7 @@
         <button class="btn glass btn-gradient"><a href="{% url 'accounts:profile' %}">Get Started</a></button>
       </div>
     </article>
-  </main>
+  </div>
 
   <footer class="footer footer-center text-neutral-content p-2 absolute bottom-0 z-10 w-full">
     {% include 'footer.html' %}
