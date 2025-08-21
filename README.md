@@ -62,5 +62,14 @@ npm run watch:css
 http://127.0.0.1:8000/
 ```
 
+### Optional: Update packages
+```bash
+uv sync -U
+
+# On directory that contains package.json
+npm outdated
+npm update    
+```
+
 
 

@@ -17,11 +17,11 @@
           <label class="label">
             <span class="label-text">选择选手</span>
           </label>
-          <select name="player_id" class="select select-bordered">
+          <select name="competitor_id" class="select select-bordered">
             <option value="">所有选手</option>
-            {% for player in players %}
-              <option value="{{ player.id }}" {% if selected_player_id == player.id %}selected{% endif %}>
-                {{ player.first_name }}
+            {% for competitor in competitors %}
+              <option value="{{ competitor.id }}" {% if selected_competitor_id == competitor.id %}selected{% endif %}>
+                {{ competitor.first_name }}
               </option>
             {% endfor %}
           </select>

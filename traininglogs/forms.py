@@ -9,7 +9,11 @@ class TrainingLogUploadForm(forms.ModelForm):
         fields = ['module', 'training_date', 'task', 'upload']
         widgets = {
             'module': forms.Select(attrs={'class': 'select appearance-none', 'aria-label': 'select'}),
-            'training_date': forms.DateInput(attrs={'type': 'date', 'class': 'input'}),
+            'training_date': forms.DateInput(attrs={
+                'type': 'date', 
+                'class': 'input',
+                'value': datetime.date.today().strftime('%Y-%m-%d')
+            }),
             'task': forms.TextInput(attrs={'type':'text', 'class': 'input', 'aria-label': 'input'}),
             'upload': forms.ClearableFileInput(attrs={'type':'file', 'class': 'input', 'aria-label': 'file-input'}),
         }
@@ -36,5 +40,5 @@ class TrainingLogUploadForm(forms.ModelForm):
                 raise ValidationError("上传文件大小不能超过10MB")
             valid_extensions = ['.doc', '.docx', '.pdf']
             if not any(upload.name.lower().endswith(ext) for ext in valid_extensions):
-                raise ValidationError("上传文件格式必须为doc、docx或pdf")
+                raise ValidationError(f"上传文件格式必须为{', '.join(valid_extensions)}。")
         return upload

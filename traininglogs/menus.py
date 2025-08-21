@@ -1,58 +1,36 @@
 from django.urls import reverse
 
-# 基础训练日志菜单项
-base_training_log_menu_items = [
-    {
-        "name": "我的日志",
-        "url": reverse("traininglogs:list_training_logs"),
-    },
-    {
-        "name": "上传日志",
-        "url": reverse("traininglogs:upload_training_log"),
-    },
-    {
-        "name": "日志统计",
-        "url": reverse("traininglogs:training_log_statistics"),
-    }
-]
+# 基础训练日志菜单项（保持静态部分）
+BASE_ITEMS = (
+    ("我的日志", "traininglogs:list_training_logs"),
+    ("日志统计", "traininglogs:training_log_statistics"),
+    ("上传日志", "traininglogs:upload_training_log"),
+)
 
-# 教练特有的训练日志菜单项
-coach_training_log_menu_items = [
-    {
-        "name": "选手日志",
-        # "url": reverse("traininglogs:athlete_logs"),
-        "url": "#",
-    }
-]
-
-competitor_training_log_menu_items = [
-    {
-       "name": "教练日志",
-       "url": "#", 
-    }
-]
-
+# 角色 -> 对向角色菜单标题
+COUNTERPART_LABEL = {
+    '教练': '选手日志',
+    '选手': '教练日志',
+}
 
 def get_training_log_menu_items(user):
-    """
-    根据用户的分组动态获取训练日志菜单项
-    
-    Args:
-        user: 当前登录用户
-        
-    Returns:
-        list: 训练日志菜单项列表
-    """
-    menu_items = base_training_log_menu_items.copy()
-    
-    # 检查用户是否登录以及是否属于教练组
-    if user.is_authenticated:
-        user_groups = user.groups.values_list('name', flat=True)
-        if '教练' in user_groups:
-            # 如果用户是教练，添加教练特有的菜单项
-            menu_items.extend(coach_training_log_menu_items)
-        elif '选手' in user_groups:
-            # 如果用户是选手，添加选手特有的菜单项
-            menu_items.extend(competitor_training_log_menu_items)
-    
+    """返回当前用户的训练日志菜单项列表，包含基础项及其对向角色日志入口。"""
+    # 构造基础菜单
+    menu_items = [
+        {"name": name, "url": reverse(url_name)} for name, url_name in BASE_ITEMS
+    ]
+
+    if not user.is_authenticated:
+        return menu_items
+
+    # 获取用户所属首个匹配角色（若两个都在，以教练优先）
+    groups = set(user.groups.values_list('name', flat=True))
+    role = '教练' if '教练' in groups else ('选手' if '选手' in groups else None)
+    if role and role in COUNTERPART_LABEL:
+        counterpart_item = {
+            "name": COUNTERPART_LABEL[role],
+            "url": reverse("traininglogs:counterpart_training_logs"),
+        }
+        # 插入到“我的日志”后面（索引1位置）
+        menu_items.insert(1, counterpart_item)
     return menu_items

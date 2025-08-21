@@ -15,7 +15,7 @@ class TrainingLog(models.Model):
                                      help_text="*特别注意：请填写日志对应的实际训练日期，而非上传日期")
     upload = models.FileField("日志文件", upload_to=f"{settings.LOGS_DIR}/%Y/%m", help_text="支持doc、docx、pdf格式, 文件大小不超过10MB")
     filename = models.CharField("文件名", max_length=200)
-    uploaded_by = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name='training_logs', verbose_name='上传者')
+    uploaded_by = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, related_name='training_logs', verbose_name='上传者', null=True, blank=True)
     uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
 
 

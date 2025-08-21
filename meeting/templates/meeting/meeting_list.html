@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block left_sidebar %}
+  {% include 'menu.html' with menu_items=custom_menus.meeting_menu_items show_divider=True %}
+{% endblock %}
+
+{% block main %}
+<div class="p-4 flex items-center flex-col">
+    <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
+    
+    {% if meetings %}
+        <div class="w-full overflow-x-auto h-fit">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="font-bold">会议标题</th>
+                        <th class="font-bold">会议日期</th>
+                        <th class="font-bold">文件名</th>
+                        <th class="font-bold">上传者</th>
+                        <th class="font-bold">上传时间</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for meeting in meetings %}
+                        <tr>
+                            <td>{{ meeting.title }}</td>
+                            <td>{{ meeting.date|date:'Y年m月d日' }}</td>
+                            <td>
+                                <a href="{% url 'meeting:meeting_detail' meeting.id %}" class="text-blue-500 hover:underline" target="_blank">
+                                    {{ meeting.filename }}
+                                </a>
+                            </td>
+                            <td>{{ meeting.uploaded_by.first_name|default:meeting.uploaded_by.username }}</td>
+                            <td>{{ meeting.uploaded_at|date:'Y-m-d H:i' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="text-center py-4">
+            <div class="text-gray-500">
+                <p class="text-lg">暂无会议记录</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -10,4 +10,5 @@ urlpatterns = [
     path('delete/<int:log_id>/', views.delete_training_log, name='delete_training_log'),
     path('statistics/', views.training_log_statistics, name='training_log_statistics'),
     path('athlete-logs/', views.athlete_logs, name='athlete_logs'),
+    path('counterpart/', views.counterpart_training_logs, name='counterpart_training_logs'),
 ]
