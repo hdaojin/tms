@@ -17,6 +17,7 @@ from .models import TrainingLog
 
 
 # Create your views here.
+@login_required
 def upload_training_log(request):
     if request.method == 'POST':
         form = TrainingLogUploadForm(request.POST, request.FILES)
@@ -26,24 +27,25 @@ def upload_training_log(request):
 
             # 获取上传的文件
             uploaded_file = request.FILES['upload']
-            
-            # 构建新的文件名
+
+            # 构建新的文件名，避免局部变量覆盖 datetime.date
             original_extension = uploaded_file.name.split('.')[-1]
-            head = settings.WSCSKILL_NAME
-            date = training_log.training_date.strftime('%Y年%m月%d日')
-            user_role = request.user.groups.first().name
-            user_name = request.user.first_name
-            new_filename = f"{head}{date}{user_role}日志-{user_name}.{original_extension}"
-            
+            head = getattr(settings, 'WSCSKILL_NAME', '')
+            date_str = training_log.training_date.strftime('%Y年%m月%d日')
+            group_obj = request.user.groups.first()
+            user_role = group_obj.name if group_obj else '未知角色'
+            user_name = request.user.first_name or request.user.username
+            new_filename = f"{head}{date_str}{user_role}日志-{user_name}.{original_extension}"
+
             # 设置数据库中的文件名字段
             training_log.filename = new_filename
-            
+
             # 将文件内容读取到内存
             file_content = uploaded_file.read()
-            
-            # 清除之前的上传对象并创建一个新的，使用新文件名
+
+            # 保存上传文件（使用新文件名）
             training_log.upload.save(new_filename, ContentFile(file_content), save=False)
-            
+
             # 保存模型实例
             training_log.save()
             # with open(Path(settings.LOGS_DIR) / Path(new_filename), 'wb+') as destination:
@@ -136,7 +138,7 @@ def view_training_log(request, log_id):
 
 @login_required
 def delete_training_log(request, log_id):
-    training_log = TrainingLog.objects.get(id=log_id)
+    training_log = get_object_or_404(TrainingLog, id=log_id)
     if training_log.uploaded_by == request.user:
         # 删除关联的物理文件
         if training_log.upload and training_log.upload.path:
@@ -172,25 +174,25 @@ def training_log_statistics(request):
     # 获取所有需要提交日志的教练和选手（排除 profile.submission_training_log=False 的用户）
     # 获取教练：包括没有个人资料的或个人资料中submission_training_log=True的
     coaches = User.objects.filter(
-        groups__name='教练'
+        groups__name='教练',
+        is_active=True,
     ).exclude(
         profile__submission_training_log=False
     ).distinct()
     coach_ids = set(coaches.values_list('id', flat=True))
     
     # 获取选手：包括没有个人资料的或个人资料中submission_training_log=True的
-    players = User.objects.filter(
-        groups__name='选手'
+    competitors = User.objects.filter(
+        groups__name='选手',
+        is_active=True,
     ).exclude(
         profile__submission_training_log=False
     ).distinct()
-    player_ids = set(players.values_list('id', flat=True))
+    competitor_ids = set(competitors.values_list('id', flat=True))
     
     # 获取用户ID到用户对象的映射
-    all_users = User.objects.filter(Q(id__in=coach_ids) | Q(id__in=player_ids))
-    user_map = {user.id: user for user in all_users}
-    
-    # 获取该月份的所有有效日志提交情况
+    all_users = User.objects.filter(Q(id__in=coach_ids) | Q(id__in=competitor_ids))
+    user_map = {user.pk: user for user in all_users}    # 获取该月份的所有有效日志提交情况
     logs = TrainingLog.objects.filter(
         training_date__gte=start_date,
         training_date__lte=end_date
@@ -217,20 +219,25 @@ def training_log_statistics(request):
         submitted_coaches = [user_map[uid] for uid in submitted_coach_ids if uid in user_map]
         
         # 获取已提交的选手
-        submitted_player_ids = player_ids.intersection(submitted_user_ids)
-        submitted_players = [user_map[uid] for uid in submitted_player_ids if uid in user_map]
+        submitted_competitor_ids = competitor_ids.intersection(submitted_user_ids)
+        submitted_competitors = [user_map[uid] for uid in submitted_competitor_ids if uid in user_map]
         
         # 获取未提交的选手
-        unsubmitted_player_ids = player_ids - submitted_user_ids
-        unsubmitted_players = [user_map[uid] for uid in unsubmitted_player_ids if uid in user_map]
+        unsubmitted_competitor_ids = competitor_ids - submitted_user_ids
+        unsubmitted_competitors = [user_map[uid] for uid in unsubmitted_competitor_ids if uid in user_map]
+        
+        # 获取未提交的教练
+        unsubmitted_coach_ids = coach_ids - submitted_user_ids
+        unsubmitted_coaches = [user_map[uid] for uid in unsubmitted_coach_ids if uid in user_map]
         
         # 添加是否为星期日的标记
         is_sunday = current_date.weekday() == 6  # Python中0是星期一，6是星期日
         
         daily_stats[current_date] = {
             'submitted_coaches': submitted_coaches,
-            'submitted_players': submitted_players,
-            'unsubmitted_players': unsubmitted_players,
+            'submitted_competitors': submitted_competitors,
+            'unsubmitted_competitors': unsubmitted_competitors,
+            'unsubmitted_coaches': unsubmitted_coaches,
             'is_sunday': is_sunday,
         }
     
@@ -275,40 +282,105 @@ def training_log_statistics(request):
 def athlete_logs(request):
     # 判断用户是否为教练
     coach_group = Group.objects.filter(name='教练').first()
-    if not coach_group or not request.user.groups.filter(id=coach_group.id).exists():
+    if not coach_group or not request.user.groups.filter(name='教练').exists():
         messages.error(request, '您没有权限查看选手日志!')
         return redirect('traininglogs:list_training_logs')
     
     # 获取所有选手
-    player_group = Group.objects.filter(name='选手').first()
-    if not player_group:
-        players = []
+    competitor_group = Group.objects.filter(name='选手').first()
+    if competitor_group:
+        competitors = User.objects.filter(groups__name='选手').order_by('first_name')
     else:
-        players = User.objects.filter(groups__id=player_group.id).order_by('first_name')
+        competitors = []
     
     # 获取指定选手的日志，如果没有选择则获取所有选手的日志
-    player_id = request.GET.get('player_id')
+    competitor_id = request.GET.get('competitor_id')
     
-    if player_id:
+    if competitor_id and competitor_id.isdigit():
         try:
-            selected_player = User.objects.get(id=player_id)
-            training_logs = TrainingLog.objects.filter(uploaded_by=selected_player).order_by('-training_date')
-            title = f'训练日志列表 - {selected_player.first_name}的日志'
+            selected_competitor = User.objects.get(id=competitor_id)
+            training_logs = TrainingLog.objects.filter(uploaded_by=selected_competitor).order_by('-training_date')
+            title = f'训练日志列表 - {selected_competitor.first_name}的日志'
         except User.DoesNotExist:
             messages.error(request, '选择的选手不存在!')
-            training_logs = TrainingLog.objects.filter(uploaded_by__groups__id=player_group.id).order_by('-training_date')
+            if competitor_group:
+                training_logs = TrainingLog.objects.filter(uploaded_by__groups__name='选手').order_by('-training_date')
+            else:
+                training_logs = TrainingLog.objects.none()
             title = '训练日志列表 - 所有选手日志'
     else:
-        training_logs = TrainingLog.objects.filter(uploaded_by__groups__id=player_group.id).order_by('-training_date')
+        if competitor_group:
+            training_logs = TrainingLog.objects.filter(uploaded_by__groups__name='选手').order_by('-training_date')
+        else:
+            training_logs = TrainingLog.objects.none()
         title = '训练日志列表 - 所有选手日志'
     
     context = {
         'title': title,
         'training_logs': training_logs,
-        'players': players,
-        'selected_player_id': int(player_id) if player_id and player_id.isdigit() else None,
+        'competitors': competitors,
+        'selected_competitor_id': int(competitor_id) if competitor_id and competitor_id.isdigit() else None,
     }
     
     return render(request, 'traininglogs/athlete_logs.html', context)
+
+
+@login_required
+def counterpart_training_logs(request):
+    """教练查看所有选手日志，选手查看所有教练日志（按月）。"""
+    # 判定身份
+    is_coach = request.user.groups.filter(name='教练').exists()
+    is_competitor = request.user.groups.filter(name='选手').exists()
+
+    if not (is_coach or is_competitor):
+        messages.error(request, '您没有所属角色，无法查看对向角色日志。')
+        return redirect('traininglogs:list_training_logs')
+
+    # 选择对向角色 queryset
+    if is_coach:
+        target_qs = User.objects.filter(groups__name='选手')
+        role_desc = '选手日志'
+    elif is_competitor:
+        target_qs = User.objects.filter(groups__name='教练')
+        role_desc = '教练日志'
+    else:
+        messages.error(request, '您没有所属角色，无法查看对向角色日志。')
+        return redirect('traininglogs:list_training_logs')
+
+
+    # 获取年月参数
+    selected_year = int(request.GET.get('year', timezone.now().year))
+    selected_month = int(request.GET.get('month', timezone.now().month))
+
+    start_date = date(selected_year, selected_month, 1)
+    _, last_day = calendar.monthrange(selected_year, selected_month)
+    end_date = date(selected_year, selected_month, last_day)
+
+    training_logs = TrainingLog.objects.filter(
+        uploaded_by__in=target_qs,
+        training_date__gte=start_date,
+        training_date__lte=end_date,
+    ).order_by('-training_date')
+
+    # 月份选择器（复用13个月逻辑）
+    months = []
+    current_date = timezone.now().date()
+    for i in range(13):
+        year = current_date.year
+        month = current_date.month - i
+        while month <= 0:
+            month += 12
+            year -= 1
+        months.append({'year': year, 'month': month, 'name': f"{year}年{month}月"})
+    months.sort(key=lambda x: (x['year'], x['month']), reverse=True)
+
+    context = {
+        'title': f'训练日志列表 - {role_desc} ({selected_year}年{selected_month}月)',
+        'training_logs': training_logs,
+        'months': months,
+        'selected_year': selected_year,
+        'selected_month': selected_month,
+    }
+    return render(request, 'traininglogs/training_logs.html', context)
 
 

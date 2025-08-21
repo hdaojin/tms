@@ -24,15 +24,33 @@
         <thead>
           <tr>
             <th>日期</th>
-            <th>已提交教练</th>
             <th>已提交选手</th>
             <th>未提交选手</th>
+            <th>已提交教练</th>
+            <th>未提交教练</th>
           </tr>
         </thead>
         <tbody>
           {% for date, stats in daily_stats.items %}
             <tr class="{% if stats.is_sunday %}bg-secondary/20{% endif %}">
               <td>{{ date|date:'m月d日' }}({{ date|date:'l'|slice:':3' }})</td>
+              <!-- 已提交选手 -->
+              <td>
+                {% for competitor in stats.submitted_competitors %}
+                  <span class="text-primary">{{ competitor.first_name }}</span>
+                {% empty %}
+                  <span>无</span>
+                {% endfor %}
+              </td>
+              <!-- 未提交选手 -->
+              <td>
+                {% for competitor in stats.unsubmitted_competitors %}
+                  <span class="text-warning">{{ competitor.first_name }}</span>
+                {% empty %}
+                  <span class="text-success">全部提交</span>
+                {% endfor %}
+              </td>
+              <!-- 已提交教练 -->
               <td>
                 {% for coach in stats.submitted_coaches %}
                   <span class="text-success">{{ coach.first_name }}</span>
@@ -40,16 +58,10 @@
                   <span>无</span>
                 {% endfor %}
               </td>
+              <!-- 未提交教练 -->
               <td>
-                {% for player in stats.submitted_players %}
-                  <span class="text-primary">{{ player.first_name }}</span>
-                {% empty %}
-                  <span>无</span>
-                {% endfor %}
-              </td>
-              <td>
-                {% for player in stats.unsubmitted_players %}
-                  <span class="text-warning">{{ player.first_name }}</span>
+                {% for coach in stats.unsubmitted_coaches %}
+                  <span class="text-warning">{{ coach.first_name }}</span>
                 {% empty %}
                   <span class="text-success">全部提交</span>
                 {% endfor %}
