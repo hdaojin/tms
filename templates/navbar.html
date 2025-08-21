@@ -63,7 +63,7 @@
                 用户信息
               </a>
             </li>
-            {% if user.is_superuser %}
+            {% if user.is_superuser or user.is_staff %}
               <li>
                 <a class="dropdown-item" href="{% url 'admin:index' %}">
                   <span class="icon-[tabler--settings]"></span>

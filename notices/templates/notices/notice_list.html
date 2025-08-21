@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block left_sidebar %}
+  {% include 'menu.html' with menu_items=custom_menus.notice_menu_items show_divider=True %}
+{% endblock %}
+
+{% block main %}
+<div class="container mx-auto p-4">
+    <!-- 页面标题 -->
+    <div class="card card-border shadow-none mb-6">
+        <div class="card-body py-3">
+            <h1 class="card-title text-xl">
+                <span class="icon-[tabler--bell] size-6 text-primary"></span>
+                {{ title }}
+            </h1>
+        </div>
+    </div>
+    
+    <!-- 通知列表 -->
+    <div class="card">
+        <div id="notice-list-content" 
+             hx-get="{% url 'notices:notice_list_partial' %}{% if request.GET.page %}?page={{ request.GET.page }}{% endif %}"
+             hx-trigger="every 1s"
+             hx-swap="innerHTML">
+            {% include 'notices/notice_list_partial.html' %}
+        </div>
+    </div>
+</div>
+
+<script>
+// 更新自动刷新的URL到指定页码
+function updateAutoRefreshUrl(page) {
+    const container = document.getElementById('notice-list-content');
+    const baseUrl = "{% url 'notices:notice_list_partial' %}";
+    const newUrl = page === 1 ? baseUrl : `${baseUrl}?page=${page}`;
+    
+    container.setAttribute('hx-get', newUrl);
+    htmx.process(container);
+    
+    // 更新浏览器URL但不刷新页面
+    const newBrowserUrl = page === 1 ? window.location.pathname : `${window.location.pathname}?page=${page}`;
+    window.history.pushState({}, '', newBrowserUrl);
+}
+
+// 更新HTMX的URL以包含当前页码
+function updateHtmxUrl() {
+    const container = document.getElementById('notice-list-content');
+    const urlParams = new URLSearchParams(window.location.search);
+    const page = urlParams.get('page') || '1';
+    const baseUrl = "{% url 'notices:notice_list_partial' %}";
+    const newUrl = page === '1' ? baseUrl : `${baseUrl}?page=${page}`;
+    
+    container.setAttribute('hx-get', newUrl);
+    htmx.process(container);
+}
+
+// 页面加载时更新URL
+document.addEventListener('DOMContentLoaded', updateHtmxUrl);
+
+// 监听浏览器前进后退按钮
+window.addEventListener('popstate', updateHtmxUrl);
+</script>
+{% endblock %}

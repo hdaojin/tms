@@ -17,6 +17,8 @@ Including another URLconf
 
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 
 admin.site.site_header = "TMS 管理后台"
 admin.site.site_title = "TMS 管理后台"
@@ -28,9 +30,10 @@ urlpatterns = [
     path("articles/", include("articles.urls", namespace="articles")),
     path("traininglogs/", include("traininglogs.urls", namespace="traininglogs")),
     path("meeting/", include("meeting.urls", namespace="meeting")),
+    path("notices/", include("notices.urls", namespace="notices")),
     path("", include("pages.urls", namespace="pages")), 
 ]
 
 # 在开发环境中添加媒体文件的URL配置
-# if settings.DEBUG:
-#     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=getattr(settings, 'MEDIA_ROOT', None))
