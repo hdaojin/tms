@@ -1,4 +1,11 @@
 {% load static %}
 <script src="{% static 'js/htmx.min.js' %}"></script>
+<script>
+// 配置HTMX使用CSRF token
+document.body.addEventListener('htmx:configRequest', function(evt) {
+    const csrfToken = document.querySelector('meta[name=csrf-token]').getAttribute('content');
+    evt.detail.headers['X-CSRFToken'] = csrfToken;
+});
+</script>
 <script src="{% static 'js/flyonui.js' %}"></script>
 <script src="{% static 'js/main.js' %}"></script>

@@ -5,6 +5,7 @@ main_menu_items = (
     ("首页", "/"),
     ("日志", reverse("traininglogs:list_training_logs")),
     ("会议", reverse("meeting:meeting_list")),
+    ("通知", reverse("notices:notice_list")),
     ("关于", reverse("pages:page_detail", kwargs={"slug": "about"})),
 )
 

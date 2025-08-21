@@ -5,6 +5,7 @@ from pages.menus import page_menu_items
 from articles.menus import article_menu_items
 from traininglogs.menus import get_training_log_menu_items
 from meeting.menus import  get_meeting_menu_items
+from notices.menus import menu_items as notice_menu_items
 
 
 def custom_context(request):
@@ -21,7 +22,8 @@ def custom_context(request):
         "training_log_menu_items": get_training_log_menu_items(request.user),
         "page_menu_items": page_menu_items,
         "article_menu_items": article_menu_items,
-        "meeting_menu_items": get_meeting_menu_items(request.user)
+        "meeting_menu_items": get_meeting_menu_items(request.user),
+        "notice_menu_items": notice_menu_items,
     }
 
     template_layout = {

@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'skills',
     'traininglogs',
     'meeting',
+    'notices',
 ]
 
 SITE_ID = 1
@@ -176,8 +177,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # 自定义变量
 MY_SITE_NAME = "ITNSA"
+WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目')
+INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=86400)  # 1天,单位为秒
 
 LOGS_DIR = env('LOGS_DIR', default='logs')
 MEETING_FILE_DIR = env('MEETING_FILE_DIR', default='meetings')
-WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目')
-INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=86400)  # 1天,单位为秒
+NOTICE_ATTACHMENT_DIR = env('NOTICE_ATTACHMENT_DIR', default='notices')
+
+
+
