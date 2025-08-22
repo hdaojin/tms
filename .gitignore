@@ -314,5 +314,5 @@ dist
 
 # Uploads directory
 media/
-.vscode/
+# .vscode/
 
