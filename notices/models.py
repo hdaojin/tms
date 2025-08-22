@@ -3,6 +3,8 @@ from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from pathlib import Path
 
 # Create your models here.
@@ -22,7 +24,7 @@ class Notice(models.Model):
 
     title = models.CharField(max_length=200, verbose_name='标题(可选)',null=True, blank=True)
     content = models.TextField(verbose_name='通知内容')
-    is_published = models.BooleanField(default=False, db_index=True, verbose_name='是否发布')
+    is_published = models.BooleanField(default=False, db_index=True, verbose_name='是否发布', help_text='发布后用户才能看到此通知, 未发布即存为草稿')
     published_by = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name='notices_published', verbose_name='发布人')
     published_at = models.DateTimeField(null=True, blank=True, verbose_name='发布时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
@@ -98,3 +100,36 @@ class NoticeAttachment(models.Model):
                 return f"{self.file_size:.1f} {unit}"
             self.file_size /= 1024.0
         return f"{self.file_size:.1f} TB"
+
+
+# 删除信号处理器
+@receiver(pre_delete, sender=NoticeAttachment)
+def delete_attachment_file(sender, instance, **kwargs):
+    """
+    删除附件时，同时删除对应的文件
+    """
+    if instance.file:
+        try:
+            # 删除物理文件
+            if instance.file.storage.exists(instance.file.name):
+                instance.file.storage.delete(instance.file.name)
+        except Exception:
+            # 如果文件删除失败，记录错误但不阻止删除
+            pass
+
+
+@receiver(pre_delete, sender=Notice)
+def delete_notice_attachments(sender, instance, **kwargs):
+    """
+    删除通知时，同时删除所有相关的附件文件
+    """
+    # 删除所有相关的附件文件
+    for attachment in instance.attachments.all():
+        if attachment.file:
+            try:
+                # 删除物理文件
+                if attachment.file.storage.exists(attachment.file.name):
+                    attachment.file.storage.delete(attachment.file.name)
+            except Exception:
+                # 如果文件删除失败，记录错误但不阻止删除
+                pass
