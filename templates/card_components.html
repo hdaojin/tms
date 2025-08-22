@@ -1,0 +1,123 @@
+{% comment %}
+daisyUI 5 卡片组件模板
+用于统一项目中的卡片样式
+{% endcomment %}
+
+{% comment %} 基础卡片 {% endcomment %}
+{% macro card(title=None, image=None, content=None, actions=None, class="") %}
+  <div class="card bg-base-100 shadow-xl {{ class }}">
+    {% if image %}
+      <figure>
+        <img src="{{ image.url }}" alt="{{ image.alt|default:title }}" />
+      </figure>
+    {% endif %}
+    <div class="card-body">
+      {% if title %}
+        <h2 class="card-title">{{ title }}</h2>
+      {% endif %}
+      {% if content %}
+        <p>{{ content }}</p>
+      {% endif %}
+      {% if actions %}
+        <div class="card-actions justify-end">
+          {{ actions }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% comment %} 统计卡片 {% endcomment %}
+{% macro stat_card(title, value, desc=None, icon=None, color="primary") %}
+  <div class="stat">
+    {% if icon %}
+      <div class="stat-figure text-{{ color }}">
+        <span class="{{ icon }} text-3xl"></span>
+      </div>
+    {% endif %}
+    <div class="stat-title">{{ title }}</div>
+    <div class="stat-value text-{{ color }}">{{ value }}</div>
+    {% if desc %}
+      <div class="stat-desc">{{ desc }}</div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% comment %} 列表卡片 {% endcomment %}
+{% macro list_card(title, items, actions=None) %}
+  <div class="card bg-base-100 shadow-xl">
+    <div class="card-body">
+      {% if title %}
+        <h2 class="card-title">{{ title }}</h2>
+      {% endif %}
+      <div class="list">
+        {% for item in items %}
+          <div class="list-row">
+            {% if item.icon %}
+              <span class="{{ item.icon }}"></span>
+            {% endif %}
+            <div>
+              {% if item.title %}
+                <div class="font-medium">{{ item.title }}</div>
+              {% endif %}
+              {% if item.description %}
+                <div class="text-sm text-base-content/70">{{ item.description }}</div>
+              {% endif %}
+            </div>
+            {% if item.action %}
+              <div class="ml-auto">{{ item.action }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+      {% if actions %}
+        <div class="card-actions justify-end">
+          {{ actions }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% comment %} 空状态卡片 {% endcomment %}
+{% macro empty_state(title, description, icon=None, action=None) %}
+  <div class="card bg-base-100 shadow-xl">
+    <div class="card-body items-center text-center">
+      {% if icon %}
+        <span class="{{ icon }} text-4xl text-base-content/30 mb-4"></span>
+      {% endif %}
+      <h2 class="card-title">{{ title }}</h2>
+      {% if description %}
+        <p class="text-base-content/70">{{ description }}</p>
+      {% endif %}
+      {% if action %}
+        <div class="card-actions">
+          {{ action }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% comment %} 信息卡片 {% endcomment %}
+{% macro info_card(title, content, type="info") %}
+  <div class="alert alert-{{ type }}">
+    {% if type == "info" %}
+      <span class="icon-[tabler--info-circle]"></span>
+    {% elif type == "success" %}
+      <span class="icon-[tabler--circle-check]"></span>
+    {% elif type == "warning" %}
+      <span class="icon-[tabler--alert-triangle]"></span>
+    {% elif type == "error" %}
+      <span class="icon-[tabler--circle-x]"></span>
+    {% endif %}
+    <div>
+      {% if title %}
+        <h3 class="font-bold">{{ title }}</h3>
+      {% endif %}
+      {% if content %}
+        <div class="text-xs">{{ content }}</div>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
