@@ -1,44 +1,47 @@
 <!DOCTYPE html>
-<html lang="zh-hans">
+<html lang="zh-hans" data-theme="light">
   <head>
     {% include 'head.html' %}
   </head>
 
-  <body class="flex flex-col min-h-screen">
+  <body class="min-h-screen flex flex-col bg-base-100">
     {% if template_layout.header %}
-      <header class="w-full fixed start-0 top-0 z-10">
+      <header class="sticky top-0 z-50">
         {% include 'navbar.html' %}
       </header>
     {% endif %}
 
-    <div class="flex grow flex-col md:flex-row {% if template_layout.header %}pt-15{% endif %}">
+    <div class="flex-1 flex {% if template_layout.header %}{% endif %}">
       {% if template_layout.left_sidebar %}
-        <aside class="w-full md:w-64 border-r border-neutral-400/50">
-          {% block left_sidebar %}
-
-          {% endblock %}
+        <aside class="w-64 bg-base-200 border-r border-base-300 hidden md:block">
+          <div class="p-4">
+            {% block left_sidebar %}
+            {% endblock %}
+          </div>
         </aside>
       {% endif %}
 
       {% if template_layout.main %}
-        <main class="grow">
-          {% block main %}
-
-          {% endblock %}
+        <main class="flex-1 overflow-auto">
+          <div class="container mx-auto p-4">
+            {% block main %}
+            {% endblock %}
+          </div>
         </main>
       {% endif %}
 
       {% if template_layout.right_sidebar %}
-        <aside class="w-full md:w-64 border-l border-neutral-400/50">
-          {% block right_sidebar %}
-
-          {% endblock %}
+        <aside class="w-64 bg-base-200 border-l border-base-300 hidden lg:block">
+          <div class="p-4">
+            {% block right_sidebar %}
+            {% endblock %}
+          </div>
         </aside>
       {% endif %}
     </div>
 
     {% if template_layout.footer %}
-      <footer class="footer footer-center bg-base-300/15 w-full">
+      <footer class="footer footer-center bg-base-200 text-base-content p-4">
         {% include 'footer.html' %}
       </footer>
     {% endif %}

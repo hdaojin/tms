@@ -7,12 +7,98 @@
 {% endblock %}
 
 {% block main %}
-  <div class="p-4">
-    <h1 class="text-2xl font-bold">{{ title }}</h1>
-    <p>用户名：{{ user.username }}</p>
-    <p>姓名：{{ user.first_name }}</p>
-    <p>邮箱：{{ user.email }}</p>
-    <p>角色：{{ user.groups.all.0.name }}</p>
-    <!-- 根据需求，添加更多用户信息 -->
+  <div class="max-w-4xl mx-auto space-y-6">
+    <!-- 页面标题 -->
+    <div class="flex items-center gap-3">
+      <span class="icon-[tabler--user] text-2xl text-primary"></span>
+      <h1 class="text-3xl font-bold">{{ title }}</h1>
+    </div>
+
+    <!-- 用户信息卡片 -->
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title">
+          <span class="icon-[tabler--id-badge]"></span>
+          基本信息
+        </h2>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">用户名</span>
+            </label>
+            <div class="input input-bordered input-disabled">{{ user.username }}</div>
+          </div>
+          
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">姓名</span>
+            </label>
+            <div class="input input-bordered input-disabled">{{ user.first_name|default:"未设置" }}</div>
+          </div>
+          
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">邮箱</span>
+            </label>
+            <div class="input input-bordered input-disabled">{{ user.email|default:"未设置" }}</div>
+          </div>
+          
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">角色</span>
+            </label>
+            <div class="badge badge-primary badge-lg">{{ user.groups.all.0.name|default:"普通用户" }}</div>
+          </div>
+        </div>
+        
+        <div class="card-actions justify-end mt-6">
+          <button class="btn btn-primary">
+            <span class="icon-[tabler--edit]"></span>
+            编辑资料
+          </button>
+          <button class="btn btn-outline">
+            <span class="icon-[tabler--key]"></span>
+            修改密码
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快速操作 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="card bg-base-100 shadow">
+        <div class="card-body items-center text-center">
+          <span class="icon-[tabler--bell] text-3xl text-info mb-2"></span>
+          <h3 class="card-title">通知</h3>
+          <p class="text-sm text-base-content/70">查看系统通知</p>
+          <div class="card-actions">
+            <a href="{% url 'notices:notice_list' %}" class="btn btn-sm btn-info">查看</a>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card bg-base-100 shadow">
+        <div class="card-body items-center text-center">
+          <span class="icon-[tabler--calendar] text-3xl text-success mb-2"></span>
+          <h3 class="card-title">会议</h3>
+          <p class="text-sm text-base-content/70">查看会议安排</p>
+          <div class="card-actions">
+            <a href="#" class="btn btn-sm btn-success">查看</a>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card bg-base-100 shadow">
+        <div class="card-body items-center text-center">
+          <span class="icon-[tabler--book] text-3xl text-warning mb-2"></span>
+          <h3 class="card-title">培训</h3>
+          <p class="text-sm text-base-content/70">查看培训记录</p>
+          <div class="card-actions">
+            <a href="#" class="btn btn-sm btn-warning">查看</a>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 {% endblock %}

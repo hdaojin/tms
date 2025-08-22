@@ -1,88 +1,84 @@
 {% load static %}
 
-<nav class="navbar shadow-base-300/20 shadow-md bg-no-repeat bg-size-[100%_2px] md:h-15 w-full" style="background-image: url('{% static 'images/navbar-bg.png' %}');">
-  <div class="w-full md:flex md:items-center md:gap-2">
-    <div class="flex items-center justify-between">
-      <div class="navbar-start items-center justify-between max-md:w-full">
-        <img src="{% static 'images/logo.png' %}" alt="Logo" class="size-8 mr-2" />
-        <a class="link text-base-content link-neutral text-xl font-bold no-underline" href="/">{{ site_info.my_site_name }}</a>
-        <div class="md:hidden">
-          <button type="button" class="collapse-toggle btn btn-outline btn-secondary btn-sm btn-square" data-collapse="#default-navbar-collapse" aria-controls="default-navbar-collapse" aria-label="Toggle navigation">
-            <span class="icon-[tabler--menu-2] collapse-open:hidden size-4"></span>
-            <span class="icon-[tabler--x] collapse-open:block hidden size-4"></span>
-          </button>
+<nav class="navbar bg-base-100 shadow-lg">
+  <div class="navbar-start">
+    <div class="dropdown">
+      <div tabindex="0" role="button" class="btn btn-ghost md:hidden">
+        <span class="icon-[tabler--menu-2] size-6"></span>
+      </div>
+      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
+        {% for item in custom_menus.main_menu %}
+          <li>
+            <a href="{{ item.url }}">{{ item.name }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="flex items-center gap-2">
+      <img src="{% static 'images/logo.png' %}" alt="Logo" class="w-8 h-8" />
+      <a class="btn btn-ghost text-xl font-bold" href="/">{{ site_info.my_site_name }}</a>
+    </div>
+  </div>
+  
+  <div class="navbar-center hidden md:flex">
+    <ul class="menu menu-horizontal px-1">
+      {% for item in custom_menus.main_menu %}
+        <li>
+          <a href="{{ item.url }}">{{ item.name }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+  
+  <div class="navbar-end gap-2">
+    {% include 'theme_selector.html' %}
+    
+    <div class="dropdown dropdown-end">
+      <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
+        <div class="w-10 rounded-full">
+          <img src="{% static 'images/avatar.png' %}" alt="avatar" />
         </div>
       </div>
-    </div>
-
-    <div id="default-navbar-collapse" class="md:navbar-end collapse hidden grow basis-full overflow-hidden transition-[height] duration-300 max-md:w-full">
-      <div class="flex items-center max-md:flex-col gap-2">
-        <label class="hidden md:flex cursor-pointer gap-2">
-          <span class="label-text">Light</span>
-          <input type="checkbox" value="dark" class="switch theme-controller" />
-          <span class="label-text">Dark</span>
-        </label>
-
-        <ul class="menu md:menu-horizontal gap-1 p-0 text-base max-md:mt-2">
-          <!-- Add your menu items here -->
-          {% for item in custom_menus.main_menu %}
-            <li>
-              <a href="{{ item.url }}">{{ item.name }}</a>
-            </li>
-          {% endfor %}
-        </ul>
-
-        <div class="dropdown relative inline-flex [--auto-close:inside] [--offset:8] [--placement:bottom-end]">
-          <button id="dropdown-scrollable" type="button" class="dropdown-toggle flex items-center gap-2" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-64 p-2 shadow">
+        <li class="menu-title">
+          <div class="flex items-center gap-3 p-2">
             <div class="avatar">
-              <div class="size-9.5 rounded-full">
-                <img src="{% static 'images/avatar.png' %}" alt="avatar 1" />
+              <div class="w-12 rounded-full">
+                <img src="{% static 'images/avatar.png' %}" alt="avatar" />
               </div>
             </div>
             <div>
-              <p class="text-sm text-warning">
-                欢迎您，<span class="underline decoration-sky-500 decoration-dashed underline-offset-6">{% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}</span>
-              </p>
+              <h6 class="font-semibold">{% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}</h6>
+              <small class="text-base-content/60">{{ user.groups.all.0.name }}</small>
             </div>
-          </button>
-          <ul class="dropdown-menu dropdown-open:opacity-100 hidden min-w-60" role="menu" aria-orientation="vertical" aria-labelledby="dropdown-avatar">
-            <li class="dropdown-header gap-2">
-              <div class="avatar">
-                <div class="w-10 rounded-full">
-                  <img src="{% static 'images/avatar.png' %}" alt="avatar" />
-                </div>
-              </div>
-              <div>
-                <h6 class="text-base-content text-base font-semibold">{% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}</h6>
-                <small class="text-base-content/50">{{ user.groups.all.0.name }}</small>
-              </div>
-            </li>
-            <li>
-              <a class="dropdown-item" href="{% url 'accounts:profile' %}">
-                <span class="icon-[tabler--user]"></span>
-                用户信息
-              </a>
-            </li>
-            {% if user.is_superuser or user.is_staff %}
-              <li>
-                <a class="dropdown-item" href="{% url 'admin:index' %}">
-                  <span class="icon-[tabler--settings]"></span>
-                  后台管理
-                </a>
-              </li>
-            {% endif %}
-            <li class="dropdown-footer gap-2">
-              <form method="post" action="{% url 'accounts:logout' %}">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-error btn-soft btn-block">
-                  <span class="icon-[tabler--logout]"></span>
-                  注销
-                </button>
-              </form>
-            </li>
-          </ul>
-        </div>
-      </div>
+          </div>
+        </li>
+        <div class="divider my-1"></div>
+        <li>
+          <a href="{% url 'accounts:profile' %}">
+            <span class="icon-[tabler--user]"></span>
+            用户信息
+          </a>
+        </li>
+        {% if user.is_superuser or user.is_staff %}
+          <li>
+            <a href="{% url 'admin:index' %}">
+              <span class="icon-[tabler--settings]"></span>
+              后台管理
+            </a>
+          </li>
+        {% endif %}
+        <div class="divider my-1"></div>
+        <li>
+          <form method="post" action="{% url 'accounts:logout' %}" class="w-full">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-error btn-sm w-full justify-start">
+              <span class="icon-[tabler--logout]"></span>
+              注销
+            </button>
+          </form>
+        </li>
+      </ul>
     </div>
   </div>
 </nav>

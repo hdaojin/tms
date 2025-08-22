@@ -1,22 +1,6 @@
-/* @import "tailwindcss";
-@plugin "@tailwindcss/typography";
-@plugin "daisyui"{
-    themes: light --default, dark --prefersdark;
-} */
-
 @import "tailwindcss";
-@plugin "flyonui";
+@plugin "daisyui" {
+  themes: light --default, dark --prefersdark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter;
+  logs: false;
+}
 @plugin "@iconify/tailwind4";
-@plugin "tailwindcss-jun-layout";
-@import "flyonui/variants.css";
-@source "./node_modules/flyonui/flyonui.js"; 
-
-/* Import Third-party override css */
-/* @import "flyonui/src/vendor/flatpickr.css"; */
-/* @import "flyonui/src/vendor/notyf.css"; */
-/* @import "flyonui/src/vendor/datatables.css"; */
-/* @import "flyonui/src/vendor/editor.css"; */
-/* @import "flyonui/src/vendor/fullcalendar.css"; */
-/* @import "flyonui/src/vendor/raty.css"; */
-/* @import "flyonui/src/vendor/waves.css"; */
-/* @import "flyonui/src/vendor/apexcharts.css"; */

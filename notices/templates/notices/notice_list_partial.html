@@ -1,50 +1,48 @@
 {% if page_obj.object_list %}
     <!-- 列表头部 -->
-    <div class="text-base-content/50 px-4 py-3 text-sm font-medium border-b">
-        通知列表 (共 {{ page_obj.paginator.count }} 条)
-        <span class="text-xs text-success ml-2">
-            <span class="icon-[tabler--refresh] size-3"></span>
+    <div class="p-4 border-b border-base-300">
+        <h3 class="text-base font-medium">通知列表 (共 {{ page_obj.paginator.count }} 条)</h3>
+        <div class="badge badge-success badge-sm mt-1">
+            <span class="icon-[tabler--refresh] size-3 mr-1"></span>
             自动更新
-        </span>
+        </div>
     </div>
     
     <!-- 通知项目 -->
-    <ul class="divide-y divide-base-content/10">
+    <div class="divide-y divide-base-300">
         {% for n in page_obj.object_list %}
             {% include 'notices/notice_item.html' %}
         {% endfor %}
-    </ul>
+    </div>
     
     <!-- 分页信息 -->
     {% if page_obj.has_other_pages %}
-        <div class="card-footer flex justify-between items-center">
+        <div class="p-4 border-t border-base-300 flex justify-between items-center">
             <div class="text-sm text-base-content/70">
                 显示第 {{ page_obj.start_index }} - {{ page_obj.end_index }} 条，共 {{ page_obj.paginator.count }} 条
             </div>
             
-            <div class="flex gap-2">
+            <div class="join">
                 {% if page_obj.has_previous %}
                     <a href="?page={{ page_obj.previous_page_number }}" 
-                       class="btn btn-sm btn-ghost"
+                       class="join-item btn btn-sm"
                        hx-get="{% url 'notices:notice_list_partial' %}?page={{ page_obj.previous_page_number }}"
                        hx-target="#notice-list-content"
                        onclick="updateAutoRefreshUrl({{ page_obj.previous_page_number }})">
                         <span class="icon-[tabler--chevron-left] size-4"></span>
-                        上一页
                     </a>
                 {% endif %}
                 
-                <span class="btn btn-sm btn-ghost btn-disabled">
-                    第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页
+                <span class="join-item btn btn-sm btn-disabled">
+                    {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
                 </span>
                 
                 {% if page_obj.has_next %}
                     <a href="?page={{ page_obj.next_page_number }}" 
-                       class="btn btn-sm btn-ghost"
+                       class="join-item btn btn-sm"
                        hx-get="{% url 'notices:notice_list_partial' %}?page={{ page_obj.next_page_number }}"
                        hx-target="#notice-list-content"
                        onclick="updateAutoRefreshUrl({{ page_obj.next_page_number }})">
-                        下一页
                         <span class="icon-[tabler--chevron-right] size-4"></span>
                     </a>
                 {% endif %}
@@ -54,7 +52,7 @@
     
 {% else %}
     <!-- 空状态 -->
-    <div class="card-body items-center justify-center min-h-60">
+    <div class="flex flex-col items-center justify-center min-h-60 p-8">
         <span class="icon-[tabler--bell-off] mb-4 size-12 text-base-content/30"></span>
         <h3 class="text-lg font-medium mb-2">暂无通知</h3>
         <p class="text-base-content/60 text-center">
