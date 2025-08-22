@@ -1,11 +1,10 @@
-<ul class="menu w-full">
+<ul class="menu w-full text-center">
   {% for item in menu_items %}
     {% with url_length=item.url|length %}
       <li {% if item.url == '/' and current_path == '/' %}class="disabled"
           {% elif item.url != '/' and current_path|slice:":url_length" == item.url %}class="disabled"{% endif %}>
         <a href="{{ item.url }}" 
-           {% if item.url == '/' and current_path == '/' %}class="active"
-           {% elif item.url != '/' and current_path|slice:":url_length" == item.url %}class="active"{% endif %}>
+           class="justify-center {% if item.url == '/' and current_path == '/' %}active{% elif item.url != '/' and current_path|slice:":url_length" == item.url %}active{% endif %}">
           {{ item.name }}
         </a>
       </li>
