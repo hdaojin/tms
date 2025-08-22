@@ -9,10 +9,19 @@
     <!-- 页面标题 -->
     <div class="card card-border shadow-none mb-6">
         <div class="card-body py-3">
-            <h1 class="card-title text-xl">
-                <span class="icon-[tabler--bell] size-6 text-primary"></span>
-                {{ title }}
-            </h1>
+            <div class="flex items-center justify-between">
+                <h1 class="card-title text-xl">
+                    <span class="icon-[tabler--bell] size-6 text-primary"></span>
+                    {{ title }}
+                </h1>
+                {% if user.is_staff %}
+                <a href="{% url 'notices:notice_create' %}" 
+                   class="btn btn-primary btn-sm">
+                    <span class="icon-[tabler--plus] size-4"></span>
+                    发布通知
+                </a>
+                {% endif %}
+            </div>
         </div>
     </div>
     

@@ -9,6 +9,7 @@ class TrainingLogAdmin(admin.ModelAdmin):
     list_filter = ('module', 'training_date', 'uploaded_by')
     date_hierarchy = 'training_date'
     ordering = ('-training_date',)
+    # readonly_fields = ['filename']
     
 
 # 向默认admin站点注册

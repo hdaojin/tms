@@ -1,9 +1,12 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.core.paginator import Paginator
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 from django.db.models import Q
+from django.utils import timezone
 
-from .models import Notice
+from .models import Notice, NoticeAttachment
+from .forms import NoticeForm
 
 
 def _get_notices_with_read_status(user):
@@ -96,4 +99,50 @@ def notice_detail(request, pk: int):
     return render(request, 'notices/notice_detail.html', {
         'notice': notice,
         'title': notice.title,
+    })
+
+
+@login_required
+def notice_create(request):
+    """
+    创建通知视图：支持多附件上传
+    """
+    if request.method == 'POST':
+        form = NoticeForm(request.POST, request.FILES)
+        if form.is_valid():
+            notice = form.save(commit=False)
+            notice.published_by = request.user
+            
+            # 如果发布，设置发布时间
+            if notice.is_published:
+                notice.published_at = timezone.now()
+            
+            notice.save()
+            form.save_m2m()  # 保存多对多关系
+            
+            # 处理多个附件上传
+            attachments = form.cleaned_data.get('attachments', [])
+            if attachments:
+                # 如果attachments是单个文件，转换为列表
+                if not isinstance(attachments, list):
+                    attachments = [attachments]
+                
+                for file in attachments:
+                    if file:
+                        NoticeAttachment.objects.create(
+                            notice=notice,
+                            file=file
+                        )
+            
+            messages.success(
+                request, 
+                f'通知已{"发布" if notice.is_published else "保存为草稿"}成功！'
+            )
+            return redirect('notices:notice_detail', pk=notice.pk)
+    else:
+        form = NoticeForm()
+    
+    return render(request, 'notices/notice_create.html', {
+        'form': form,
+        'title': '发布通知',
     })
