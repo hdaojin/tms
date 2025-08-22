@@ -4,6 +4,7 @@ from django.utils import timezone
 
 # Register your models here.
 
+# Admin class for NoticeAttachment to allow inline editing of attachments within Notice admin
 class NoticeAttachmentInline(admin.TabularInline):
     """
     通知附件内联编辑
@@ -20,9 +21,11 @@ class NoticeAttachmentInline(admin.TabularInline):
     @admin.display(description='文件大小')
     def file_size_human(self, obj):
         return obj.file_size_human if obj else ''
-
+    
+# Register the Notice model with custom admin options
 class NoticeAdmin(admin.ModelAdmin):
     list_display = ('title', 'content', 'get_attachments_count', 'is_published', 'published_by', 'get_target_groups_display', 'published_at', 'updated_at')
+    empty_value_display = '-空-'
     list_filter = ('is_published', 'published_by', 'target_groups')
     search_fields = ('title', 'content')
     readonly_fields = ('published_at', 'updated_at')
@@ -88,12 +91,12 @@ class NoticeAdmin(admin.ModelAdmin):
             
         super().save_model(request, obj, form, change)
 
-    @admin.action(description='发布选中通知')
+    @admin.action(description='发布所选的 通知')
     def publish_notices(self, request, queryset):
         queryset.update(is_published=True, published_by=request.user, published_at=timezone.now())
         self.message_user(request, f"已发布 {queryset.count()} 条通知。")
 
-    @admin.action(description='撤销选中通知')
+    @admin.action(description='撤销所选的 通知')
     def unpublish_notices(self, request, queryset):
         queryset.update(is_published=False, published_by=None, published_at=None)
         self.message_user(request, f"已撤销 {queryset.count()} 条通知。")
@@ -101,4 +104,4 @@ class NoticeAdmin(admin.ModelAdmin):
 
 # 注册模型和自定义的Admin类
 admin.site.register(Notice, NoticeAdmin)
-admin.site.register(NoticeAttachment)
+# admin.site.register(NoticeAttachment)

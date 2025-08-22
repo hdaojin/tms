@@ -56,14 +56,14 @@ class NoticeAttachment(models.Model):
     通知附件模型 - 支持多个附件
     """
     notice = models.ForeignKey(Notice, on_delete=models.CASCADE, related_name='attachments', verbose_name='通知')
-    file = models.FileField(upload_to=notice_attachment_upload_to, verbose_name='附件文件')
+    file = models.FileField(upload_to=notice_attachment_upload_to, verbose_name='附件文件', help_text="支持多个文件上传")
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name='上传时间')
     file_size = models.BigIntegerField(null=True, blank=True, verbose_name='文件大小(字节)')
 
     class Meta:
         ordering = ('uploaded_at',)
-        verbose_name = '通知附件'
-        verbose_name_plural = '通知附件'
+        verbose_name = '附件'
+        verbose_name_plural = '附件'
 
     def __str__(self):
         return f"{self.notice} - {Path(self.file.name).name if self.file else '未知文件'}"

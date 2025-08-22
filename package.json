@@ -1,7 +1,10 @@
 {
   "dependencies": {
     "@tailwindcss/cli": "^4.0.15",
+    "dropzone": "^6.0.0-beta.2",
     "flyonui": "^2.0.1",
+    "htmx.org": "^2.0.6",
+    "lodash": "^4.17.21",
     "tailwindcss": "^4.0.15",
     "tailwindcss-jun-layout": "^0.8.1"
   },
