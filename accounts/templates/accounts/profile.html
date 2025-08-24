@@ -45,10 +45,25 @@
           </div>
           
           <div class="form-control">
-            <label class="label">
+            <label class="label flex flex-wrap gap-2 items-center">
               <span class="label-text">角色</span>
+              <span class="flex flex-wrap gap-2">
+                {# 系统内置角色 #}
+                {% if user.is_superuser %}
+                  <span class="badge badge-error badge-lg">管理员</span>
+                {% elif user.is_staff %}
+                  <span class="badge badge-secondary badge-lg">工作人员</span>
+                {% endif %}
+                {# 用户所属分组，全部列出 #}
+                {% for g in user.groups.all %}
+                  <span class="badge badge-primary badge-lg">{{ g.name }}</span>
+                {% empty %}
+                  {% if not user.is_superuser and not user.is_staff %}
+                    <span class="badge badge-outline badge-lg">普通用户</span>
+                  {% endif %}
+                {% endfor %}
+              </span>
             </label>
-            <div class="badge badge-primary badge-lg">{{ user.groups.all.0.name|default:"普通用户" }}</div>
           </div>
         </div>
         
