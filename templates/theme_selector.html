@@ -99,3 +99,58 @@ daisyUI 5 主题选择器组件
     </li>
   </ul>
 </div>
+
+<script>
+// 初始化主题 - 优先级：localStorage > 系统偏好 > light
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme');
+  let theme;
+  
+  if (savedTheme) {
+    theme = savedTheme;
+  } else {
+    // 检测系统主题偏好
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    theme = prefersDark ? 'dark' : 'light';
+  }
+  
+  // 设置主题
+  document.documentElement.setAttribute('data-theme', theme);
+  
+  // 更新主题选择器的状态
+  const themeController = document.querySelector(`input[value="${theme}"]`);
+  if (themeController) {
+    themeController.checked = true;
+  }
+}
+
+// 监听主题切换
+document.addEventListener('DOMContentLoaded', function() {
+  initTheme();
+  
+  // 监听系统主题变化
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+    // 只有在用户没有手动选择主题时才跟随系统
+    if (!localStorage.getItem('theme')) {
+      const theme = e.matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+      const themeController = document.querySelector(`input[value="${theme}"]`);
+      if (themeController) {
+        themeController.checked = true;
+      }
+    }
+  });
+  
+  // 监听主题选择器变化
+  const themeControllers = document.querySelectorAll('.theme-controller');
+  themeControllers.forEach(controller => {
+    controller.addEventListener('change', function() {
+      if (this.checked) {
+        const theme = this.value;
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+      }
+    });
+  });
+});
+</script>
