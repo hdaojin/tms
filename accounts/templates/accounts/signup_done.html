@@ -1,20 +1,54 @@
 {% extends 'base.html' %}
 
 {% block main %}
-  <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full md:w-96">
-    <div class="alert alert-soft alert-success flex items-start gap-4">
-      <span class="icon-[tabler--check] shrink-0 size-6"></span>
-      <div class="flex flex-col gap-1">
-        <h2 class="text-lg font-semibold">注册成功！</h2>
-        <p>
-          欢迎 <span class="text-base-content">{{ user.username }}</span> 加入我们！请等待管理员激活后才能登录您的账户。
-        </p>
+  <div class="hero min-h-screen bg-base-200">
+    <div class="hero-content text-center">
+      <div class="max-w-md">
+        <div class="card bg-base-100 shadow-xl">
+          <div class="card-body">
+            <div class="flex flex-col items-center gap-4">
+              <div class="avatar">
+                <div class="w-16 rounded-full bg-success text-success-content flex items-center justify-center">
+                  <span class="icon-[tabler--check] text-2xl"></span>
+                </div>
+              </div>
+              
+              <div class="text-center">
+                <h2 class="card-title text-2xl justify-center mb-2">注册成功！</h2>
+                {% if user %}
+                  <p class="text-base-content/70 mb-4">
+                    欢迎 <span class="font-semibold text-primary">{{ user.username }}</span> 
+                    {% if user.first_name %}
+                      ({{ user.first_name }})
+                    {% endif %}
+                    加入我们！
+                  </p>
+                {% else %}
+                  <p class="text-base-content/70 mb-4">
+                    欢迎加入我们！
+                  </p>
+                {% endif %}
+                
+                <div class="alert alert-info text-sm">
+                  <span class="icon-[tabler--info-circle] shrink-0"></span>
+                  <span>请等待管理员激活您的账户后才能登录。</span>
+                </div>
+              </div>
+              
+              <div class="card-actions justify-center">
+                <a href="{% url 'pages:homepage' %}" class="btn btn-primary">
+                  <span class="icon-[tabler--home] text-lg"></span>
+                  返回首页
+                </a>
+                <a href="{% url 'accounts:login' %}" class="btn btn-outline">
+                  <span class="icon-[tabler--login] text-lg"></span>
+                  立即登录
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="text-center mt-4">
-      <p>
-        已有账号? <a href="{% url 'accounts:login' %}" class="link link-accent mt-2">立即登录</a>
-      </p>
     </div>
   </div>
 {% endblock %}

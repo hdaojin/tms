@@ -29,6 +29,7 @@ def account_signup(request):
             # 此处可添加发送激活邮件逻辑
             return render(request, 'accounts/signup_done.html', {
                 'title': "注册成功",
+                'template_layout': template_layout,
                 'user': user
             }) 
     else:

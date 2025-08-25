@@ -1,19 +1,42 @@
 {% extends 'base.html' %}
 
 {% block left_sidebar %}
-
 {% include 'menu.html' with menu_items=custom_menus.user_menu_items show_divider=True %}
-
 {% endblock left_sidebar %}
 
 {% block main %}
-<div class="p-4">
-  <h1 class="text-2xl font-bold">{{ title }}</h1>
-  <div class="mt-4">
-    <p>请将以下邀请码提供给需要注册的用户：</p>
-    <div class="flex items-center mt-2">
-      <input type="text" readonly value="{{ code }}" class="flex-1 p-2 border rounded" id="inviteCode" />
-      <button id="copyBtn" class="ml-2 btn btn-info">复制</button>
+<div class="space-y-6">
+  <!-- 页面标题 -->
+  <div class="flex items-center gap-3 justify-center">
+    <span class="icon-[tabler--user-plus] text-2xl text-primary"></span>
+    <h1 class="text-3xl font-bold">{{ title }}</h1>
+  </div>
+
+  <!-- 邀请码内容 -->
+  <div class="space-y-6">
+    <div>
+      <h2 class="text-xl font-semibold flex items-center gap-2 mb-4">
+        <span class="icon-[tabler--qrcode]"></span>
+        邀请码
+      </h2>
+      
+      <p class="text-base-content/70 mb-4">请将以下邀请码提供给需要注册的用户：</p>
+      
+      <div class="flex gap-2 items-end">
+        <label class="input input-bordered flex-1">
+          <span class="label">邀请码</span>
+          <input type="text" readonly value="{{ code }}" id="inviteCode" />
+        </label>
+        <button id="copyBtn" class="btn btn-primary">
+          <span class="icon-[tabler--copy]"></span>
+          复制
+        </button>
+      </div>
+      
+      <div class="alert alert-info mt-4">
+        <span class="icon-[tabler--info-circle] shrink-0"></span>
+        <span>请妥善保管邀请码，只分享给需要注册的用户。</span>
+      </div>
     </div>
   </div>
 </div>
@@ -21,7 +44,20 @@
 <script>
 document.getElementById('copyBtn').addEventListener('click', function() {
   navigator.clipboard.writeText('{{ code }}').then(function() {
-    alert('邀请码已复制');
+    // 显示复制成功提示
+    const btn = document.getElementById('copyBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="icon-[tabler--check]"></span>已复制';
+    btn.classList.add('btn-success');
+    btn.classList.remove('btn-primary');
+    
+    setTimeout(function() {
+      btn.innerHTML = originalText;
+      btn.classList.remove('btn-success');
+      btn.classList.add('btn-primary');
+    }, 2000);
+  }).catch(function() {
+    alert('复制失败，请手动复制邀请码');
   });
 });
 </script>

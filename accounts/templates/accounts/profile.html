@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block main %}
-  <div class="max-w-4xl mx-auto space-y-6">
+  <div class="mx-auto space-y-6">
     <!-- 页面标题 -->
     <div class="flex items-center gap-3">
       <span class="icon-[tabler--user] text-2xl text-primary"></span>
@@ -23,47 +23,39 @@
         </h2>
         
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">账号</span>
-            </label>
-            <div class="input input-bordered input-disabled">{{ user.username }}</div>
-          </div>
+          <label class="input">
+            <span class="label">账号</span>
+            <input type="text" value="{{ user.username }}" disabled />
+          </label>
           
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">姓名</span>
-            </label>
-            <div class="input input-bordered input-disabled">{{ user.first_name|default:"未设置" }}</div>
-          </div>
+          <label class="input">
+            <span class="label">姓名</span>
+            <input type="text" value="{{ user.first_name|default:"未设置" }}" disabled />
+          </label>
           
-          <div class="form-control">
-            <label class="label">
-              <span class="label-text">邮箱</span>
-            </label>
-            <div class="input input-bordered input-disabled">{{ user.email|default:"未设置" }}</div>
-          </div>
+          <label class="input">
+            <span class="label">邮箱</span>
+            <input type="email" value="{{ user.email|default:"未设置" }}" disabled />
+          </label>
           
-          <div class="form-control">
-            <label class="label flex flex-wrap gap-2 items-center">
-              <span class="label-text">角色</span>
-              <span class="flex flex-wrap gap-2">
-                {# 系统内置角色 #}
-                {% if user.is_superuser %}
-                  <span class="badge badge-error badge-lg">管理员</span>
-                {% elif user.is_staff %}
-                  <span class="badge badge-secondary badge-lg">工作人员</span>
+          <div class="label">
+            <span class="label-text">角色</span>
+            <div class="flex flex-wrap gap-2">
+              {# 系统内置角色 #}
+              {% if user.is_superuser %}
+                <span class="badge badge-error badge-lg">管理员</span>
+              {% elif user.is_staff %}
+                <span class="badge badge-secondary badge-lg">工作人员</span>
+              {% endif %}
+              {# 用户所属分组，全部列出 #}
+              {% for g in user.groups.all %}
+                <span class="badge badge-primary badge-lg">{{ g.name }}</span>
+              {% empty %}
+                {% if not user.is_superuser and not user.is_staff %}
+                  <span class="badge badge-outline badge-lg">普通用户</span>
                 {% endif %}
-                {# 用户所属分组，全部列出 #}
-                {% for g in user.groups.all %}
-                  <span class="badge badge-primary badge-lg">{{ g.name }}</span>
-                {% empty %}
-                  {% if not user.is_superuser and not user.is_staff %}
-                    <span class="badge badge-outline badge-lg">普通用户</span>
-                  {% endif %}
-                {% endfor %}
-              </span>
-            </label>
+              {% endfor %}
+            </div>
           </div>
         </div>
         

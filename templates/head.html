@@ -14,5 +14,25 @@
 </title>
 <!-- 引入CSS文件 -->
 <link rel="stylesheet" href="{% static 'css/output.css' %}" />
+
+<!-- 主题初始化脚本 - 防止页面闪烁 -->
+<script>
+(function() {
+  const savedTheme = localStorage.getItem('theme');
+  let theme;
+  
+  if (savedTheme) {
+    theme = savedTheme;
+  } else {
+    // 检测系统主题偏好
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    theme = prefersDark ? 'dark' : 'light';
+  }
+  
+  // 立即设置主题
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+
 {% block extra_css %}
 {% endblock %}
