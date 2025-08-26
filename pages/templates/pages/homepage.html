@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block main %}
+{% block content %}
   <div class="hero min-h-screen min-w-screen relative" style="background-image: url('{% static 'images/bg-bit.png' %}');">
     <div class="hero-overlay bg-opacity-60"></div>
     <div class="hero-content flex-col lg:flex-row-reverse w-full max-w-6xl">
@@ -90,4 +90,4 @@
       {% include 'footer.html' %}
     </div>
   </div>
-{% endblock main %}
+{% endblock content %}

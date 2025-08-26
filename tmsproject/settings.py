@@ -33,10 +33,10 @@ SECRET_KEY = env('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = True
-DEBUG = env.bool('DEBUG', default=False)
+DEBUG = env.bool('DEBUG', default=False) # type: ignore
 
 # ALLOWED_HOSTS = []
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1']) # type: ignore
 
 
 # Application definition
@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     # Custom apps
+    'common',
     'pages',
     'accounts',
     'articles',
@@ -87,7 +88,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 # 自定义上下文处理器
-                'tmsproject.context_processors.custom_context',
+                'common.context_processors.custom_context',
             ],
         },
     },
@@ -108,7 +109,7 @@ WSGI_APPLICATION = 'tmsproject.wsgi.application'
 # }
 
 DATABASES = {
-    'default': env.db(default=f'sqlite:///{BASE_DIR}/db.sqlite3')
+    'default': env.db(default=f'sqlite:///{BASE_DIR}/db.sqlite3') # type: ignore
 }
 
 
@@ -177,12 +178,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # 自定义变量
 MY_SITE_NAME = "ITNSA"
-WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目')
-INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=86400)  # 1天,单位为秒
+WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目') # type: ignore
+INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=86400)  # type: ignore # 1天,单位为秒
 
-LOGS_DIR = env('LOGS_DIR', default='logs')
-MEETING_FILE_DIR = env('MEETING_FILE_DIR', default='meetings')
-NOTICE_ATTACHMENT_DIR = env('NOTICE_ATTACHMENT_DIR', default='notices')
+LOGS_DIR = env('LOGS_DIR', default='logs') # type: ignore
+MEETING_FILE_DIR = env('MEETING_FILE_DIR', default='meetings') # type: ignore
+NOTICE_ATTACHMENT_DIR = env('NOTICE_ATTACHMENT_DIR', default='notices') # type: ignore
 
 
 

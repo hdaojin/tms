@@ -1,17 +1,26 @@
-from django.urls import reverse
+# meeting/menus.py
+"""
+定义meeting应用的菜单项
+"""
+
+MENUS = [
+    {
+        "section": "会议记录",
+        "items": [
+            {
+                "name": "浏览会议记录",
+                "url_name": "meeting:meeting_list",
+                "icon": "tabler--article",
+                "perms": ["is_authenticated"],
+            },
+            {
+                "name": "上传会议记录",
+                "url_name": "meeting:upload_meeting",
+                "icon": "tabler--upload",
+                "perms": ["is_authenticated", "meeting.add_meeting"],
+            },
+        ],
+    },
+]
 
 
-def get_meeting_menu_items(user):
-    """返回当前用户的会议管理菜单项列表"""
-    menu_items = [
-        {"name": "会议记录", "url": reverse("meeting:meeting_list")},
-    ]
-    
-    # 只有班务人员才能看到上传选项
-    if user.is_authenticated and user.groups.filter(name='班务').exists():
-        menu_items.append({
-            "name": "上传会议记录",
-            "url": reverse("meeting:upload_meeting"),
-        })
-    
-    return menu_items

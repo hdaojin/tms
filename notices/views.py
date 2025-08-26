@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.core.paginator import Paginator
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import permission_required
 from django.contrib import messages
 from django.db.models import Q
 from django.utils import timezone
@@ -44,7 +44,7 @@ def _get_paginated_notices(request):
     return paginator.get_page(page_number)
 
 
-@login_required
+# @login_required
 def notice_list(request):
     """
     通知列表视图: 只显示已发布的通知, 并标记用户已读状态, 最新的通知在前, 12条一页
@@ -63,7 +63,7 @@ def notice_list(request):
     })
 
 
-@login_required
+# @login_required
 def notice_list_partial(request):
     """
     部分通知列表视图: 用于HTMX自动刷新
@@ -81,20 +81,12 @@ def notice_list_partial(request):
     })
 
 
-@login_required
+# @login_required
 def notice_detail(request, pk: int):
     """
     通知详情视图：显示通知的详细内容
     """
     notice = get_object_or_404(Notice.objects.prefetch_related('attachments'), pk=pk, is_published=True)
-    
-    # 检查用户是否有权限查看该通知
-    user_group_ids = list(request.user.groups.values_list('id', flat=True))
-    if notice.target_groups.exists():
-        # 如果通知有目标组，检查用户是否在目标组中
-        if not notice.target_groups.filter(id__in=user_group_ids).exists():
-            # 用户不在目标组中，返回404
-            return render(request, '404.html', status=404)
     
     return render(request, 'notices/notice_detail.html', {
         'notice': notice,
@@ -102,7 +94,8 @@ def notice_detail(request, pk: int):
     })
 
 
-@login_required
+# @login_required
+@permission_required('notices.add_notice')
 def notice_create(request):
     """
     创建通知视图：支持多附件上传

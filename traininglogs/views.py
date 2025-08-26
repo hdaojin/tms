@@ -3,7 +3,6 @@ from datetime import date
 import calendar
 
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.conf import settings
 from django.contrib import messages
 from django.core.files.base import ContentFile
@@ -17,7 +16,6 @@ from .models import TrainingLog
 
 
 # Create your views here.
-@login_required
 def upload_training_log(request):
     if request.method == 'POST':
         form = TrainingLogUploadForm(request.POST, request.FILES)
@@ -58,7 +56,6 @@ def upload_training_log(request):
     return render(request, 'traininglogs/upload_training_log.html', {'form': form, 'title': '上传训练日志'})
 
 
-@login_required
 def training_logs(request):
     # 获取请求中的年份和月份参数，如果没有则使用当前年月
     selected_year = int(request.GET.get('year', timezone.now().year))
@@ -113,7 +110,6 @@ def training_logs(request):
     return render(request, 'traininglogs/training_logs.html', context)
 
 
-@login_required
 def view_training_log(request, log_id):
     try:
         training_log = get_object_or_404(TrainingLog, id=log_id)
@@ -136,7 +132,6 @@ def view_training_log(request, log_id):
         return redirect('traininglogs:list_training_logs')
 
 
-@login_required
 def delete_training_log(request, log_id):
     training_log = get_object_or_404(TrainingLog, id=log_id)
     if training_log.uploaded_by == request.user:
@@ -153,7 +148,6 @@ def delete_training_log(request, log_id):
     return redirect('traininglogs:list_training_logs')
 
 
-@login_required
 def training_log_statistics(request):
     # 获取请求中的年份和月份参数，如果没有则使用当前年月
     selected_year = int(request.GET.get('year', timezone.now().year))
@@ -278,7 +272,6 @@ def training_log_statistics(request):
     return render(request, 'traininglogs/training_log_statistics.html', context)
 
 
-@login_required
 def athlete_logs(request):
     # 判断用户是否为教练
     coach_group = Group.objects.filter(name='教练').first()
@@ -325,7 +318,6 @@ def athlete_logs(request):
     return render(request, 'traininglogs/athlete_logs.html', context)
 
 
-@login_required
 def counterpart_training_logs(request):
     """教练查看所有选手日志，选手查看所有教练日志（按月）。"""
     # 判定身份

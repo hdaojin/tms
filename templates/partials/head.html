@@ -18,15 +18,15 @@
 <!-- 主题初始化脚本 - 防止页面闪烁 -->
 <script>
 (function() {
-  const savedTheme = localStorage.getItem('theme');
-  let theme;
+  const savedTheme = localStorage.getItem('theme');  // 从本地存储获取主题
+  let theme = 'light';  // 默认主题
   
   if (savedTheme) {
-    theme = savedTheme;
+    theme = savedTheme;  // 如果本地存储有主题则使用
   } else {
     // 检测系统主题偏好
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    theme = prefersDark ? 'dark' : 'light';
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;  // 如果系统偏好为暗色模式
+    theme = prefersDark ? 'dark' : 'light';    // 就使用系统偏好，否则使用浅色模式
   }
   
   // 立即设置主题
@@ -35,4 +35,7 @@
 </script>
 
 {% block extra_css %}
+{% endblock %}
+
+{% block extra_head %}
 {% endblock %}

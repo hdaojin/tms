@@ -4,7 +4,7 @@
   {% include 'menu.html' with menu_items=custom_menus.page_menu_items show_divider=True %}
 {% endblock %}
 
-{% block main %}
+{% block content %}
   <div class="p-4">
     <h1 class="mb-4">{{ page.title }}</h1>
     <div>{{ page.content|safe|linebreaks }}</div>

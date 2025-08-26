@@ -1,7 +1,11 @@
 {% extends 'base.html' %}
 
-{% block main %}
-  <div class="hero min-h-screen bg-base-200">
+
+{% block left_sidebar %}{% endblock left_sidebar %}
+
+
+{% block content %}
+  <div class="hero">
     <div class="hero-content text-center">
       <div class="max-w-md">
         <div class="card bg-base-100 shadow-xl">
@@ -15,11 +19,11 @@
               
               <div class="text-center">
                 <h2 class="card-title text-2xl justify-center mb-2">注册成功！</h2>
-                {% if user %}
+                {% if new_user %}
                   <p class="text-base-content/70 mb-4">
-                    欢迎 <span class="font-semibold text-primary">{{ user.username }}</span> 
-                    {% if user.first_name %}
-                      ({{ user.first_name }})
+                    欢迎 <span class="font-semibold text-primary">{{ new_user.username }}</span> 
+                    {% if new_user.first_name %}
+                      ({{ new_user.first_name }})
                     {% endif %}
                     加入我们！
                   </p>
@@ -52,3 +56,5 @@
     </div>
   </div>
 {% endblock %}
+
+{% block right_sidebar %}{% endblock right_sidebar %}

@@ -1,55 +1,39 @@
 <!DOCTYPE html>
-<html lang="zh-hans">
+<html lang="zh-hans" data-theme="light">
   <head>
-    {% include 'head.html' %}
+    {% include 'partials/head.html' %}
   </head>
 
-  <body class="min-h-screen flex flex-col bg-base-100">
-    {% if template_layout.header %}
-      <header class="sticky top-0 z-50">
-        {% include 'navbar.html' %}
-      </header>
-    {% endif %}
+  <body class="min-h-screen flex flex-col">
+    {# Header：默认显示；若子模板要隐藏，覆盖 block 为“空”即可 #}
+    {% block header %}
+      {% include 'partials/header.html' %}
+    {% endblock %}
 
-    <div class="flex-1 flex">
-      {% if template_layout.left_sidebar %}
-        <aside class="w-64 bg-base-200 border-r border-base-300 hidden md:block">
-          <div class="p-4">
-            {% block left_sidebar %}
+    <div class="flex flex-1">
+      {# Sidebar：默认显示；若子模板要隐藏，覆盖 block 为“空”即可 #}
+      {% block left_sidebar %}
+        {% include 'partials/left_sidebar.html' %}
+      {% endblock %}
 
-            {% endblock %}
-          </div>
-        </aside>
-      {% endif %}
+      <main class="flex-1 p-4">
+        <div class="w-full md:max-w-9/10 mx-auto py-4">
+          {% block content %}
 
-      {% if template_layout.main %}
-        <main class="flex-1 overflow-auto">
-          {% if template_layout.header %}
-            <div class="container mx-auto p-4 sm:p-8">
-          {% endif %}
-              {% block main %}{% endblock %}
-          {% if template_layout.header %}
-            </div>
-          {% endif %}
-        </main>
-      {% endif %}
+          {% endblock %}
+        </div>
+      </main>
 
-      {% if template_layout.right_sidebar %}
-        <aside class="w-64 bg-base-200 border-l border-base-300 hidden lg:block">
-          <div class="p-4">
-            {% block right_sidebar %}
-
-            {% endblock %}
-          </div>
-        </aside>
-      {% endif %}
+      {% block right_sidebar %}
+        {% include 'partials/right_sidebar.html' %}
+      {% endblock %}
     </div>
 
-    {% if template_layout.footer %}
-      <footer class="footer footer-center sm:footer-horizontal bg-base-300 text-base-content p-4">
-        {% include 'footer.html' %}
-      </footer>
-    {% endif %}
-    {% include 'foot.html' %}
+    {% block footer %}
+      {# Footer：默认显示；若子模板要隐藏，覆盖 block 为“空”即可 #}
+      {% include 'partials/footer.html' %}
+    {% endblock %}
+
+    {% include 'partials/foot.html' %}
   </body>
 </html>

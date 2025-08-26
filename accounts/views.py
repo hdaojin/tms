@@ -1,19 +1,10 @@
 from django.shortcuts import render
-from django.contrib.auth.decorators import login_not_required, login_required, user_passes_test
+from django.contrib.auth.decorators import login_not_required # type: ignore
 
 from .forms import CustomUserCreationForm
 from .utils import generate_invitation_code
+from common.decorators import superuser_required
 
-def superuser_required(view_func):
-    return user_passes_test(lambda u: u.is_superuser)(view_func)
-
-template_layout = {
-    "header": False,
-    "main": True,
-    "left_sidebar": False,
-    "right_sidebar": False,
-    "footer": True,
-}
 
 @login_not_required
 def account_signup(request):
@@ -29,8 +20,7 @@ def account_signup(request):
             # 此处可添加发送激活邮件逻辑
             return render(request, 'accounts/signup_done.html', {
                 'title': "注册成功",
-                'template_layout': template_layout,
-                'user': user
+                'new_user': user
             }) 
     else:
         form = CustomUserCreationForm()
@@ -38,7 +28,6 @@ def account_signup(request):
     return render(request, 'accounts/signup.html', {
         'form': form,
         'title': "注册",
-        'template_layout': template_layout,
     })
 
 
@@ -49,7 +38,6 @@ def account_profile(request):
         'user': request.user
     })
 
-@login_required
 @superuser_required
 def generate_invitation(request):
     code = generate_invitation_code()

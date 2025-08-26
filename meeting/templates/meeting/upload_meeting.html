@@ -1,60 +1,101 @@
 {% extends 'base.html' %}
+{% load form_filters %}
 
-{% block left_sidebar %}
-  {% include 'menu.html' with menu_items=custom_menus.meeting_menu_items show_divider=True %}
-{% endblock %}
+{% block content %}
+  <div class="container mx-auto max-w-2xl px-4">
+    <div class="card bg-base-100 shadow-xl">
+      <div class="card-body">
+        <h2 class="card-title text-2xl justify-center mb-6">{{ title }}</h2>
 
-{% block main %}
-  <div class="p-4 flex items-center flex-col">
-    <h1 class="text-2xl font-bold mb-4">{{ title }}</h1>
+        {% if error_message %}
+          <div class="alert alert-error mb-4">
+            <span class="icon-[tabler--alert-circle] size-5"></span>
+            <span>{{ error_message }}</span>
+          </div>
+        {% endif %}
 
-    {% if error_message %}
-      <div class="alert alert-error alert-outline">{{ error_message }}</div>
-    {% endif %}
+        {% if success_message %}
+          <div class="alert alert-success mb-4">
+            <span class="icon-[tabler--check] size-5"></span>
+            <span>{{ success_message }}</span>
+          </div>
+        {% endif %}
 
-    {% if success_message %}
-      <div class="alert alert-success alert-outline">{{ success_message }}</div>
-    {% endif %}
-
-    <form method="post" enctype="multipart/form-data">
-      {% csrf_token %}
-      {% for field in form %}
-        <div class="max-w-md">
-          <div class="flex items-center mt-4">
-            <label class="label-text w-24 mr-2" for="{{ field.id_for_label }}">{{ field.label }}: </label>
-            <div class="flex-1">{{ field }}</div>
+        <form method="post" enctype="multipart/form-data" class="space-y-4">
+          {% csrf_token %}
+          
+          <!-- 会议标题字段 - 使用统一的表单组件样式 -->
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text">{{ form.title.label }}<span class="text-error">*</span></span>
+            </label>
+            {{ form.title|add_class:"input input-bordered w-full" }}
+            {% if form.title.errors %}
+              <label class="label">
+                <span class="label-text-alt text-error">{{ form.title.errors.0 }}</span>
+              </label>
+            {% endif %}
           </div>
 
-          {% if field.errors %}
-            <div class="helper-text text-error text-end" role="alert">{{ field.errors }}</div>
-          {% endif %}
+          <!-- 会议日期字段 -->
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text">{{ form.date.label }}<span class="text-error">*</span></span>
+            </label>
+            {{ form.date|add_class:"input input-bordered w-full" }}
+            {% if form.date.help_text %}
+              <label class="label">
+                <span class="label-text-alt">{{ form.date.help_text }}</span>
+              </label>
+            {% endif %}
+            {% if form.date.errors %}
+              <label class="label">
+                <span class="label-text-alt text-error">{{ form.date.errors.0 }}</span>
+              </label>
+            {% endif %}
+          </div>
 
-          {% if field.help_text %}
-            <span class="helper-text text-primary text-end" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</span>
-          {% endif %}
-        </div>
-      {% endfor %}
+          <!-- 文件上传字段 -->
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text">{{ form.upload.label }}<span class="text-error">*</span></span>
+            </label>
+            {{ form.upload|add_class:"file-input file-input-bordered w-full" }}
+            {% if form.upload.help_text %}
+              <label class="label">
+                <span class="label-text-alt">{{ form.upload.help_text }}</span>
+              </label>
+            {% endif %}
+            {% if form.upload.errors %}
+              <label class="label">
+                <span class="label-text-alt text-error">{{ form.upload.errors.0 }}</span>
+              </label>
+            {% endif %}
+          </div>
 
-      <div class="flex items-center justify-end mt-4">
-        <button class="btn btn-accent" type="submit">上传</button>
-        <button class="btn btn-neutral ml-2" type="reset">重置</button>
+          <!-- 表单操作按钮 - 使用统一的按钮样式 -->
+          <div class="form-control mt-6">
+            <div class="flex gap-2 justify-end">
+              <button type="reset" class="btn btn-ghost">
+                <span class="icon-[tabler--refresh] size-4"></span>
+                重置
+              </button>
+              <a href="{% url 'meeting:meeting_list' %}" class="btn btn-outline">
+                <span class="icon-[tabler--arrow-left] size-4"></span>
+                取消
+              </a>
+              <button type="submit" class="btn btn-primary">
+                <span class="icon-[tabler--upload] size-4"></span>
+                上传
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>
   </div>
 {% endblock %}
 
-{% block extra_js %}
-<script>
-// 确保日期输入框显示当前日期
-document.addEventListener('DOMContentLoaded', function() {
-    const dateInput = document.querySelector('input[type="date"]');
-    if (dateInput && !dateInput.value) {
-        const today = new Date();
-        const formattedDate = today.getFullYear() + '-' + 
-                             String(today.getMonth() + 1).padStart(2, '0') + '-' + 
-                             String(today.getDate()).padStart(2, '0');
-        dateInput.value = formattedDate;
-    }
-});
-</script>
-{% endblock %}
+
+
+{% block right_sidebar %}{% endblock right_sidebar %}

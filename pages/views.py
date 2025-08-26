@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect 
-from django.contrib.auth.decorators import login_not_required
+from django.contrib.auth.decorators import login_not_required # type: ignore
 from django.views.generic.detail import DetailView
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
@@ -53,11 +53,11 @@ class PageDetailView(DetailView):
     model = Page
 
     def get_template_names(self):
-        return [f"pages/page_{self.object.template}.html"]
+        return [f"pages/page_{self.object.template}.html"] # type: ignore
      
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = self.object.title
+        context['title'] = self.object.title # type: ignore
         return {"page": context['object'], "title": context['title']}
 
     def get_queryset(self):

@@ -1,0 +1,85 @@
+{% load static %}
+{% load menus %}
+
+<nav class="navbar bg-base-100 shadow-lg px-8 relative z-10">
+  <div class="navbar-start">
+    <div class="dropdown">
+      <div tabindex="0" role="button" class="btn btn-ghost md:hidden">
+        <span class="icon-[tabler--menu-2] size-6"></span>
+      </div>
+      <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
+        {% get_main_menu as main_menu %}
+        {% for item in main_menu %}
+          <li>
+            <a href="{{ item.url }}" class="{% if item.active %}active font-medium{% endif %}">{{ item.name }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="flex items-center gap-2">
+      <img src="{% static 'images/logo.png' %}" alt="Logo" class="w-8 h-8" />
+      <a class="btn btn-ghost text-xl font-bold" href="/">{{ site_info.my_site_name }}</a>
+    </div>
+  </div>
+
+  <div class="navbar-center hidden md:flex">
+    <ul class="menu menu-horizontal px-1">
+      {% get_main_menu as main_menu %}
+      {% for item in main_menu %}
+        <li>
+          <a href="{{ item.url }}" class="{% if item.active %}active font-medium{% endif %}">{{ item.name }}</a>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="navbar-end gap-2">
+    {% include 'theme_selector.html' %}
+
+    {% if user.is_authenticated %}
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-ghost gap-2">
+          <div class="avatar">
+            <div class="w-10 rounded-full">
+              <img src="{% static 'images/avatar.png' %}" alt="avatar" />
+            </div>
+          </div>
+          <span class="text-base-content font-medium">
+            {% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}
+          </span>
+        </div>
+        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-48 p-2 shadow-lg border border-base-300">
+          <li>
+            <a href="{% url 'accounts:profile' %}" class="flex items-center gap-3">
+              <span class="icon-[tabler--user-circle] size-5"></span>
+              用户信息
+            </a>
+          </li>
+          {% if user.is_staff %}
+            <li>
+              <a href="{% url 'admin:index' %}" class="flex items-center gap-3">
+                <span class="icon-[tabler--settings] size-5"></span>
+                后台管理
+              </a>
+            </li>
+          {% endif %}
+          <li><hr class="border-base-300" /></li>
+          <li>
+            <form method="post" action="{% url 'accounts:logout' %}" class="p-0 m-0">
+              {% csrf_token %}
+              <button type="submit" class="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-error hover:text-error-content rounded-lg transition-colors text-error">
+                <span class="icon-[tabler--logout] size-5"></span>
+                注销
+              </button>
+            </form>
+          </li>
+        </ul>
+      </div>
+    {% else %}
+      <a href="{% url 'accounts:login' %}" class="btn btn-primary">
+        <span class="icon-[tabler--login] size-5"></span>
+        登录
+      </a>
+    {% endif %}
+  </div>
+</nav>

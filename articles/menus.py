@@ -1,11 +1,19 @@
-from django.urls import reverse
+# articles/menus.py
+"""
+定义articles应用的菜单项
+"""
 
-
-# 文章菜单项
-
-article_menu_items = [
+MENUS = [
     {
-        "name": "文章列表",
-        "url": reverse("articles:list"),
+        "section": "文章管理",
+        "items": [
+            {
+                "name": "文章列表",
+                "url_name": "articles:list",
+                "icon": "tabler--article",
+                "perms": ["is_authenticated"],
+            },
+        ],
     },
 ]
+

@@ -1,14 +1,11 @@
 {% extends 'base.html' %}
 
-{% block left_sidebar %}
-{% include 'menu.html' with menu_items=custom_menus.user_menu_items show_divider=True %}
-{% endblock left_sidebar %}
 
-{% block main %}
+{% block content %}
 <div class="space-y-6">
   <!-- 页面标题 -->
-  <div class="flex items-center gap-3 justify-center">
-    <span class="icon-[tabler--user-plus] text-2xl text-primary"></span>
+  <div class="flex items-center gap-3 justify-start">
+    <span class="icon-[tabler--user-plus] size-8 text-primary"></span>
     <h1 class="text-3xl font-bold">{{ title }}</h1>
   </div>
 
@@ -62,3 +59,5 @@ document.getElementById('copyBtn').addEventListener('click', function() {
 });
 </script>
 {% endblock %}
+
+{% block right_sidebar %}{% endblock right_sidebar %}
