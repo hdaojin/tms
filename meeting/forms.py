@@ -8,11 +8,12 @@ class MeetingUploadForm(forms.ModelForm):
     class Meta:
         model = Meeting
         fields = ['title', 'date', 'upload']
-        widgets = {
-            'title': forms.TextInput(attrs={'type': 'text', 'class': 'input input-bordered w-full', 'aria-label': 'input', 'placeholder': '网络系统管理项目周例会'}),
-            'date': forms.DateInput(attrs={'type': 'date', 'class': 'input input-bordered w-full'}),
-            'upload': forms.FileInput(attrs={'type':'file', 'class': 'input input-bordered w-full', 'accept': '.pdf', 'aria-label': 'file-input'}),
-        }
+        # 使用自定义的模板filters来渲染样式，所以这里不需要再定义widgets
+        # widgets = {
+        #     'title': forms.TextInput(attrs={'type': 'text', 'class': 'input input-bordered w-full', 'aria-label': 'input', 'placeholder': '网络系统管理项目周例会'}),
+        #     'date': forms.DateInput(attrs={'type': 'date', 'class': 'input input-bordered w-full'}),
+        #     'upload': forms.FileInput(attrs={'type':'file', 'class': 'input input-bordered w-full', 'accept': '.pdf', 'aria-label': 'file-input'}),
+        # }
         # labels = {
         #     'title': '会议标题',
         #     'date': '会议日期',
@@ -24,6 +25,16 @@ class MeetingUploadForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        # 设置字段属性
+        self.fields['title'].widget.attrs.update({
+            'placeholder': '例如：网络系统管理项目周例会',
+        })
+        
+        self.fields['upload'].widget.attrs.update({
+            'accept': '.pdf',
+        })
+        
         # 设置默认日期为今天（每次实例化时动态设置）
         if not self.instance.pk:
             today = timezone.now().date()

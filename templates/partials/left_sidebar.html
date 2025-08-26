@@ -1,0 +1,23 @@
+{# templates/partials/left_sidebar.html #}
+<aside class="w-64 bg-base-200 border-r border-base-300 hidden md:block relative z-0 pt-1">
+  <ul class="menu bg-base-200 rounded-box w-full">
+    {% load menus %}
+    {% get_sidebar_menu as sidebar_menus %}
+    {% for sec in sidebar_menus %}
+      {% if sec.section %}
+        <li class="menu-title">{{ sec.section }}</li>
+      {% endif %}
+      {% for it in sec.items %}
+        <li>
+          <a href="{{ it.url }}" class="{% if it.active %}active font-medium{% endif %}">
+            {% if it.icon %}
+              <span class="icon-[{{ it.icon }}] size-6 text-primary"></span>
+            {% endif %}
+            <span>{{ it.name }}</span>
+          </a>
+        </li>
+      {% endfor %}
+      {% if not forloop.last %}<li class="my-2 opacity-50"><hr/></li>{% endif %}
+    {% endfor %}
+  </ul>
+</aside>

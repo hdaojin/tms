@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block main %}
-    <div class="min-h-screen flex items-center justify-center p-4">
+{% block left_sidebar %}{% endblock left_sidebar %}
+
+{% block content %}
+    <div class="flex items-center justify-center p-4">
       <div class="w-full max-w-md">
         {% if form.errors %}
         <div class="alert alert-error mb-4" role="alert">
@@ -74,3 +76,6 @@
       </div>
     </div>
 {% endblock %}
+
+{% block right_sidebar %}{% endblock right_sidebar %}
+
