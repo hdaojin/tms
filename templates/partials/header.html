@@ -45,35 +45,38 @@
             </div>
           </div>
           <span class="text-base-content font-medium">
-            {% if user.first_name %}{{ user.first_name }}{% else %}{{ user.username }}{% endif %}
+            {% if user.first_name %}
+              {{ user.first_name }}
+            {% else %}
+              {{ user.username }}
+            {% endif %}
           </span>
         </div>
+        {% get_sidebar_menu as dropdown_menus %}
         <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-48 p-2 shadow-lg border border-base-300">
+          {% for section in dropdown_menus %}
+            {% for item in section.items %}
+              <li>
+                <a href="{{ item.url }}" class="flex items-center gap-3">
+                  {% if item.icon %}
+                    <span class="icon-[{{ item.icon }}] size-5 text-primary"></span>
+                  {% endif %}
+                  <span>{{ item.name }}</span>
+                </a>
+              </li>
+            {% endfor %}
+          {% endfor %}
+          <div class="divider my-1"></div>
           <li>
-            <a href="{% url 'accounts:profile' %}" class="flex items-center gap-3">
-              <span class="icon-[tabler--user-circle] size-5"></span>
-              用户信息
+            <a href="#" onclick="document.getElementById('logout-form').submit(); return false;" class="text-error hover:bg-error hover:text-error-content">
+              <span class="icon-[tabler--logout] size-5"></span>
+              <span>注销</span>
             </a>
           </li>
-          {% if user.is_staff %}
-            <li>
-              <a href="{% url 'admin:index' %}" class="flex items-center gap-3">
-                <span class="icon-[tabler--settings] size-5"></span>
-                后台管理
-              </a>
-            </li>
-          {% endif %}
-          <li><hr class="border-base-300" /></li>
-          <li>
-            <form method="post" action="{% url 'accounts:logout' %}" class="p-0 m-0">
-              {% csrf_token %}
-              <button type="submit" class="w-full text-left flex items-center gap-3 px-4 py-3 hover:bg-error hover:text-error-content rounded-lg transition-colors text-error">
-                <span class="icon-[tabler--logout] size-5"></span>
-                注销
-              </button>
-            </form>
-          </li>
         </ul>
+        <form id="logout-form" method="post" action="{% url 'accounts:logout' %}" style="display: none;">
+          {% csrf_token %}
+        </form>
       </div>
     {% else %}
       <a href="{% url 'accounts:login' %}" class="btn btn-primary">
