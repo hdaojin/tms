@@ -1,10 +1,40 @@
-<div>
-    {{ form.username.label_tag }}
-    {{ form.username }}
+{# templates/django/forms/for_snippet.html  #}
+{# 入参: form, action, method="post", submit_label="提交", htmlx=dict #}
 
-    {{ form.password1.label_tag }}
-    {{ form.password1 }}
+<form action="{{ action|default:'' }}" method="{{ method|default:'post' }}" {% if form.is_multipart %}enctype="multipart/form-data"{% endif %} {% if htmlx %}{% for attr, value in htmlx.items %} {{ attr }}="{{ value }}"{% endfor %}{% endif %}>
+    
+    {% csrf_token %}
 
-    {{ form.password2.label_tag }}
-    {{ form.password2 }}
-</div>
+    {# 隐藏字段 #}
+    {% for hidden in form.hidden_fields %}
+        {{ hidden }}
+    {% endfor %}
+
+    {# 非字段错误，比如表单的全局错误 #}
+    {% if form.non_field_errors %}
+        <div class="alert alert-error mb-4">
+           <ul class="list-disc list-inside">
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+            </ul> 
+        </div>
+    {% endif %}
+
+    {# 遍历可见字段 #}
+    {% for field in form.visible_fields %}
+        {{ field.errors }}
+        {{ field.label_tag }}{{ field }}
+        {{ field.help_text|safe }}
+    {% endfor %}
+
+    {# 提交按钮 #}
+    <div class="mt-4 space-y-4">
+        <button type="submit" class="btn btn-primary w-full">
+            {{ submit_label|default:"提交" }}
+        </button>
+        <button type="reset" class="btn btn-outline w-full">
+            重置
+        </button>
+    </div>
+</form>
