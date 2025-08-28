@@ -18,7 +18,7 @@ class StyledFormMixin:
         # 输入框
        (forms.TextInput, forms.NumberInput, forms.EmailInput, forms.URLInput, forms.PasswordInput, forms.DateInput, forms.DateTimeInput, forms.TimeInput): 'input w-full',
        # 文件上传框
-       (forms.FileInput,): 'file-input w-full',
+       (forms.FileInput,): 'file-input w-full file-input-primary',
     }
 
     def __init__(self, *args, **kwargs):
