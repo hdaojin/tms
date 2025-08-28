@@ -165,12 +165,14 @@ def _build_menu_items(request, menu_items):
     return items
 
 
-def build_siderbar_menu(request):
+def build_siderbar_menu(request, current_app=None):
     """
     构建侧边栏菜单
     """
     autodiscover_menus()
-    current_app = _current_app_label(request)
+
+    if not current_app:
+        current_app = _current_app_label(request)
 
     sidebar_menu = []
     for section in _REGISTRED_MENUS:
