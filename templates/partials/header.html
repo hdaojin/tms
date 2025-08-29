@@ -52,7 +52,7 @@
             {% endif %}
           </span>
         </div>
-        {% get_sidebar_menu as dropdown_menus %}
+        {% get_user_menu as dropdown_menus %}
         <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-48 p-2 shadow-lg border border-base-300">
           {% for section in dropdown_menus %}
             {% for item in section.items %}

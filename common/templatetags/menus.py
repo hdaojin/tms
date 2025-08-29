@@ -19,3 +19,10 @@ def get_main_menu(context):
     request = context['request']
     main_menu = build_main_menu(request)
     return main_menu
+
+
+@register.simple_tag(takes_context=True)
+def get_user_menu(context):
+    request = context['request']
+    user_menu = build_siderbar_menu(request, current_app='accounts')
+    return user_menu
