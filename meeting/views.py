@@ -1,89 +1,46 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import permission_required
+# from django.contrib.auth.decorators import permission_required  # 如果使用函数视图
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.contrib import messages
 from django.core.files.base import ContentFile
 from django.http import FileResponse
+from django.views.generic import CreateView, ListView, DetailView
+from django.urls import reverse_lazy
 
 from pathlib import Path
 
 from .forms import MeetingUploadForm
 from .models import Meeting
 
+class MeetingUploadView(PermissionRequiredMixin, CreateView):
+    model = Meeting
+    form_class = MeetingUploadForm
+    template_name = 'meeting/upload_meeting.html'
+    success_url = reverse_lazy('meeting:meeting_list')
+    permission_required = 'meeting.add_meeting'
+    raise_exception = True  # 如果没有权限则抛出403错误
 
-# @login_required
-@permission_required('meeting.add_meeting', raise_exception=True)
-def upload_meeting(request):
-    if request.method == 'POST':
-        form = MeetingUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            meeting = form.save(commit=False)
-            meeting.uploaded_by = request.user
-
-            # 获取上传的文件
-            uploaded_file = request.FILES['upload']
-            
-            # 构建新的文件名：日期-文件标题.pdf
-            date_str = meeting.date.strftime('%Y.%m.%d')
-            new_filename = f"{date_str}-{meeting.title}.pdf"
-            
-            # 设置数据库中的文件名字段
-            meeting.filename = new_filename
-            
-            # 将文件内容读取到内存
-            file_content = uploaded_file.read()
-            
-            # 保存上传文件（使用新文件名）
-            meeting.upload.save(new_filename, ContentFile(file_content), save=False)
-            
-            # 保存模型实例
-            meeting.save()
-            messages.success(request, '会议记录文件上传成功!')
-            return redirect('meeting:meeting_list')
-    else:
-        form = MeetingUploadForm()
-    
-    return render(request, 'meeting/upload_meeting.html', {
-        'form': form, 
-        'title': '上传会议记录'
-    })
+    def form_valid(self, form):
+        form.instance.uploaded_by = self.request.user
+        file_extension = Path(form.instance.upload.name).suffix.lower()
+        form.instance.filename = f"{form.instance.date.strftime('%Y.%m.%d')}-{form.instance.title}{file_extension}"
+        return super().form_valid(form)
 
 
-def meeting_list(request):
-    meetings = Meeting.objects.all().order_by('-date')
+class MeetingListView(ListView):
+    model = Meeting
+    template_name = 'meeting/meeting_list.html'
+    context_object_name = 'meetings'
+    ordering = ['-date']
+    paginate_by = 20  # 每页显示10条记录
     
-    # 检查用户是否是班务人员
-    is_class_admin = request.user.groups.filter(name='班务').exists()
-    
-    context = {
-        'title': '会议记录列表',
-        'meetings': meetings,
-        'is_class_admin': is_class_admin,
-    }
-    
-    return render(request, 'meeting/meeting_list.html', context)
+
+class MeetingDetailView(DetailView):
+    model = Meeting
+    template_name = 'meeting/meeting_detail.html'
+    context_object_name = 'meeting'
 
 
-def meeting_detail(request, meeting_id):
-    meeting = get_object_or_404(Meeting, id=meeting_id)
-    
-    if not meeting.upload or not meeting.upload.path:
-        messages.error(request, '会议记录文件不存在或未上传。')
-        return redirect('meeting:meeting_list')
-    
-    file_path = Path(meeting.upload.path)
-    if not file_path.exists():
-        messages.error(request, '会议记录文件不存在或已被删除。')
-        return redirect('meeting:meeting_list')
-    
-    try:
-        response = FileResponse(
-            open(file_path, 'rb'), 
-            content_type='application/pdf'
-        )
-        # 使用 inline 让浏览器直接显示PDF内容而不是下载
-        response['Content-Disposition'] = f'inline; filename="{meeting.filename}"'
-        return response
-    except Exception as e:
-        messages.error(request, f'下载文件时发生错误: {str(e)}')
-        return redirect('meeting:meeting_list')
+
+
     
