@@ -116,10 +116,11 @@ def _current_app_label(request):
     1) app_names（Django 自带 app_name 链）
     2) namespaces（实例/包含命名空间）
     3) view_name 前缀（'ns:view' → 'ns'）
+
     """
     rm = getattr(request, 'resolver_match', None)
     if not rm:
-        return None
+        return "pages"
     if getattr(rm, 'app_names', None):
         return rm.app_names[-1]
     if getattr(rm, 'namespaces', None):
