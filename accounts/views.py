@@ -27,14 +27,14 @@ def account_signup(request):
     
     return render(request, 'accounts/signup.html', {
         'form': form,
-        'title': "注册",
+        'title': "新用户注册",
     })
 
 
-# @login_required
 def account_profile(request):
     return render(request, 'accounts/profile.html', {
         'title': '个人信息',
+        'title_icon': 'icon-[tabler--user-circle]',
         'user': request.user
     })
 

@@ -1,19 +1,16 @@
-{% extends 'base.html' %}
+{% extends 'base_no_left_right_sidebar.html' %}
 
-{% block left_sidebar %}{% endblock left_sidebar %}
-
-
-{% block content %}
-  <div class="flex items-center justify-center p-4">
-    <div class="w-full max-w-lg">
-      {% include "form_snippet.html" with  form=form action=request.path submit_label="注册" title="注册新账号" %}
-      <div class="text-center mt-4">
-        <p>
-          已有账号? <a href="{% url 'accounts:login' %}" class="link link-accent">立即登录</a>
-        </p>
-      </div>
-    </div>
-  </div>
+{% block title %}
 {% endblock %}
 
-{% block right_sidebar %}{% endblock right_sidebar %}
+{% block content %}
+  <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 max-lg mx-auto shadow-xl">
+    <legend class="fieldset-legend text-2xl font-bold text-center mb-4">{{ title }}</legend>
+    {% include 'components/form_snippet.html' with form=form action=request.path submit_label='注册' %}
+  </fieldset>
+  <div class="text-center mt-4">
+    <p>
+      已有账号? <a href="{% url 'accounts:login' %}" class="link link-accent">立即登录</a>
+    </p>
+  </div>
+{% endblock %}

@@ -10,19 +10,19 @@ MENUS = [
             {
                 "name": "个人资料",
                 "url_name": "accounts:profile",
-                "icon": "tabler--user-circle",
+                "icon": "icon-[tabler--user-circle]",
                 "perms": ["is_authenticated"],
             },
             {
                 "name": "管理后台",
                 "url_name": "admin:index",
-                "icon": "tabler--settings",
+                "icon": "icon-[tabler--settings]",
                 "perms": ["is_staff"],
             },
             {
                 "name": "邀请注册",
                 "url_name": "accounts:generate_invitation",
-                "icon": "tabler--key",
+                "icon": "icon-[tabler--key]",
                 "perms": ["is_superuser"],
             },
         ],

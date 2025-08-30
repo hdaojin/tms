@@ -8,17 +8,17 @@ from common.forms import BaseModelForm
 class MeetingUploadForm(BaseModelForm):
     class Meta:
         model = Meeting
-        fields = ['title', 'date', 'upload']
+        fields = ['title', 'date', 'file']
         localized_fields = ['date']
         widgets = {
-            'title': forms.TextInput(attrs={'type': 'text', 'aria-label': 'input', 'placeholder': '网络系统管理项目周例会'}),
+            'title': forms.TextInput(attrs={'type': 'text', 'aria-label': 'input', 'placeholder': '例如: 网络系统管理项目周例会'}),
             'date': forms.DateInput(attrs={'type': 'date'}),
-            'upload': forms.FileInput(attrs={'type':'file', 'accept': '.pdf', 'aria-label': 'file-input'}),
+            'file': forms.FileInput(attrs={'type':'file', 'accept': '.pdf', 'aria-label': 'file-input'}),
          }
         labels = {
             'title': '会议名称',
             'date': '会议日期',
-            'upload': '会议记录文件',
+            'file': '会议记录文件',
         }
 
     def __init__(self, *args, **kwargs):
@@ -30,25 +30,25 @@ class MeetingUploadForm(BaseModelForm):
             self.fields['date'].initial = today.strftime('%Y-%m-%d')
             self.fields['date'].widget.attrs['value'] = today.strftime('%Y-%m-%d')
 
-    def clean_upload(self):
-        upload = self.cleaned_data.get('upload')
+    def clean_file(self):
+        file = self.cleaned_data.get('file')
         
-        if upload:
+        if file:
             # 检查文件扩展名
             valid_extensions = ['.pdf']
-            if not any(upload.name.lower().endswith(ext) for ext in valid_extensions):
+            if not any(file.name.lower().endswith(ext) for ext in valid_extensions):
                 raise ValidationError(f"上传文件格式必须为{', '.join(valid_extensions)}。")
             
             # 检查文件大小（10MB = 10 * 1024 * 1024 bytes）
-            if upload.size > 10 * 1024 * 1024:
+            if file.size > 10 * 1024 * 1024:
                 raise ValidationError('上传文件大小不能超过10MB。')
         
-        return upload
+        return file
 
     def clean_date(self):
         date = self.cleaned_data.get('date')
         
-        if date and date > timezone.now().date():
+        if date and date > timezone.localdate():
             raise ValidationError('会议日期不能是未来的日期。')
         
         return date

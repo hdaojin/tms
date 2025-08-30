@@ -37,7 +37,7 @@
         <legend class="fieldset-legend">{{ field.label_tag }}</legend>
             {{ field }}
             {% if field.help_text %}
-                <p class="label">{{ field.help_text|safe }}</p>
+                <p class="label text-info">{{ field.help_text|safe }}</p>
             {% endif %}
         </fieldset>
     {% endfor %}

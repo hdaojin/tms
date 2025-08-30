@@ -1,16 +1,7 @@
-<!DOCTYPE html>
-<html lang="zh-hans" data-theme="light">
-  <head>
-    {% include 'partials/head.html' %}
-  </head>
+{% extends "base.html" %}
 
-  <body class="min-h-screen flex items-center justify-center p-6">
-    <main class="w-full max-w-lg">
-      {% block content %}
 
-      {% endblock %}
-    </main>
-
-    {% include 'partials/foot.html' %}
-  </body>
-</html>
+{% block header %}{% endblock header %}
+{% block left_sidebar %}{% endblock left_sidebar %}
+{% block right_sidebar %}{% endblock right_sidebar %}
+{% block footer %}{% endblock footer %}
