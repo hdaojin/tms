@@ -1,12 +1,13 @@
-{% extends 'base.html' %}
+{% extends 'base_no_left_right_sidebar.html' %}
 {% load static %}
 
-{% block left_sidebar %}{% endblock left_sidebar %}
+{% block title %}
+{% endblock %}
 
 {% block content %}
-    <div class="flex items-center justify-center p-4">
-      <div class="w-full max-w-md">
-        {% if form.errors %}
+  <div class="flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+      {% if form.errors %}
         <div class="alert alert-error mb-4" role="alert">
           <span class="icon-[tabler--alert-triangle] shrink-0 size-6"></span>
           <div>
@@ -18,24 +19,24 @@
 
       <form method="post" action="{% url 'accounts:login' %}">
         {% csrf_token %}
-        <fieldset class="fieldset bg-base-100 shadow-xl rounded-box p-6">
-          <legend class="fieldset-legend">登录</legend>
+        <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 max-lg mx-auto shadow-xl">
+          <legend class="fieldset-legend text-2xl font-bold text-center mb-4">{{ title }}</legend>
           <div class="space-y-4">
-          {% for field in form %}
-            <div>
-            {% if field.errors %}
-              <div class="alert alert-error alert-outline mt-2" role="alert">{{ field.errors }}</div>
-            {% endif %}
-            <label class="input input-bordered w-full">
-              <span class="label">{{ field.label }}</span>
-              {{ field }}
-            </label>
+            {% for field in form %}
+              <div>
+                {% if field.errors %}
+                  <div class="alert alert-error alert-outline mt-2" role="alert">{{ field.errors }}</div>
+                {% endif %}
+                <label class="input input-bordered w-full">
+                  <span class="label">{{ field.label }}</span>
+                  {{ field }}
+                </label>
 
-            {% if field.help_text %}
-              <p class="label text-sm opacity-70 text-primary" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</p>
-            {% endif %}
-            </div>
-          {% endfor %}
+                {% if field.help_text %}
+                  <p class="label text-sm opacity-70 text-primary" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</p>
+                {% endif %}
+              </div>
+            {% endfor %}
           </div>
 
           <!-- 记住我 -->
@@ -53,7 +54,7 @@
           <input type="hidden" name="next" value="{{ next }}" />
         </fieldset>
       </form>
-      
+
       <div class="text-center mt-4">
         <p>
           还没有账户? <a href="{% url 'accounts:signup' %}" class="link link-accent">立即注册</a>
@@ -73,9 +74,6 @@
           </div>
         {% endif %}
       {% endif %}
-      </div>
     </div>
+  </div>
 {% endblock %}
-
-{% block right_sidebar %}{% endblock right_sidebar %}
-

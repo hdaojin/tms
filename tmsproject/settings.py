@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-from django.forms.renderers import TemplatesSetting
+# from django.forms.renderers import TemplatesSetting
 
 from pathlib import Path
 
@@ -95,11 +95,11 @@ TEMPLATES = [
 ]
 
 
-class CustomFormRenderer(TemplatesSetting):
-    form_template_name = "form_snippet.html"
-    # field_template_name = "field_snippet.html"
+# class CustomFormRenderer(TemplatesSetting):
+#     form_template_name = "components/form_snippet.html"
+#     # field_template_name = "field_snippet.html"
 
-FORM_RENDERER = "tmsproject.settings.CustomFormRenderer"
+# FORM_RENDERER = "tmsproject.settings.CustomFormRenderer"
 
 
 WSGI_APPLICATION = 'tmsproject.wsgi.application'

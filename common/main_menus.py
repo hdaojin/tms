@@ -3,8 +3,6 @@
 定义网站的主菜单项
 """
 
-from django.urls import reverse
-
 # 主菜单项
 MENUS = [
     {
@@ -13,7 +11,7 @@ MENUS = [
         "perms": ["is_authenticated"],
     },
     {
-        "name": "日志",
+        "name": "训练",
         "url_name": "traininglogs:list_training_logs",
         "perms": ["is_authenticated"],
     },
@@ -29,7 +27,8 @@ MENUS = [
     },
     {
         "name": "关于",
-        "url": reverse("pages:page_detail", kwargs={"slug": "about"}),
+        "url_name": "pages:page_detail",
+        "url_kwargs": {"slug": "about"},
         "perms": [],  # 公开访问，无权限要求
     },
 ]

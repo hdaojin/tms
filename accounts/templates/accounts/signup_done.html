@@ -1,8 +1,7 @@
-{% extends 'base.html' %}
+{% extends 'base_no_left_right_sidebar.html' %}
 
-
-{% block left_sidebar %}{% endblock left_sidebar %}
-
+{% block title %}
+{% endblock %}
 
 {% block content %}
   <div class="hero">
@@ -16,29 +15,26 @@
                   <span class="icon-[tabler--check] text-2xl"></span>
                 </div>
               </div>
-              
+
               <div class="text-center">
                 <h2 class="card-title text-2xl justify-center mb-2">注册成功！</h2>
                 {% if new_user %}
                   <p class="text-base-content/70 mb-4">
-                    欢迎 <span class="font-semibold text-primary">{{ new_user.username }}</span> 
+                    欢迎 <span class="font-semibold text-primary">{{ new_user.username }}</span>
                     {% if new_user.first_name %}
                       ({{ new_user.first_name }})
-                    {% endif %}
-                    加入我们！
+                    {% endif %}加入我们！
                   </p>
                 {% else %}
-                  <p class="text-base-content/70 mb-4">
-                    欢迎加入我们！
-                  </p>
+                  <p class="text-base-content/70 mb-4">欢迎加入我们！</p>
                 {% endif %}
-                
+
                 <div class="alert alert-info text-sm">
                   <span class="icon-[tabler--info-circle] shrink-0"></span>
                   <span>请等待管理员激活您的账户后才能登录。</span>
                 </div>
               </div>
-              
+
               <div class="card-actions justify-center">
                 <a href="{% url 'pages:homepage' %}" class="btn btn-primary">
                   <span class="icon-[tabler--home] text-lg"></span>
@@ -56,5 +52,3 @@
     </div>
   </div>
 {% endblock %}
-
-{% block right_sidebar %}{% endblock right_sidebar %}

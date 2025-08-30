@@ -16,14 +16,24 @@
         {% include 'partials/left_sidebar.html' %}
       {% endblock %}
 
+      {% block main %}
       <main class="flex-1 p-4">
-        <div class="w-full md:max-w-9/10 mx-auto py-4">
+        <div class="flex flex-col space-y-4 w-full md:max-w-9/10 p-2 mx-auto">
+          {% block title %}
+            {% if title and show_title|default:True %}
+              <div class="flex items-center gap-3">
+                <span class="{{ title_icon }} size-6 text-primary"></span>
+                <h1 class="text-2xl font-bold">{{ title }}</h1>
+              </div>
+            {% endif %}
+          {% endblock %}
           {% block content %}
-
           {% endblock %}
         </div>
       </main>
+      {% endblock main %}
 
+      {# 右侧边栏：默认显示；若子模板要隐藏，覆盖 block 为“空”即可 #}
       {% block right_sidebar %}
         {% include 'partials/right_sidebar.html' %}
       {% endblock %}

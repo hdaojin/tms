@@ -34,7 +34,7 @@
   </div>
 
   <div class="navbar-end gap-2">
-    {% include 'theme_selector.html' %}
+    {% include 'partials/theme_selector.html' %}
 
     {% if user.is_authenticated %}
       <div class="dropdown dropdown-end">
@@ -44,7 +44,7 @@
               <img src="{% static 'images/avatar.png' %}" alt="avatar" />
             </div>
           </div>
-          <span class="text-base-content font-medium">
+          <span class="text-primary font-medium">
             {% if user.first_name %}
               {{ user.first_name }}
             {% else %}

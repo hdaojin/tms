@@ -10,13 +10,13 @@ MENUS = [
             {
                 "name": "浏览会议记录",
                 "url_name": "meeting:meeting_list",
-                "icon": "tabler--article",
+                "icon": "icon-[tabler--file-stack]",
                 "perms": ["is_authenticated"],
             },
             {
                 "name": "上传会议记录",
                 "url_name": "meeting:upload_meeting",
-                "icon": "tabler--upload",
+                "icon": "icon-[tabler--upload]",
                 "perms": ["is_authenticated", "meeting.add_meeting"],
             },
         ],

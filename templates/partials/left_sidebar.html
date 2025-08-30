@@ -11,7 +11,7 @@
         <li>
           <a href="{{ it.url }}" class="{% if it.active %}active font-medium{% endif %}">
             {% if it.icon %}
-              <span class="icon-[{{ it.icon }}] size-6 text-primary"></span>
+              <span class="{{ it.icon }} size-6 text-primary"></span>
             {% endif %}
             <span>{{ it.name }}</span>
           </a>

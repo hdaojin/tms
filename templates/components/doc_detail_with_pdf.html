@@ -1,0 +1,90 @@
+{# templates/components/doc_detail_with_pdf.html #}
+{% comment %}
+期望参数：
+  必填：
+    file_url        实际文件直链
+    file_name       文件名
+    file_size       文件大小(已格式化)
+    uploaded_at     上传时间(已格式化)
+    uploader_name   上传者显示名
+  可选：
+    preview_url     用于内联预览的 URL（建议指向你控制响应头的视图）；默认用 file_url
+    title           页面或模块标题；默认“文档详情”
+    show_preview    是否展示预览；默认 true
+{% endcomment %}
+
+{% with preview_url_final=preview_url|default:file_url %}
+<div class="flex flex-col w-full space-y-4">
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <!-- 文档信息 -->
+    <div class="bg-base-200 p-6 rounded-lg">
+      <h2 class="text-lg font-bold mb-4 flex items-center">
+        <span class="icon-[tabler--info-circle] size-5 mr-1"></span>
+        文档信息
+      </h2>
+      <div class="flex flex-col flex-wrap md:flex-row gap-x-6 gap-y-2">
+        <div class="flex items-center">
+          <span class="icon-[tabler--clock] size-4 mr-1 text-base-content/70"></span>
+          <span class="text-sm text-base-content/70 mr-1">上传时间：</span>
+          <span class="font-medium">{{ uploaded_at }}</span>
+        </div>
+        <div class="flex items-center">
+          <span class="icon-[tabler--user] size-4 mr-1 text-base-content/70"></span>
+          <span class="text-sm text-base-content/70 mr-1">上传者：</span>
+          <span class="font-medium">{{ uploader_name }}</span>
+        </div>
+        <div class="flex items-center">
+          <span class="icon-[tabler--file-info] size-4 mr-1 text-base-content/70"></span>
+          <span class="text-sm text-base-content/70 mr-1">文件大小：</span>
+          <span class="font-medium">{{ file_size }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 文件操作 -->
+    <div class="bg-base-200 p-6 rounded-lg">
+      <h2 class="text-lg font-bold mb-4 flex items-center">
+        <span class="icon-[tabler--file-text] size-5 mr-1"></span>
+        文件操作
+      </h2>
+      <div class="flex flex-col flex-wrap md:flex-row space-x-6 space-y-2">
+        <div class="flex items-center space-x-2">
+          {% if file_url|lower|slice:'-4:' == '.pdf' %}
+            <span class="icon-[tabler--file-type-pdf] size-5 text-error"></span>
+          {% else %}
+            <span class="icon-[tabler--file] size-5"></span>
+          {% endif %}
+          <span class="text-sm truncate" title="{{ file_name }}">{{ file_name }}</span>
+        </div>
+        <div class="flex items-center space-x-3">
+          <a href="{{ file_url }}" target="_blank" class="btn btn-primary btn-sm">
+            <span class="icon-[tabler--eye] size-4 mr-1"></span>在线查看
+          </a>
+          <a href="{{ file_url }}" download="{{ file_name }}" class="btn btn-secondary btn-sm">
+            <span class="icon-[tabler--download] size-4 mr-1"></span>下载文件
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if show_preview|default_if_none:True and file_url|lower|slice:'-4:' == '.pdf' %}
+    <div class="bg-base-200 p-4 rounded-lg">
+      <h2 class="text-lg font-bold mb-3 flex items-center">
+        <span class="icon-[tabler--report-search] size-5 mr-1"></span>文档预览
+      </h2>
+      <object data="{{ preview_url_final }}" type="application/pdf"
+              class="w-full h-[85vh] rounded-lg border border-base-300 bg-white">
+        <div class="text-center py-8">
+          <p class="mb-4">您的浏览器不支持PDF预览。请点击下面的链接下载文件查看。</p>
+          <a href="{{ file_url }}" download="{{ file_name }}" class="btn btn-secondary btn-sm">
+            <span class="icon-[tabler--download] size-4 mr-1"></span>下载文件
+          </a>
+        </div>
+      </object>
+    </div>
+  {% endif %}
+
+</div>
+{% endwith %}

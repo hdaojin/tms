@@ -145,8 +145,9 @@ def _build_menu_items(request, menu_items):
             continue
             
         url_name = item.get('url_name')
+        url_kwargs = item.get('url_kwargs', {})
         try:
-            url = reverse(url_name) if url_name else item.get('url', '#')
+            url = reverse(url_name, kwargs=url_kwargs) if url_name else item.get('url', '#')
         except NoReverseMatch:
             url = '#'
             

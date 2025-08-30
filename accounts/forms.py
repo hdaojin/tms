@@ -3,6 +3,8 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
 from .utils import validate_invitation_code  
 
+from common.forms import StyledFormMixin
+
 
 class CustomAuthenticationForm(AuthenticationForm):
     """自定义登录表单，用于首页登录"""
@@ -29,7 +31,7 @@ class CustomAuthenticationForm(AuthenticationForm):
     # }
 
 
-class CustomUserCreationForm(UserCreationForm):
+class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
     full_name = forms.CharField(
         max_length=100, 
         required=True, 

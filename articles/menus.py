@@ -10,7 +10,7 @@ MENUS = [
             {
                 "name": "文章列表",
                 "url_name": "articles:list",
-                "icon": "tabler--article",
+                "icon": "icon-[tabler--article]",
                 "perms": ["is_authenticated"],
             },
         ],

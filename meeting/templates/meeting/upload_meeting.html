@@ -1,16 +1,7 @@
-{% extends 'base.html' %}
+{% extends 'base_no_right_sidebar.html' %}
 
 {% block content %}
-  <div class="container mx-auto max-w-2xl px-4">
-    <div class="card bg-base-100 shadow-xl">
-      <div class="card-body">
-        <h2 class="card-title text-2xl justify-center mb-6">{{ title }}</h2>
-        {% url 'meeting:upload_meeting' as upload_url %}
-        {% include "form_snippet.html" with form=form action=upload_url submit_label="上传" %}
-    </div>
+  <div class="max-w-lg mx-auto p-2 w-full">
+    {% include 'components/form_snippet.html' with form=form action=request.path submit_label="上传" %}
   </div>
 {% endblock %}
-
-
-
-{% block right_sidebar %}{% endblock right_sidebar %}
