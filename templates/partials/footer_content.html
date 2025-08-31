@@ -1,7 +1,7 @@
 {% load static %}
 <div class="flex flex-wrap text-xs">
   <p>
-    &copy; 2024-{% now 'Y' %} <a class="link [--link-color:text-neutral-content] link-animated" href="{% url 'pages:homepage' %}">{{ site_info.my_site_name|lower }}.cn</a> 版权所有.
+    &copy; 2024-{% now 'Y' %} <a class="link [--link-color:text-neutral-content] link-animated" href="/">{{ site_info.my_site_name|lower }}.cn</a> 版权所有.
   </p>
   <div class="flex items-center space-x-1">
     <img src="{% static 'images/gong_an_bu_bei_an.png' %}" alt="公安部备案图标" width="16" height="16" />

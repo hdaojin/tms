@@ -5,19 +5,17 @@
 
 MENUS = [
     {
-        "section": "关于",
+        "section": None,  # flatpage菜单不显示section标题
         "items": [
             {
                 "name": "关于本站",
-                "url_name": "pages:page_detail",
-                "url_kwargs": {"slug": "about"},
+                "url": "/about/",
                 "icon": "icon-[tabler--info-circle]",
                 "perms": [],  # 公开访问，无权限要求
             },
             {
                 "name": "关于作者",
-                "url_name": "pages:page_detail",
-                "url_kwargs": {"slug": "about-author"},
+                "url": "/about-author/",
                 "icon": "icon-[tabler--user-circle]",
                 "perms": [],  # 公开访问，无权限要求
             },

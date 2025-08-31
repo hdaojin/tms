@@ -4,8 +4,8 @@
 <meta name="csrf-token" content="{{ csrf_token }}" />
 <link rel="icon" type="image/png" href="{% static 'images/computer-laptop-color-icon.png' %}" />
 <title>
-  {% if title %}
-    {{ title }} | {{ site_info.my_site_name }}
+  {% if title or flatpage.title %}
+    {% firstof title flatpage.title %} | {{ site_info.my_site_name }}
   {% else %}
     {% block title %}
       {{ my_site_name }}

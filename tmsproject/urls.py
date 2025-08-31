@@ -19,6 +19,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from common.home.views import HomeView
 
 admin.site.site_header = "TMS 管理后台"
 admin.site.site_title = "TMS 管理后台"
@@ -31,7 +32,8 @@ urlpatterns = [
     path("traininglogs/", include("traininglogs.urls", namespace="traininglogs")),
     path("meeting/", include("meeting.urls", namespace="meeting")),
     path("notices/", include("notices.urls", namespace="notices")),
-    path("", include("pages.urls", namespace="pages")), 
+    path("", HomeView.as_view(), name="home"),
+    # path("", include("pages.urls", namespace="pages")), 
 ]
 
 # 在开发环境中添加静态文件和媒体文件的URL配置

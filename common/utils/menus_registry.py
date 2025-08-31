@@ -43,7 +43,8 @@ from importlib import import_module
 from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 
-from common.main_menus import MENUS as MAIN_MENUS
+from common.menus.main_menus import MENUS as MAIN_MENUS
+from common.menus.flatpage_menus import MENUS as FLATPAGES_MENUS
 
 
 _REGISTRED_MENUS = []
@@ -120,7 +121,7 @@ def _current_app_label(request):
     """
     rm = getattr(request, 'resolver_match', None)
     if not rm:
-        return "pages"
+        return None
     if getattr(rm, 'app_names', None):
         return rm.app_names[-1]
     if getattr(rm, 'namespaces', None):
@@ -200,3 +201,11 @@ def build_main_menu(request):
     """
     main_menus = _build_menu_items(request, MAIN_MENUS)
     return main_menus
+
+
+def build_flatpage_menu(request):
+    """
+    构建静态页面菜单，复用通用菜单构建逻辑
+    """
+    flatpage_menus = _build_menu_items(request, FLATPAGES_MENUS)
+    return flatpage_menus

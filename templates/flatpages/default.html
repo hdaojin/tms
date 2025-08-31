@@ -1,0 +1,12 @@
+{% extends 'base_no_right_sidebar.html' %}
+
+{% block title %}
+  <div class="flex items-center gap-3">
+    <span class="icon-[tabler--info-square-rounded] size-6 text-primary"></span>
+    <h1 class="text-2xl font-bold">{{ flatpage.title }}</h1>
+  </div>
+{% endblock %}
+
+{% block content %}
+  <div class="w-full mt-2">{{ flatpage.content|safe }}</div>
+{% endblock %}
