@@ -2,7 +2,11 @@
 <aside class="w-48 bg-base-200 border-r border-base-300 hidden md:block relative z-0 pt-1">
   <ul class="menu bg-base-200 rounded-box w-full">
     {% load menus %}
-    {% get_sidebar_menu as sidebar_menus %}
+    {% if flatpage %}
+      {% get_flatpage_menu as sidebar_menus %}
+    {% else %}
+      {% get_sidebar_menu as sidebar_menus %}
+    {% endif %}
     {% for sec in sidebar_menus %}
       {% if sec.section %}
         <li class="menu-title">{{ sec.section }}</li>
@@ -17,7 +21,11 @@
           </a>
         </li>
       {% endfor %}
-      {% if not forloop.last %}<li class="my-2 opacity-50"><hr/></li>{% endif %}
+      {% if not forloop.last %}
+        <li class="my-2 opacity-50">
+          <hr />
+        </li>
+      {% endif %}
     {% endfor %}
   </ul>
 </aside>

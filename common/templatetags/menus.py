@@ -1,7 +1,7 @@
 # common/templatetags/menus.py
 from django import template
 
-from common.menus_registry import build_siderbar_menu, build_main_menu
+from common.utils.menus_registry import build_siderbar_menu, build_main_menu, build_flatpage_menu
 
 
 register = template.Library()
@@ -26,3 +26,9 @@ def get_user_menu(context):
     request = context['request']
     user_menu = build_siderbar_menu(request, current_app='accounts')
     return user_menu
+
+@register.simple_tag(takes_context=True)
+def get_flatpage_menu(context):
+    request = context['request']
+    flatpage_menu = build_flatpage_menu(request)
+    return flatpage_menu

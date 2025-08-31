@@ -47,10 +47,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
+    'django.contrib.flatpages',
     'django.forms',
     # Custom apps
     'common',
-    'pages',
+    # 'pages',
     'accounts',
     'articles',
     'competitions',
@@ -72,6 +74,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',
 ]
 
 ROOT_URLCONF = 'tmsproject.urls'

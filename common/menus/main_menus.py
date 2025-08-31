@@ -27,8 +27,7 @@ MENUS = [
     },
     {
         "name": "关于",
-        "url_name": "pages:page_detail",
-        "url_kwargs": {"slug": "about"},
+        "url": "/about/",
         "perms": [],  # 公开访问，无权限要求
     },
 ]
