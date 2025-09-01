@@ -1,5 +1,4 @@
 {% load static %}
-{% load menus %}
 
 <nav class="navbar bg-base-100 shadow-lg px-8 relative z-10">
   <div class="navbar-start">
@@ -8,12 +7,9 @@
         <span class="icon-[tabler--menu-2] size-6"></span>
       </div>
       <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
-        {% get_main_menus as main_menus %}
-        {% for item in main_menus %}
           <li>
-            <a href="{{ item.url }}" class="{% if item.active %}active font-medium{% endif %}">{{ item.name }}</a>
+            <a href="#" class="{% if item.active %}active font-medium{% endif %}">{{ item.name }}</a>
           </li>
-        {% endfor %}
       </ul>
     </div>
     <div class="flex items-center gap-2">
@@ -46,20 +42,13 @@
             {% endif %}
           </span>
         </div>
-        {% get_user_menus as dropdown_menus %}
         <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-48 p-2 shadow-lg border border-base-300">
-          {% for section in dropdown_menus %}
-            {% for item in section.items %}
               <li>
-                <a href="{{ item.url }}" class="flex items-center gap-3">
-                  {% if item.icon %}
-                    <span class="{{ item.icon }} size-5 text-primary"></span>
-                  {% endif %}
-                  <span>{{ item.name }}</span>
+                <a href="#" class="flex items-center gap-3">
+                    <span class="size-5 text-primary"></span>
+                  <span>#</span>
                 </a>
               </li>
-            {% endfor %}
-          {% endfor %}
           <div class="divider my-1"></div>
           <li>
             <a href="#" onclick="document.getElementById('logout-form').submit(); return false;" class="text-error hover:bg-error hover:text-error-content">
