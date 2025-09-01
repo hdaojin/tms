@@ -1,0 +1,12 @@
+{# navigation/templates/navigation/sidebar_menu.html #}
+{% comment %}
+侧边栏菜单，垂直布局，支持折叠
+{% endcomment %}
+
+{% if tree %}
+    <ul class="menu bg-base-200 rounded-box w-full">
+        {% for node in tree %}
+            {% include 'navigation/sidebar_menu_item.html' with node=node %}
+        {% endfor %}
+    </ul>
+{% endif %}

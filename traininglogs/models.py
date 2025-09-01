@@ -11,13 +11,13 @@ from skills.models import Module
 # Create your models here.
 # 训练日志上传存储模型
 class TrainingLog(models.Model):
-    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='training_logs', verbose_name='训练模块')
+    module = models.ForeignKey(Module, on_delete=models.SET_NULL, null=True, blank=True, related_name='training_logs', verbose_name='训练模块')
     task = models.CharField("训练任务", max_length=20)
     training_date = models.DateField("训练日期", default=timezone.now,
                                      help_text="*特别注意：请填写日志对应的实际训练日期，而非上传日期")
     upload = models.FileField("日志文件", upload_to=f"{settings.LOGS_DIR}/%Y/%m", help_text="支持doc、docx、pdf格式, 文件大小不超过10MB")
     filename = models.CharField("文件名", max_length=200)
-    uploaded_by = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, related_name='training_logs', verbose_name='上传者', null=True, blank=True)
+    uploaded_by = models.ForeignKey(get_user_model(), on_delete=models.PROTECT, related_name='training_logs', verbose_name='上传者',  blank=True)
     uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
 
 

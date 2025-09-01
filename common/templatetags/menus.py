@@ -1,34 +1,35 @@
 # common/templatetags/menus.py
 from django import template
 
-from common.utils.menus_registry import build_siderbar_menu, build_main_menu, build_flatpage_menu
-
+from common.utils.menus_registry import build_menus
+from common.menus.main_menus import MENUS as MAIN_MENUS
+from common.menus.flatpage_menus import MENUS as FLATPAGES_MENUS
 
 register = template.Library()
 
 
 @register.simple_tag(takes_context=True)
-def get_sidebar_menu(context):
+def get_sidebar_menus(context):
     request = context['request']
-    sidebar_menu = build_siderbar_menu(request)
-    return sidebar_menu
+    sidebar_menus = build_menus(request)
+    return sidebar_menus
 
 
 @register.simple_tag(takes_context=True)
-def get_main_menu(context):
+def get_main_menus(context):
     request = context['request']
-    main_menu = build_main_menu(request)
-    return main_menu
+    main_menus = build_menus(request, manual_menus=MAIN_MENUS)
+    return main_menus
 
 
 @register.simple_tag(takes_context=True)
-def get_user_menu(context):
+def get_user_menus(context):
     request = context['request']
-    user_menu = build_siderbar_menu(request, current_app='accounts')
-    return user_menu
+    user_menus = build_menus(request, fix_app='accounts')
+    return user_menus
 
 @register.simple_tag(takes_context=True)
-def get_flatpage_menu(context):
+def get_flatpage_menus(context):
     request = context['request']
-    flatpage_menu = build_flatpage_menu(request)
-    return flatpage_menu
+    flatpage_menus = build_menus(request, manual_menus=FLATPAGES_MENUS)
+    return flatpage_menus
