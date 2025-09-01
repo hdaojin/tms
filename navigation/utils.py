@@ -78,8 +78,27 @@ def item_is_visible(request, item):
 
     # 权限检查
     if item.required_perms:
-        if not user or not user.has_perms(item.required_perms):
+        # 如果没有用户对象，则拒绝所有需要权限的项目
+        if not user:
             return False
+        
+        # 检查每个所需权限
+        for perm in item.required_perms:
+            # 特殊处理：检查用户是否已登录
+            if perm == 'is_authenticated':
+                if not user.is_authenticated:
+                    return False
+            # 特殊处理：检查用户是否为管理员
+            elif perm == 'is_staff':
+                if not user.is_staff:
+                    return False
+            elif perm == 'is_superuser':
+                if not user.is_superuser:
+                    return False
+            # 标准权限检查（格式：app_label.permission_codename）
+            else:
+                if not user.has_perm(perm):
+                    return False
 
     return True
 

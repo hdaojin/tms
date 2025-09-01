@@ -53,7 +53,7 @@ class MenuItem(models.Model):
     start_at = models.DateTimeField("开始时间", null=True, blank=True, help_text="菜单项显示的开始时间，留空表示立即开始")
     end_at = models.DateTimeField("结束时间", null=True, blank=True, help_text="菜单项显示的结束时间，留空表示无限期")
     # 权限控制
-    required_perms = models.JSONField("所需权限", default=list, blank=True, help_text='访问此菜单项所需的权限列表["app_label.permission_codename"], 如 ["is_authenticated", "meeting.view_meeting"]，留空表示不限制')
+    required_perms = models.JSONField("所需权限", default=list, blank=True, help_text='访问此菜单项所需的权限列表。支持特殊权限："is_authenticated"(已登录)、"is_staff"(管理员)、"is_superuser"(超级用户)，以及标准权限如"app_label.permission_codename"。例：["is_authenticated", "meeting.view_meeting"]表示需要登录且有查看会议权限的用户才能访问此菜单项，留空表示不限制')
     # 指向方式1：外部链接
     external_url = models.URLField("外部链接", max_length=500, blank=True, help_text="外部链接地址，如 'https://example.com'")
     # 指向方式2：命名路由
