@@ -43,34 +43,45 @@ from importlib import import_module
 from django.conf import settings
 from django.urls import reverse, NoReverseMatch
 
-from common.menus.main_menus import MENUS as MAIN_MENUS
-from common.menus.flatpage_menus import MENUS as FLATPAGES_MENUS
-
 
 _REGISTRED_MENUS = []
 
-def autodiscover_menus():
+def autodiscover_menus(manual_menus=None):
     """
-    自动发现并导入各个应用的menus模块
+    自动发现并导入各个应用的menus模块，同时支持手动指定的MENUS
+    
+    Args:
+        manual_menus (list, optional): 手动指定的菜单项列表，每个元素应该是一个菜单配置字典
+                                     如果指定了manual_menus，则不再自动收集app的menus
     """
     global _REGISTRED_MENUS
     if _REGISTRED_MENUS:
         return
     collected = []
 
-    for app in settings.INSTALLED_APPS:
-        try:
-            module = import_module(f"{app}.menus")
-        except Exception:
-            continue
+    # 如果指定了手动菜单，则只使用手动菜单，不再自动发现
+    if manual_menus:
+        for menu in manual_menus:
+            if isinstance(menu, dict):
+                # 为手动菜单添加默认的app_label标识
+                menu = {**menu, "__app_label": menu.get("__app_label", "manual")}
+                collected.append(menu)
+    else:
+        # 只有在没有指定手动菜单时，才自动发现各个应用的menus模块
+        for app in settings.INSTALLED_APPS:
+            try:
+                module = import_module(f"{app}.menus")
+            except Exception:
+                continue
 
-        menus = getattr(module, "MENUS", None)
-        if not menus:
-            continue
-        app_label = app.split('.')[-1]
-        for sec in menus:
-            sec = {**sec, "__app_label": sec.get("__app_label", app_label)}
-            collected.append(sec)
+            menus = getattr(module, "MENUS", None)
+            if not menus:
+                continue
+            app_label = app.split('.')[-1]
+            for sec in menus:
+                sec = {**sec, "__app_label": sec.get("__app_label", app_label)}
+                collected.append(sec)
+    
     _REGISTRED_MENUS = collected
 
 
@@ -168,44 +179,40 @@ def _build_menu_items(request, menu_items):
     return items
 
 
-def build_siderbar_menu(request, current_app=None):
+def build_menus(request, fix_app=None, manual_menus=None):
     """
-    构建侧边栏菜单
+    构建菜单
     """
-    autodiscover_menus()
+    autodiscover_menus(manual_menus=manual_menus)
 
-    if not current_app:
+    if not fix_app:
         current_app = _current_app_label(request)
+    else:
+        current_app = fix_app
 
-    sidebar_menu = []
+    custom_menus = []
     for section in _REGISTRED_MENUS:
-        # 只保留当前 app 的菜单，允许跨 app 全局显示: scope = 'global'
+        # 菜单显示逻辑：
+        # 1. scope='global' 的菜单全局显示
+        # 2. manual 菜单默认全局显示
+        # 3. 当前 app 的菜单显示
         scope = section.get('scope')
         app_label = section.get('__app_label')
-        if scope != 'global' and app_label != current_app:
+        
+        should_display = (
+            scope == 'global' or 
+            app_label == 'manual' or 
+            app_label == current_app
+        )
+        
+        if not should_display:
             continue
 
         items = _build_menu_items(request, section.get('items', []))
         
         if items:
-            sidebar_menu.append({
+            custom_menus.append({
                 "section": section.get('section'),
                 "items": items,
             })
-    return sidebar_menu
-
-
-def build_main_menu(request):
-    """
-    构建主菜单，复用通用菜单构建逻辑
-    """
-    main_menus = _build_menu_items(request, MAIN_MENUS)
-    return main_menus
-
-
-def build_flatpage_menu(request):
-    """
-    构建静态页面菜单，复用通用菜单构建逻辑
-    """
-    flatpage_menus = _build_menu_items(request, FLATPAGES_MENUS)
-    return flatpage_menus
+    return custom_menus

@@ -49,12 +49,12 @@ class Skill(models.Model):
         return f"{self.topic.module.code}-{self.topic.name}-{self.name}"
 
 class ExamPoint(models.Model):
-    competition = models.ForeignKey(Competition, verbose_name="所属竞赛", on_delete=models.CASCADE)
+    competition = models.ForeignKey(Competition, verbose_name="所属竞赛", on_delete=models.PROTECT, related_name='exam_points')
     skill = models.ManyToManyField(Skill, verbose_name="技能点", related_name='exam_points')
     name = models.CharField("考点", max_length=500)  # 可选
     detail_content = models.TextField("详细内容", blank=True, null=True)  # 可选
     difficulty = models.PositiveSmallIntegerField("难度系数", default=3, help_text="1-5, 1最简单，5最难")
-    score = models.DecimalField("分值", max_digits=10, decimal_places=2, default=0)
+    score = models.DecimalField("分值", max_digits=10, decimal_places=2, default=0)  # type: ignore
     
     class Meta:
         verbose_name = '考点'

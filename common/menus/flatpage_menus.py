@@ -6,6 +6,7 @@
 MENUS = [
     {
         "section": None,  # flatpage菜单不显示section标题
+        "Position": "left_siderbar",  # flatpage菜单显示在侧边栏
         "items": [
             {
                 "name": "关于本站",

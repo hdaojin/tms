@@ -8,15 +8,20 @@ from django.contrib.auth import get_user_model
 # Create your models here.
 
 class Competition(models.Model):
-    class Level(models.TextChoices):
-        INTERNATIONAL = '0IN', '国际级'
-        NATIONAL = '1NA', '国家级'
-        PROVINCIAL = '2PR', '省级'
-        MUNICIPAL = '3MU', '市级'
-        OTHER = '4OT', '其他'
+    class Level(models.IntegerChoices):
+        INTERNATIONAL = 0, '国际级'
+        NATIONAL = 1, '国家级'
+        PROVINCIAL = 2, '省级'
+        MUNICIPAL = 3, '市级'
+        DISTRICT = 4, '区级'
+        SCHOOL = 5, '校级'
+        CLASS = 6, '班级'
+
+        __empty__ = '其他'
+
 
     name = models.CharField("名称", max_length=100, unique=True)
-    level = models.CharField("级别", max_length=3, choices=Level.choices, default=Level.OTHER)
+    level = models.IntegerField("级别", choices=Level, default=Level.PROVINCIAL, help_text="比赛的级别") #type: ignore
     weight = models.FloatField("权重", default=1.0, help_text="比赛的权重，用于计算考点的重要性")
     
     class Meta:
@@ -33,7 +38,7 @@ class CompetitionDetail(models.Model):
     start_date = models.DateField("开始日期", help_text="比赛开始日期", blank=True, null=True)
     end_date = models.DateField("结束日期", help_text="比赛结束日期", blank=True, null=True)
     location = models.CharField("地点", max_length=100, help_text="比赛举办城市", blank=True, null=True)
-    description = models.TextField("描述", blank=True, null=True, help_text="比赛的详细描述")  
+    description = models.TextField("描述", blank=True,  help_text="比赛的详细描述")  
 
     class Meta:
         verbose_name = '竞赛详情'
@@ -71,11 +76,11 @@ class CompetitionTeamRelation(models.Model):
 
 
 class CompetionResult(models.Model):
-    competition = models.OneToOneField(Competition, on_delete=models.CASCADE, related_name='result', verbose_name='竞赛', null=True, blank=True)
-    gold = models.ForeignKey(CompetitionTeam, on_delete=models.SET_NULL, null=True, blank=True, related_name='+', verbose_name="获得金牌的参赛队", help_text="获得金牌的参赛队")
-    silver = models.ForeignKey(CompetitionTeam, on_delete=models.SET_NULL, null=True, blank=True, related_name='+', verbose_name="获得银牌的参赛队", help_text="获得银牌的参赛队")
-    bronze = models.ForeignKey(CompetitionTeam, on_delete=models.SET_NULL, null=True, blank=True, related_name='+', verbose_name="获得铜牌的参赛队", help_text="获得铜牌的参赛队")
-    our_competitor = models.ForeignKey(get_user_model(), verbose_name="我们的参赛选手", on_delete=models.CASCADE, related_name="competitions", help_text="我们的参赛选手", null=True, blank=True)
+    competition = models.OneToOneField(Competition, on_delete=models.CASCADE, related_name='result', verbose_name='竞赛',  blank=True)
+    gold = models.ForeignKey(CompetitionTeam, on_delete=models.PROTECT,  blank=True, related_name='+', verbose_name="获得金牌的参赛队", help_text="获得金牌的参赛队")
+    silver = models.ForeignKey(CompetitionTeam, on_delete=models.PROTECT,  blank=True, related_name='+', verbose_name="获得银牌的参赛队", help_text="获得银牌的参赛队")
+    bronze = models.ForeignKey(CompetitionTeam, on_delete=models.PROTECT,  blank=True, related_name='+', verbose_name="获得铜牌的参赛队", help_text="获得铜牌的参赛队")
+    our_competitor = models.ForeignKey(get_user_model(), verbose_name="我们的参赛选手", on_delete=models.PROTECT, related_name="competitions", help_text="我们的参赛选手",  blank=True)
     our_result = models.CharField("我们的选手成绩", max_length=100, blank=True, help_text='我们选手的成绩, 填写"金牌" "银牌" "铜牌" "优胜奖" "未获奖"，或名次，如"第一名"，或具体成绩，如"78.5分"')
 
     class Meta:

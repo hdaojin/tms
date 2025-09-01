@@ -1,0 +1,30 @@
+{# templates/navigation/menu_item.html #}
+{% comment %}
+递归渲染单个菜单项，支持多级子菜单
+{% endcomment %}
+<li class="{% if node.active %}bg-base-200{% endif %} {{ node.extra_css }}">
+  {% if node.children %}
+    <details {% if node.open %}open{% endif %}>
+      <summary class="flex items-center gap-2">
+        {% if node.icon %}<span class="{{ node.icon }}"></span>{% endif %}
+        <a href="{{ node.url }}" {% if node.target_blank %}target="_blank" rel="noopener"{% endif %}
+           {% for k,v in node.htmx_attrs.items %} {{k}}="{{v}}"{% endfor %}
+           class="py-2 px-3 rounded-lg hover:bg-base-200">
+          {{ node.name }}
+        </a>
+      </summary>
+      <ul class="ml-3">
+        {% for ch in node.children %}
+          {% include "navigation/menu_item.html" with node=ch %}
+        {% endfor %}
+      </ul>
+    </details>
+  {% else %}
+    <a href="{{ node.url }}" {% if node.target_blank %}target="_blank" rel="noopener"{% endif %}
+       {% for k,v in node.htmx_attrs.items %} {{k}}="{{v}}"{% endfor %}
+       class="py-2 px-3 rounded-lg hover:bg-base-200 flex items-center gap-2">
+      {% if node.icon %}<span class="{{ node.icon }}"></span>{% endif %}
+      <span>{{ node.name }}</span>
+    </a>
+  {% endif %}
+</li>

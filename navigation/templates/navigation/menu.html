@@ -1,0 +1,14 @@
+{# navigation/templates/navigation/menu.html #}
+{% comment %}
+头部主菜单，支持下拉、激活、高亮、Iconify、HTMX
+{% endcomment %}
+
+{% if tree %}
+    <nav class="w-full">
+        <ul class="menu menu-horizontal gap-1">
+            {% for node in tree %}
+                {% include 'navigation/menu_item.html' with node=node %}
+            {% endfor %}
+        </ul>
+    </nav>
+{% endif %}

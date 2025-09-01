@@ -37,7 +37,7 @@ class Article(models.Model):
     status = models.CharField("状态", max_length=2, choices=Status.choices, default=Status.DRAFT)
     title = models.CharField("标题", max_length=200)
     slug = models.SlugField("URL别名", max_length=250, unique_for_date="publish_date", blank=True)
-    author = models.ForeignKey(get_user_model(), on_delete=models.CASCADE, related_name="articles", verbose_name="作者")
+    author = models.ForeignKey(get_user_model(), on_delete=models.PROTECT, related_name="articles", verbose_name="作者")
     content = models.TextField("内容")
     publish_date = models.DateTimeField("发布时间", null=True, blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)

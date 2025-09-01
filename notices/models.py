@@ -22,10 +22,10 @@ class Notice(models.Model):
     站内通知
     """
 
-    title = models.CharField(max_length=200, verbose_name='标题(可选)',null=True, blank=True)
+    title = models.CharField(max_length=200, verbose_name='标题(可选)', blank=True)
     content = models.TextField(verbose_name='通知内容')
     is_published = models.BooleanField(default=False, db_index=True, verbose_name='是否发布', help_text='发布后用户才能看到此通知, 未发布即存为草稿')
-    published_by = models.ForeignKey(get_user_model(), on_delete=models.SET_NULL, null=True, blank=True, related_name='notices_published', verbose_name='发布人')
+    published_by = models.ForeignKey(get_user_model(), on_delete=models.PROTECT, null=True, blank=True, related_name='notices_published', verbose_name='发布人')
     published_at = models.DateTimeField(null=True, blank=True, verbose_name='发布时间')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
     target_groups = models.ManyToManyField(Group, blank=True, verbose_name='目标组', help_text='如果未选择任何组，则向所有用户发送')
