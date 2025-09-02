@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.core.cache import cache
 
 from .models import Menu, MenuItem
+from .forms import MenuItemForm
 
 
 class MenuItemInline(admin.TabularInline):
@@ -11,7 +12,7 @@ class MenuItemInline(admin.TabularInline):
 
 @admin.register(Menu)
 class MenuAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'is_active', 'locations')
+    list_display = ('name', 'slug', 'is_active', 'display_locations')
     inlines = [MenuItemInline]
     actions = ['clear_all_caches']
     
@@ -47,14 +48,45 @@ class MenuAdmin(admin.ModelAdmin):
         super().delete_model(request, obj)
         self.message_user(request, f"菜单 '{menu_name}' 已删除，缓存已清除。")
 
+    # 显示位置（MultiSelectField 的友好显示）
+    def display_locations(self, obj):
+        # MultiSelectField 提供 get_FOO_display()，其返回逗号分隔的可读标签
+        try:
+            return obj.get_locations_display()
+        except Exception:  # 回退
+            val = obj.locations
+            if isinstance(val, (list, tuple)):
+                return ", ".join(val)
+            return val
+    display_locations.short_description = "显示位置"  # type: ignore
+
 
 @admin.register(MenuItem)
 class MenuItemAdmin(admin.ModelAdmin):
-    list_display = ('name', 'get_menus', 'parent', 'order', 'is_visible')
+    form = MenuItemForm
+    list_display = ('name', 'get_menus', 'parent', 'order', 'is_visible', 'required_perms', 'named_url', 'flatpage', 'external_url', 'target_blank')
     list_filter = ('menus',)
     search_fields = ('name', 'menus__name', 'named_url', 'external_url')
     filter_horizontal = ('menus',)
-    actions = ['clear_related_caches']
+    actions = ['clear_related_caches', 'refresh_named_url_cache']
+    # 分组字段显示
+    fieldsets = (
+        (None, {
+            'fields': ('name',  'menus', 'parent', 'order', 'is_visible')
+        }),
+        ('链接配置 (优先级: 命名路由 > FlatPage > 外部链接)', {
+            'fields': ('icon', 'required_perms', 'named_url', 'url_kwargs', 'url_query', 'flatpage', 'external_url'),
+        }),
+        ('前端显示', {
+            'classes': ('collapse',),
+            'fields': ('target_blank', 'css_classes', 'htmx_attrs'),
+        }),
+        ('存留时间', {
+            'classes': ('collapse',),
+            'fields': ('start_at', 'end_at'),
+            'description': '控制菜单项持续存留时间。'
+        }),
+    )
     
     def get_menus(self, obj):
         return ", ".join([menu.name for menu in obj.menus.all()])
@@ -102,3 +134,12 @@ class MenuItemAdmin(admin.ModelAdmin):
         self.clear_related_menu_caches(obj)
         super().delete_model(request, obj)
         self.message_user(request, f"菜单项 '{menuitem_name}' 已删除，相关菜单缓存已清除。")
+
+    # 自定义动作：刷新命名路由缓存
+    def refresh_named_url_cache(self, request, queryset):  # pylint: disable=unused-argument
+        from . import utils as nav_utils
+        nav_utils.refresh_named_url_choices()
+        total = len(nav_utils.get_named_url_choices())
+        self.message_user(request, f"命名路由缓存已刷新，当前可选 URL 数量：{total}")
+    refresh_named_url_cache.short_description = "刷新命名路由缓存"  # type: ignore
+
