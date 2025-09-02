@@ -5,10 +5,10 @@
 <link rel="icon" type="image/png" href="{% static 'images/computer-laptop-color-icon.png' %}" />
 <title>
   {% if title or flatpage.title %}
-    {% firstof title flatpage.title %} | {{ site_info.my_site_name }}
+    {% firstof title flatpage.title %} | {{ site_info.site_name }}
   {% else %}
     {% block title %}
-      {{ my_site_name }}
+      {{ site_name }}
     {% endblock %}
   {% endif %}
 </title>

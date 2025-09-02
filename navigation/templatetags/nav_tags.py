@@ -38,7 +38,7 @@ def render_sidebar_menu(context, slug_or_location):
     用法:
         {% load nav_tags %}
         {% render_sidebar_menu 'sidebar' %}
-        {% render_sidebar_menu request.resolver_match.app_name %}
+        {% render_sidebar_menu 'follow' %}
 
     Args:
         context (dict): 模板上下文
@@ -48,7 +48,12 @@ def render_sidebar_menu(context, slug_or_location):
         dict: 包含菜单项树形结构的上下文字典
     """
     request = context['request']
+
+    if slug_or_location == 'follow':
+        slug_or_location = request.resolver_match.app_name
+
     menu, tree = get_menu_tree(request, slug_or_location)
+
     return {
         'menu': menu,
         'tree': tree

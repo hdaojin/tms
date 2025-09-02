@@ -10,7 +10,7 @@ from django.utils import timezone
 def item_resolve_url(item):
     """
     解析菜单项的URL，支持多种指向方式
-    优先级：external_url > named_url > flatpage > generic object
+    优先级： named_url > flatpage > external_url 
 
     Args:
         item (MenuItem): 菜单项实例
@@ -18,11 +18,7 @@ def item_resolve_url(item):
     Returns:
         str: 解析后的URL字符串，如果无法解析则返回'#'
     """
-    # 指向方式1：外部链接
-    if item.external_url:
-        return item.external_url
-
-    # 指向方式2：命名路由
+    # 指向方式1：命名路由
     if item.named_url:
         try:
             url = reverse(item.named_url, kwargs=item.url_kwargs or {})
@@ -35,17 +31,13 @@ def item_resolve_url(item):
             url = f"{url}?{query_string}"
         return url
     
-    # 指向方式3：FlatPage 页面
+    # 指向方式2：FlatPage 页面
     if item.flatpage:
         return item.flatpage.get_absolute_url()
     
-    # 指向方式4：通用对象
-    if item.content_object and hasattr(item.content_object, 'get_absolute_url'):
-        try:
-            url = item.content_object.get_absolute_url()
-            return url
-        except Exception:
-            return '#'
+    # 指向方式3：外部链接
+    if item.external_url:
+        return item.external_url
     
     return '#'
 
