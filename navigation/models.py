@@ -1,6 +1,8 @@
 from django.db import models
 from multiselectfield import MultiSelectField
 
+from .url_discovery import get_named_url_choices
+
 
 class Menu(models.Model):
     """
@@ -13,8 +15,9 @@ class Menu(models.Model):
     # 在模板中的位置绑定（可多选）
     class Location(models.TextChoices):
         MAIN = 'header', '顶部菜单'
-        USER = 'user', '用户菜单'
+        # USER = 'user', '用户菜单'
         SIDEBAR = 'sidebar', '侧边栏菜单'
+        FOLLOW = 'follow', '跟随应用'
         FOOTER = 'footer', '页脚菜单'
         CUSTOM = 'custom', '自定义位置'
     # locations = models.JSONField("显示位置", default=list, help_text="菜单显示的位置，可多选", blank=True) # 存储为列表['main', 'user']
@@ -51,7 +54,7 @@ class MenuItem(models.Model):
     # 权限控制
     required_perms = models.JSONField("所需权限", default=list, blank=True, help_text='访问此菜单项所需的权限列表。支持特殊权限："is_authenticated"(已登录)、"is_staff"(管理员)、"is_superuser"(超级用户)，以及标准权限如"app_label.permission_codename"。例：["is_authenticated", "meeting.view_meeting"]表示需要登录且有查看会议权限的用户才能访问此菜单项，留空表示不限制')
     # 指向方式1：命名路由
-    named_url = models.CharField("命名路由", max_length=200, blank=True, help_text="Django 命名路由名称，如 'home', 'meeting:list' 等")
+    named_url = models.CharField("命名路由", max_length=200, blank=True, choices=get_named_url_choices(), help_text="Django 命名路由名称，从已发现的URL列表中选择")
     url_kwargs = models.JSONField("路由参数", default=dict, blank=True, help_text="命名路由的参数，如 {'pk': 1}，留空表示无参数")
     url_query = models.JSONField("路由查询参数", default=dict, blank=True, help_text="命名路由的查询参数，如 {'tab': 'files'}，留空表示无查询参数")
     # 指向方式2：FlatPage 页面
