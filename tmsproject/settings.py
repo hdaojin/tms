@@ -163,6 +163,7 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
 ]
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 
 # Media files (user uploaded files)
@@ -188,7 +189,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # FORM_RENDERER = 'tmsproject.settings.CustomFormRenderer'
 
 # 自定义变量
-MY_SITE_NAME = "ITNSA"
+SITE_NAME = env('SITE_NAME', default="ITNSA") # type: ignore
+SITE_DESCRIPTION = env('SITE_DESCRIPTION')
+SITE_KEYWORDS = env('SITE_KEYWORDS')
+SITE_AUTHOR = env('SITE_AUTHOR')
+SITE_COPYRIGHT = env('SITE_COPYRIGHT')
+
+
 WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目') # type: ignore
 INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=86400)  # type: ignore # 1天,单位为秒
 

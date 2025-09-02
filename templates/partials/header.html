@@ -1,20 +1,20 @@
 {% load static %}
 
-<nav class="navbar bg-base-100 shadow-lg px-8 relative z-10">
+<nav class="navbar bg-base-100 shadow-lg px-2 md:px-8 relative z-10">
   <div class="navbar-start">
     <div class="dropdown">
       <div tabindex="0" role="button" class="btn btn-ghost md:hidden">
         <span class="icon-[tabler--menu-2] size-6"></span>
       </div>
       <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
-          <li>
-            <a href="#" class="{% if item.active %}active font-medium{% endif %}">{{ item.name }}</a>
-          </li>
+        <li>
+          <a href="#" class="{% if item.active %}active font-medium{% endif %}">{{ item.name }}</a>
+        </li>
       </ul>
     </div>
     <div class="flex items-center gap-2">
       <img src="{% static 'images/logo.png' %}" alt="Logo" class="w-8 h-8" />
-      <a class="btn btn-ghost text-xl font-bold" href="/">{{ site_info.my_site_name }}</a>
+      <a class="btn btn-ghost text-xl font-bold" href="/">{{ site_info.site_name }}</a>
     </div>
   </div>
 
@@ -43,12 +43,20 @@
           </span>
         </div>
         <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-48 p-2 shadow-lg border border-base-300">
-              <li>
-                <a href="#" class="flex items-center gap-3">
-                    <span class="size-5 text-primary"></span>
-                  <span>#</span>
-                </a>
-              </li>
+          <li>
+            <a href="{% url 'accounts:profile' %}" class="flex items-center gap-3">
+              <span class="icon-[tabler--user-circle] size-5 text-primary"></span>
+              <span>个人信息</span>
+            </a>
+          </li>
+          {% if user.is_staff %}
+            <li>
+              <a href="{% url 'admin:index' %}" class="flex items-center gap-3">
+                <span class="icon-[tabler--settings] size-5 text-primary"></span>
+                <span>管理后台</span>
+              </a>
+            </li>
+          {% endif %}
           <div class="divider my-1"></div>
           <li>
             <a href="#" onclick="document.getElementById('logout-form').submit(); return false;" class="text-error hover:bg-error hover:text-error-content">

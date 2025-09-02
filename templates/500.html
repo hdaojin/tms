@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}页面未找到 - {{ site_info.site_name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto p-8 text-center">
+    <!-- 404 图标和标题 -->
+    <div class="flex flex-col items-center justify-center min-h-[60vh]">
+        <div class="mb-8">
+            <span class="icon-[tabler--error-404] size-32 text-error opacity-60"></span>
+        </div>
+        
+        <div class="max-w-md">
+            <h1 class="text-4xl font-bold text-base-content mb-4">404</h1>
+            <h2 class="text-xl font-semibold text-base-content/80 mb-4">页面未找到</h2>
+            <p class="text-base-content/60 mb-8">
+                抱歉，您访问的页面不存在或已被删除。
+                可能是链接错误或页面已被移动。
+            </p>
+            
+            <!-- 操作按钮 -->
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="javascript:history.back()" 
+                   class="btn btn-outline btn-primary">
+                    <span class="icon-[tabler--arrow-left] size-4"></span>
+                    返回上页
+                </a>
+                <a href="{% url 'pages:homepage' %}" 
+                   class="btn btn-primary">
+                    <span class="icon-[tabler--home] size-4"></span>
+                    返回首页
+                </a>
+            </div>
+        </div>
+        
+        <!-- 建议链接 -->
+        <div class="mt-12 w-full max-w-2xl">
+            <h3 class="text-lg font-medium text-base-content/80 mb-4">您可能想要访问：</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <a href="{% url 'notices:notice_list' %}" 
+                   class="card card-border hover:shadow-md transition-shadow">
+                    <div class="card-body text-center py-4">
+                        <span class="icon-[tabler--bell] size-8 text-primary mx-auto mb-2"></span>
+                        <div class="card-title text-sm">通知列表</div>
+                    </div>
+                </a>
+                
+                <a href="{% url 'traininglogs:traininglog_list' %}" 
+                   class="card card-border hover:shadow-md transition-shadow">
+                    <div class="card-body text-center py-4">
+                        <span class="icon-[tabler--book] size-8 text-success mx-auto mb-2"></span>
+                        <div class="card-title text-sm">训练日志</div>
+                    </div>
+                </a>
+                
+                <a href="{% url 'meeting:meeting_list' %}" 
+                   class="card card-border hover:shadow-md transition-shadow">
+                    <div class="card-body text-center py-4">
+                        <span class="icon-[tabler--users] size-8 text-warning mx-auto mb-2"></span>
+                        <div class="card-title text-sm">会议记录</div>
+                    </div>
+                </a>
+                
+                <a href="{% url 'accounts:profile' %}" 
+                   class="card card-border hover:shadow-md transition-shadow">
+                    <div class="card-body text-center py-4">
+                        <span class="icon-[tabler--user] size-8 text-info mx-auto mb-2"></span>
+                        <div class="card-title text-sm">个人资料</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

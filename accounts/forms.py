@@ -1,8 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
-from .utils import validate_invitation_code  
-
+from common.utils.invitation import validate_invitation_code  
 from common.forms import StyledFormMixin
 
 

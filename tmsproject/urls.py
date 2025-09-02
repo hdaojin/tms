@@ -19,6 +19,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.contrib.auth.decorators import login_not_required # type: ignore
+
 from common.home.views import HomeView
 
 admin.site.site_header = "TMS 管理后台"
@@ -26,13 +28,13 @@ admin.site.site_title = "TMS 管理后台"
 admin.site.index_title = "欢迎来到 TMS 管理后台"
 
 urlpatterns = [
-    path("admin/", admin.site.urls, name="admin"),
+    path("admin/", admin.site.urls),
     path("accounts/", include("accounts.urls", namespace="accounts")),
     path("articles/", include("articles.urls", namespace="articles")),
     path("traininglogs/", include("traininglogs.urls", namespace="traininglogs")),
     path("meeting/", include("meeting.urls", namespace="meeting")),
     path("notices/", include("notices.urls", namespace="notices")),
-    path("", HomeView.as_view(), name="home"),
+    path("", login_not_required(HomeView.as_view()), name="home"),
     # path("", include("pages.urls", namespace="pages")), 
 ]
 

@@ -1,7 +1,4 @@
 from django.db import models
-from django.contrib.contenttypes.fields import GenericForeignKey
-from django.contrib.contenttypes.models import ContentType
-
 from multiselectfield import MultiSelectField
 
 
@@ -36,11 +33,10 @@ class Menu(models.Model):
 class MenuItem(models.Model):
     """
     树形菜单项。一个菜单项可以有多个子菜单项。
-    支持四种类型的链接：
+    支持三种类型的链接：
     1. 外部链接（如： 'https://example.com'）
     2. 命名路由（如： 'home', 'meeting:list'）
     3. flatpage 页面（如： FlatPage 实例）
-    4. 通用对象(任意模型 + 主键, 调用其 get_absolute_url 方法)
     """
 
     menus = models.ManyToManyField(Menu, related_name='items', verbose_name="所属菜单组", help_text="此菜单项可以同时属于多个菜单组")
@@ -54,18 +50,14 @@ class MenuItem(models.Model):
     end_at = models.DateTimeField("结束时间", null=True, blank=True, help_text="菜单项显示的结束时间，留空表示无限期")
     # 权限控制
     required_perms = models.JSONField("所需权限", default=list, blank=True, help_text='访问此菜单项所需的权限列表。支持特殊权限："is_authenticated"(已登录)、"is_staff"(管理员)、"is_superuser"(超级用户)，以及标准权限如"app_label.permission_codename"。例：["is_authenticated", "meeting.view_meeting"]表示需要登录且有查看会议权限的用户才能访问此菜单项，留空表示不限制')
-    # 指向方式1：外部链接
-    external_url = models.URLField("外部链接", max_length=500, blank=True, help_text="外部链接地址，如 'https://example.com'")
-    # 指向方式2：命名路由
+    # 指向方式1：命名路由
     named_url = models.CharField("命名路由", max_length=200, blank=True, help_text="Django 命名路由名称，如 'home', 'meeting:list' 等")
     url_kwargs = models.JSONField("路由参数", default=dict, blank=True, help_text="命名路由的参数，如 {'pk': 1}，留空表示无参数")
     url_query = models.JSONField("路由查询参数", default=dict, blank=True, help_text="命名路由的查询参数，如 {'tab': 'files'}，留空表示无查询参数")
-    # 指向方式3：FlatPage 页面
+    # 指向方式2：FlatPage 页面
     flatpage = models.ForeignKey('flatpages.FlatPage', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="FlatPage 页面", help_text="选择一个 FlatPage 页面")
-    # 指向方式4：通用对象
-    content_type = models.ForeignKey(ContentType, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="内容类型", help_text="选择一个内容类型")
-    object_id = models.PositiveIntegerField("对象ID", null=True, blank=True, help_text="内容对象的主键ID")
-    content_object = GenericForeignKey('content_type', 'object_id')
+    # 指向方式3：外部链接
+    external_url = models.URLField("外部链接", max_length=500, blank=True, help_text="外部链接地址，如 'https://example.com'")
 
     # 其他前端属性
     target_blank = models.BooleanField("新标签页打开", default=False, help_text="是否在新标签页中打开链接")

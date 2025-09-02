@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_not_required # type: ignore
 
 from .forms import CustomUserCreationForm
-from .utils import generate_invitation_code
+from common.utils.invitation import generate_invitation_code
 from common.decorators import superuser_required
 
 

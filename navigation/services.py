@@ -36,7 +36,7 @@ def get_menu_tree(request, slug_or_location):
     cache_key = f"nav.items.{menu.id}"   # type: ignore
     items = cache.get(cache_key)
     if items is None:
-        items = list(MenuItem.objects.filter(menus=menu).select_related('parent', 'flatpage', 'content_type'))
+        items = list(MenuItem.objects.filter(menus=menu).select_related('parent', 'flatpage'))
         cache.set(cache_key, items, CACHE_TIMEOUT)
 
     # 过滤可见项
