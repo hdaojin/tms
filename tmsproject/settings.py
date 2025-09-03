@@ -195,6 +195,8 @@ SITE_KEYWORDS = env('SITE_KEYWORDS')
 SITE_AUTHOR = env('SITE_AUTHOR')
 SITE_COPYRIGHT = env('SITE_COPYRIGHT')
 
+CACHE_TIMEOUT = env('CACHE_TIMEOUT', default=300) # type: ignore
+
 
 WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目') # type: ignore
 INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=86400)  # type: ignore # 1天,单位为秒
