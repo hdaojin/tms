@@ -1,74 +1,70 @@
 # navigation/services.py
-"""
-导航服务模块
-"""
-
 from django.core.cache import cache
-
+from django.conf import settings
 from .models import Menu, MenuItem
-from .utils import item_is_visible, item_resolve_url, mark_active
+from .utils import item_resolve_url, item_time_window_ok, user_meets_menu_requirements, mark_active
 
+CACHE_TIMEOUT = getattr(settings, 'CACHE_TIMEOUT', 300)  # 5 min
 
-CACHE_TIMEOUT = 300  # 缓存时间，单位秒
+def _fetch_menu(slug_or_location: str):
+    """根据 slug 或 location 获取活动菜单"""
+    try:
+        return Menu.objects.get(slug=slug_or_location, is_active=True)
+    except Menu.DoesNotExist:
+        return Menu.objects.filter(is_active=True, locations__contains=slug_or_location).first()
 
 def get_menu_tree(request, slug_or_location):
-    """
-    获取指定菜单的树形结构，应用权限和可见性过滤，并标记当前活动项
-
-    Args:
-        request (HttpRequest): 当前请求对象
-        slug_or_location (str): 菜单的 slug 或 位置标识符
-
-    Returns:
-        list: 经过过滤和处理的菜单项树形结构
-    """
-
-    # 找菜单
-    try:
-        menu = Menu.objects.get(is_active=True, slug=slug_or_location)
-    except Menu.DoesNotExist:
-        # 对于MultiSelectField，使用contains查询
-        menu = Menu.objects.filter(is_active=True, locations__contains=slug_or_location).first()
+    """获取指定菜单的树形结构，包含权限和可见性过滤"""
+    menu = _fetch_menu(slug_or_location)
     if not menu:
         return None, []
-    
-    # 缓存键
-    cache_key = f"nav.items.{menu.id}"   # type: ignore
+
+    cache_key = f"nav.m2m_items.{menu.id}"   # type: ignore
     items = cache.get(cache_key)
     if items is None:
-        items = list(MenuItem.objects.filter(menus=menu).select_related('parent', 'flatpage'))
+        items = list(
+            MenuItem.objects.filter(menus=menu)
+            .select_related("parent", "flatpage")
+            .prefetch_related("permissions")
+            .only(
+                "id","parent_id","name","icon","order",
+                "is_visible","start_at","end_at",
+                "perm_match_all","login_required","is_group_header",
+                "named_url","url_kwargs","url_query","flatpage_id","external_url",
+                "target_blank","css_classes","htmx_attrs",
+            )
+        )
         cache.set(cache_key, items, CACHE_TIMEOUT)
 
-    # 过滤可见项
-    visible = [item for item in items if item_is_visible(request, item)]
-
-    # 标记 active/open
+    # 过滤
+    visible = [it for it in items if item_time_window_ok(it) and user_meets_menu_requirements(request.user, it)]
     visible = mark_active(request.path, visible)
 
-    # 构建树形结构
+    # 构树（仅挂接可见父）
+    visible_ids = {it.id for it in visible}   # type: ignore
     by_parent = {}
-    for item in visible:
-        by_parent.setdefault(item.parent_id, []).append(item)   # type: ignore
+    for it in visible:
+        pid = it.parent_id if (it.parent_id in visible_ids) else None  # type: ignore
+        by_parent.setdefault(pid, []).append(it)
     for k in by_parent:
-        by_parent[k].sort(key=lambda x: (x.order, x.name))
+        by_parent[k].sort(key=lambda x: (x.order, x.id))
 
-    def build_tree(parent_id=None):
-        subtree = []
-        for item in by_parent.get(parent_id, []):
-            node = {
-                "id": item.id,
-                "name": item.name,
-                "icon": item.icon,
-                "url": item_resolve_url(item),
-                "active": getattr(item, '_active', False),
-                "open": getattr(item, '_open', False),
-                "css_classes": item.css_classes,
-                "target_blank": item.target_blank,
-                "htmx_attrs": item.htmx_attrs or {},
-                "children": build_tree(item.id)
-            }
-            subtree.append(node)
-        return subtree
+    def build(pid=None):
+        res = []
+        for it in by_parent.get(pid, []):
+            res.append({
+                "id": it.id,
+                "name": it.name,
+                "icon": it.icon,
+                "url": item_resolve_url(it),
+                "active": getattr(it, "_active", False),
+                "open": getattr(it, "_open", False),
+                "css_classes": it.css_classes,
+                "target_blank": it.target_blank,
+                "htmx": it.htmx_attrs or {},
+                "is_group_header": it.is_group_header,
+                "children": build(it.id),
+            })
+        return res
 
-    tree = build_tree(None)
-    return menu, tree
+    return menu, build(None)
