@@ -1,11 +1,20 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 
-# Create your models here.
 
-# 比赛管理
+class Skill(models.Model):
+    number = models.PositiveSmallIntegerField("技能编号", unique=True)
+    name = models.CharField("技能名称", max_length=100, unique=True)
+    description = models.TextField("技能描述", blank=True)
 
-# Create your models here.
+    class Meta:
+        verbose_name = "竞赛项目"
+        verbose_name_plural = "竞赛项目"
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
 
 class Competition(models.Model):
     class Level(models.IntegerChoices):

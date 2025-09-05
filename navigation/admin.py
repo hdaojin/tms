@@ -33,10 +33,11 @@ class MenuAdmin(admin.ModelAdmin):
 @admin.register(MenuItem)
 class MenuItemAdmin(admin.ModelAdmin):
     form = MenuItemForm
-    list_display = ("name", "icon", "display_url", "parent", "display_menus", "order", "display_required_perms",  "perm_match_all",  "login_required", "is_visible", "is_group_header", )
+    list_display = ("name", "display_menus", "parent", "icon", "display_url",  "order", "display_required_perms",  "perm_match_all",  "login_required", "is_visible", "is_group_header", )
     list_filter = ("is_visible", "login_required", "perm_match_all", "is_group_header", "menus")
     search_fields = ("name", "named_url", "external_url")
     filter_horizontal = ("menus",)
+    ordering = ("menus", "parent__id", "order")
     fieldsets = (
         (None, {"fields": ("name", "menus", "order", "parent", "icon", "is_visible", "is_group_header")} ),
         ("指向链接（选择一种方式：命名路由、简单页面或外部链接）", {"fields": ("named_url", "url_kwargs", "url_query", "flatpage", "external_url")} ),

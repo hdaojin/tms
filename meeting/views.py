@@ -5,7 +5,6 @@ from django.views.generic import CreateView, DetailView
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
 
-from pathlib import Path
 
 from .forms import MeetingUploadForm
 from .models import Meeting
@@ -26,8 +25,6 @@ class MeetingUploadView(PermissionRequiredMixin, TitleMixin, CreateView):
     
     def form_valid(self, form):
         form.instance.uploaded_by = self.request.user
-        file_extension = Path(form.instance.file.name).suffix.lower()
-        form.instance.filename = f"{form.instance.date.strftime('%Y.%m.%d')}-{form.instance.title}{file_extension}"
         return super().form_valid(form)
 
 
@@ -40,7 +37,7 @@ class MeetingListView(TitleMixin, TableListView):
     title = "会议记录列表"
     title_icon = "icon-[tabler--file-stack]"
 
-    table_headers = ["会议日期", "会议名称", "上传者", "上传时间", "操作"]
+    table_headers = ["会议日期", "会议名称", "文件名", "上传者", "上传时间", "操作"]
     table_sort_map = {
         "会议日期": "date",
         "会议名称": "title",
@@ -57,6 +54,7 @@ class MeetingListView(TitleMixin, TableListView):
             rows.append([
                 meeting.date.strftime('%Y-%m-%d'),
                 meeting.title,
+                meeting.filename,
                 meeting.uploaded_by.first_name if meeting.uploaded_by.first_name else meeting.uploaded_by.username,
                 meeting.uploaded_at.strftime('%Y-%m-%d %H:%M'),
                 btn,
