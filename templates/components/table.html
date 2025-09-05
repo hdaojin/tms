@@ -1,24 +1,24 @@
 {# templates/components/table.html #}
 
-
 {# 仅渲染表格；外层容器由调用者提供 #}
-<div class="overflow-x-auto" id="{{ table_zone_id|default:'table-zone' }}">
-  <table class="table w-full {{ table_css_classes|default:'' }}">
+<div id="{{ table_zone_id|default:'table-zone' }}">
+  <table class="overflow-x-auto table w-full {{ table_css_classes|default:'' }}">
     <thead>
       <tr>
         {% if header_controls %}
           {% for h in header_controls %}
             <th>
               {% if h.sort_key %}
-                <button
-                  class="btn btn-ghost btn-xs"
-                  hx-get="{{ h.hx_get }}"
-                  hx-target="#{{ table_zone_id|default:'table-zone' }}"
-                  hx-push-url="true"
-                >
+                <button class="btn btn-ghost btn-xs" hx-get="{{ h.hx_get }}" hx-target="#{{ table_zone_id|default:'table-zone' }}" hx-push-url="true">
                   <span>{{ h.label }}</span>
                   {% if h.is_active %}
-                    <span class="ml-1">{% if h.current_order == 'asc' %}↑{% else %}↓{% endif %}</span>
+                    <span class="ml-1">
+                      {% if h.current_order == 'asc' %}
+                        ↑
+                      {% else %}
+                        ↓
+                      {% endif %}
+                    </span>
                   {% endif %}
                 </button>
               {% else %}
@@ -27,7 +27,9 @@
             </th>
           {% endfor %}
         {% else %}
-          {% for head in headers %}<th>{{ head }}</th>{% endfor %}
+          {% for head in headers %}
+            <th>{{ head }}</th>
+          {% endfor %}
         {% endif %}
       </tr>
     </thead>
@@ -35,14 +37,12 @@
       {% for row in rows %}
         <tr class="hover:bg-base-200">
           {% for cell in row %}
-            <td>{{ cell|default:"—" }}</td>
+            <td>{{ cell|default:'—' }}</td>
           {% endfor %}
         </tr>
       {% empty %}
         <tr>
-          <td colspan="{{ header_controls|default:headers|length }}" class="text-center text-gray-500">
-            {{ table_empty_text|default:"暂无数据" }}
-          </td>
+          <td colspan="{{ header_controls|default:headers|length }}" class="text-center text-gray-500">{{ table_empty_text|default:'暂无数据' }}</td>
         </tr>
       {% endfor %}
     </tbody>
@@ -53,22 +53,28 @@
     <div class="join mt-4">
       {% if page_obj.has_previous %}
         <a class="join-item btn btn-sm"
-           hx-get="?page={{ page_obj.previous_page_number }}{% if qs_base %}&{{ qs_base }}{% endif %}"
-           hx-target="#{{ table_zone_id|default:'table-zone' }}"
-           hx-push-url="true">«</a>
+          hx-get="?page={{ page_obj.previous_page_number }}{% if qs_base %}
+            &{{ qs_base }}
+          {% endif %}"
+          hx-target="#{{ table_zone_id|default:'table-zone' }}"
+          hx-push-url="true">
+          «
+        </a>
       {% else %}
         <button class="join-item btn btn-sm" disabled>«</button>
       {% endif %}
 
-      <span class="join-item btn btn-sm">
-        第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页
-      </span>
+      <span class="join-item btn btn-sm">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
 
       {% if page_obj.has_next %}
         <a class="join-item btn btn-sm"
-           hx-get="?page={{ page_obj.next_page_number }}{% if qs_base %}&{{ qs_base }}{% endif %}"
-           hx-target="#{{ table_zone_id|default:'table-zone' }}"
-           hx-push-url="true">»</a>
+          hx-get="?page={{ page_obj.next_page_number }}{% if qs_base %}
+            &{{ qs_base }}
+          {% endif %}"
+          hx-target="#{{ table_zone_id|default:'table-zone' }}"
+          hx-push-url="true">
+          »
+        </a>
       {% else %}
         <button class="join-item btn btn-sm" disabled>»</button>
       {% endif %}

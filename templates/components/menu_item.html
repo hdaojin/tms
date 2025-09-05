@@ -1,0 +1,33 @@
+{# templates/components/menu_item.html (DaisyUI collapsible with filters) #}
+{% load menu_tags %}
+<li class="{{ item|css_classes }}">
+  {% if item.children %}
+    <details open>
+      <summary class="flex items-center gap-2 cursor-pointer select-none">
+        {{ item|icon }}
+        {% if item.is_group_header or item.url == '#' %}
+          <span>{{ item.name }}</span>
+        {% else %}
+          <a href="{{ item.url }}" class="flex items-center gap-2" {{ item|link_attrs }}>
+            <span>{{ item.name }}</span>
+          </a>
+        {% endif %}
+      </summary>
+      <ul class="pl-3 border-l border-base-300 mt-1 space-y-1">
+        {% for child in item.children %}
+          {% include 'components/menu_item.html' with item=child %}
+        {% empty %}
+          <li class="opacity-50 text-xs">(空)</li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% else %}
+    {% if item.is_group_header %}
+      <span class="flex items-center gap-2 opacity-70">{{ item|icon }}<span>{{ item.name }}</span></span>
+    {% else %}
+      <a href="{{ item.url }}" class="flex items-center gap-2" {{ item|link_attrs }}>
+        {{ item|icon }}<span>{{ item.name }}</span>
+      </a>
+    {% endif %}
+  {% endif %}
+</li>

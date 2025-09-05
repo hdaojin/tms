@@ -1,0 +1,15 @@
+---
+# accounts/menus.yml
+# 定义用户账户应用的菜单项
+
+- name: 用户管理
+  icon: icon-[tabler--user-circle]
+  is_group_header: true
+  children:
+      - name: 我的资料
+        named_url: accounts:profile
+        icon: icon-[tabler--user]
+        is_visible: true
+        login_required: true
+
+  

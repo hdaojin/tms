@@ -1,0 +1,11 @@
+{# template/components/menu.html #}
+{# 水平菜单 #}
+{% if menus_tree %}
+  <nav class="w-fit mx-auto">
+    <ul class="menu menu-horizontal gap-1 rounded-box">
+      {% for item in menus_tree %}
+        {% include 'components/menu_item.html' with item=item %}
+      {% endfor %}
+    </ul>
+  </nav>
+{% endif %}

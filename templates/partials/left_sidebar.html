@@ -1,9 +1,9 @@
 {# templates/partials/left_sidebar.html #}
-<aside class="w-48 bg-base-200 border-r border-base-300 hidden md:block relative z-0 pt-1">
-  {% load nav_tags %}
+<aside class="w-56 bg-base-200 border-r border-base-300 hidden md:block relative z-0 pt-1">
+  {% load menus %}
   {% if flatpage %}
-    {% render_sidebar_menu 'sidebar' %}
+    {% render_flatpages_menu %}
   {% else %}
-    {% render_sidebar_menu 'follow' %}
+    {% render_current_app_menu %}
   {% endif %}
 </aside>

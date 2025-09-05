@@ -1,0 +1,22 @@
+---
+# traininglogs/menus.yml
+# 定义训练日志应用的菜单项
+
+- name: 训练日志管理
+  icon: icon-[tabler--file-text]
+  is_group_header: true
+  children:
+      - name: 训练日志列表
+        named_url: traininglogs:traininglog_list
+        icon: icon-[tabler--file-stack]
+        is_visible: true
+        login_required: true
+
+      - name: 上传训练日志
+        named_url: traininglogs:traininglog_upload
+        icon: icon-[tabler--upload]
+        is_visible: true
+        login_required: true
+        perm_match_all: false
+        required_perms:
+            - traininglogs.add_traininglog

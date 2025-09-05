@@ -1,0 +1,19 @@
+---
+# common/menus/menus_header.yml
+# 定义网站头部菜单项
+
+- name: 首页
+  named_url: home
+  login_required: false
+
+- name: 训练
+  named_url: traininglogs:traininglog_list
+  login_required: true
+
+- name: 会议
+  named_url: meeting:meeting_list
+  login_required: true
+
+- name: 关于
+  external_url: /about/
+  login_required: false

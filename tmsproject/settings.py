@@ -196,6 +196,8 @@ SITE_AUTHOR = env('SITE_AUTHOR')
 SITE_COPYRIGHT = env('SITE_COPYRIGHT')
 
 CACHE_TIMEOUT = env('CACHE_TIMEOUT', default=300) # type: ignore
+UPLOAD_MAX_SIZE_MB = env('UPLOAD_MAX_SIZE_MB', default=10) # type: ignore
+UPLOAD_MAX_SIZE = UPLOAD_MAX_SIZE_MB * 1024 * 1024  # type: ignore
 
 
 WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目') # type: ignore

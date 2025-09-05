@@ -1,0 +1,23 @@
+---
+# meeting/menus.yml
+# 定义会议应用的菜单项
+
+- name: 会议管理
+  icon: icon-[tabler--calendar]
+  is_group_header: true
+  children:
+      - name: 会议列表
+        named_url: meeting:meeting_list
+        icon: icon-[tabler--calendar-event]
+        is_visible: true
+        login_required: true
+
+      - name: 创建会议
+        named_url: meeting:meeting_upload
+        icon: icon-[tabler--calendar-plus]
+        is_visible: true
+        login_required: true
+        perm_match_all: false
+        required_perms:
+            - meeting.add_meeting
+

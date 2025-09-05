@@ -35,7 +35,6 @@ urlpatterns = [
     path("meeting/", include("meeting.urls", namespace="meeting")),
     path("notices/", include("notices.urls", namespace="notices")),
     path("", login_not_required(HomeView.as_view()), name="home"),
-    # path("", include("pages.urls", namespace="pages")), 
 ]
 
 # 在开发环境中添加静态文件和媒体文件的URL配置
