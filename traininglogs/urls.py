@@ -1,14 +1,11 @@
 from django.urls import path
-from . import views
+from .views import TrainingLogUploadView, TrainingLogListView, TrainingLogDetailView, traininglog_pdf_inline
 
 app_name = 'traininglogs'
 
 urlpatterns = [
-    path('', views.training_logs, name='list_training_logs'),
-    path('upload/', views.upload_training_log, name='upload_training_log'),
-    path('view/<int:log_id>/', views.view_training_log, name='view_training_log'),
-    path('delete/<int:log_id>/', views.delete_training_log, name='delete_training_log'),
-    path('statistics/', views.training_log_statistics, name='training_log_statistics'),
-    path('athlete-logs/', views.athlete_logs, name='athlete_logs'),
-    path('counterpart/', views.counterpart_training_logs, name='counterpart_training_logs'),
+    path('', TrainingLogListView.as_view(), name='traininglog_list'),
+    path('upload/', TrainingLogUploadView.as_view(), name='traininglog_upload'),
+    path('<int:pk>/', TrainingLogDetailView.as_view(), name='traininglog_detail'),
+    path('pdf_inline/<int:pk>/', traininglog_pdf_inline, name='traininglog_pdf_inline'),
 ]

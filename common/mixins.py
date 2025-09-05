@@ -64,7 +64,10 @@ class TitleMixin:
             if self.title_template and self.title_object_fields:
                 field_values = {}
                 for field in self.title_object_fields:  # type: ignore
-                    field_values[field] = str(getattr(self.object, field, ''))  # type: ignore
+                    # 支持日期/时间等对象格式化：在模板中使用 {date:%Y-%m-%d} 即可
+                    # 关键点：不要提前 str()，否则失去 __format__ 能力
+                    value = getattr(self.object, field, '')  # type: ignore
+                    field_values[field] = value if value is not None else ''
                 try:
                     return self.title_template.format(**field_values)
                 except (KeyError, ValueError):

@@ -16,9 +16,12 @@ class StyledFormMixin:
     """
     default_mapping = {
         # 输入框
-       (forms.TextInput, forms.NumberInput, forms.EmailInput, forms.URLInput, forms.PasswordInput, forms.DateInput, forms.DateTimeInput, forms.TimeInput): 'input w-full',
-       # 文件上传框
-       (forms.FileInput,): 'file-input w-full file-input-primary',
+        (forms.TextInput, forms.NumberInput, forms.EmailInput, forms.URLInput, forms.PasswordInput, forms.DateInput, forms.DateTimeInput, forms.TimeInput): 'input w-full',
+        # 文件上传框
+        (forms.FileInput,): 'file-input w-full file-input-primary',
+        (forms.ClearableFileInput,): 'file-input w-full file-input-primary',
+        # 选择框
+        (forms.Select, forms.SelectMultiple): 'select w-full',
     }
 
     def __init__(self, *args, **kwargs):
