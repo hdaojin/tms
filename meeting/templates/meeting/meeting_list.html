@@ -1,15 +1,5 @@
 {% extends 'base_no_right_sidebar.html' %}
 
-{% comment %} {% block title %}
-{% endblock %} {% endcomment %}
-
 {% block content %}
-  {# —— 搜索表单（输入即触发） —— #}
-  <form class="mb-4 join w-full max-w-xl" hx-get="{{ request.path }}" hx-target="#{{ table_zone_id }}" hx-push-url="true">
-    <input type="search" name="q" value="{{ request.GET.q }}" placeholder="搜索：标题 / 上传者" class="input input-bordered join-item w-full" hx-trigger="keyup changed delay:500ms, search" />
-    <button class="btn btn-primary join-item" type="submit">搜索</button>
-  </form>
-
-  {# —— 表格区域：HTMX 的替换目标 —— #}
-  {% include 'components/table.html' with headers=headers header_controls=header_controls rows=rows table_css_classes=table_css_classes table_empty_text=table_empty_text table_zone_id=table_zone_id qs_base=qs_base is_paginated=is_paginated page_obj=page_obj %}
-{% endblock %}
+   {% include "components/table_block.html" %}
+{% endblock content %}

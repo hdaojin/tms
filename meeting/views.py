@@ -1,9 +1,11 @@
 # from django.contrib.auth.decorators import permission_required  # 如果使用函数视图
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.http import  Http404
-from django.views.generic import CreateView, DetailView
+from django.views.generic import CreateView, DetailView, ListView
 from django.urls import reverse_lazy, reverse
 from django.shortcuts import get_object_or_404
+from django_tables2 import SingleTableView
+from .tables import MeetingTable
 
 
 from .forms import MeetingUploadForm
@@ -28,6 +30,19 @@ class MeetingUploadView(PermissionRequiredMixin, TitleMixin, CreateView):
         return super().form_valid(form)
 
 
+class MeetingListView(SingleTableView):
+    model = Meeting
+    table_class = MeetingTable
+    template_name = 'meeting/meeting_list.html'
+    table_pagination = {"per_page": 20}  # 每页显示20条记录
+    extra_context = {
+        'title': "会议记录列表",
+        'title_icon': "icon-[tabler--file-stack]",
+    }
+
+
+
+"""
 class MeetingListView(TitleMixin, TableListView):
     model = Meeting
     template_name = 'meeting/meeting_list.html'
@@ -60,7 +75,7 @@ class MeetingListView(TitleMixin, TableListView):
                 btn,
             ])
         return rows
-            
+"""          
 
 
 def meeting_pdf_inline(request, pk):

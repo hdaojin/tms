@@ -1,5 +1,4 @@
 version = 1
-revision = 1
 requires-python = ">=3.12"
 
 [[package]]
@@ -47,6 +46,18 @@ wheels = [
 ]
 
 [[package]]
+name = "django-tables2"
+version = "2.7.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "django" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/19/0f/497ebb829a0f6d93ac8ae720b114a413e6e3a6eb0682f15c7a8d59f69464/django_tables2-2.7.5.tar.gz", hash = "sha256:fb5dcaa09379cf3947598ec7e1bd5f26ed63aafdee3b23963446763bbeac37bf", size = 128618 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0b/66/6d454db3edcd285b767caaa790c3e7a3969c91bb6f93601d9a879aab06f2/django_tables2-2.7.5-py3-none-any.whl", hash = "sha256:d9338937797207ffb6f481be2125c5ec3a0bb1858d409c672cc25fc5d654cb22", size = 95984 },
+]
+
+[[package]]
 name = "pyyaml"
 version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -89,6 +100,7 @@ dependencies = [
     { name = "django" },
     { name = "django-environ" },
     { name = "django-multiselectfield" },
+    { name = "django-tables2" },
     { name = "pyyaml" },
 ]
 
@@ -97,6 +109,7 @@ requires-dist = [
     { name = "django", specifier = ">=5.1.6" },
     { name = "django-environ", specifier = ">=0.12.0" },
     { name = "django-multiselectfield", specifier = ">=1.0.1" },
+    { name = "django-tables2", specifier = ">=2.7.5" },
     { name = "pyyaml", specifier = ">=6.0.2" },
 ]
 

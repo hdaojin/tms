@@ -51,9 +51,9 @@ INSTALLED_APPS = [
     'django.contrib.flatpages',
     'django.forms',
     # Custom apps
+    'django_tables2',
     'multiselectfield',
     'common',
-    'navigation',
     'accounts',
     'articles',
     'competitions',
