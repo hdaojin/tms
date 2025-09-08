@@ -1,10 +1,10 @@
 from django import forms
 from django.utils import timezone
 from .models import TrainingLog, ALLOWED_EXTENSIONS
-from common.forms import BaseModelForm
+from common.forms import StyledFormMixin
 
 
-class TrainingLogCreateForm(BaseModelForm):
+class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = TrainingLog
         fields = ['training_date', 'module', 'task', 'file']

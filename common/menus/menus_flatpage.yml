@@ -11,7 +11,14 @@
         external_url: /about/
         icon: icon-[tabler--info-square]
         login_required: false
+
       - name: 关于作者
         external_url: /about/author/
         icon: icon-[tabler--user-circle]
         login_required: false
+
+      - name: 问题反馈
+        external_url: https://github.com/hdaojin/tms/issues/new
+        icon: icon-[tabler--message-question]
+        login_required: false
+        target_blank: true

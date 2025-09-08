@@ -36,17 +36,3 @@ class StyledFormMixin:
                     else:
                         field.widget.attrs['class'] = css_class
                     break
-
-
-class BaseForm(StyledFormMixin, forms.Form):
-    """
-    自定义基础表单，继承自StyledFormMixin和forms.Form
-    """
-    pass
-
-
-class BaseModelForm(StyledFormMixin, forms.ModelForm):
-    """
-    自定义基础模型表单，继承自StyledFormMixin和forms.ModelForm
-    """
-    pass

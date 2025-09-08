@@ -2,9 +2,9 @@ from django import forms
 from .models import Meeting
 from django.utils import timezone
 
-from common.forms import BaseModelForm
+from common.forms import StyledFormMixin
 
-class MeetingUploadForm(BaseModelForm):
+class MeetingUploadForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = Meeting
         fields = ['title', 'date', 'file']
