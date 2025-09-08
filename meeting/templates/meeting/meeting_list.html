@@ -1,5 +1,8 @@
 {% extends 'base_no_right_sidebar.html' %}
 
 {% block content %}
-   {% include "components/table_block.html" %}
-{% endblock content %}
+  <div class="text-right">
+    <p class="text-sm text-info">*提示: 如果需要删除会议记录，请联系管理员。</p>
+  </div>
+  {% include 'components/table_block.html' %}
+{% endblock %}

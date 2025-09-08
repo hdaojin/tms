@@ -33,8 +33,8 @@ def account_signup(request):
 
 def account_profile(request):
     return render(request, 'accounts/profile.html', {
-        'title': '个人信息',
-        'title_icon': 'icon-[tabler--user-circle]',
+        'title': '个人资料',
+        'title_icon': 'icon-[tabler--user]',
         'user': request.user
     })
 
@@ -43,5 +43,6 @@ def generate_invitation(request):
     code = generate_invitation_code()
     return render(request, 'accounts/generate_invite.html', {
         'title': '生成邀请码',
+        'title_icon': 'icon-[tabler--user-plus]',
         'code': code,
     })

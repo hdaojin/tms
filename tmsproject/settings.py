@@ -189,11 +189,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # FORM_RENDERER = 'tmsproject.settings.CustomFormRenderer'
 
 # 自定义变量
-SITE_NAME = env('SITE_NAME', default="ITNSA") # type: ignore
-SITE_DESCRIPTION = env('SITE_DESCRIPTION')
-SITE_KEYWORDS = env('SITE_KEYWORDS')
-SITE_AUTHOR = env('SITE_AUTHOR')
-SITE_COPYRIGHT = env('SITE_COPYRIGHT')
+
+# SITE INFO
+SITE_INFO = {
+    "site_name": env('SITE_NAME', default="ITNSA"), # type: ignore
+    "site_description": env('SITE_DESCRIPTION', default="A simple training management system."), # type: ignore
+    "site_keywords": env('SITE_KEYWORDS', default="TMS, Training Management System, Training, Management"), # type: ignore
+    "site_author": env('SITE_AUTHOR', default="hdaojin"), # type: ignore
+}
 
 CACHE_TIMEOUT = env('CACHE_TIMEOUT', default=300) # type: ignore
 UPLOAD_MAX_SIZE_MB = env('UPLOAD_MAX_SIZE_MB', default=10) # type: ignore

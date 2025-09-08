@@ -95,6 +95,11 @@ class TrainingLog(models.Model):
         verbose_name = '训练日志'
         verbose_name_plural = '训练日志'
         ordering = ('-training_date', '-uploaded_at')
+        permissions = [
+            ('view_all_traininglog', '查看所有训练日志'),
+            ('view_coach_traininglog', '查看教练训练日志'),
+            ('view_competitor_traininglog', '查看选手训练日志'),
+        ]
 
     def __str__(self):
         m = self.module.name if self.module else "未分配模块"

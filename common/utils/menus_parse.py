@@ -64,8 +64,7 @@ def _perm_match(user, item: dict) -> bool:
     """
     if item.get("login_required", True) and not user.is_authenticated:
         return False
-    # 兼容旧字段 required_perms（YAML 中用户当前使用），优先使用新字段 permissions
-    perms = item.get("permissions") or item.get("required_perms") or []
+    perms = item.get("required_perms") or []
     if not perms:
         return True
     if item.get("perm_match_all", True):
@@ -99,7 +98,7 @@ def _map_menu_items(item: dict, request) -> dict | None:
         "htmx_attrs": item.get("htmx_attrs", {}) or {},
         "is_group_header": item.get("is_group_header", False),
         # 传递计算后的权限列表（仅用于调试或前端需要显示，可选）
-        "_perms": item.get("permissions") or item.get("required_perms") or [],
+        "_perms": item.get("required_perms") or [],
         "children": [],
     }
     for child in item.get("children", []):

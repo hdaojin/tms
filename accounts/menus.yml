@@ -6,10 +6,19 @@
   icon: icon-[tabler--user-circle]
   is_group_header: true
   children:
-      - name: 我的资料
+      - name: 个人资料
         named_url: accounts:profile
         icon: icon-[tabler--user]
         is_visible: true
         login_required: true
+
+      - name: 邀请注册
+        named_url: accounts:generate_invitation
+        icon: icon-[tabler--user-plus]
+        is_visible: true
+        login_required: true
+        required_perms: accounts.add_ivitationcode
+
+
 
   

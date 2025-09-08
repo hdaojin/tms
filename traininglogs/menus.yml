@@ -6,17 +6,43 @@
   icon: icon-[tabler--file-text]
   is_group_header: true
   children:
-      - name: 训练日志列表
-        named_url: traininglogs:traininglog_list
-        icon: icon-[tabler--file-stack]
-        is_visible: true
-        login_required: true
+    - name: 我的训练日志
+      named_url: "traininglogs:traininglog_list"
+      icon: icon-[tabler--file-stack]
+      is_visible: true
+      login_required: true
 
-      - name: 上传训练日志
-        named_url: traininglogs:traininglog_upload
-        icon: icon-[tabler--upload]
-        is_visible: true
-        login_required: true
-        perm_match_all: false
-        required_perms:
-            - traininglogs.add_traininglog
+    - name: 教练训练日志
+      # visible_for_groups: ["选手"]
+      named_url: "traininglogs:traininglog_coach_list"
+      icon: icon-[tabler--file-search]
+      is_visible: true
+      login_required: true
+      perm_match_all: true
+      required_perms: 
+        - traininglogs.view_coach_traininglog
+
+    - name: 选手训练日志
+      # visible_for_groups: ["教练"]
+      named_url: "traininglogs:traininglog_competitor_list"
+      icon: icon-[tabler--file-search]
+      is_visible: true
+      login_required: true
+      perm_match_all: true
+      required_perms: 
+        - traininglogs.view_competitor_traininglog
+
+    - name: 上传训练日志
+      named_url: "traininglogs:traininglog_upload"
+      icon: icon-[tabler--upload]
+      is_visible: true
+      login_required: true
+      perm_match_all: false
+      required_perms:
+        - traininglogs.add_traininglog
+
+    - name: 日志提交统计
+      named_url: "traininglogs:traininglog_stats"
+      icon: icon-[tabler--chart-bar]
+      is_visible: true
+      login_required: true
