@@ -1,0 +1,16 @@
+{% extends "base_no_right_sidebar.html" %}
+
+{% block content %}
+<div class="max-w-lg mx-auto p-2 w-full">
+    {% include 'components/form_snippet.html' with form=form action=request.path submit_label="发布通知" %}
+    {% comment %} {% for field in form  %}
+        <div class="mb-4">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}
+                <p class="label text-info">{{ field.help_text|safe }}</p>
+            {% endif %}
+        </div>
+    {% endfor %} {% endcomment %}
+</div>
+{% endblock %}

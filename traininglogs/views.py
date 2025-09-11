@@ -42,7 +42,7 @@ class TraininglogListView(LoginRequiredMixin, SingleTableView):
     template_name = "traininglogs/traininglog_list.html"
     table_pagination = {"per_page": 31}  # 每页显示31条记录
     extra_context = {
-        "title": "训练日志列表",
+        "title": "我的训练日志",
         "title_icon": "icon-[tabler--file-stack]",
     }
 
@@ -131,7 +131,7 @@ class TrainingLogDetailView(LoginRequiredMixin, DetailView):
 
 class TrainingLogDeleteView(LoginRequiredMixin, DeleteView):
     model = TrainingLog
-    template_name = "traininglogs/traininglog_confirm_delete.html"
+    # template_name = "traininglogs/traininglog_confirm_delete.html"
     success_url = reverse_lazy("traininglogs:traininglog_list")
     # permission_required = 'traininglogs.delete_traininglog'
     raise_exception = True
@@ -155,13 +155,12 @@ class CoachTraininglogListView(
     table_class = TrainingLogOthersTable
     template_name = "traininglogs/traininglog_list.html"
     permission_required = "traininglogs.view_coach_traininglog"
+    raise_exception = True
     table_pagination = {"per_page": 31}
     extra_context = {
         "title": "教练训练日志",
-        "title_icon": "icon-[tabler--user-shield]",
+        "title_icon": "icon-[tabler--file-search]",
     }
-
-    raise_exception = True
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -180,13 +179,12 @@ class CompetitorTraininglogListView(
     table_class = TrainingLogOthersTable
     template_name = "traininglogs/traininglog_list.html"
     permission_required = "traininglogs.view_competitor_traininglog"
+    raise_exception = True
     table_pagination = {"per_page": 31}
     extra_context = {
         "title": "选手训练日志",
-        "title_icon": "icon-[tabler--user]",
+        "title_icon": "icon-[tabler--file-search]",
     }
-
-    raise_exception = True
 
     def get_queryset(self):
         qs = super().get_queryset()

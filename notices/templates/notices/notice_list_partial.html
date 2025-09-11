@@ -1,63 +1,81 @@
-{% if page_obj.object_list %}
-    <!-- 列表头部 -->
-    <div class="p-4 border-b border-base-300">
-        <h3 class="text-base font-medium">通知列表 (共 {{ page_obj.paginator.count }} 条)</h3>
-        <div class="badge badge-success badge-sm mt-1">
-            <span class="icon-[tabler--refresh] size-3 mr-1"></span>
-            自动更新
-        </div>
-    </div>
-    
-    <!-- 通知项目 -->
-    <div class="divide-y divide-base-300">
-        {% for n in page_obj.object_list %}
-            {% include 'notices/notice_item.html' %}
-        {% endfor %}
-    </div>
-    
-    <!-- 分页信息 -->
-    {% if page_obj.has_other_pages %}
-        <div class="p-4 border-t border-base-300 flex justify-between items-center">
-            <div class="text-sm text-base-content/70">
-                显示第 {{ page_obj.start_index }} - {{ page_obj.end_index }} 条，共 {{ page_obj.paginator.count }} 条
+{% for notice in notices %}
+  <div class="card card-border bg-base-100 mb-4 shadow-sm {% if forloop.first and not request.GET.page or forloop.first and request.GET.page == '1' %}shadow-info{% endif %}">
+    <div class="card-body">
+      <!-- 标题信息 -->
+      {% if notice.title %}
+        <h2 class="card-title">{{ notice.title }}</h2>
+      {% endif %}
+      <!-- 发布者信息 -->
+      <div class="py-2 border-b border-base-300 flex justify-between">
+        <div>
+          <div class="flex items-center gap-4 text-sm">
+            {% if forloop.first and not request.GET.page or forloop.first and request.GET.page == '1' %}
+              <div class="badge badge-secondary flex items-center gap-2">
+                <span class="icon-[tabler--star-filled] size-3"></span>
+                <span class="text-sm">最新</span>
+              </div>
+            {% endif %}
+
+            <div class="flex items-center gap-1">
+              <span class="icon-[tabler--calendar] size-4"></span>
+              {{ notice.published_at|date:'Y年m月d日 H:i:s' }}
             </div>
-            
-            <div class="join">
-                {% if page_obj.has_previous %}
-                    <a href="?page={{ page_obj.previous_page_number }}" 
-                       class="join-item btn btn-sm"
-                       hx-get="{% url 'notices:notice_list_partial' %}?page={{ page_obj.previous_page_number }}"
-                       hx-target="#notice-list-content"
-                       onclick="updateAutoRefreshUrl({{ page_obj.previous_page_number }})">
-                        <span class="icon-[tabler--chevron-left] size-4"></span>
-                    </a>
+
+            <div class="flex items-center">
+              <div class="flex items-center gap-1">
+                <span class="icon-[tabler--user] size-4"></span>
+                {% if user == notice.published_by %}
+                  <div class="text-error mr-1">我</div>
+                {% else %}
+                  <div class="text-primary mr-1">{{ notice.published_by.get_full_name|default:notice.published_by.username }}</div>
                 {% endif %}
-                
-                <span class="join-item btn btn-sm btn-disabled">
-                    {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
-                </span>
-                
-                {% if page_obj.has_next %}
-                    <a href="?page={{ page_obj.next_page_number }}" 
-                       class="join-item btn btn-sm"
-                       hx-get="{% url 'notices:notice_list_partial' %}?page={{ page_obj.next_page_number }}"
-                       hx-target="#notice-list-content"
-                       onclick="updateAutoRefreshUrl({{ page_obj.next_page_number }})">
-                        <span class="icon-[tabler--chevron-right] size-4"></span>
-                    </a>
-                {% endif %}
+              </div>
+              <div class="mr-1">对</div>
+              {% if notice.target_groups.all|length %}
+                <div class="flex flex-wrap gap-1">
+                  所有{% for g in notice.target_groups.all %}
+                    <span class="badge badge-soft badge-primary badge-sm">{{ g.name }}</span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <div class="badge badge-soft badge-primary badge-sm">所有人</div>
+              {% endif %}
+              <span class="icon-[tabler--volume] size-4"></span>
             </div>
+          </div>
         </div>
-    {% endif %}
-    
-{% else %}
-    <!-- 空状态 -->
-    <div class="flex flex-col items-center justify-center min-h-60 p-8">
-        <span class="icon-[tabler--bell-off] mb-4 size-12 text-base-content/30"></span>
-        <h3 class="text-lg font-medium mb-2">暂无通知</h3>
-        <p class="text-base-content/60 text-center">
-            目前没有已发布的通知<br>
-            请稍后再查看
+        {% if user == notice.published_by %}
+          <div class="card-actions">
+            <form method="post" action="{% url 'notices:notice_delete' notice.id %}" onsubmit="return confirm('确认删除该通知？此操作不可恢复。');">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-sm flex items-center">
+                <span class="icon-[tabler--trash] size-4"></span>
+                <span>删除</span>
+              </button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- 内容预览 -->
+      {% if notice.content|length > 50 %}
+        <p>
+          {{ notice.content|striptags|truncatechars_html:50 }}
+          <a href="{% url 'notices:notice_detail' notice.id %}" class="link link-primary text-sm ml-1">查看详情</a>
         </p>
+      {% else %}
+        <p>{{ notice.content|striptags }}</p>
+      {% endif %}
+
+      <!-- 附件信息 -->
+      {% if notice.attachments.all %}
+        <div class="flex items-center gap-2 text-sm text-base-content/70">
+          <span class="icon-[tabler--paperclip] size-4"></span>
+          <a href="{% url 'notices:notice_detail' notice.id %}" class="link link-info text-xs hover:text-info-focus"><span>附件 {{ notice.attachments.count }} 个</span></a>
+        </div>
+      {% endif %}
     </div>
-{% endif %}
+  </div>
+{% empty %}
+  <p class="text-center">暂无通知。</p>
+{% endfor %}

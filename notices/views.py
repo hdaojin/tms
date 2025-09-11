@@ -1,9 +1,12 @@
-from django.shortcuts import render, get_object_or_404, redirect
-from django.core.paginator import Paginator
-from django.contrib.auth.decorators import permission_required
+from django.db.models.base import Model as Model
 from django.contrib import messages
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import CreateView, DetailView, ListView, DeleteView
+from django.urls import reverse_lazy
+from django.http import Http404
 
 from .models import Notice, NoticeAttachment
 from .forms import NoticeForm
@@ -15,127 +18,111 @@ def _get_notices_with_read_status(user):
     """
     # 用户组ID列表
     user_group_ids = list(user.groups.values_list('id', flat=True))
-    
-    # 过滤条件：
-    # 1. 通知已发布
-    # 2. 没有指定目标组（向所有人发送）或用户在目标组中
-    notices = Notice.objects.filter(is_published=True).prefetch_related('attachments')
-    
+
+    # 可见性规则：作者始终可见；其他用户需满足（有发布时间 且 未限定或在目标组）
+    author_q = Q(published_by=user)
     if user_group_ids:
-        # 如果用户有组，则显示：无目标组的通知 或 用户组在目标组中的通知
-        notices = notices.filter(
-            Q(target_groups__isnull=True) | 
-            Q(target_groups__in=user_group_ids)
+        published_visible_q = Q(published_at__isnull=False) & (
+            Q(target_groups__isnull=True) | Q(target_groups__in=user_group_ids)
         )
     else:
-        # 如果用户没有组，只显示没有指定目标组的通知
-        notices = notices.filter(target_groups__isnull=True)
+        published_visible_q = Q(published_at__isnull=False) & Q(target_groups__isnull=True)
+
+    notices = (
+        Notice.objects
+        .filter(author_q | published_visible_q)
+        .prefetch_related('attachments')
+        .distinct()
+        .order_by('-published_at', '-id')
+    )
+
+    return notices
+
+
+class NoticeListView(LoginRequiredMixin, ListView):
+    model = Notice
+    template_name = 'notices/notice_list.html'
+    partial_template_name = 'notices/notice_list_partial.html'
+    context_object_name = 'notices'
+    paginate_by = 10
+    extra_context = {
+        "title": "通知列表",
+        "title_icon" : "icon-[tabler--list]"
+    }
+
+    def get_queryset(self):
+        return _get_notices_with_read_status(self.request.user)
+
+    def get_template_names(self):
+        # django-htmx：HTMX 请求返回局部模板，其余返回整页模板
+        if self.request.htmx:      # type: ignore
+            return [self.partial_template_name]
+        return [self.template_name]
+
     
-    return notices.distinct().order_by('-published_at', '-updated_at')
+class NoticeDetailView(LoginRequiredMixin, DetailView):
+    model = Notice
+    template_name = 'notices/notice_detail.html'
+    context_object_name = 'notice'
+    extra_context = {
+        "title": "通知详情",
+        "title_icon" : "icon-[tabler--bell]"
+    }
+
+    def get_queryset(self):
+        return _get_notices_with_read_status(self.request.user)
 
 
-def _get_paginated_notices(request):
-    """
-    获取分页的通知列表
-    """
-    notices = _get_notices_with_read_status(request.user)
-    paginator = Paginator(notices, 12)  # 每页12条
-    page_number = request.GET.get('page')
-    return paginator.get_page(page_number)
+class NoticeDeleteView(LoginRequiredMixin, DeleteView):
+    model = Notice
+    success_url = reverse_lazy('notices:notice_list')
+    extra_context = {
+        "title": "删除通知",
+        "title_icon" : "icon-[tabler--trash]"
+    }
+
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        # 仅允许发布者本人删除
+        if self.request.user != obj.published_by:     # type: ignore
+            raise Http404
+        return obj
 
 
-# @login_required
-def notice_list(request):
-    """
-    通知列表视图: 只显示已发布的通知, 并标记用户已读状态, 最新的通知在前, 12条一页
-    """
-    page_obj = _get_paginated_notices(request)
-    
-    # 获取最新的通知ID（用于在模板中特殊显示）
-    latest_notice_id = None
-    if page_obj.object_list:
-        latest_notice_id = page_obj.object_list[0].id if page_obj.number == 1 else None
-    
-    return render(request, 'notices/notice_list.html', {
-        'page_obj': page_obj,
-        'title': '通知列表',
-        'latest_notice_id': latest_notice_id,
-    })
 
+class NoticeCreateView(LoginRequiredMixin, CreateView):
+    model = Notice
+    form_class = NoticeForm
+    template_name = 'notices/notice_create.html'
+    success_url = reverse_lazy('notices:notice_list')
+    extra_context = {
+        "title": "发布通知",
+        "title_icon" : "icon-[tabler--plus]"
+    }
+    def form_valid(self, form):
+        form.instance.published_by = self.request.user
+        # 直接发布：设置发布时间
+        if not form.instance.published_at:
+            form.instance.published_at = timezone.now()
 
-# @login_required
-def notice_list_partial(request):
-    """
-    部分通知列表视图: 用于HTMX自动刷新
-    """
-    page_obj = _get_paginated_notices(request)
-    
-    # 获取最新的通知ID（用于在模板中特殊显示）
-    latest_notice_id = None
-    if page_obj.object_list:
-        latest_notice_id = page_obj.object_list[0].id if page_obj.number == 1 else None
-    
-    return render(request, 'notices/notice_list_partial.html', {
-        'page_obj': page_obj,
-        'latest_notice_id': latest_notice_id,
-    })
-
-
-# @login_required
-def notice_detail(request, pk: int):
-    """
-    通知详情视图：显示通知的详细内容
-    """
-    notice = get_object_or_404(Notice.objects.prefetch_related('attachments'), pk=pk, is_published=True)
-    
-    return render(request, 'notices/notice_detail.html', {
-        'notice': notice,
-        'title': notice.title,
-    })
-
-
-# @login_required
-@permission_required('notices.add_notice')
-def notice_create(request):
-    """
-    创建通知视图：支持多附件上传
-    """
-    if request.method == 'POST':
-        form = NoticeForm(request.POST, request.FILES)
-        if form.is_valid():
-            notice = form.save(commit=False)
-            notice.published_by = request.user
-            
-            # 如果发布，设置发布时间
-            if notice.is_published:
-                notice.published_at = timezone.now()
-            
-            notice.save()
-            form.save_m2m()  # 保存多对多关系
-            
-            # 处理多个附件上传
-            attachments = form.cleaned_data.get('attachments', [])
-            if attachments:
-                # 如果attachments是单个文件，转换为列表
-                if not isinstance(attachments, list):
-                    attachments = [attachments]
-                
-                for file in attachments:
-                    if file:
-                        NoticeAttachment.objects.create(
-                            notice=notice,
-                            file=file
-                        )
-            
-            messages.success(
-                request, 
-                f'通知已{"发布" if notice.is_published else "保存为草稿"}成功！'
-            )
-            return redirect('notices:notice_detail', pk=notice.pk)
-    else:
-        form = NoticeForm()
-    
-    return render(request, 'notices/notice_create.html', {
-        'form': form,
-        'title': '发布通知',
-    })
+        attachments = self.request.FILES.getlist('attachments')
+        with transaction.atomic():
+            response = super().form_valid(form)
+            obj = getattr(self, 'object', None)
+            if attachments and obj is not None:
+                objs = []
+                for f in attachments:
+                    if not f:
+                        continue
+                    na = NoticeAttachment(notice=obj, file=f)
+                    # bulk_create 不会触发 save()，这里显式填充文件大小
+                    try:
+                        na.file_size = getattr(f, 'size', None)
+                    except Exception:
+                        pass
+                    objs.append(na)
+                if objs:
+                    NoticeAttachment.objects.bulk_create(objs)
+        if obj is not None:
+            messages.success(self.request, "通知已发布成功！")
+        return response

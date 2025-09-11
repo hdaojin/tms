@@ -24,14 +24,14 @@ class NoticeAttachmentInline(admin.TabularInline):
     
 # Register the Notice model with custom admin options
 class NoticeAdmin(admin.ModelAdmin):
-    list_display = ('title', 'content', 'get_attachments_count', 'is_published', 'published_by', 'get_target_groups_display', 'published_at', 'updated_at')
+    list_display = ('title', 'content', 'get_attachments_count', 'published_by', 'get_target_groups_display', 'published_at')
     empty_value_display = '-空-'
-    list_filter = ('is_published', 'published_by', 'target_groups')
+    list_filter = ('published_by', 'target_groups')
     search_fields = ('title', 'content')
-    readonly_fields = ('published_at', 'updated_at')
+    readonly_fields = ('published_at',)
     date_hierarchy = 'published_at'
-    ordering = ('-is_published', '-published_at', '-updated_at')
-    actions = ['publish_notices', 'unpublish_notices']
+    ordering = ('-published_at', '-id')
+    actions = []
     filter_horizontal = ('target_groups',)  # 使用水平过滤器选择组
     inlines = [NoticeAttachmentInline]  # 添加附件内联编辑
 
@@ -50,18 +50,17 @@ class NoticeAdmin(admin.ModelAdmin):
 
     def get_fields(self, request, obj=None):
         """根据用户权限动态调整字段显示"""
-        fields = ['title', 'content', 'target_groups', 'is_published']
+        fields = ['title', 'content', 'target_groups']
         
         # 只有超级用户才能看到和编辑发布人字段
         if request.user.is_superuser:
             fields.append('published_by')
-        
-        fields.extend(['published_at', 'updated_at'])
+            fields.extend(['published_at'])
         return fields
 
     def get_readonly_fields(self, request, obj=None):
         """根据用户权限动态调整只读字段"""
-        readonly_fields = ['published_at', 'updated_at']
+        readonly_fields = ['published_at']
         
         # 对于非超级用户，如果显示发布人字段则设为只读
         if not request.user.is_superuser and 'published_by' in self.get_fields(request, obj):
@@ -71,36 +70,14 @@ class NoticeAdmin(admin.ModelAdmin):
 
     def save_model(self, request, obj, form, change):
         """保存时自动设置发布人和发布时间"""
-        # 如果通知被设置为发布状态
-        if obj.is_published:
-            # 如果是新创建的对象或者发布人为空，设置为当前用户
-            if not change or not obj.published_by:
-                obj.published_by = request.user
-            
-            # 如果发布时间为空，设置为当前时间
-            if not obj.published_at:
-                obj.published_at = timezone.now()
-            
-            # 如果不是超级用户，强制设置发布人为当前用户
-            if not request.user.is_superuser:
-                obj.published_by = request.user
-        else:
-            # 如果取消发布，清除发布时间和发布人
-            obj.published_at = None
-            obj.published_by = None
+        # 统一直接发布：设置发布人和发布时间
+        if not obj.published_by:
+            obj.published_by = request.user
+        if not obj.published_at:
+            obj.published_at = timezone.now()
             
         super().save_model(request, obj, form, change)
 
-    @admin.action(description='发布所选的 通知')
-    def publish_notices(self, request, queryset):
-        queryset.update(is_published=True, published_by=request.user, published_at=timezone.now())
-        self.message_user(request, f"已发布 {queryset.count()} 条通知。")
-
-    @admin.action(description='撤销所选的 通知')
-    def unpublish_notices(self, request, queryset):
-        queryset.update(is_published=False, published_by=None, published_at=None)
-        self.message_user(request, f"已撤销 {queryset.count()} 条通知。")
-    
 
 # 注册模型和自定义的Admin类
 admin.site.register(Notice, NoticeAdmin)

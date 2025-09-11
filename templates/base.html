@@ -1,10 +1,12 @@
+{% load django_htmx %}
 <!DOCTYPE html>
 <html lang="zh-hans" data-theme="light">
   <head>
     {% include 'partials/head.html' %}
+    {% htmx_script %}
   </head>
 
-  <body class="min-h-screen flex flex-col">
+  <body class="min-h-screen flex flex-col" hx-headers='{"x-csrftoken": "{{ csrf_token }}"}'>
     {# Header：默认显示；若子模板要隐藏，覆盖 block 为“空”即可 #}
     {% block header %}
       {% include 'partials/header.html' %}

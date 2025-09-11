@@ -1,45 +1,71 @@
-{# templates/django/forms/for_snippet.html  #}
+{# django-template #}
+{# templates/django/forms/for_snippet.html #}
 {# 入参: form, action, method="post", submit_label="提交", htmlx=dict #}
 
-<form action="{{ action|default:'' }}" method="{{ method|default:'post' }}" {% if form.is_multipart %}enctype="multipart/form-data"{% endif %} {% if htmlx %}{% for attr, value in htmlx.items %} {{ attr }}="{{ value }}"{% endfor %}{% endif %}>
-    
+{% load form_extras %}
+
+<form action="{{ action|default:'' }}" method="{{ method|default:'post' }}" {% if form.is_multipart %}enctype="multipart/form-data" {% endif %} {% if htmlx %}{% for attr, value in htmlx.items %} {{ attr }}="{{ value }}" {% endfor %}{% endif %}>
+
     {% csrf_token %}
 
     {# 隐藏字段 #}
     {% for hidden in form.hidden_fields %}
-        {{ hidden }}
+    {{ hidden }}
     {% endfor %}
 
     {# 非字段错误，比如表单的全局错误 #}
     {% if form.non_field_errors %}
-        <div class="alert alert-error mb-4">
-           <ul class="list-disc list-inside">
+    <div class="alert alert-error mb-4">
+        <ul class="list-disc list-inside">
             {% for error in form.non_field_errors %}
-                <li>{{ error }}</li>
+            <li>{{ error }}</li>
             {% endfor %}
-            </ul> 
-        </div>
+        </ul>
+    </div>
     {% endif %}
 
     {# 遍历可见字段 #}
     {% for field in form.visible_fields %}
-        {% if field.errors %}
-            <div class="alert alert-error mb-2">
-                <ul class="list-disc list-inside">
-                {% for error in field.errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-                </ul>
-            </div>
-        {% endif %}
+    {% if field.errors %}
+    <div class="alert alert-error mb-2">
+        <ul class="list-disc list-inside">
+            {% for error in field.errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 
-        <fieldset class="fieldset mb-4">
+    {% if field|is_checkbox_multiple %}
+    <fieldset class="fieldset mt-4">
+        <legend class="fieldset-legend">{{ field.label }}</legend>
+        <div class="flex flex-wrap flex-row gap-4">
+        {% for cb in field %}
+            <div class="gap-x-2 flex items-center" for="{{ cb.id_for_label }}">
+                {{ cb.tag }} <span class="">{{ cb.choice_label }}</span>
+            </div>
+        {% endfor %} 
+        </div>
+    </fieldset>
+
+    {% elif field|is_checkbox_input %}
+    <fieldset class="fieldset mt-4">
+    <div class="gap-x-2" for="{{ field.id_for_label }}">
+        {{ field.as_widget }} <span class="ml-1">{{ field.label }}</span>
+    </div>
+    </fieldset>
+
+    {% else %}
+    <fieldset class="fieldset mt-4">
         <legend class="fieldset-legend">{{ field.label_tag }}</legend>
-            {{ field }}
-            {% if field.help_text %}
-                <p class="label text-info">{{ field.help_text|safe }}</p>
-            {% endif %}
-        </fieldset>
+        {{ field }}
+    </fieldset>
+    {% endif %}
+
+    {% if field.help_text %}
+    <p class="text-info text-xs">{{ field.help_text|safe }}</p>
+    {% endif %}
+
     {% endfor %}
 
     {# 提交按钮 #}

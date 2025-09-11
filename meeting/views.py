@@ -24,7 +24,7 @@ class MeetingUploadView(PermissionRequiredMixin, CreateView):
 
     extra_context = {
     "title": "上传会议记录",
-    "title_icon" : "icon-[tabler--upload]"
+    "title_icon" : "icon-[tabler--calendar-plus]"
     } 
     
     def form_valid(self, form):
@@ -39,7 +39,7 @@ class MeetingListView(SingleTableView):
     table_pagination = {"per_page": 20}  # 每页显示20条记录
     extra_context = {
         'title': "会议记录列表",
-        'title_icon': "icon-[tabler--file-stack]",
+        'title_icon': "icon-[tabler--calendar-event]",
     }
 
 

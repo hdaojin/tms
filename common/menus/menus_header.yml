@@ -6,6 +6,10 @@
   named_url: home
   login_required: false
 
+- name: 通知
+  named_url: notices:notice_list
+  login_required: true
+
 - name: 训练
   named_url: traininglogs:traininglog_list
   login_required: true

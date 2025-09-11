@@ -1,69 +1,41 @@
-{% extends 'base.html' %}
-
+{% extends 'base_no_right_sidebar.html' %}
 
 {% block content %}
-<div class="container mx-auto p-4">
-    <!-- 页面标题 -->
-    <div class="card card-border shadow-none mb-6">
-        <div class="card-body py-3">
-            <div class="flex items-center justify-between">
-                <h1 class="card-title text-xl">
-                    <span class="icon-[tabler--bell] size-6 text-primary"></span>
-                    {{ title }}
-                </h1>
-                {% if perms.notices.add_notice %}
-                <a href="{% url 'notices:notice_create' %}" 
-                   class="btn btn-primary btn-sm">
-                    <span class="icon-[tabler--plus] size-4"></span>
-                    发布通知
+  <!-- 通知列表：仅在第一页自动刷新，其它页不刷新 -->
+  <div id="notice-list-content"
+       {% if not request.GET.page or request.GET.page == '1' %}
+         hx-get="{% url 'notices:notice_list' %}"
+         hx-trigger="every 1s"
+         hx-swap="innerHTML"
+       {% endif %}>
+    {% include 'notices/notice_list_partial.html' %}
+  </div>
+
+<!-- 分页信息 -->
+{% if page_obj.has_other_pages %}
+    <div class="p-4 border-t border-base-300 flex justify-between items-center">
+        <div class="text-sm text-base-content/70">
+            显示第 {{ page_obj.start_index }} - {{ page_obj.end_index }} 条，共 {{ page_obj.paginator.count }} 条
+        </div>
+        
+        <div class="join">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" class="join-item btn btn-sm">
+                    <span class="icon-[tabler--chevron-left] size-4"></span>
                 </a>
-                {% endif %}
-            </div>
+            {% endif %}
+            
+            <span class="join-item btn btn-sm btn-disabled">
+                {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+            </span>
+            
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="join-item btn btn-sm">
+                    <span class="icon-[tabler--chevron-right] size-4"></span>
+                </a>
+            {% endif %}
         </div>
     </div>
-    
-    <!-- 通知列表 -->
-    <div class="card">
-        <div id="notice-list-content" 
-             hx-get="{% url 'notices:notice_list_partial' %}{% if request.GET.page %}?page={{ request.GET.page }}{% endif %}"
-             hx-trigger="every 1s"
-             hx-swap="innerHTML">
-            {% include 'notices/notice_list_partial.html' %}
-        </div>
-    </div>
-</div>
+{% endif %}
 
-<script>
-// 更新自动刷新的URL到指定页码
-function updateAutoRefreshUrl(page) {
-    const container = document.getElementById('notice-list-content');
-    const baseUrl = "{% url 'notices:notice_list_partial' %}";
-    const newUrl = page === 1 ? baseUrl : `${baseUrl}?page=${page}`;
-    
-    container.setAttribute('hx-get', newUrl);
-    htmx.process(container);
-    
-    // 更新浏览器URL但不刷新页面
-    const newBrowserUrl = page === 1 ? window.location.pathname : `${window.location.pathname}?page=${page}`;
-    window.history.pushState({}, '', newBrowserUrl);
-}
-
-// 更新HTMX的URL以包含当前页码
-function updateHtmxUrl() {
-    const container = document.getElementById('notice-list-content');
-    const urlParams = new URLSearchParams(window.location.search);
-    const page = urlParams.get('page') || '1';
-    const baseUrl = "{% url 'notices:notice_list_partial' %}";
-    const newUrl = page === '1' ? baseUrl : `${baseUrl}?page=${page}`;
-    
-    container.setAttribute('hx-get', newUrl);
-    htmx.process(container);
-}
-
-// 页面加载时更新URL
-document.addEventListener('DOMContentLoaded', updateHtmxUrl);
-
-// 监听浏览器前进后退按钮
-window.addEventListener('popstate', updateHtmxUrl);
-</script>
 {% endblock %}

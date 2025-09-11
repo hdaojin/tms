@@ -51,8 +51,8 @@ INSTALLED_APPS = [
     'django.contrib.flatpages',
     'django.forms',
     # Custom apps
+    'django_htmx',
     'django_tables2',
-    'multiselectfield',
     'common',
     'accounts',
     'articles',
@@ -66,16 +66,17 @@ INSTALLED_APPS = [
 SITE_ID = 1
 
 MIDDLEWARE = [
+    'django_htmx.middleware.HtmxMiddleware',     # django-htmx 中间件
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    # 启用将所有未认证请求重定向到登录页面
-    'django.contrib.auth.middleware.LoginRequiredMiddleware',
+    
+    'django.contrib.auth.middleware.LoginRequiredMiddleware',   # 启用将所有未认证请求重定向到登录页面
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',
+    'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',   # 启用 flatpages 中间件
 ]
 
 ROOT_URLCONF = 'tmsproject.urls'
@@ -91,8 +92,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                # 自定义上下文处理器
-                'common.context_processors.custom_context',
+                'common.context_processors.custom_context',     # 自定义上下文处理器
             ],
         },
     },

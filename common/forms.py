@@ -17,11 +17,17 @@ class StyledFormMixin:
     default_mapping = {
         # 输入框
         (forms.TextInput, forms.NumberInput, forms.EmailInput, forms.URLInput, forms.PasswordInput, forms.DateInput, forms.DateTimeInput, forms.TimeInput): 'input w-full',
+        # 多行文本框
+        (forms.Textarea,): 'textarea w-full',
         # 文件上传框
         (forms.FileInput,): 'file-input w-full file-input-primary',
         (forms.ClearableFileInput,): 'file-input w-full file-input-primary',
-        # 选择框
+        # 下拉选择框
         (forms.Select, forms.SelectMultiple): 'select w-full',
+        # 单个复选框
+        (forms.CheckboxInput,): 'checkbox checkbox-primary',
+        # 多个复选框
+        (forms.CheckboxSelectMultiple,): 'checkbox checkbox-primary',
     }
 
     def __init__(self, *args, **kwargs):
@@ -30,9 +36,9 @@ class StyledFormMixin:
             widget_type = type(field.widget)
             for types, css_class in self.default_mapping.items():
                 if widget_type in types:
-                    existing_classes = field.widget.attrs.get('class', '')
-                    if existing_classes:
-                        field.widget.attrs['class'] = f"{existing_classes} {css_class}"
-                    else:
-                        field.widget.attrs['class'] = css_class
+                    # existing_classes = field.widget.attrs.get('class', '')
+                    # if existing_classes:
+                    #     field.widget.attrs['class'] = f"{existing_classes} {css_class}"
+                    # else:
+                    field.widget.attrs['class'] = css_class
                     break
