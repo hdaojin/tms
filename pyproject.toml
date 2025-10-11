@@ -11,4 +11,5 @@ dependencies = [
     "pyyaml>=6.0.2",
     "django-htmx>=1.23.2",
     "mysqlclient>=2.2.7",
+    "gunicorn>=23.0.0",
 ]
