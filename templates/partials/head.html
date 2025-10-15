@@ -7,9 +7,7 @@
   {% if title or flatpage.title %}
     {% firstof title flatpage.title %} | {{ site_info.site_name }}
   {% else %}
-    {% block title %}
-      {{ site_name }}
-    {% endblock %}
+      {{ site_info.site_name }}
   {% endif %}
 </title>
 <!-- 引入CSS文件 -->
