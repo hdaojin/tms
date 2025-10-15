@@ -76,7 +76,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.LoginRequiredMiddleware',   # 启用将所有未认证请求重定向到登录页面
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',   # 启用 flatpages 中间件
+    # 'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',   # 启用 flatpages 中间件
 ]
 
 ROOT_URLCONF = 'tmsproject.urls'
