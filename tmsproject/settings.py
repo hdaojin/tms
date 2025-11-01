@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'django_tables2',
     'common',
     'accounts',
+    'samba',
     'articles',
     'competitions',
     'skills',

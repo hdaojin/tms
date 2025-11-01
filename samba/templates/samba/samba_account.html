@@ -1,0 +1,71 @@
+{% extends "base_no_right_sidebar.html" %}
+{% block content %}
+<h1>Samba 账户</h1>
+
+{% for message in messages %}
+  <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">{{ message }}</div>
+{% endfor %}
+
+{% if enabled %}
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">当前状态：已开通</h5>
+      <p class="card-text">
+        你的 Samba 账户已创建，用户名与本站用户名一致（{{ request.user.username }}）。
+        如需更改密码，请使用下方表单。
+      </p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">修改 Samba 密码</h5>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="change">
+        {{ form.non_field_errors }}
+        <div class="mb-3">
+          <label class="form-label">{{ form.password1.label }}</label>
+          {{ form.password1 }}
+          {% if form.password1.help_text %}<div class="form-text">{{ form.password1.help_text|safe }}</div>{% endif %}
+          {% if form.password1.errors %}<div class="text-danger">{{ form.password1.errors }}</div>{% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">{{ form.password2.label }}</label>
+          {{ form.password2 }}
+          {% if form.password2.errors %}<div class="text-danger">{{ form.password2.errors }}</div>{% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">修改密码</button>
+      </form>
+    </div>
+  </div>
+
+{% else %}
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">开通 Samba 账户</h5>
+      <p class="card-text">
+        点击开通后，系统会按照你在 Django 中的用户名与所属组创建本地用户/组并生成 Samba 账户。
+      </p>
+      <form method="post" novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="enable">
+        {{ form.non_field_errors }}
+        <div class="mb-3">
+          <label class="form-label">{{ form.password1.label }}</label>
+          {{ form.password1 }}
+          {% if form.password1.help_text %}<div class="form-text">{{ form.password1.help_text|safe }}</div>{% endif %}
+          {% if form.password1.errors %}<div class="text-danger">{{ form.password1.errors }}</div>{% endif %}
+        </div>
+        <div class="mb-3">
+          <label class="form-label">{{ form.password2.label }}</label>
+          {{ form.password2 }}
+          {% if form.password2.errors %}<div class="text-danger">{{ form.password2.errors }}</div>{% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary">开通并设置密码</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+
+{% endblock %}

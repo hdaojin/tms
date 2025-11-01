@@ -19,6 +19,12 @@
         login_required: true
         required_perms: accounts.add_ivitationcode
 
+      - name: SMB账户
+        named_url: samba:accounts
+        icon: icon-[tabler--user-plus]
+        is_visible: true
+        login_required: true
+
 
 
   

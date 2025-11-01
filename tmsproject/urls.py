@@ -32,6 +32,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # path("pages/", include("django.contrib.flatpages.urls")),  # 内置的 flatpages 应用
     path("accounts/", include("accounts.urls", namespace="accounts")),
+    path("samba/", include("samba.urls", namespace="samba")),
     path("articles/", include("articles.urls", namespace="articles")),
     path("traininglogs/", include("traininglogs.urls", namespace="traininglogs")),
     path("meeting/", include("meeting.urls", namespace="meeting")),
