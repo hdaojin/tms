@@ -1,4 +1,13 @@
 import subprocess
+from .models import SambaGroupMap
+
+
+def _resolve_unix_group_for_django_group(django_group) -> str | None:
+    try:
+        mapping = SambaGroupMap.objects.get(group=django_group)
+        return mapping.unix_name
+    except SambaGroupMap.DoesNotExist:
+        raise RuntimeError(f"组 '{django_group.name}' 未配置 Samba 组映射, 请联系管理员。")
 
 
 def _run(cmd: list[str], input_bytes: bytes | None = None) -> subprocess.CompletedProcess:
@@ -56,18 +65,19 @@ def _set_samba_user_password(username: str, password: str, create_if_missing: bo
 def enable_samba_for_user(user, password:str) -> dict:
     username = user.username
 
-    django_group = list(user.groups.values_list("name", flat=True))
-    primary_group = django_group[0] if django_group else None
+    django_groups = list(user.groups.all())
+    unix_groups = [_resolve_unix_group_for_django_group(g) for g in django_groups]
+    primary_group = unix_groups[0] if unix_groups else None
 
-    for group in django_group:
-        __create_unix_group(group)
+    for ug in unix_groups:
+        __create_unix_group(ug)  # type: ignore
 
     pre_exists = _exists_unix_user(username)
     _create_unix_user(username, password, primary_group, create_home=False, shell="/sbin/nologin")
 
 
-    extend_groups = django_group[1:] if primary_group else django_group
-    _ensure_user_in_groups(username, extend_groups)
+    extend_groups = unix_groups[1:] if primary_group else unix_groups
+    _ensure_user_in_groups(username, extend_groups)  # type: ignore
 
     _set_samba_user_password(username, password, create_if_missing=True)
     return {
