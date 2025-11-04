@@ -16,13 +16,15 @@ def samba_account_view(request):
 
         if action not in {"enable", "change"}:
             messages.error(request, "无效的操作。")
-            return redirect("samba:samba-account")
+            return redirect("samba:accounts")
 
         if not form.is_valid():
             # 校验失败，回显表单与当前状态
             return render(request, "samba/samba_account.html", {
                 "enabled": enabled,
                 "form": form,
+                "title": "Samba 账户管理",
+                "title_icon" : "icon-[tabler--users-plus]"
             })
 
         try:
@@ -36,18 +38,20 @@ def samba_account_view(request):
             elif action == "change":
                 if not enabled:
                     messages.error(request, "Samba 用户尚未开通，无法修改密码。")
-                    return redirect("samba:samba-account")
+                    return redirect("samba:accounts")
                 change_samba_password(user, form.password)
                 messages.success(request, "Samba 密码已修改。")
         except Exception as e:
             messages.error(request, f"操作失败：{e}")
 
         # 处理完 POST 后回到页面，避免重复提交
-        return redirect("samba:samba-account")
+        return redirect("samba:accounts")
 
     # GET：渲染
     form = SambaPasswordForm(user=user)
     return render(request, "samba/samba_account.html", {
         "enabled": enabled,
         "form": form,
+        "title": "Samba 账户管理",
+        "title_icon" : "icon-[tabler--users-plus]"
     })

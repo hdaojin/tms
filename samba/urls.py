@@ -5,5 +5,5 @@ from .views import samba_account_view
 app_name = 'samba'
 
 urlpatterns = [
-    path("accounts/", samba_account_view, name="samba-account")
+    path("accounts/", samba_account_view, name="accounts")
 ]
