@@ -28,8 +28,13 @@ def traininglog_upload_to(instance: "TrainingLog", filename: str) -> str:
     date = instance.training_date or timezone.localdate()
     date_part = f"{date:%Y年%m月%d日}"
 
-    # 组成可读的“人造文件名”
-    user_part = slugify(instance.uploaded_by.first_name if instance.uploaded_by else "unknown", allow_unicode=True)
+    # 组成可读的“人造文件名”：优先使用 first_name；若为空则用用户名（支持自定义 USERNAME_FIELD）
+    if instance.uploaded_by:
+        first_name = (getattr(instance.uploaded_by, 'first_name', '') or '').strip()
+        user_src = first_name or instance.uploaded_by.get_username()
+    else:
+        user_src = "unknown"
+    user_part = slugify(user_src, allow_unicode=True)
     
     # 获取用户组信息，如有“教练”和“选手”，提取之中的一个，否则为空字符串
     group = ""

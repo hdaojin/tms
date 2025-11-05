@@ -8,7 +8,7 @@ class TrainingLogTable(BaseTable):
     training_date = tables.DateColumn(verbose_name="训练日期")
     module = tables.Column(verbose_name="训练模块", accessor="module.name", orderable=True)
     filename = tables.Column(verbose_name="文件名", accessor="filename", orderable=False)
-    uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by.first_name", orderable=True)
+    uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by", orderable=True)
     actions = ActionsColumn(
         view_url="traininglogs:traininglog_detail",
         delete_url="traininglogs:traininglog_delete",
@@ -22,13 +22,19 @@ class TrainingLogTable(BaseTable):
         fields = ("training_date", "module", "task", "filename", "uploaded_by", "uploaded_at", "actions")
         order_by = ("-training_date",)
 
+    def render_uploaded_by(self, value):
+        if not value:
+            return "-"
+        name = (getattr(value, "first_name", "") or "").strip()
+        return name or value.get_username()
+
 
 class TrainingLogOthersTable(BaseTable):
     """用于展示他人日志的表格（仅“查看”操作）。"""
     training_date = tables.DateColumn(verbose_name="训练日期")
     module = tables.Column(verbose_name="训练模块", accessor="module.name", orderable=True)
     filename = tables.Column(verbose_name="文件名", accessor="filename", orderable=False)
-    uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by.first_name", orderable=True)
+    uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by", orderable=True)
     actions = ActionsColumn(
         view_url="traininglogs:traininglog_detail",
         view_perm=None,
@@ -39,6 +45,12 @@ class TrainingLogOthersTable(BaseTable):
         model = TrainingLog
         fields = ("training_date", "module", "task", "filename", "uploaded_by", "uploaded_at", "actions")
         order_by = ("-training_date",)
+
+    def render_uploaded_by(self, value):
+        if not value:
+            return "-"
+        name = (getattr(value, "first_name", "") or "").strip()
+        return name or value.get_username()
 
 
 class MonthlyStatTable(BaseTable):
