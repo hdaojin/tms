@@ -1,0 +1,41 @@
+{% extends 'base_no_right_sidebar.html' %}
+{% load static %}
+
+{% block content %}
+  <!-- 用户中心：功能卡片 -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="card bg-base-100 shadow">
+      <div class="card-body items-center text-center">
+        <span class="icon-[tabler--bell] text-3xl text-info mb-2"></span>
+        <h3 class="card-title">通知</h3>
+        <p class="text-sm text-base-content/70">查看系统通知</p>
+        <div class="card-actions">
+          <a href="{% url 'notices:notice_list' %}" class="btn btn-sm btn-info">查看</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+      <div class="card-body items-center text-center">
+        <span class="icon-[tabler--calendar] text-3xl text-success mb-2"></span>
+        <h3 class="card-title">会议</h3>
+        <p class="text-sm text-base-content/70">查看会议记录</p>
+        <div class="card-actions">
+          <a href="{% url "meeting:meeting_list" %}" class="btn btn-sm btn-success">查看</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="card bg-base-100 shadow">
+      <div class="card-body items-center text-center">
+        <span class="icon-[tabler--book] text-3xl text-warning mb-2"></span>
+        <h3 class="card-title">训练</h3>
+        <p class="text-sm text-base-content/70">查看训练日志</p>
+        <div class="card-actions">
+          <a href="{% url "traininglogs:traininglog_list" %}" class="btn btn-sm btn-warning">查看</a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+

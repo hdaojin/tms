@@ -15,5 +15,5 @@ class HomeView(TemplateView):
     def dispatch(self, request, *args, **kwargs):
         """如果用户已登录，则重定向到个人资料页面"""
         if request.user.is_authenticated:
-            return redirect(reverse('accounts:profile'))
+            return redirect(reverse('accounts:home'))
         return super().dispatch(request, *args, **kwargs)

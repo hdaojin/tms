@@ -3,6 +3,7 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
 from common.utils.invitation import validate_invitation_code  
 from common.forms import StyledFormMixin
+from .models import UserProfile
 
 
 class CustomAuthenticationForm(AuthenticationForm):
@@ -31,6 +32,9 @@ class CustomAuthenticationForm(AuthenticationForm):
 
 
 class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
+    """
+    自定义用户注册表单，添加姓名和邀请码字段。
+    """
     full_name = forms.CharField(
         max_length=100, 
         required=True, 
@@ -72,3 +76,81 @@ class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
     class Meta:
         model = User
         fields = ("username", "full_name", "invitation_code", "password1", "password2")
+
+
+class ProfileForm(forms.ModelForm):
+    """用户资料表单，用于编辑用户的个人信息。"""
+    class Meta:
+        model = UserProfile
+        # 不包含 user，一般在视图里用 request.user.profile 绑定
+        fields = [
+            "student_id",
+            "name_pronunciation",
+            "gender",
+            "birth_date",
+            "phone_number",
+            "emergency_contact",
+            "emergency_contact_phone",
+            "emergency_contact_relation",
+            "address",
+            "id_number",
+            "original_class",
+            "original_headteacher",
+            "original_headteacher_phone",
+            "school_dormitory",
+            "join_date",
+            "leave_date",
+            "notes",
+        ]
+        widgets = {
+            "student_id": forms.TextInput(attrs={"placeholder": "请输入学号"}),
+            "name_pronunciation": forms.TextInput(attrs={"placeholder": "请输入姓名全拼"}),
+            "gender": forms.Select(attrs={"class":"select select-sm select-ghost"}),
+            "birth_date": forms.DateInput(attrs={"type": "text", "placeholder": "YYYY/MM/DD"}),
+            "phone_number": forms.TextInput(attrs={"placeholder": "请输入电话号码"}),
+            "emergency_contact": forms.TextInput(attrs={"placeholder": "紧急联系人姓名"}),
+            "emergency_contact_phone": forms.TextInput(attrs={"placeholder": "紧急联系人电话"}),
+            "emergency_contact_relation": forms.TextInput(attrs={"placeholder": "与紧急联系人的关系"}),
+            "address": forms.TextInput(attrs={"placeholder": "家庭住址"}),
+            "id_number": forms.TextInput(attrs={"placeholder": "身份证号"}),
+            "original_class": forms.TextInput(attrs={"placeholder": "原班级"}),
+            "original_headteacher": forms.TextInput(attrs={"placeholder": "原班主任"}),
+            "original_headteacher_phone": forms.TextInput(attrs={"placeholder": "原班主任电话"}),
+            "school_dormitory": forms.TextInput(attrs={"placeholder": "学校宿舍"}),
+            "join_date": forms.DateInput(attrs={"type": "text", "placeholder": "YYYY/MM/DD"}),
+            "leave_date": forms.DateInput(attrs={"type": "text", "placeholder": "YYYY/MM/DD"}),
+            "notes": forms.Textarea(attrs={"rows": 4, "placeholder": "备注信息","class":"textarea w-full"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop("request", None)
+        super().__init__(*args, **kwargs)
+        # 锁定后，前台一律禁用输入（不区分管理员）。
+        if self.instance and self.instance.pk and self.instance.locked:
+            for field in self.fields.values():
+                field.disabled = True
+
+
+    def clean_birth_date(self):
+        bd = self.cleaned_data.get("birth_date")
+        if bd is not None:
+            from django.utils import timezone
+            if bd > timezone.localdate():
+                raise forms.ValidationError("出生日期不能晚于今天。")
+        return bd
+
+    def clean(self):
+        cleaned = super().clean()
+        join_date = cleaned.get("join_date")
+        leave_date = cleaned.get("leave_date")
+        if join_date and leave_date and leave_date < join_date:
+            self.add_error("leave_date", "离开日期不能早于入读日期。")
+
+        # 锁定后，前台不可修改（无论是否管理员）。管理员如需变更，请在后台解锁。
+        if self.instance and self.instance.pk and self.instance.locked:
+            raise forms.ValidationError("该用户资料已被锁定，无法修改。如需更改，请联系管理员在后台解除锁定后再尝试。")
+        
+        return cleaned
+
+
+

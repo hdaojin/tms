@@ -10,9 +10,26 @@ class UserProfile(models.Model):
         SECRET = 'S', '保密'
 
     user = models.OneToOneField(get_user_model(), on_delete=models.CASCADE, related_name='profile')
+    student_id = models.CharField('学号', max_length=50, null=True, unique=True)
+    name_pronunciation = models.CharField('姓名全拼', max_length=100, null=True)
     gender = models.CharField('性别', max_length=1, choices=Gender.choices, default=Gender.SECRET)
-    birth_date = models.DateField('出生日期', null=True, blank=True)
-    phone_number = models.CharField('电话号码', max_length=20,  blank=True)
+    birth_date = models.DateField('出生日期', null=True)
+    phone_number = models.CharField('电话号码', max_length=20, null=True)
+    emergency_contact = models.CharField('紧急联系人', max_length=100, null=True)
+    emergency_contact_phone = models.CharField('紧急联系人电话', max_length=20, null=True)
+    emergency_contact_relation = models.CharField('紧急联系人关系', max_length=50, null=True)
+    address = models.CharField('家庭住址', max_length=200, null=True, blank=True)
+    id_number = models.CharField('身份证号', max_length=50, null=True, blank=True)
+    original_class = models.CharField('原班级', max_length=100, null=True, blank=True)
+    original_headteacher = models.CharField('原班主任', max_length=100, null=True, blank=True)
+    original_headteacher_phone = models.CharField('原班主任电话', max_length=20, null=True, blank=True)
+    school_dormitory = models.CharField('学校宿舍', max_length=100, null=True, blank=True)
+    join_date = models.DateField('入读精英班日期', null=True, blank=True)
+    leave_date = models.DateField('离开精英班日期', null=True, blank=True)
+    notes = models.TextField('备注', null=True, blank=True)
+
+    locked = models.BooleanField('信息锁定', default=False, help_text='锁定后用户无法修改个人资料。')
+
     
     def __str__(self):
         return f"{self.user.username} 的信息"

@@ -6,9 +6,15 @@
   icon: icon-[tabler--user-circle]
   is_group_header: true
   children:
+      - name: 用户中心
+        named_url: accounts:home
+        icon: icon-[tabler--user]
+        is_visible: true
+        login_required: true
+
       - name: 个人资料
         named_url: accounts:profile
-        icon: icon-[tabler--user]
+        icon: icon-[tabler--id]
         is_visible: true
         login_required: true
 

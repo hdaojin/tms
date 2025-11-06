@@ -180,7 +180,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # 认证相关设置
 # LOGIN_URL = '/accounts/login/'
-# LOGIN_REDIRECT_URL = '/cms/posts/'  # 登录成功后跳转的页面
+LOGIN_REDIRECT_URL = '/accounts/'  # 登录成功后跳转的页面
 # LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 

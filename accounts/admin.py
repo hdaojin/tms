@@ -17,11 +17,11 @@ class CustomUserAdmin(DefaultUserAdmin):
     
     def full_name(self, obj):
         return obj.first_name
-    full_name.short_description = '姓名'
+    full_name.short_description = '姓名' # type: ignore
 
     def groups_name(self, obj):
         return ", ".join([group.name for group in obj.groups.all()])
-    groups_name.short_description = '角色'
+    groups_name.short_description = '角色' # type: ignore
 
 
     # # 修改详情页展示字段，移除 last_name
