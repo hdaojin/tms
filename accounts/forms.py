@@ -12,7 +12,7 @@ class CustomAuthenticationForm(AuthenticationForm):
         max_length=254,
         label="用户名",
         widget=forms.TextInput(attrs={
-            'placeholder': '请输入用户名',
+            'placeholder': '输入用户名',
             'autocomplete': 'username',
         })
     )
@@ -20,7 +20,7 @@ class CustomAuthenticationForm(AuthenticationForm):
         label="密码",
         strip=False,
         widget=forms.PasswordInput(attrs={
-            'placeholder': '请输入密码',
+            'placeholder': '输入密码',
             'autocomplete': 'current-password',
         })
     )
@@ -41,16 +41,16 @@ class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
         label="姓名",
         help_text="必填; 必须是中文真实姓名。",
         widget=forms.TextInput(attrs={
-            'placeholder': '请输入真实姓名',
+            'placeholder': '请填写真实姓名',
         })
     )
     invitation_code = forms.CharField(
         max_length=255, 
         required=True, 
         label="邀请码",
-        help_text="请输入邀请码",
+        help_text="请填写管理员提供的邀请码。",
         widget=forms.TextInput(attrs={
-            'placeholder': '请输入邀请码。',
+            'placeholder': '输入邀请码',
         })
     )
 
@@ -58,13 +58,13 @@ class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
         super().__init__(*args, **kwargs)
         # 为默认字段添加 DaisyUI 样式
         self.fields['username'].widget.attrs.update({
-            'placeholder': '请输入用户名',
+            'placeholder': '用户名',
         })
         self.fields['password1'].widget.attrs.update({
-            'placeholder': '请输入密码',
+            'placeholder': '密码',
         })
         self.fields['password2'].widget.attrs.update({
-            'placeholder': '请再次输入密码',
+            'placeholder': '请再次填写密码',
         })
 
     def clean_invitation_code(self):
@@ -103,29 +103,29 @@ class ProfileForm(forms.ModelForm):
             "notes",
         ]
         widgets = {
-            "student_id": forms.TextInput(attrs={"placeholder": "请输入学号"}),
-            "name_pronunciation": forms.TextInput(attrs={"placeholder": "请输入姓名全拼"}),
+            "student_id": forms.TextInput(attrs={"placeholder": "学号"}),
+            "name_pronunciation": forms.TextInput(attrs={"placeholder": "姓名全拼"}),
             "gender": forms.Select(attrs={"class":"select select-sm select-ghost"}),
             "birth_date": forms.DateInput(attrs={"type": "text", "placeholder": "YYYY/MM/DD"}),
-            "phone_number": forms.TextInput(attrs={"placeholder": "请输入电话号码"}),
+            "phone_number": forms.TextInput(attrs={"placeholder": "电话号码"}),
             "emergency_contact": forms.TextInput(attrs={"placeholder": "紧急联系人姓名"}),
             "emergency_contact_phone": forms.TextInput(attrs={"placeholder": "紧急联系人电话"}),
             "emergency_contact_relation": forms.TextInput(attrs={"placeholder": "与紧急联系人的关系"}),
-            "address": forms.TextInput(attrs={"placeholder": "家庭住址"}),
-            "id_number": forms.TextInput(attrs={"placeholder": "身份证号"}),
-            "original_class": forms.TextInput(attrs={"placeholder": "原班级"}),
-            "original_headteacher": forms.TextInput(attrs={"placeholder": "原班主任"}),
-            "original_headteacher_phone": forms.TextInput(attrs={"placeholder": "原班主任电话"}),
-            "school_dormitory": forms.TextInput(attrs={"placeholder": "学校宿舍"}),
+            "address": forms.TextInput(attrs={"placeholder": "详细家庭住址，具体到门牌号"}),
+            "id_number": forms.TextInput(attrs={"placeholder": "你的身份证号码"}),
+            "original_class": forms.TextInput(attrs={"placeholder": "原班级名称"}),
+            "original_headteacher": forms.TextInput(attrs={"placeholder": "原班主任姓名"}),
+            "original_headteacher_phone": forms.TextInput(attrs={"placeholder": "原班主任联系电话"}),
+            "school_dormitory": forms.TextInput(attrs={"placeholder": "学校宿舍房间号，如走读则填写“走读”"}),
             "join_date": forms.DateInput(attrs={"type": "text", "placeholder": "YYYY/MM/DD"}),
             "leave_date": forms.DateInput(attrs={"type": "text", "placeholder": "YYYY/MM/DD"}),
-            "notes": forms.Textarea(attrs={"rows": 4, "placeholder": "备注信息","class":"textarea w-full"}),
+            "notes": forms.Textarea(attrs={"rows": 4, "placeholder": "其他信息","class":"textarea w-full"}),
         }
 
     def __init__(self, *args, **kwargs):
         self.request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
-        # 锁定后，前台一律禁用输入（不区分管理员）。
+        # 锁定后，前台一律禁用填写（不区分管理员）。
         if self.instance and self.instance.pk and self.instance.locked:
             for field in self.fields.values():
                 field.disabled = True
