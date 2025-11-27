@@ -315,4 +315,7 @@ dist
 # Uploads directory
 media/
 # .vscode/
+.VSCodeCounter/
+all_html_code.txt
+all_python_code.txt
 
