@@ -8,6 +8,8 @@ class UserProfileInline(admin.StackedInline):
     can_delete = False
     verbose_name = '用户信息'
     verbose_name_plural = '用户信息'
+    extra = 1
+
 
 
 class CustomUserAdmin(DefaultUserAdmin):
@@ -44,6 +46,7 @@ class CustomUserAdmin(DefaultUserAdmin):
     # # 搜索时仅包含需要显示的字段
     # search_fields = ('username', 'first_name', 'email')
 
+    
 
 # 先注销默认的 UserAdmin 再用自定义的重新注册
 admin.site.unregister(User)

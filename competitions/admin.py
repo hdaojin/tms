@@ -1,46 +1,29 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import Competition, CompetitionDetail, CompetitionTeam, CompetionResult, CompetitionTeamRelation
-
-
-class CompetitionDetailInline(admin.StackedInline):
-    model = CompetitionDetail
-    can_delete = False
-    verbose_name = '竞赛详情'
-    verbose_name_plural = '竞赛详情'
-
-
-class CompetitionTeamInline(admin.TabularInline):
-    model = CompetitionTeam
-    extra = 1
-    verbose_name = '参赛队'
-    verbose_name_plural = '参赛队'
-
-
-class CompetitionResultInline(admin.StackedInline):
-    model = CompetionResult
-    can_delete = False
-    verbose_name = '竞赛结果'
-    verbose_name_plural = '竞赛结果'
-
-
-class CompetitionTeamRelationInline(admin.TabularInline):
-    model = CompetitionTeamRelation
-    extra = 1
-    verbose_name = '参赛队'
-    verbose_name_plural = '参赛队'
+from .models import Competition, Examination, ExamScore
+from .forms import ExamScoreForm
 
 
 class CompetitionAdmin(admin.ModelAdmin):
-    list_display = ('name', 'level')
-    inlines = [CompetitionDetailInline, CompetitionTeamRelationInline, CompetitionResultInline]
-    search_fields = ('name', 'level')
+    list_display = ('name', 'level', 'weight', 'start_date', 'end_date', 'location', 'organizer', 'is_team_event')
+    list_filter = ('level', 'is_team_event', 'start_date')
+    search_fields = ('name', 'level', 'organizer', 'location')
+    ordering = ('-start_date', 'name', 'level')
 
-class CompetitionTeamRelationAdmin(admin.ModelAdmin):
-    list_display = ('competition', 'team')
+class ExaminationAdmin(admin.ModelAdmin):
+    form = ExamScoreForm
+    list_display = ('name', 'start_date', 'end_date', 'location', 'organizer', 'is_team_event')
+    list_filter = ('is_team_event', 'start_date')
+    search_fields = ('name', 'organizer', 'location')
+    ordering = ('-start_date', 'name')
 
+class ExamScoreAdmin(admin.ModelAdmin):
+    list_display = ('examination', 'model', 'user', 'score', 'created_at')
+    list_filter = ('examination', 'model')
+    search_fields = ('user__username', 'user__first_name', 'model__code', 'examination__name')
+    ordering = ('-examination__start_date', 'user__username', 'model__code')
 
 admin.site.register(Competition, CompetitionAdmin)
-admin.site.register(CompetitionTeam)
-admin.site.register(CompetitionTeamRelation, CompetitionTeamRelationAdmin)
+admin.site.register(Examination, ExaminationAdmin)
+admin.site.register(ExamScore, ExamScoreAdmin)

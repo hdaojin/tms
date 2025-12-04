@@ -30,6 +30,9 @@ class UserProfile(models.Model):
 
     locked = models.BooleanField('信息锁定', default=False, help_text='锁定后用户无法修改个人资料。')
 
-    
+    class Meta:
+        verbose_name = '用户信息'
+        verbose_name_plural = '用户信息'    
+
     def __str__(self):
         return f"{self.user.username} 的信息"

@@ -1,5 +1,5 @@
 from django.db import models
-from competitions.models import Competition
+"""避免循环导入：使用字符串引用外键模型。"""
 
 
 # Create your models here.
@@ -49,7 +49,7 @@ class Skill(models.Model):
         return f"{self.topic.module.code}-{self.topic.name}-{self.name}"
 
 class ExamPoint(models.Model):
-    competition = models.ForeignKey(Competition, verbose_name="所属竞赛", on_delete=models.PROTECT, related_name='exam_points')
+    competition = models.ForeignKey('competitions.Competition', verbose_name="所属竞赛", on_delete=models.PROTECT, related_name='exam_points')
     skill = models.ManyToManyField(Skill, verbose_name="技能点", related_name='exam_points')
     name = models.CharField("考点", max_length=500)  # 可选
     detail_content = models.TextField("详细内容", blank=True, null=True)  # 可选
