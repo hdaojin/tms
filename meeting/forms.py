@@ -2,7 +2,7 @@ from django import forms
 from .models import Meeting
 from django.utils import timezone
 
-from common.forms import StyledFormMixin
+from common.utils.forms import StyledFormMixin
 
 class MeetingUploadForm(StyledFormMixin, forms.ModelForm):
     class Meta:

@@ -1,52 +1,133 @@
 # common/templatetags/menu_tags.py
 from django import template
-from django.utils.safestring import mark_safe
+
+from common.utils.menus import (
+    get_layout_sections,
+    get_menu_by_slug,
+    get_section_menu,
+    get_sections,
+)
 
 register = template.Library()
 
-@register.filter(is_safe=True)
-def link_attrs(item) -> str:
-    """
-    生成菜单项的链接属性字符串
-    Args:
-        item (dict): 菜单项字典
-    Returns:
-        str: 链接属性字符串
-    """
-    attrs = []
-    if item.get("target_blank"):
-        attrs.append('target="_blank" rel="noopener"')
-    htmx_attrs = item.get("htmx_attrs", {})
-    for k, v in htmx_attrs.items():
-        attrs.append(f'{k}="{v}"')
-    return " ".join(attrs)
+
+def _first_item_url(items):
+    for item in items:
+        if item.resolved_url and item.resolved_url != "#":
+            return item.resolved_url
+        if item.children:
+            child_url = _first_item_url(item.children)
+            if child_url:
+                return child_url
+    return None
 
 
-@register.filter(is_safe=True)
-def css_classes(item) -> str:
-    """
-    获取菜单项的 CSS 类字符串
-    Args:
-        item (dict): 菜单项字典
-    Returns:
-        str: CSS 类字符串
-    """
-    return item.get("css_classes", "") or ""
+def _resolve_section_slug_for_request(request):
+    match = getattr(request, "resolver_match", None)
+    app_name = getattr(match, "app_name", None)
+    # 优先：按 section.include_menus 直接匹配 app_name（兼容旧配置）
+    if app_name:
+        for section in get_sections():
+            include = section.get("include_menus", []) or []
+            if app_name in include:
+                return section.get("section")
+
+    # 次级：按菜单定义的 app_name -> menu_slug，再找包含该 menu_slug 的 section
+    if app_name:
+        app_menus = _load_app_menus()
+        for menu_slug, menu_def in app_menus.items():
+            if menu_def.get("app_name") == app_name:
+                for section in get_sections():
+                    include = section.get("include_menus", []) or []
+                    if menu_slug in include:
+                        return section.get("section")
+
+    # fallback: 匹配 flatpage 等无 app_name 的菜单片段
+    for section in get_sections():
+        include = section.get("include_menus", []) or []
+        if "flatpage" in include:
+            return section.get("section")
+    return None
 
 
-@register.filter(name="icon", is_safe=True)
-def render_icon(value, size: str = "6", color: str = "text-primary") -> str:
-    """渲染图标:
-    用法:
-        {{ item|icon }}                     # 从字典 item['icon'] 读取
-        {{ item|icon:'5' }}                 # 指定 size
-        {{ item|icon:'5 text-red-500' }}    # 指定 size 和 color
-        {{ 'icon-[tabler--user]'|icon }}    # 直接传类名
+@register.inclusion_tag("common/partials/sidebar_menu.html", takes_context=True)
+def render_section_menu(context, section_slug: str):
+    """根据主菜单节点（section）渲染侧边栏。"""
+    request = context["request"]
+    items = get_section_menu(section_slug, request.user, request=request)
+    return {"items": items}
+
+
+@register.inclusion_tag("common/partials/sidebar_menu.html", takes_context=True)
+def render_section_menu_auto(context):
+    """自动根据当前 app 判断所属 section 并渲染侧边栏。"""
+    request = context["request"]
+    section_slug = _resolve_section_slug_for_request(request)
+    items = get_section_menu(section_slug, request.user, request=request) if section_slug else []
+    return {"items": items}
+
+
+@register.inclusion_tag("common/partials/sidebar_menu.html", takes_context=True)
+def render_menu(context, menu_slug: str):
     """
-    if not value:
-        return ""
-    # value 可能是 dict（整条 item）或直接的类名字符串
-    icon_class = value.get("icon") if isinstance(value, dict) else value
-    if not icon_class:
-        return ""
-    return mark_safe(f'<i class="{icon_class} size-{size} {color}"></i>')
+    如有需要，可以直接按 menu_slug 渲染单个菜单片段。
+    例如：{% render_menu "accounts" %}
+    """
+    request = context["request"]
+    items = get_menu_by_slug(menu_slug, request.user)
+    return {"items": items}
+
+
+def _filter_sections(slug_string: str | None, default_key: str | None = None) -> list[dict]:
+    all_sections = get_sections()
+    desired: list[str] = []
+    if slug_string:
+        desired = [s.strip() for s in slug_string.split(",") if s.strip()]
+    elif default_key:
+        desired = get_layout_sections(default_key)
+    if not desired:
+        return all_sections
+    lookup = {s.get("section"): s for s in all_sections}
+    return [lookup[slug] for slug in desired if slug in lookup]
+
+
+@register.inclusion_tag("common/partials/sections_nav.html", takes_context=True)
+def render_sections_nav(context, slugs: str | None = None):
+    """顶部导航：可按逗号分隔指定，或从 layout.yml.header_sections 读取。"""
+    request = context["request"]
+    user = request.user
+    sections = []
+    for section in _filter_sections(slugs, default_key="header_sections"):
+        slug = section.get("section")
+        items = get_section_menu(slug, user, request=request)  #type: ignore
+        url = _first_item_url(items) or "#"
+        active = any(item.active for item in items)
+        sections.append({
+            "slug": slug,
+            "label": section.get("label", slug),
+            "icon": section.get("icon"),
+            "url": url,
+            "active": active,
+        })
+    return {"sections": sections}
+
+
+@register.inclusion_tag("common/partials/sections_cards.html", takes_context=True)
+def render_sections_cards(context, slugs: str | None = None):
+    """账户首页卡片：可按逗号分隔指定，或从 layout.yml.account_home_sections 读取。"""
+    request = context["request"]
+    user = request.user
+    sections = []
+    for section in _filter_sections(slugs, default_key="account_home_sections"):
+        slug = section.get("section")
+        items = get_section_menu(slug, user, request=request)  # type: ignore
+        url = _first_item_url(items) or "#"
+        sections.append({
+            "slug": slug,
+            "label": section.get("label", slug),
+            "icon": section.get("icon"),
+            "description": section.get("description"),
+            "url": url,
+            "count": len(items),
+        })
+    return {"sections": sections}

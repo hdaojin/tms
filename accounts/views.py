@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_not_required # type: ignore
 
 from .forms import CustomUserCreationForm, ProfileForm
 from common.utils.invitation import generate_invitation_code
-from common.decorators import superuser_required
+from common.utils.decorators import superuser_required
 from .models import UserProfile
 
 

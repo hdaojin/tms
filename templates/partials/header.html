@@ -1,5 +1,5 @@
 {% load static %}
-{% load menus %}
+{% load menu_tags %}
 
 <nav class="navbar bg-base-100 shadow-lg px-2 md:px-8 relative z-10">
   <div class="navbar-start">
@@ -8,11 +8,7 @@
         <span class="icon-[tabler--menu-2] size-6"></span>
       </div>
       <div tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
-        {% if flatpage %}
-          {% render_flatpages_menu %}
-        {% else %}
-          {% render_current_app_menu %}
-        {% endif %}
+        {% render_sections_nav %}
       </div>
     </div>
     <div class="flex items-center gap-2">
@@ -24,7 +20,7 @@
   </div>
 
   <div class="navbar-center hidden md:flex">
-    {% render_header_menu %}
+    {% render_sections_nav %}
   </div>
 
   <div class="navbar-end gap-2">

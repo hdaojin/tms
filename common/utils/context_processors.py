@@ -1,4 +1,3 @@
-# common/context_processors.py
 """
 自定义上下文处理器模块
 提供一些常用的上下文处理器
@@ -7,7 +6,7 @@
     ...
 """
 
-from .models import SiteConfig
+from ..models import SiteConfig
 
 
 def custom_context(request):

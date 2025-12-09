@@ -1,0 +1,55 @@
+---
+# 按功能区汇总全部菜单
+
+- section: "training"
+  label: "训练"
+  icon: 
+    pic: "icon-[tabler--book]"
+    size: "6"
+    color: "warning"
+  description: "日常训练管理"
+  include_menus:
+    - "traininglogs"
+
+- section: "meeting"
+  label: "会议"
+  icon:
+    pic: "icon-[tabler--calendar]"
+    size: "6"  
+    color: "success"
+  description: "会议记录"
+  include_menus:
+    - "meeting"
+
+- section: "account"
+  label: "账户"
+  icon:
+    pic: "icon-[tabler--user-circle]"
+    size: "6"
+    color: "accent"
+  description: "用户账户管理"
+  include_menus:
+    - "accounts"
+    - "samba"
+
+- section: "notice"
+  label: "通知"
+  icon:
+    pic: "icon-[tabler--bell]"
+    size: "6"
+    color: "info"
+  description: "通知与待办事项"
+  include_menus:
+    - "notices"
+
+- section: "about"
+  label: "关于"
+  icon:
+    pic: "icon-[tabler--info-circle]"
+    size: "6"
+    color: "neutral"
+  description: "关于本站点的信息"
+  include_menus:
+    - "flatpage"
+    - "external_link"
+

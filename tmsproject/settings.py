@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'django_filters',
     # Local apps
     'common',
+    'config',
     'accounts',
     'samba',
     'articles',
@@ -95,7 +96,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'common.context_processors.custom_context',     # 自定义上下文处理器
+                'common.utils.context_processors.custom_context',     # 自定义上下文处理器
             ],
         },
     },

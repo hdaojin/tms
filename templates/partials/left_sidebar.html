@@ -1,9 +1,5 @@
 {# templates/partials/left_sidebar.html #}
 <aside class="w-56 bg-base-200 border-r border-base-300 hidden md:block relative z-0 pt-1">
-  {% load menus %}
-  {% if flatpage %}
-    {% render_flatpages_menu %}
-  {% else %}
-    {% render_current_app_menu %}
-  {% endif %}
+  {% load menu_tags %}
+  {% render_section_menu_auto %}
 </aside>

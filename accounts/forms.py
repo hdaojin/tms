@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
 from common.utils.invitation import validate_invitation_code  
-from common.forms import StyledFormMixin
+from common.utils.forms import StyledFormMixin
 from .models import UserProfile
 
 

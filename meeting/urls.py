@@ -4,7 +4,7 @@ from .views import MeetingUploadView, MeetingListView, MeetingDetailView, Meetin
 app_name = 'meeting'
 
 urlpatterns = [
-    path('', MeetingListView.as_view(), name='meeting_list'),
+    path('list/', MeetingListView.as_view(), name='meeting_list'),
     path('upload/', MeetingUploadView.as_view(), name='meeting_upload'),
     path('detail/<int:pk>/', MeetingDetailView.as_view(), name='meeting_detail'),
     path('delete/<int:pk>/', MeetingDeleteView.as_view(), name='meeting_delete'),
