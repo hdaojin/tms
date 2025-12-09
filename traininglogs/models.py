@@ -9,10 +9,11 @@ from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from pathlib import Path
 
-from skills.models import Module
+"""避免循环导入：使用字符串引用外键模型。"""
 
-MAX_FILE_MB = getattr(settings, 'UPLOAD_MAX_SIZE_MB', 10) # 默认10MB
-ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf']
+TRAININGLOG_UPLOAD_DIR = getattr(settings, "TRAININGLOG_UPLOAD_DIR", "traininglogs")
+UPLOAD_MAX_SIZE_MB = getattr(settings, 'UPLOAD_MAX_SIZE_MB', 10)  # 默认10MB
+TRAININGLOG_ALLOWED_EXTENSIONS = getattr(settings, "TRAININGLOG_ALLOWED_EXTENSIONS", ['pdf'])
 
 def traininglog_upload_to(instance: "TrainingLog", filename: str) -> str:
     """
@@ -52,7 +53,7 @@ def traininglog_upload_to(instance: "TrainingLog", filename: str) -> str:
     basename = f"{prefix_part}{date_part}{group_part}日志-{user_part}{ext}"
 
     # 目录：可用 settings.LOGS_DIR，否则默认 "training_logs"
-    base_dir = getattr(settings, "LOGS_DIR", "training_logs")
+    base_dir = TRAININGLOG_UPLOAD_DIR
     
     return f"{base_dir}/{date:%Y}/{date:%m}/{basename}"
 
@@ -63,13 +64,13 @@ def training_date_validator(date):
 
 def file_size_validator(f):
     """验证上传的文件大小"""
-    if getattr(f, 'size', 0) > MAX_FILE_MB * 1024 * 1024:
-        raise ValidationError(f"上传文件大小不能超过{MAX_FILE_MB}MB。")
+    if getattr(f, 'size', 0) > UPLOAD_MAX_SIZE_MB * 1024 * 1024:
+        raise ValidationError(f"上传文件大小不能超过{UPLOAD_MAX_SIZE_MB}MB。")
 
 
 class TrainingLog(models.Model):
     module = models.ForeignKey(
-        Module, on_delete=models.SET_NULL,
+        'competitions.Module', on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='training_logs', verbose_name='训练模块'
     )
@@ -82,9 +83,9 @@ class TrainingLog(models.Model):
     file = models.FileField(
         "日志文件",
         upload_to=traininglog_upload_to,
-        help_text=f"支持格式：{', '.join(ALLOWED_EXTENSIONS)}，文件大小不超过{MAX_FILE_MB}MB",
+        help_text=f"支持格式：{', '.join(TRAININGLOG_ALLOWED_EXTENSIONS)}，文件大小不超过{UPLOAD_MAX_SIZE_MB}MB",
         validators=[
-            FileExtensionValidator(allowed_extensions=ALLOWED_EXTENSIONS, message=f"仅支持以下格式的文件：{', '.join(ALLOWED_EXTENSIONS)}"),
+            FileExtensionValidator(allowed_extensions=TRAININGLOG_ALLOWED_EXTENSIONS, message=f"仅支持以下格式的文件：{', '.join(TRAININGLOG_ALLOWED_EXTENSIONS)}"),
             file_size_validator,
         ],
     )

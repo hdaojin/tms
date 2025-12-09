@@ -1,12 +1,23 @@
 {% load static %}
 <div class="flex flex-wrap text-xs">
   <p>
-    &copy; 2024-{% now 'Y' %} <a class="link [--link-color:text-neutral-content] link-animated" href="/">{{ site_info.site_name|upper }}.CN</a> 版权所有. 
+    {% now 'Y' as current_year %}
+    {% if site_info.created_at|date:'Y' == current_year %}
+      &copy; {{ current_year }} {{ site_info.site_copyright|default:'All Rights Reserved' }}.
+    {% else %}
+      &copy; {{ site_info.created_at|date:'Y' }} -{{ current_year }} {{ site_info.site_copyright|default:'All Rights Reserved' }}.
+    {% endif %}
   </p>
-  <p>Powered by {{ site_info.site_author|upper }}.</p>
-  <div class="flex items-center space-x-1">
-    <img src="{% static 'images/gong_an_bu_bei_an.png' %}" alt="公安部备案图标" width="16" height="16" />
-    <a href="https://beian.mps.gov.cn/#/query/webSearch?code=44011102484109" rel="noreferrer" target="_blank">粤公网安备44011102484109</a>
-  </div>
-  <a href="https://beian.miit.gov.cn/" rel="noreferrer" target="_blank">粤ICP备2022011003号-1</a>
+  
+  <p>Powered by <a href="{{ site_info.site_author_link|default:"/" }}">{{ site_info.site_author|upper|default:'TMS' }}</a>.</p>
+
+  {% if site_info.site_ism_beian %}
+    <div class="flex items-center space-x-1">
+      <img src="{% static 'images/gong_an_bu_bei_an.png' %}" alt="公安部备案图标" width="16" height="16" />
+      <a href="{{ site_info.site_ism_beian_link }}" rel="noreferrer" target="_blank">{{ site_info.site_ism_beian }}</a>
+    </div>
+  {% endif %}
+  {% if site_info.site_icp_beian %}
+    <a href="{{ site_info.site_icp_beian_link }}" rel="noreferrer" target="_blank">{{ site_info.site_icp_beian }}</a>
+  {% endif %}
 </div>

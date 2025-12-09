@@ -12,14 +12,14 @@ from pathlib import Path
 
 
 def meeting_file_upload_to(instance, original_name: str) -> str:
-    """生成存储路径: <MEETING_FILE_DIR>/<YYYY>/<YYYY.MM.DD>-<title><ext>"""
+    """生成存储路径: <MEETING_UPLOAD_DIR>/<YYYY>/<YYYY.MM.DD>-<title><ext>"""
     ext = Path(original_name).suffix.lower() or '.pdf'
     date_part = instance.date or timezone.localdate()
     # 简单清理标题中的不安全字符
     # 这里之前错误使用 getattr(instance.title,'title',...) 得到的是内置方法对象，导致文件名包含 'built-in-method-title...'
     safe_title = slugify(instance.title or 'untitled', allow_unicode=True)
     basename = f"{date_part:%Y.%m.%d}-{safe_title}{ext}"
-    base_dir = getattr(settings, 'MEETING_FILE_DIR', 'meetings')
+    base_dir = getattr(settings, 'MEETING_UPLOAD_DIR', 'meetings')
     return f"{base_dir}/{date_part:%Y}/{basename}"
 
 

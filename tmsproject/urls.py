@@ -37,6 +37,7 @@ urlpatterns = [
     path("traininglogs/", include("traininglogs.urls", namespace="traininglogs")),
     path("meeting/", include("meeting.urls", namespace="meeting")),
     path("notices/", include("notices.urls", namespace="notices")),
+    # path("competitions/", include("competitions.urls", namespace="competitions")),
     path("", login_not_required(HomeView.as_view()), name="home"),
 ]
 

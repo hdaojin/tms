@@ -62,7 +62,7 @@ ALLOWED_EXTENSIONS = [
 def notice_attachment_upload_to(instance, original_name: str) -> str:
     """上传通知相关附件的路径。
     符合 Django FileField upload_to 回调签名 (instance, filename)。"""
-    notice_attachment_dir = getattr(settings, 'NOTICE_ATTACHMENT_DIR', 'notices')
+    notice_attachment_dir = getattr(settings, 'NOTICE_UPLOAD_DIR', 'notices')
     # 使用当前时间构建路径，避免使用可能为 None 的 instance.id
     return f"{notice_attachment_dir}/{timezone.now().strftime('%Y/%m/%d')}/{original_name}"
 

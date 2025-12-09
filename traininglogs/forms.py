@@ -1,8 +1,10 @@
 from django import forms
 from django.utils import timezone
-from .models import TrainingLog, ALLOWED_EXTENSIONS
+from django.conf import settings
+from .models import TrainingLog
 from common.forms import StyledFormMixin
 
+ALLOWED_EXTENSIONS = getattr(settings, "TRAININGLOG_ALLOWED_EXTENSIONS", ['pdf'])
 
 class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
     class Meta:

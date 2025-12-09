@@ -50,15 +50,17 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'django.contrib.flatpages',
     'django.forms',
-    # Custom apps
+    # Third-party apps
     'django_htmx',
     'django_tables2',
+    'django_filters',
+    # Local apps
     'common',
     'accounts',
     'samba',
     'articles',
     'competitions',
-    'skills',
+    # 'skills',
     'traininglogs',
     'meeting',
     'notices',
@@ -190,26 +192,17 @@ LOGIN_REDIRECT_URL = '/accounts/'  # 登录成功后跳转的页面
 # FORM_RENDERER = 'tmsproject.settings.CustomFormRenderer'
 
 # 自定义变量
-
-# SITE INFO
-SITE_INFO = {
-    "site_name": env('SITE_NAME', default="ITNSA"), # type: ignore
-    "site_description": env('SITE_DESCRIPTION', default="A simple training management system."), # type: ignore
-    "site_keywords": env('SITE_KEYWORDS', default="TMS, Training Management System, Training, Management"), # type: ignore
-    "site_author": env('SITE_AUTHOR', default="hdaojin"), # type: ignore
-}
-
 CACHE_TIMEOUT = env('CACHE_TIMEOUT', default=300) # type: ignore
-UPLOAD_MAX_SIZE_MB = env('UPLOAD_MAX_SIZE_MB', default=10) # type: ignore
-UPLOAD_MAX_SIZE = UPLOAD_MAX_SIZE_MB * 1024 * 1024  # type: ignore
+UPLOAD_MAX_SIZE_MB = 10
 
+TRAININGLOG_UPLOAD_DIR = "traininglogs"
+TRAININGLOG_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf']
 
-WSCSKILL_NAME = env('WSCSKILL_NAME', default='网络系统管理项目') # type: ignore
-INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=86400)  # type: ignore # 1天,单位为秒
+MEETING_UPLOAD_DIR = "meetings"
+NOTICE_UPLOAD_DIR = "notices"
 
-LOGS_DIR = env('LOGS_DIR', default='logs') # type: ignore
-MEETING_FILE_DIR = env('MEETING_FILE_DIR', default='meetings') # type: ignore
-NOTICE_ATTACHMENT_DIR = env('NOTICE_ATTACHMENT_DIR', default='notices') # type: ignore
+INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=24*60*60) # type: ignore
+
 
 
 

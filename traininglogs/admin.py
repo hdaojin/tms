@@ -4,9 +4,9 @@ from .models import TrainingLog
 
 # Register your models here.
 class TrainingLogAdmin(admin.ModelAdmin):
-    list_display = ('module', 'task', 'display_filename', 'training_date', 'uploaded_by', 'uploaded_at')
+    list_display = ('task', 'module', 'display_filename', 'training_date', 'uploaded_by', 'uploaded_at')
     list_filter = ('module', 'training_date', 'uploaded_by')
-    search_fields = ('module__name', 'task', 'training_date', 'uploaded_by__username')
+    search_fields = ('task', 'module__name', 'training_date', 'uploaded_by__username')
     date_hierarchy = 'training_date'
     ordering = ('-training_date',)
     readonly_fields = ('uploaded_at', )

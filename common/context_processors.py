@@ -7,14 +7,14 @@
     ...
 """
 
-from django.conf import settings
+from .models import SiteConfig
 
 
 def custom_context(request):
     """
-    自定义上下文处理器
+    自定义上下文处理器, 在所有模板中注入站点配置信息
     """
-    site_info = getattr(settings, 'SITE_INFO', {})
+    site_info = SiteConfig.get_solo()
 
     context = {
         "site_info": site_info,

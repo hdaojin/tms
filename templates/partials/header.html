@@ -8,17 +8,18 @@
         <span class="icon-[tabler--menu-2] size-6"></span>
       </div>
       <div tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
-      {% if flatpage %}
-        {% render_flatpages_menu %}
-      {% else %}
-        {% render_current_app_menu %}
-      {% endif %}
+        {% if flatpage %}
+          {% render_flatpages_menu %}
+        {% else %}
+          {% render_current_app_menu %}
+        {% endif %}
       </div>
-
     </div>
     <div class="flex items-center gap-2">
-      <img src="{% static 'images/logo.png' %}" alt="Logo" class="w-8 h-8" />
-      <a class="btn btn-ghost text-xl font-bold" href="/">{{ site_info.site_name }}</a>
+      <div class="btn btn-ghost normal-case p-0">
+        <img src="{% static 'images/logo.png' %}" alt="Logo" class="w-8 h-8" />
+        <a class="text-xl font-bold" href="/">{{ site_info.site_short_name }}</a>
+      </div>
     </div>
   </div>
 
