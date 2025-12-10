@@ -1,0 +1,46 @@
+---
+# permissions: ["permission_codename", "content_type.app_label", "content_type.model_name"]
+- model: auth.group
+  pk: 1
+  fields:
+    name: "教练"
+    permissions:
+      - ["add_traininglog", "traininglogs", "traininglog"]
+      - ["view_coach_traininglog", "traininglogs", "traininglog"]
+      - ["view_competitor_traininglog", "traininglogs", "traininglog"]
+
+- model: accounts.groupprofile
+  pk: 1
+  fields:
+    group: 1
+    codename: "coach"
+    description: "教练组"
+
+- model: auth.group
+  pk: 2
+  fields:
+    name: "选手"
+    permissions:
+      - ["add_traininglog", "traininglogs", "traininglog"]
+
+- model: accounts.groupprofile
+  pk: 2
+  fields:
+    group: 2
+    codename: "competitor"
+    description: "选手组"
+
+- model: auth.group
+  pk: 3
+  fields:
+    name: "班务"
+    permissions:
+      - ["add_notice", "notices", "notice"]
+
+- model: accounts.groupprofile
+  pk: 3
+  fields:
+    group: 3
+    codename: "assistant"
+    description: "班务组"
+

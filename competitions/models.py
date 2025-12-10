@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 
@@ -21,9 +23,12 @@ class Competition(models.Model):
         "权重",
         max_digits=2,
         decimal_places=1,
-        default=7.0,    # type: ignore
+        default=Decimal("7.0"),
         help_text="用于统计该竞赛所涉考点的重要性，数值越大表示该竞赛所涉考点越重要，取值范围0.0-7.0，原则上与竞赛级别对应。",
-        validators=[MinValueValidator(0.0), MaxValueValidator(7.0)]
+        validators=[
+            MinValueValidator(Decimal("0.0")),
+            MaxValueValidator(Decimal("7.0")),
+        ],
     )
     description = models.TextField("描述", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
@@ -52,8 +57,8 @@ class Project(models.Model):
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
-        verbose_name = '竞赛项目'
-        verbose_name_plural = '竞赛项目'
+        verbose_name = '项目'
+        verbose_name_plural = '项目'
         ordering = ['name']
     
     def __str__(self):
@@ -179,3 +184,4 @@ class Module(models.Model):
 #     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 #     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 # """
+

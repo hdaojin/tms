@@ -1,6 +1,6 @@
 from django import forms
 from .models import Notice, NoticeAttachment, ALLOWED_EXTENSIONS
-from common.utils.forms import StyledFormMixin
+from core.utils.forms import StyledFormMixin
 
 
 class MultipleFileInput(forms.ClearableFileInput):

@@ -1,7 +1,0 @@
-menu_slug: "external_link"
-items:
-  - name: 问题反馈
-    external_url: https://github.com/hdaojin/tms/issues/new
-    icon: icon-[tabler--message-question]
-    login_required: false
-    target_blank: true

@@ -22,7 +22,7 @@ from django.conf.urls.static import static
 from django.contrib.auth.decorators import login_not_required  # type: ignore
 from django.contrib.flatpages import views as flatpage_views
 
-from common.home.views import HomeView
+from core.home.views import HomeView
 
 admin.site.site_header = "TMS 管理后台"
 admin.site.site_title = "TMS 管理后台"

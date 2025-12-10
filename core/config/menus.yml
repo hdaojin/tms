@@ -1,0 +1,72 @@
+---
+# 不同位置显示的菜单项(section)和顺序
+layouts:
+  header_menu: 
+    - home
+    - notice
+    - training
+    - meeting
+    - about
+  dashboard_home:
+    - section: "notice"
+    - section: "meeting"
+    - section: "training"
+  # - resource
+  # - asset
+  # - article
+
+# sidebar menus will be generated dynamically based on the sections defined below
+# 汇总全部菜单并按 section 分类显示
+sections:
+  - section: "home"
+    label: "首页"
+    description: "系统首页"
+    login_required: false
+    include:
+      - "home"
+
+  - section: "training"
+    label: "训练"
+    description: "日常训练管理"
+    icon: 
+      pic: "icon-[tabler--file-text]"
+      size: 6
+      color: "success"
+    include:
+      - "traininglogs"
+
+  - section: "meeting"
+    label: "会议"
+    description: "会议记录"
+    icon: 
+      pic: "icon-[tabler--calendar]"
+      size: 6
+      color: "primary"
+    include:
+      - "meeting"
+
+  - section: "account"
+    label: "账户"
+    description: "用户账户管理"
+    include:
+      - "accounts"
+      - "samba"
+
+  - section: "notice"
+    label: "通知"
+    description: "通知与待办事项"
+    icon: 
+      pic: "icon-[tabler--bell]"
+      size: 6
+      color: "info"      
+    include:
+      - "notices"
+
+  - section: "about"
+    label: "关于"
+    description: "关于系统的相关信息"
+    login_required: false
+    include:
+      - "about"
+      - "feedback"
+

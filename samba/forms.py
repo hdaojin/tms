@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 
-from common.utils.forms import StyledFormMixin
+from core.utils.forms import StyledFormMixin
 
 
 class SambaPasswordForm(StyledFormMixin, forms.Form):

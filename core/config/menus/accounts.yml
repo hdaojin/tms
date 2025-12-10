@@ -1,0 +1,39 @@
+---
+# 定义用户账户应用的菜单项
+menu_slug: "accounts"
+app_name: "accounts"
+items:
+  - name: "用户管理"
+    icon: 
+      pic: "icon-[tabler--users]"
+      size: 4
+    is_group_header: true
+    is_visible: true
+    login_required: true
+    children:
+        - name: "用户中心"
+          named_url: "accounts:home"
+          icon: 
+            pic: "icon-[tabler--user]"
+            size: 4
+          is_visible: true
+          login_required: true
+
+        - name: "个人资料"
+          named_url: "accounts:profile"
+          icon: 
+            pic: "icon-[tabler--id]"
+            size: 4
+          is_visible: true
+          login_required: true
+
+        - name: "邀请注册"
+          named_url: "accounts:generate_invitation"
+          icon: 
+            pic: "icon-[tabler--user-plus]"
+            size: 4
+          is_visible: true
+          login_required: true
+          required_perms: 
+            - "accounts.add_ivitationcode"
+          

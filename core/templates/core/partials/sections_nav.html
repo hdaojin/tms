@@ -1,0 +1,10 @@
+{% comment %}Section-based top navigation{% endcomment %}
+<nav class="menu menu-horizontal px-1 gap-1">
+  {% for section in sections %}
+    <a href="{{ section.url }}" class="btn btn-ghost gap-2 {% if section.active %}btn-active text-primary{% endif %}" {% if item.target_blank %}target="_blank" rel="noopener"{% endif %}>
+      <span>{{ section.label }}</span>
+    </a>
+  {% empty %}
+    <span class="text-sm text-base-content/60 px-2">暂无菜单</span>
+  {% endfor %}
+</nav>

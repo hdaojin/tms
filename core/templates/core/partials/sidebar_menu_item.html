@@ -1,0 +1,35 @@
+{# 单个菜单项（递归） #}
+<li class="text-sm">
+  {% if item.children %}
+    <details class="rounded-lg" {% if item.expanded %}open{% endif %}>
+      <summary class="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer select-none">
+        <span class="flex items-center gap-2">
+          {% if item.icon %}
+            {% if item.icon.pic %}
+              <span class="{{ item.icon.pic }} {% if item.icon.size %}size-{{ item.icon.size }}{% else %}size-4{% endif %}{% if item.icon.color %} text-{{ item.icon.color }}{% endif %}"></span>
+            {% else %}
+              <span class="{{ item.icon }} size-4"></span>
+            {% endif %}
+          {% endif %}
+          <span class="{% if item.active %}text-primary font-semibold{% endif %}">{{ item.name }}</span>
+        </span>
+      </summary>
+      <ul class="pl-4 mt-1 border-l border-base-300 space-y-1" data-submenu>
+        {% for child in item.children %}
+          {% include "core/partials/sidebar_menu_item.html" with item=child %}
+        {% endfor %}
+      </ul>
+    </details>
+  {% else %}
+    <a href="{{ item.resolved_url }}" class="flex items-center gap-2 px-3 py-2 {% if item.active %}text-primary font-semibold bg-base-200{% endif %}" {% if item.target_blank %}target="_blank" rel="noopener"{% endif %}>
+      {% if item.icon %}
+        {% if item.icon.pic %}
+          <span class="{{ item.icon.pic }} {% if item.icon.size %}size-{{ item.icon.size }}{% else %}size-4{% endif %}{% if item.icon.color %} text-{{ item.icon.color }}{% endif %}"></span>
+        {% else %}
+          <span class="{{ item.icon }} size-4"></span>
+        {% endif %}
+      {% endif %}
+      <span>{{ item.name }}</span>
+    </a>
+  {% endif %}
+</li>

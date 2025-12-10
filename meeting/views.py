@@ -10,8 +10,8 @@ from .tables import MeetingTable
 
 from .forms import MeetingUploadForm
 from .models import Meeting
-from common.utils.mixins import TitleMixin
-from common.utils.pdf_response import pdf_inline_response
+from core.utils.mixins import TitleMixin
+from core.utils.pdf_response import pdf_inline_response
 
 
 class MeetingUploadView(PermissionRequiredMixin, CreateView):

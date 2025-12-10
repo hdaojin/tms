@@ -1,0 +1,31 @@
+---
+# 定义会议应用的菜单项
+
+menu_slug: "meeting"
+app_name: "meeting"
+items:
+  - name: "会议记录管理"
+    icon: 
+      pic: "icon-[tabler--calendar]"
+      size: 4
+    is_group_header: true
+    children:
+        - name: "会议记录列表"
+          named_url: "meeting:meeting_list"
+          icon: 
+            pic: "icon-[tabler--calendar-event]"
+            size: 4
+          is_visible: true
+          login_required: true
+  
+        - name: "上传会议记录"
+          named_url: "meeting:meeting_upload"
+          icon: 
+            pic: "icon-[tabler--calendar-plus]"
+            size: 4
+          is_visible: true
+          login_required: true
+          perm_match_all: true
+          required_perms:
+              - "meeting.add_meeting"
+

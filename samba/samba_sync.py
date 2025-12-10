@@ -1,13 +1,13 @@
 import subprocess
-from .models import SambaGroupMap
+from accounts.models import GroupProfile
 
 
 def _resolve_unix_group_for_django_group(django_group) -> str | None:
     try:
-        mapping = SambaGroupMap.objects.get(group=django_group)
-        return mapping.unix_name
-    except SambaGroupMap.DoesNotExist:
-        raise RuntimeError(f"组 '{django_group.name}' 未配置 Samba 组映射, 请联系管理员。")
+        mapping = GroupProfile.objects.get(group=django_group)
+        return mapping.codename
+    except GroupProfile.DoesNotExist:
+        raise RuntimeError(f"组 '{django_group.name}' 未配置组的codename, 请联系管理员。")
 
 
 def _run(cmd: list[str], input_bytes: bytes | None = None) -> subprocess.CompletedProcess:

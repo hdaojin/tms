@@ -2,7 +2,7 @@ from django import forms
 from django.utils import timezone
 from django.conf import settings
 from .models import TrainingLog
-from common.utils.forms import StyledFormMixin
+from core.utils.forms import StyledFormMixin
 
 ALLOWED_EXTENSIONS = getattr(settings, "TRAININGLOG_ALLOWED_EXTENSIONS", ['pdf'])
 

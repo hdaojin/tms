@@ -13,7 +13,7 @@ from .views import (
 app_name = 'traininglogs'
 
 urlpatterns = [
-    path('', TraininglogListView.as_view(), name='traininglog_list'),
+    path('list/', TraininglogListView.as_view(), name='traininglog_list'),
     path('coaches/', CoachTraininglogListView.as_view(), name='traininglog_coach_list'),
     path('competitors/', CompetitorTraininglogListView.as_view(), name='traininglog_competitor_list'),
     path('stats/', TraininglogMonthlyStatView.as_view(), name='traininglog_stats'),

@@ -1,0 +1,10 @@
+menu_slug: "home"
+app_name: "core"
+items: 
+  - name: "首页"
+    named_url: "home"
+    icon: 
+      pic: "icon-[tabler--home]"
+      size: "4"
+    is_visible: true
+    login_required: false

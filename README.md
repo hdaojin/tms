@@ -46,6 +46,13 @@ cp .env.example .env
 uv run manage.py migrate
 ```
 
+### Load initial data
+```bash
+uv run manage.py loaddata core/default
+uv run manage.py loaddata accounts/default
+uv run manage.py loaddata competitions/default
+```
+
 ### Create superuser
 ```bash
 uv run manage.py createsuperuser

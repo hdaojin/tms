@@ -12,7 +12,7 @@ from django_tables2 import SingleTableView
 
 from .models import TrainingLog
 from .forms import TrainingLogCreateForm
-from common.utils.pdf_response import pdf_inline_response
+from core.utils.pdf_response import pdf_inline_response
 from .tables import TrainingLogTable, TrainingLogOthersTable, MonthlyStatTable
 
 

@@ -1,5 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.validators import RegexValidator
 
 # Create your models here.
 
@@ -36,3 +38,31 @@ class UserProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.username} 的信息"
+
+
+
+# group codename 必须满足 Unix/Linux 系统组名规范
+
+name_validator = RegexValidator(
+    regex=r'^[a-zA-Z][a-zA-Z0-9_]{1,30}$',
+    message='codename 必须以字母开头, 后续字符可以是字母、数字或下划线, 且长度不超过30个字符。'
+)
+
+
+class GroupProfile(models.Model):
+    group = models.OneToOneField(Group, on_delete=models.CASCADE, related_name='profile')
+    codename = models.SlugField('英文标识', 
+                                max_length=30, 
+                                unique=True,
+                                blank=True,
+                                validators=[name_validator],
+                                help_text='用于脚本或系统集成的组codename, 必须以字母开头, 后续字符可以是字母、数字或下划线, 且长度不超过30个字符, 如: coach。'
+                                )
+    description = models.TextField('描述', null=True, blank=True)
+
+    class Meta:
+        verbose_name = '用户组信息'
+        verbose_name_plural = '用户组信息'    
+
+    def __str__(self):
+        return f"{self.group.name} 的信息"

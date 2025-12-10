@@ -1,0 +1,29 @@
+---
+# 定义简单页面应用的菜单项
+
+menu_slug: "about"
+app_name: "flatpage"
+items:
+  - name: "关于"
+    icon: 
+      pic: "icon-[tabler--info-circle]"
+      size: 4
+    is_group_header: true
+    login_required: false
+    children:
+      - name: "关于本站"
+        external_url: "/about/site/"
+        icon: 
+          pic: "icon-[tabler--info-square]"
+          size: 4
+        login_required: false
+  
+      - name: "关于作者"
+        external_url: "/about/author/"
+        icon: 
+          pic: "icon-[tabler--user-circle]"
+          size: 4
+        login_required: false
+  
+
+        
