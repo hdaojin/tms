@@ -314,6 +314,7 @@ dist
 
 # Uploads directory
 media/
+private-media/
 # .vscode/
 .VSCodeCounter/
 all_html_code.txt

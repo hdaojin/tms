@@ -1,0 +1,64 @@
+{% extends 'base_no_right_sidebar.html' %}
+
+{% block content %}
+  {% if user.is_superuser %}
+    <div class="mb-6 space-y-2">
+      <div class="text-sm font-semibold">笔记库目录统计</div>
+      <div class="text-sm text-base-content/70">
+        总目录：{{ total_repo_dirs|default:0 }}；已显示：{{ visible_repo_count|default:0 }}；不可见：{{ invisible_repo_count|default:0 }}；未注册：{{ unregistered_repo_count|default:0 }}；目录缺失：{{ missing_repo_count|default:0 }}
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for repo in repos %}
+      <a href="{% url 'notes:note_repo_index' repo=repo.slug %}" class="card bg-base-100 shadow hover:shadow-lg transition-shadow">
+        <div class="card-body">
+          <h2 class="card-title">{{ repo.title|default:repo.slug }}</h2>
+          <p class="text-sm text-base-content/70">
+            {% if repo.description %}
+              {{ repo.description }}
+            {% else %}
+              进入 {{ repo.slug }} 笔记库
+            {% endif %}
+          </p>
+        </div>
+      </a>
+    {% empty %}
+      <div class="col-span-full text-center text-base-content/60">暂无笔记库</div>
+    {% endfor %}
+  </div>
+
+  {% if user.is_superuser and invisible_repos %}
+    <div class="mt-6 space-y-2">
+      <h3 class="font-semibold text-sm text-warning">不可见的 NoteRepo（未对普通用户开放）</h3>
+      <ul class="list-disc list-inside text-sm text-base-content/70">
+        {% for repo in invisible_repos %}
+          <li>{{ repo.slug }}{% if repo.title %} — {{ repo.title }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if unregistered_repos %}
+    <div class="mt-6 space-y-2">
+      <h3 class="font-semibold text-sm text-warning">未注册的目录（存在文件夹但没有 NoteRepo 配置） — {{ unregistered_repo_count|default:0 }} 个</h3>
+      <ul class="list-disc list-inside text-sm text-base-content/70">
+        {% for name in unregistered_repos %}
+          <li>{{ name }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  {% if missing_repos %}
+    <div class="mt-6 space-y-2">
+      <h3 class="font-semibold text-sm text-error">数据库存在但目录缺失 — {{ missing_repo_count|default:0 }} 个</h3>
+      <ul class="list-disc list-inside text-sm text-base-content/70">
+        {% for repo in missing_repos %}
+          <li>{{ repo.slug }}{% if repo.title %} — {{ repo.title }}{% endif %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+{% endblock %}

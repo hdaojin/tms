@@ -8,9 +8,10 @@ layouts:
     - meeting
     - about
   dashboard_home:
-    - section: "notice"
-    - section: "meeting"
-    - section: "training"
+    - "notice"
+    - "meeting"
+    - "training"
+    - "notes"
   # - resource
   # - asset
   # - article
@@ -70,3 +71,12 @@ sections:
       - "about"
       - "feedback"
 
+  - section: "notes"
+    label: "笔记"
+    description: "教学笔记"
+    icon: 
+      pic: "icon-[tabler--book]"
+      size: 6
+      color: "warning"
+    include:
+      - "notes"

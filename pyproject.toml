@@ -13,4 +13,6 @@ dependencies = [
     "mysqlclient>=2.2.7",
     "gunicorn>=23.0.0",
     "django-filter>=25.2",
+    "markdown>=3.10",
+    "python-frontmatter>=1.1.0",
 ]

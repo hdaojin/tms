@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'samba',
     'articles',
     'competitions',
+    'notes',
     # 'skills',
     'traininglogs',
     'meeting',
@@ -79,7 +80,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.LoginRequiredMiddleware',   # 启用将所有未认证请求重定向到登录页面
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    # 'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',   # 启用 flatpages 中间件
+    'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',   # 启用 flatpages 中间件
 ]
 
 ROOT_URLCONF = 'tmsproject.urls'
@@ -168,12 +169,9 @@ STATICFILES_DIRS = [
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-
 # Media files (user uploaded files)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
-
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
@@ -182,7 +180,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # 认证相关设置
 # LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/accounts/'  # 登录成功后跳转的页面
+LOGIN_REDIRECT_URL = '/accounts/home/'  # 登录成功后跳转的页面
 # LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 
@@ -194,6 +192,11 @@ LOGIN_REDIRECT_URL = '/accounts/'  # 登录成功后跳转的页面
 # 自定义变量
 CACHE_TIMEOUT = env('CACHE_TIMEOUT', default=300) # type: ignore
 UPLOAD_MAX_SIZE_MB = 10
+
+# 私有文件根目录（请手动创建）：BASE_DIR/private-media
+PRIVATE_MEDIA_ROOT = BASE_DIR / "private-media"
+# 笔记根目录（请手动创建）：BASE_DIR/private-media/notes
+NOTES_ROOT = PRIVATE_MEDIA_ROOT / "notes"
 
 TRAININGLOG_UPLOAD_DIR = "traininglogs"
 TRAININGLOG_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf']

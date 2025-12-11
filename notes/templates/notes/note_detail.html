@@ -1,0 +1,52 @@
+{% extends "base_no_right_sidebar.html" %}
+{% load static %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+  <div class="breadcrumbs text-sm text-base-content/80">
+    <ul>
+      <li>Notes</li>
+      <li>{{ repo }}</li>
+      <li>{{ slug|default:"README" }}</li>
+    </ul>
+  </div>
+
+  {% if meta_parse_error %}
+    <div class="alert alert-warning">
+      <span>Front Matter 解析失败：{{ meta_parse_error_message }}</span>
+    </div>
+  {% endif %}
+
+  <div class="card bg-base-100 shadow">
+    <div class="card-body space-y-2">
+      <h1 class="card-title text-2xl">{{ meta.title|default:note.slug|default:"笔记详情" }}</h1>
+      <div class="text-sm text-base-content/70 space-y-1">
+        {% if meta.author %}<div>作者：{{ meta.author }}</div>{% endif %}
+        {% if meta.date %}<div>日期：{{ meta.date }}</div>{% endif %}
+        {% if meta.module %}<div>模块：{{ meta.module }}</div>{% endif %}
+        {% if meta.summary %}<div>摘要：{{ meta.summary }}</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <article class="prose max-w-none">
+    {{ note.html|safe }}
+  </article>
+
+  <div class="border-t pt-4 text-sm text-base-content/70">
+    <!-- TODO: 上一条 / 下一条 导航 -->
+    <span>更多导航即将到来…</span>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <!-- Prism.js styles (place actual static path as needed) -->
+  <link rel="stylesheet" href="{% static 'css/prism.css' %}">
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <!-- Prism.js script (place actual static path as needed) -->
+  <script src="{% static 'js/prism.js' %}"></script>
+{% endblock %}
