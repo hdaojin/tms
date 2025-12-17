@@ -37,7 +37,7 @@ cd tms
 uv sync
 npm install
 # Optional: Copy latest JavaScript file to static/js
-cp node_modules/htmx.org/dist/htmx.min.js static/js
+# cp node_modules/htmx.org/dist/htmx.min.js static/js
 ```
 
 ### Migrate database

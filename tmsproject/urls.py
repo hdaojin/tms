@@ -23,6 +23,7 @@ from django.contrib.auth.decorators import login_not_required  # type: ignore
 # from django.contrib.flatpages import views as flatpage_views
 
 from core.home.views import HomeView
+from notes.views import note_asset_view
 
 admin.site.site_header = "TMS 管理后台"
 admin.site.site_title = "TMS 管理后台"
@@ -38,6 +39,7 @@ urlpatterns = [
     path("meeting/", include("meeting.urls", namespace="meeting")),
     path("notices/", include("notices.urls", namespace="notices")),
     path("notes/", include("notes.urls", namespace="notes")),
+    path("notes-files/<str:repo>/<path:asset_path>", note_asset_view, name="note_asset"),
     # path("competitions/", include("competitions.urls", namespace="competitions")),
     path("", login_not_required(HomeView.as_view()), name="home"),
 ]

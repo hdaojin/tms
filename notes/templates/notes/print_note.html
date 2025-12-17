@@ -1,0 +1,113 @@
+{% extends 'base_minimal.html' %}
+{% load static %}
+
+{% block title %}
+
+{% endblock %}
+
+{% block content %}
+  <div class="w-5xl max-w-none mx-auto text-base print:text-black p-6">
+    <div class="flex items-center justify-between mb-4">
+      <img src="{% static 'images/gm-logo.png' %}" alt="GM Logo" class="h-10 w-auto" />
+      <img src="{% static 'images/world-skills-china.png' %}" alt="World Skills China" class="h-10 w-auto" />
+    </div>
+
+    <div class="text-center text-2xl font-semibold leading-snug mb-4">
+      {% if print_meta.class %}
+        <p>{{ print_meta.class }}</p>
+      {% endif %}
+      <p>
+        {{ print_meta.document|default_if_none:'' }}
+        {% if print_meta.role %}
+          （{{ print_meta.role }}）
+        {% endif %}
+      </p>
+    </div>
+
+    <table class="table border border-neutral border-collapse w-full">
+      <tbody>
+        <tr class="align-middle text-center whitespace-nowrap">
+          <th class="border border-neutral px-3 py-2 w-28">日期</th>
+          <td class="border border-neutral px-3 py-2 text-left">{{ print_meta.updated_at|default_if_none:'' }}</td>
+          <th class="border border-neutral px-3 py-2 w-28">教练姓名</th>
+          <td class="border border-neutral px-3 py-2 text-left">{{ print_meta.author|default_if_none:'' }}</td>
+        </tr>
+        <tr class="align-middle text-center whitespace-nowrap">
+          <th class="border border-neutral px-3 py-2 w-28">训练模块</th>
+          <td class="border border-neutral px-3 py-2 text-left">{{ print_meta.module|default_if_none:'' }}</td>
+          <th class="border border-neutral px-3 py-2 w-28">训练任务</th>
+          <td class="border border-neutral px-3 py-2 text-left">{{ print_meta.task|default_if_none:'' }}</td>
+        </tr>
+        <tr>
+          <th class="border border-neutral px-3 py-2 align-middle text-center w-28">训练目标</th>
+          <td colspan="3" class="border border-neutral px-3 py-2 text-left">
+            {% if print_meta.objectives %}
+              {% for obj in print_meta.objectives %}
+                {{ forloop.counter }}. {{ obj }}<br />
+              {% endfor %}
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th class="border border-neutral px-3 py-2 align-middle text-center w-28">训练内容</th>
+          <td colspan="3" class="border border-neutral px-3 py-2 text-left">
+            {% if print_meta.contents %}
+              {% for item in print_meta.contents %}
+                {{ forloop.counter }}. {{ item }}<br />
+              {% endfor %}
+            {% endif %}
+          </td>
+        </tr>
+        <tr>
+          <th class="border border-neutral px-3 py-2 align-top text-center w-28">过程记录</th>
+          <td colspan="3" class="border border-neutral px-3 py-2 prose prose-sm max-w-none text-left">{{ html|safe }}</td>
+        </tr>
+        <tr>
+          <th class="border border-neutral px-3 py-2 align-top text-center w-28">总结</th>
+          <td colspan="3" class="border border-neutral px-3 py-2 text-left space-y-2">
+            <div>
+              <p class="font-semibold mb-1">训练目标达成情况：</p>
+              {% if print_meta.summary.objective_achievement %}
+                {% for line in print_meta.summary.objective_achievement %}
+                  <p>{{ forloop.counter }}. {{ line }}</p>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <div>
+              <p class="font-semibold mb-1">不足之处：</p>
+              {% if print_meta.summary.shortcomings %}
+                {% for line in print_meta.summary.shortcomings %}
+                  <p>{{ forloop.counter }}. {{ line }}</p>
+                {% endfor %}
+              {% endif %}
+            </div>
+
+            <div>
+              <p class="font-semibold mb-1">改进方向：</p>
+              {% if print_meta.summary.improvement_plan %}
+                {% for line in print_meta.summary.improvement_plan %}
+                  <p>{{ forloop.counter }}. {{ line }}</p>
+                {% endfor %}
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <th class="border border-neutral px-3 py-2 align-middle text-center w-28">填写人</th>
+          <td colspan="3" class="border border-neutral px-3 py-2 text-left">黄道金</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
+
+{% block extra_css %}
+  <!-- Prism.js styles (place actual static path as needed) -->
+  <link rel="stylesheet" href="{% static 'css/prism.css' %}" />
+{% endblock %}
+
+{% block extra_js %}
+  <!-- Prism.js script (place actual static path as needed) -->
+  <script src="{% static 'js/prism.js' %}"></script>
+{% endblock %}

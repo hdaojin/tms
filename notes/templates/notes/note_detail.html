@@ -1,52 +1,121 @@
-{% extends "base_no_right_sidebar.html" %}
+{% extends 'base.html' %}
 {% load static %}
-{% block content %}
-<div class="max-w-5xl mx-auto px-4 py-6 space-y-6">
-  <div class="breadcrumbs text-sm text-base-content/80">
-    <ul>
-      <li>Notes</li>
-      <li>{{ repo }}</li>
-      <li>{{ slug|default:"README" }}</li>
-    </ul>
-  </div>
 
-  {% if meta_parse_error %}
-    <div class="alert alert-warning">
-      <span>Front Matter 解析失败：{{ meta_parse_error_message }}</span>
+{% block left_sidebar %}
+  <aside class="hidden min-w-56 w-fit max-w-80 lg:block bg-base-200 border border-base-300 rounded-lg px-4 pt-8 space-y-2 sticky top-16 max-h-[calc(100vh-4rem)] overflow-y-auto print:hidden">
+    <div class="font-semibold text-base-content">{{ repo|title }}</div>
+    <div class="prose prose-sm max-w-none">
+      {% if readme_toc_html %}
+        {{ readme_toc_html|safe }}
+      {% else %}
+        <p class="text-base-content/60">README 未提供目录列表</p>
+      {% endif %}
     </div>
-  {% endif %}
+  </aside>
+{% endblock %}
 
-  <div class="card bg-base-100 shadow">
-    <div class="card-body space-y-2">
-      <h1 class="card-title text-2xl">{{ meta.title|default:note.slug|default:"笔记详情" }}</h1>
-      <div class="text-sm text-base-content/70 space-y-1">
-        {% if meta.author %}<div>作者：{{ meta.author }}</div>{% endif %}
-        {% if meta.date %}<div>日期：{{ meta.date }}</div>{% endif %}
-        {% if meta.module %}<div>模块：{{ meta.module }}</div>{% endif %}
-        {% if meta.summary %}<div>摘要：{{ meta.summary }}</div>{% endif %}
+{% block content %}
+  <div class="w-full space-y-4">
+    <div class="space-y-1">
+      <div class="breadcrumbs text-sm text-base-content/80">
+        <ul>
+          <li>
+            <a href="/notes/">Notes</a>
+          </li>
+          <li>
+            <a href="/notes/{{ repo }}/">{{ repo|title }}</a>
+          </li>
+          {% if slug %}
+            <li>
+              <a href="/notes/{{ repo }}/{{ slug }}/">{{ slug|title }}</a>
+            </li>
+          {% else %}
+            <li>
+              <a href="/notes/{{ repo }}/">README</a>
+            </li>
+          {% endif %}
+        </ul>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-base-content/70 space-x-4">
+          {% with author=meta.author created=meta.created_at updated=meta.updated_at module=meta.module %}
+            {% if author %}
+              <span>作者：{{ author }}</span>
+            {% endif %}
+            {% if created %}
+              <span>创建：{{ created }}</span>
+            {% endif %}
+            {% if updated %}
+              <span>更新：{{ updated }}</span>
+            {% endif %}
+            {% if module %}
+              <span>模块：{{ module }}</span>
+            {% endif %}
+          {% endwith %}
+        </div>
+
+        {% if slug and slug|lower != 'readme' %}
+          <div class="print:hidden">
+            <a class="btn btn-primary btn-sm" href="{% url 'notes:note_print' repo=repo slug=slug %}">生成训练日志</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <hr />
+
+    <article class="prose max-w-none py-4">{{ note.html|safe }}</article>
+
+    <div class="border-t pt-4 text-sm text-base-content/70">
+      <div class="flex items-center justify-between gap-4">
+        {% if prev_note %}
+          <a class="btn btn-ghost btn-sm gap-2" href="{{ prev_note.url }}">
+            <span class="text-lg">←</span>
+            <span class="text-left">
+              <span class="block text-xs text-base-content/60">上一条</span>
+              <span class="block text-base-content">{{ prev_note.slug }}</span>
+            </span>
+          </a>
+        {% else %}
+          <span class="text-base-content/50">没有上一条</span>
+        {% endif %}
+
+        {% if next_note %}
+          <a class="btn btn-ghost btn-sm gap-2 ml-auto" href="{{ next_note.url }}">
+            <span class="text-left">
+              <span class="block text-xs text-base-content/60">下一条</span>
+              <span class="block text-base-content">{{ next_note.slug }}</span>
+            </span>
+            <span class="text-lg">→</span>
+          </a>
+        {% else %}
+          <span class="text-base-content/50 ml-auto">没有下一条</span>
+        {% endif %}
       </div>
     </div>
   </div>
-
-  <article class="prose max-w-none">
-    {{ note.html|safe }}
-  </article>
-
-  <div class="border-t pt-4 text-sm text-base-content/70">
-    <!-- TODO: 上一条 / 下一条 导航 -->
-    <span>更多导航即将到来…</span>
-  </div>
-</div>
 {% endblock %}
 
-{% block extra_head %}
-  {{ block.super }}
+{% block right_sidebar %}
+  <aside class="min-w-56 w-fit max-w-80 hidden lg:block bg-base-200 border border-base-300 rounded-lg px-4 pt-8 space-y-2 sticky top-16 max-h-[calc(100vh-4rem)] overflow-y-auto print:hidden">
+    <div class="font-semibold text-base-content">本文大纲</div>
+    <div class="prose prose-sm max-w-none">
+      {% if toc_html %}
+        {{ toc_html|safe }}
+      {% else %}
+        <p class="text-base-content/60">未找到大纲标题</p>
+      {% endif %}
+    </div>
+  </aside>
+{% endblock %}
+
+{% block extra_css %}
   <!-- Prism.js styles (place actual static path as needed) -->
-  <link rel="stylesheet" href="{% static 'css/prism.css' %}">
+  <link rel="stylesheet" href="{% static 'css/prism.css' %}" />
 {% endblock %}
 
 {% block extra_js %}
-  {{ block.super }}
   <!-- Prism.js script (place actual static path as needed) -->
   <script src="{% static 'js/prism.js' %}"></script>
 {% endblock %}

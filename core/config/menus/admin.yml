@@ -1,0 +1,20 @@
+menu_slug: "admin"
+app_name: "admin"
+items:
+  - name: "管理后台"
+    icon: 
+      pic: "icon-[tabler--layout-dashboard]"
+      size: 4
+    is_group_header: true
+    is_visible: true
+    login_required: true
+    superuser_required: true
+    children:
+        - name: "站点管理"
+          named_url: "admin:index"
+          icon: 
+            pic: "icon-[tabler--settings-2]"
+            size: 4
+          is_visible: true
+          login_required: true
+          superuser_required: true

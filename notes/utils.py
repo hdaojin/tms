@@ -1,42 +1,39 @@
 from __future__ import annotations
 
-import logging
 import re
 from dataclasses import dataclass
-from html import escape
-from html.parser import HTMLParser
+import posixpath
 from pathlib import Path, PurePosixPath
-from typing import Any, List, Tuple
+from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
-import frontmatter
-import markdown
 from django.conf import settings
 
-
-logger = logging.getLogger(__name__)
+from core.utils.markdown import render_markdown_text
 
 
 class InvalidNotePathError(Exception):
-    """Raised when the requested note path is invalid or escapes NOTES_ROOT."""
+    """当请求的笔记路径非法（含穿越）或逃逸出 NOTES_ROOT 时抛出。"""
 
 
 class NoteNotFoundError(Exception):
-    """Raised when the requested note file does not exist."""
+    """当笔记文件不存在时抛出。"""
 
 
 @dataclass
 class NoteContent:
-    """Container for rendered note content and metadata."""
+    """渲染后的笔记内容与元数据容器。"""
 
     repo: str
     slug: str
     meta: dict[str, Any]
     html: str
     source_path: Path
+    toc_tokens: str | None
 
 
 def normalize_repo_name(repo: str) -> str:
-    """Ensure repo name uses only [a-zA-Z0-9-_]; otherwise raise error."""
+    """校验 repo 名称，只允许 `[A-Za-z0-9_-]`，否则抛出异常。"""
 
     if not repo or not re.fullmatch(r"[A-Za-z0-9_-]+", repo):
         raise InvalidNotePathError("Invalid repo name")
@@ -44,25 +41,41 @@ def normalize_repo_name(repo: str) -> str:
 
 
 def _safe_join(base: Path, *parts: str) -> Path:
+    """在 base 下拼接路径，并确保最终结果仍位于 NOTES_ROOT 内。
+
+    说明：
+    - 这里的校验是为了防止通过 `..` 或软链接等方式进行路径穿越。
+    - 返回值保持为“候选路径”（可能尚不存在），方便调用方继续 exists() 判断。
+    """
+
     candidate = base.joinpath(*parts)
-    root = Path(settings.NOTES_ROOT).resolve()
+    notes_root = Path(settings.NOTES_ROOT).resolve()
     resolved = candidate.resolve(strict=False)
-    if not resolved.is_relative_to(root):
+    if not resolved.is_relative_to(notes_root):
         raise InvalidNotePathError("Path traversal detected")
     return candidate
 
 
 def resolve_note_markdown_path(repo: str, slug: str | None) -> Path:
-    """Resolve a repo/slug to a markdown file within NOTES_ROOT, with escape protection."""
+    """把 (repo, slug) 解析成 NOTES_ROOT 下的 markdown 文件路径。
+
+    路由约定：
+    - slug 为空：优先 `README.md`
+    - slug 为 `a/b`：优先 `a/b.md`，其次 `a/b/README.md`
+    - slug 允许带 `.md` 后缀（会自动去掉）
+    """
 
     safe_repo = normalize_repo_name(repo)
     base = Path(settings.NOTES_ROOT) / safe_repo
 
-    if not slug:
+    def _readme_or_raise() -> Path:
         candidate = _safe_join(base, "README.md")
         if candidate.exists():
             return candidate
         raise NoteNotFoundError("README not found")
+
+    if not slug:
+        return _readme_or_raise()
 
     slug_path = PurePosixPath(slug)
     if slug_path.is_absolute() or ".." in slug_path.parts:
@@ -70,126 +83,171 @@ def resolve_note_markdown_path(repo: str, slug: str | None) -> Path:
 
     normalized_slug = slug_path.as_posix().strip("/")
     if not normalized_slug:
-        candidate = _safe_join(base, "README.md")
-        if candidate.exists():
-            return candidate
-        raise NoteNotFoundError("README not found")
+        return _readme_or_raise()
 
-    # Allow incoming slugs that already include a .md suffix.
+    # 允许传入已带 `.md` 后缀的 slug（例如从 markdown 链接直接来）。
     if normalized_slug.lower().endswith(".md"):
         normalized_slug = normalized_slug[:-3]
 
-    primary = _safe_join(base, f"{normalized_slug}.md")
-    if primary.exists():
-        return primary
-
-    fallback = _safe_join(base, normalized_slug, "README.md")
-    if fallback.exists():
-        return fallback
+    candidates = (
+        _safe_join(base, f"{normalized_slug}.md"),
+        _safe_join(base, normalized_slug, "README.md"),
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
 
     raise NoteNotFoundError("Note file not found")
 
 
-class _RelativeURLRewriter(HTMLParser):
-    """HTML parser that rewrites relative href/src to the notes-files endpoint."""
+def rewrite_relative_urls(html: str, repo: str, current_dir: str = "") -> str:
+    """把 HTML 中的相对 href/src 改写为站内 URL（使用 bs4 + lxml）。
 
-    def __init__(self, repo: str):
-        super().__init__(convert_charrefs=True)
-        self.repo = repo
-        self._buf: List[str] = []
+    说明：
+    - 这里优先选择“更好懂/更少代码”，因此使用 BeautifulSoup 做 HTML 解析。
+    - 注意：bs4 在输出 HTML 时可能会重排属性顺序、统一引号、补全某些标签（这是正常现象）。
+    """
 
-    # Public API
-    @property
-    def html(self) -> str:
-        return "".join(self._buf)
+    current_dir_path = PurePosixPath(current_dir or ".")
 
-    # Core helpers
-    def _rewrite_url(self, url: str | None) -> str | None:
+    def is_external_url(url: str) -> bool:
+        lowered = url.lower()
+        if lowered.startswith(("http://", "https://", "//", "mailto:", "tel:", "data:", "javascript:")):
+            return True
+        return False
+
+    def resolve_relative_path(path: str) -> str:
+        """把相对 path 解析到 current_dir 下，并防止输出以 `..` 开头的穿越路径。"""
+
+        if not path:
+            return ""
+        joined = posixpath.join(current_dir_path.as_posix(), path)
+        normalized = posixpath.normpath(joined).lstrip("/")
+        if normalized in {".", ".."}:
+            return ""
+        while normalized.startswith("../"):
+            normalized = normalized[3:]
+        return normalized
+
+    def rewrite_url(url: str | None) -> str | None:
         if not url:
             return url
-        lowered = url.lower()
-        if lowered.startswith(("http://", "https://", "//", "mailto:", "tel:")):
+        if url.startswith(("#", "?")):
             return url
-        if url.startswith("/"):
+        if url.startswith("/") or is_external_url(url):
             return url
-        return f"/notes-files/{self.repo}/{url}"
 
-    def _format_attrs(self, attrs: List[Tuple[str, str | None]]) -> str:
-        formatted: List[str] = []
-        for key, value in attrs:
-            if key in {"href", "src"}:
-                value = self._rewrite_url(value)
-            if value is None:
-                formatted.append(f" {key}")
-            else:
-                formatted.append(f" {key}=\"{escape(value, quote=True)}\"")
-        return "".join(formatted)
+        split = urlsplit(url)
+        if split.scheme or split.netloc:
+            return url
+        if not split.path and (split.query or split.fragment):
+            return url
 
-    def _emit_start(self, tag: str, attrs: List[Tuple[str, str | None]], self_closing: bool) -> None:
-        attr_str = self._format_attrs(attrs)
-        closing = " />" if self_closing else ">"
-        self._buf.append(f"<{tag}{attr_str}{closing}")
+        resolved_path = resolve_relative_path(split.path or "")
+        suffix = PurePosixPath(resolved_path).suffix.lower()
+        first_segment = resolved_path.split("/", 1)[0] if resolved_path else ""
+        is_assets_path = first_segment == "assets"
 
-    # HTMLParser hooks
-    def handle_starttag(self, tag, attrs):
-        self._emit_start(tag, attrs, False)
+        # `.md` 或无后缀：当作“笔记页面跳转”（assets 目录例外）
+        if suffix in {".md", ""} and not is_assets_path:
+            slug_path = resolved_path
+            if slug_path.lower().endswith(".md"):
+                slug_path = slug_path[:-3]
+            slug_path = slug_path.strip("/")
+            base = f"/notes/{repo}/"
+            target = base if not slug_path else f"/notes/{repo}/{slug_path}/"
+        else:
+            target = f"/notes-files/{repo}/{resolved_path}"
 
-    def handle_startendtag(self, tag, attrs):
-        self._emit_start(tag, attrs, True)
+        return urlunsplit(("", "", target, split.query, split.fragment))
 
-    def handle_endtag(self, tag):
-        self._buf.append(f"</{tag}>")
+    # 延迟导入：避免在某些环境（例如未安装依赖的脚本工具）中仅 import 本模块就报错。
+    from bs4 import BeautifulSoup
 
-    def handle_data(self, data):
-        self._buf.append(data)
+    soup = BeautifulSoup(html, "lxml")
 
-    def handle_entityref(self, name):
-        self._buf.append(f"&{name};")
+    # markdown 渲染的通常是“片段”（没有 <html>/<body>），但 lxml 解析后会自动补齐；
+    # 为了保持调用方的预期，这里对片段只返回 body 内部内容。
+    html_lower = html.lower()
+    is_fragment = "<html" not in html_lower and "<body" not in html_lower
+    root = soup.body if (is_fragment and soup.body) else soup
 
-    def handle_charref(self, name):
-        self._buf.append(f"&#{name};")
+    for tag in root.find_all(href=True):
+        tag["href"] = rewrite_url(tag.get("href"))
+    for tag in root.find_all(src=True):
+        tag["src"] = rewrite_url(tag.get("src"))
 
-    def handle_comment(self, data):
-        self._buf.append(f"<!--{data}-->")
-
-
-def rewrite_relative_urls(html: str, repo: str) -> str:
-    """Rewrite relative href/src URLs to /notes-files/<repo>/... while leaving absolute URLs untouched."""
-
-    parser = _RelativeURLRewriter(repo)
-    parser.feed(html)
-    parser.close()
-    return parser.html
+    return root.decode_contents() if root is soup.body else str(root)
 
 
 def render_note_markdown(path: Path, repo: str, slug: str) -> NoteContent:
-    """Load markdown with front matter, render to HTML, and rewrite relative links."""
+    """读取 markdown（可选 front matter），渲染为 HTML，并改写相对链接。"""
 
-    meta: dict[str, Any] = {}
+    # current_dir 用于把相对链接（例如 `../img.png`）解析为正确的仓库内路径。
+    repo_base = Path(settings.NOTES_ROOT) / repo
     try:
-        post = frontmatter.load(path)
-        meta = dict(post.metadata)
-        content = post.content
+        current_dir = path.parent.relative_to(repo_base).as_posix()
+    except ValueError:
+        current_dir = ""
+    try:
+        content = path.read_text(encoding="utf-8")
     except Exception as exc:  # noqa: BLE001
-        with path.open("r", encoding="utf-8") as f:
-            content = f.read()
-        meta = {
-            "_parse_error": True,
-            "_parse_error_message": str(exc),
-        }
-        logger.warning("Front matter parse failed repo=%s slug=%s path=%s error=%s", repo, slug, path, exc)
-
-    md = markdown.Markdown(extensions=["fenced_code", "tables", "toc", "attr_list"])
-    html = md.convert(content)
-    html = rewrite_relative_urls(html, repo)
+        rendered_html = ""
+        meta = {"_parse_error": True, "_parse_error_message": str(exc)}
+        toc_html = None
+    else:
+        rendered = render_markdown_text(
+            content,
+            html_postprocessor=lambda html: rewrite_relative_urls(html, repo, current_dir=current_dir),
+        )
+        rendered_html = rendered.html
+        meta = rendered.meta
+        toc_html = rendered.toc
 
     return NoteContent(
         repo=repo,
         slug=slug,
         meta=meta,
-        html=html,
+        html=rendered_html,
         source_path=path,
+        toc_tokens=toc_html,
     )
+
+def check_note_permission(user, note_content: NoteContent | None) -> bool:
+    """笔记访问权限检查（按 repo 配置）。
+
+    规则：
+    - 找不到 NoteRepo 配置：默认允许（视图层通常已保证用户已登录）。
+    - `is_visible=False`：仅超级管理员可访问。
+    - `allowed_groups` 非空：用户必须属于其中任意一个组。
+    - `allowed_groups` 为空：默认允许。
+
+    注：LoginRequiredMixin / @login_required 通常会在调用前保证已认证。
+    """
+
+    from .models import NoteRepo
+
+    if note_content is None:
+        return True
+
+    try:
+        note_repo = NoteRepo.objects.filter(slug=note_content.repo).prefetch_related("allowed_groups").first()
+    except Exception as exc:  # noqa: BLE001
+        # 发生数据库/ORM 异常时，保守起见拒绝访问。
+        return False
+
+    if note_repo is None:
+        return True
+
+    if note_repo.is_visible is False and not getattr(user, "is_superuser", False):
+        return False
+
+    allowed = list(note_repo.allowed_groups.all())
+    if allowed:
+        user_groups = set(user.groups.all())
+        return any(g in user_groups for g in allowed)
+
+    return True
 
 
 __all__ = [
@@ -202,41 +260,3 @@ __all__ = [
     "rewrite_relative_urls",
     "check_note_permission",
 ]
-
-
-def check_note_permission(user, note_content: NoteContent | None) -> bool:
-    """Repo-aware permission check for notes access.
-
-    Rules:
-    - If no matching NoteRepo is found: allow authenticated users (log info).
-    - If NoteRepo.is_visible is False: deny unless user.is_superuser.
-    - If allowed_groups is non-empty: allow only when user is in any allowed group.
-    - If allowed_groups is empty: allow authenticated users.
-
-    LoginRequiredMixin/@login_required already ensure authentication before calling.
-    """
-
-    from .models import NoteRepo
-
-    if note_content is None:
-        return True
-
-    try:
-        note_repo = NoteRepo.objects.filter(slug=note_content.repo).prefetch_related("allowed_groups").first()
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Permission lookup failed for repo=%s error=%s", note_content.repo, exc)
-        return False
-
-    if note_repo is None:
-        logger.info("NoteRepo not registered, using default allow: repo=%s", note_content.repo)
-        return True
-
-    if note_repo.is_visible is False and not getattr(user, "is_superuser", False):
-        return False
-
-    allowed = list(note_repo.allowed_groups.all())
-    if allowed:
-        user_groups = set(user.groups.all())
-        return any(g in user_groups for g in allowed)
-
-    return True

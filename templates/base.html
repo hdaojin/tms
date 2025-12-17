@@ -3,6 +3,8 @@
 <html lang="zh-hans" data-theme="light">
   <head>
     {% include 'partials/head.html' %}
+    {% block extra_css %}{% endblock %}
+    {% block extra_head %}{% endblock %}
     {% htmx_script %}
   </head>
 
@@ -48,5 +50,6 @@
     {% endblock %}
 
     {% include 'partials/foot.html' %}
+    {% block extra_js %}{% endblock %}
   </body>
 </html>

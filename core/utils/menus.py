@@ -1,6 +1,7 @@
 # core/utils/menus.py
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable, List, Optional
@@ -14,6 +15,8 @@ from django.urls import NoReverseMatch, reverse
 
 # 缓存命名空间（版本化以便更新配置后强制刷新）
 CACHE_NS = "tms:menus:v3"
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -35,6 +38,8 @@ class MenuItem:
     active: bool = False
     expanded: bool = False
     target_blank: bool = False
+    superuser_required: bool = False
+    staff_required: bool = False
 
     @property
     def has_children(self) -> bool:
@@ -124,6 +129,7 @@ def _reverse_named_url(named_url: str) -> str:
     try:
         return reverse(named_url)
     except NoReverseMatch:
+        logger.warning("菜单链接反解失败，named_url=%s", named_url)
         return "#"
 
 
@@ -157,6 +163,8 @@ def _build_items(raw_items: Iterable[dict], menu_slug: Optional[str]) -> List[Me
             menu_slug=menu_slug,
             resolved_url=_resolve_url(raw),
             target_blank=raw.get("target_blank", False),
+            superuser_required=raw.get("superuser_required", False),
+            staff_required=raw.get("staff_required", False),
         )
         items.append(item)
     return items
@@ -188,8 +196,8 @@ def _check_perms(user, perms: list[str], match_all: bool) -> bool:
 
 
 def _login_required_effective(item: MenuItem) -> bool:
-    """login_required 或配置了 required_perms 均视为需要登录。"""
-    return bool(item.login_required or item.required_perms)
+    """login_required 或配置了 required_perms/superuser/staff 均视为需要登录。"""
+    return bool(item.login_required or item.required_perms or item.superuser_required or item.staff_required)
 
 
 def _filter_item(item: MenuItem, user) -> Optional[MenuItem]:
@@ -200,6 +208,12 @@ def _filter_item(item: MenuItem, user) -> Optional[MenuItem]:
 
     # （2）登录要求（自动推导 required_perms -> 必须登录）
     if _login_required_effective(item) and isinstance(user, AnonymousUser):
+        return None
+
+    # superuser / staff 限制
+    if item.superuser_required and not getattr(user, "is_superuser", False):
+        return None
+    if item.staff_required and not getattr(user, "is_staff", False):
         return None
 
     # 组过滤（保留旧字段兼容）
@@ -271,7 +285,7 @@ def get_layout_sections(key: str) -> List[str]:
         if isinstance(entry, str):
             sections.append(entry)
         elif isinstance(entry, dict) and "section" in entry:
-            sections.append(entry.get("section"))
+            sections.append(entry.get("section"))  # type: ignore
     return sections
 
 

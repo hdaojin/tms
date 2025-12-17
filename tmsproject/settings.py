@@ -28,11 +28,11 @@ environ.Env.read_env(env_file=BASE_DIR / '.env')
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # SECRET_KEY = 'django-insecure-ervt8@=%%#n1vmzhs)$5^x%#bfk+*lnre8e)n=c243)mihbi@^'
-SECRET_KEY = env('SECRET_KEY')
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-ervt8@=%%#n1vmzhs)$5^x%#bfk+*lnre8e)n=c243)mihbi@^') # type: ignore
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = True
-DEBUG = env.bool('DEBUG', default=False) # type: ignore
+DEBUG = env.bool('DEBUG', default=True) # type: ignore
 
 # ALLOWED_HOSTS = []
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1']) # type: ignore
@@ -193,9 +193,9 @@ LOGIN_REDIRECT_URL = '/accounts/home/'  # 登录成功后跳转的页面
 CACHE_TIMEOUT = env('CACHE_TIMEOUT', default=300) # type: ignore
 UPLOAD_MAX_SIZE_MB = 10
 
-# 私有文件根目录（请手动创建）：BASE_DIR/private-media
-PRIVATE_MEDIA_ROOT = BASE_DIR / "private-media"
-# 笔记根目录（请手动创建）：BASE_DIR/private-media/notes
+# 私有文件根目录（请手动创建）：BASE_DIR/media-private
+PRIVATE_MEDIA_ROOT = BASE_DIR / "media-private"
+# 笔记根目录（请手动创建）：BASE_DIR/media-private/notes
 NOTES_ROOT = PRIVATE_MEDIA_ROOT / "notes"
 
 TRAININGLOG_UPLOAD_DIR = "traininglogs"

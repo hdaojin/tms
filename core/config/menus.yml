@@ -52,6 +52,7 @@ sections:
     include:
       - "accounts"
       - "samba"
+      - "admin"
 
   - section: "notice"
     label: "通知"
@@ -80,3 +81,5 @@ sections:
       color: "warning"
     include:
       - "notes"
+
+
