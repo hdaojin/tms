@@ -6,13 +6,16 @@
 {% endblock %}
 
 {% block content %}
-  <div class="w-5xl max-w-none mx-auto text-base print:text-black p-6">
+  <button onclick="window.print()" class="fixed top-8 right-8 bg-blue-600 text-white px-4 py-2 rounded shadow print:hidden z-50">
+    打印
+  </button>
+  <div class="w-4xl max-w-none mx-auto text-base print:text-black p-6">
     <div class="flex items-center justify-between mb-4">
-      <img src="{% static 'images/gm-logo.png' %}" alt="GM Logo" class="h-10 w-auto" />
-      <img src="{% static 'images/world-skills-china.png' %}" alt="World Skills China" class="h-10 w-auto" />
+      <img src="{% static 'images/gm-logo.png' %}" alt="GM Logo" class="h-14 w-auto" />
+      <img src="{% static 'images/world-skills-china.png' %}" alt="World Skills China" class="h-20 w-auto" />
     </div>
 
-    <div class="text-center text-2xl font-semibold leading-snug mb-4">
+    <div class="text-center text-3xl font-semibold leading-snug mb-4">
       {% if print_meta.class %}
         <p>{{ print_meta.class }}</p>
       {% endif %}
@@ -24,27 +27,34 @@
       </p>
     </div>
 
-    <table class="table border border-neutral border-collapse w-full">
+    <table class="table table-lg border border-neutral border-collapse w-full">
       <tbody>
         <tr class="align-middle text-center whitespace-nowrap">
           <th class="border border-neutral px-3 py-2 w-28">日期</th>
-          <td class="border border-neutral px-3 py-2 text-left">{{ print_meta.updated_at|default_if_none:'' }}</td>
+          <td class="border border-neutral px-3 py-2 text-center">{{ print_meta.updated_at|default_if_none:'' }}</td>
           <th class="border border-neutral px-3 py-2 w-28">教练姓名</th>
-          <td class="border border-neutral px-3 py-2 text-left">{{ print_meta.author|default_if_none:'' }}</td>
+          <td class="border border-neutral px-3 py-2 text-center">{{ print_meta.author|default_if_none:'' }}</td>
         </tr>
         <tr class="align-middle text-center whitespace-nowrap">
           <th class="border border-neutral px-3 py-2 w-28">训练模块</th>
-          <td class="border border-neutral px-3 py-2 text-left">{{ print_meta.module|default_if_none:'' }}</td>
+          <td class="border border-neutral px-3 py-2 text-center">{{ print_meta.module|default_if_none:'' }}</td>
           <th class="border border-neutral px-3 py-2 w-28">训练任务</th>
-          <td class="border border-neutral px-3 py-2 text-left">{{ print_meta.task|default_if_none:'' }}</td>
+          <td class="border border-neutral px-3 py-2 text-center">{{ print_meta.task|default_if_none:'' }}</td>
         </tr>
         <tr>
           <th class="border border-neutral px-3 py-2 align-middle text-center w-28">训练目标</th>
           <td colspan="3" class="border border-neutral px-3 py-2 text-left">
             {% if print_meta.objectives %}
-              {% for obj in print_meta.objectives %}
-                {{ forloop.counter }}. {{ obj }}<br />
-              {% endfor %}
+              {% if print_meta.objectives.is_list %}
+                <!-- <ul class="list-decimal list-inside"> -->
+                <ul class="list-disc list-inside">
+                  {% for item in print_meta.objectives.items %}
+                    <li>{{ item|linebreaksbr|safe }}</li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                {{ print_meta.objectives.item|linebreaksbr|safe }}
+              {% endif %}
             {% endif %}
           </td>
         </tr>
@@ -52,43 +62,73 @@
           <th class="border border-neutral px-3 py-2 align-middle text-center w-28">训练内容</th>
           <td colspan="3" class="border border-neutral px-3 py-2 text-left">
             {% if print_meta.contents %}
-              {% for item in print_meta.contents %}
-                {{ forloop.counter }}. {{ item }}<br />
-              {% endfor %}
+              {% if print_meta.contents.is_list %}
+                <ul class="list-disc list-inside">
+                  {% for item in print_meta.contents.items %}
+                    <li>{{ item|linebreaksbr|safe }}</li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                {{ print_meta.contents.item|linebreaksbr|safe }}
+              {% endif %}
             {% endif %}
           </td>
         </tr>
         <tr>
           <th class="border border-neutral px-3 py-2 align-top text-center w-28">过程记录</th>
-          <td colspan="3" class="border border-neutral px-3 py-2 prose prose-sm max-w-none text-left">{{ html|safe }}</td>
+          <td colspan="3" class="border border-neutral px-4 py-4 prose prose-h1:text-3xl max-w-none text-left">{{ html|safe }}</td>
         </tr>
         <tr>
-          <th class="border border-neutral px-3 py-2 align-top text-center w-28">总结</th>
+          <th class="border border-neutral px-3 py-2 align-middle text-center w-28">总结</th>
           <td colspan="3" class="border border-neutral px-3 py-2 text-left space-y-2">
             <div>
               <p class="font-semibold mb-1">训练目标达成情况：</p>
               {% if print_meta.summary.objective_achievement %}
-                {% for line in print_meta.summary.objective_achievement %}
-                  <p>{{ forloop.counter }}. {{ line }}</p>
-                {% endfor %}
+                <div class="pl-6">
+                  {% if print_meta.summary.objective_achievement.is_list %}
+                    <ul class="list-disc list-inside">
+                      {% for item in print_meta.summary.objective_achievement.items %}
+                        <li>{{ item|linebreaksbr|safe }}</li>
+                      {% endfor %}
+                    </ul>
+                  {% else %}
+                    {{ print_meta.summary.objective_achievement.item|linebreaksbr|safe }}
+                  {% endif %}
+                </div>
               {% endif %}
             </div>
 
             <div>
               <p class="font-semibold mb-1">不足之处：</p>
               {% if print_meta.summary.shortcomings %}
-                {% for line in print_meta.summary.shortcomings %}
-                  <p>{{ forloop.counter }}. {{ line }}</p>
-                {% endfor %}
+                <div class="pl-6">
+                  {% if print_meta.summary.shortcomings.is_list %}
+                    <ul class="list-disc list-inside">
+                      {% for item in print_meta.summary.shortcomings.items %}
+                        <li>{{ item|linebreaksbr|safe }}</li>
+                      {% endfor %}
+                    </ul>
+                  {% else %}
+                    {{ print_meta.summary.shortcomings.item|linebreaksbr|safe }}
+                  {% endif %}
+                </div>
               {% endif %}
             </div>
 
             <div>
               <p class="font-semibold mb-1">改进方向：</p>
               {% if print_meta.summary.improvement_plan %}
-                {% for line in print_meta.summary.improvement_plan %}
-                  <p>{{ forloop.counter }}. {{ line }}</p>
-                {% endfor %}
+                <div class="pl-6">
+                  {% if print_meta.summary.improvement_plan.is_list %}
+                    <ul class="list-disc list-inside">
+                      {% for item in print_meta.summary.improvement_plan.items %}
+                        <li>{{ item|linebreaksbr|safe }}</li>
+                      {% endfor %}
+                    </ul>
+                  {% else %}
+                    {{ print_meta.summary.improvement_plan.item|linebreaksbr|safe }}
+                  {% endif %}
+                </div>
               {% endif %}
             </div>
           </td>

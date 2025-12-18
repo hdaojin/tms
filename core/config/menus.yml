@@ -31,7 +31,7 @@ sections:
     description: "日常训练管理"
     icon: 
       pic: "icon-[tabler--file-text]"
-      size: 6
+      size: 8
       color: "success"
     include:
       - "traininglogs"
@@ -41,7 +41,7 @@ sections:
     description: "会议记录"
     icon: 
       pic: "icon-[tabler--calendar]"
-      size: 6
+      size: 8
       color: "primary"
     include:
       - "meeting"
@@ -59,7 +59,7 @@ sections:
     description: "通知与待办事项"
     icon: 
       pic: "icon-[tabler--bell]"
-      size: 6
+      size: 8
       color: "info"      
     include:
       - "notices"
@@ -77,7 +77,7 @@ sections:
     description: "教学笔记"
     icon: 
       pic: "icon-[tabler--book]"
-      size: 6
+      size: 8
       color: "warning"
     include:
       - "notes"

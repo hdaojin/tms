@@ -17,7 +17,7 @@
           {% endif %}
         </p>
         <div class="card-actions">
-          <a href="{{ section.url }}" class="btn btn-sm {% if section.icon and section.icon.color %}btn-{{  section.icon.color }}{% else %}btn-primary{% endif %}" {% if item.target_blank %}target="_blank" rel="noopener"{% endif %}>查看</a>
+          <a href="{{ section.url }}" class="btn btn-sm {% if section.icon and section.icon.color %}{% if section.icon.color == 'primary' %}btn-primary{% elif section.icon.color == 'success' %}btn-success{% elif section.icon.color == 'warning' %}btn-warning{% elif section.icon.color == 'info' %}btn-info{% else %}btn-primary{% endif %}{% else %}btn-primary{% endif %}" {% if item.target_blank %}target="_blank" rel="noopener"{% endif %}>查看</a>
         </div>
       </div>
     </div>

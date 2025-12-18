@@ -240,13 +240,19 @@ def note_detail_view(
 def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
 	"""Render a print-friendly note page."""
 
-	def _as_lines(value: Any) -> list[str]:
+	def _as_lines(value: Any) -> dict[str, Any]:
 		if value is None:
-			return []
+			return {}
 		if isinstance(value, (list, tuple)):
-			return [str(v) for v in value if v is not None and str(v).strip()]
-		text = str(value).strip()
-		return [text] if text else []
+			return {
+					"is_list": True,
+					"items": [str(v) for v in value if v is not None and str(v).strip()]
+			}
+		else:
+			return {
+				"is_list": False,
+				"item": str(value).strip(),
+			}
 
 	try:
 		safe_repo = normalize_repo_name(repo)
@@ -264,7 +270,6 @@ def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
 		return HttpResponseForbidden()
 
 	meta = note.meta if isinstance(note.meta, dict) else {}
-	summary = meta.get("summary") if isinstance(meta.get("summary"), dict) else {}
 
 	print_meta = {
 		"class": meta.get("class"),
@@ -277,13 +282,9 @@ def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
 		"objectives": _as_lines(meta.get("objectives")),
 		"contents": _as_lines(meta.get("contents")),
 		"summary": {
-			"objective_achievement": _as_lines(
-				summary.get("Objective_achievement") or summary.get("objective_achievement")
-			),
-			"shortcomings": _as_lines(summary.get("Shortcomings") or summary.get("shortcomings")),
-			"improvement_plan": _as_lines(
-				summary.get("Improvement_plan") or summary.get("improvement_plan")
-			),
+			"objective_achievement": _as_lines(meta.get("summary", {}).get("objective_achievement")),
+			"shortcomings": _as_lines(meta.get("summary", {}).get("shortcomings")),
+			"improvement_plan": _as_lines(meta.get("summary", {}).get("improvement_plan")),
 		},
 	}
 
