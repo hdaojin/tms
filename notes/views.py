@@ -241,8 +241,11 @@ def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
 	"""Render a print-friendly note page."""
 
 	def _as_lines(value: Any) -> dict[str, Any]:
-		if value is None:
-			return {}
+		if not value:
+			return {
+				"is_list": False,
+				"item": "",
+			}
 		if isinstance(value, (list, tuple)):
 			return {
 					"is_list": True,
