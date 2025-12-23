@@ -250,6 +250,68 @@ def check_note_permission(user, note_content: NoteContent | None) -> bool:
     return True
 
 
+def get_nav_order_from_readme(repo_path: Path) -> list[dict[str, str]]:
+    """从 README.md 的 TOC 区域解析笔记导航顺序。"""
+    readme_path = repo_path / "README.md"
+    if not readme_path.exists():
+        return []
+
+    try:
+        content = readme_path.read_text(encoding="utf-8")
+    except Exception:
+        return []
+
+    lines = content.splitlines()
+
+    start_idx = -1
+    end_idx = -1
+    for i, line in enumerate(lines):
+        if "<!-- TOC_START -->" in line:
+            start_idx = i
+        elif "<!-- TOC_END -->" in line:
+            end_idx = i
+            break
+
+    if start_idx == -1 or end_idx == -1 or start_idx >= end_idx:
+        return []
+
+    toc_lines = lines[start_idx + 1 : end_idx]
+    toc_text = "\n".join(toc_lines)
+
+    # 提取 markdown 链接 [text](url)
+    matches = re.findall(r"\[([^\]]*)\]\(([^)]*)\)", toc_text)
+
+    nav_items = []
+    for text, link in matches:
+        # 去掉可能存在的 title 属性
+        url = link.split()[0]
+
+        # 去掉 anchor
+        if "#" in url:
+            url = url.split("#", 1)[0]
+
+        if not url:
+            continue
+
+        if url.lower().startswith(("http:", "https:", "ftp:", "mailto:", "//")):
+            continue
+
+        # Normalize
+        if url.lower().endswith(".md"):
+            url = url[:-3]
+
+        if url.startswith("./"):
+            url = url[2:]
+
+        slug = url.strip("/")
+        if slug.lower() == "readme":
+            slug = ""
+
+        nav_items.append({"slug": slug, "title": text.strip()})
+
+    return nav_items
+
+
 __all__ = [
     "InvalidNotePathError",
     "NoteNotFoundError",
@@ -259,4 +321,5 @@ __all__ = [
     "render_note_markdown",
     "rewrite_relative_urls",
     "check_note_permission",
+    "get_nav_order_from_readme",
 ]

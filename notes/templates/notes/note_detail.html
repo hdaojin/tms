@@ -2,8 +2,8 @@
 {% load static %}
 
 {% block left_sidebar %}
-  <aside class="hidden min-w-56 w-fit max-w-80 lg:block bg-base-200 border border-base-300 rounded-lg px-4 pt-8 space-y-2 sticky top-16 max-h-[calc(100vh-4rem)] overflow-y-auto print:hidden">
-    <div class="font-semibold text-base-content">{{ repo|title }}</div>
+  <aside class="hidden min-w-56 w-fit max-w-80 md:block bg-base-200 border border-base-300 rounded-lg px-4 pt-8 space-y-2 sticky top-16 max-h-[calc(100vh-4rem)] overflow-y-auto print:hidden">
+    <div class="font-semibold text-base-content">{{repo_title|default:repo|title }}</div>
     <div class="prose prose-sm max-w-none">
       {% if readme_toc_html %}
         {{ readme_toc_html|safe }}
@@ -20,20 +20,21 @@
       <div class="breadcrumbs text-sm text-base-content/80">
         <ul>
           <li>
-            <a href="/notes/">Notes</a>
+            <a href="/notes/">{{ notes_root_name|default:"Notes"|title }}</a>
           </li>
           <li>
-            <a href="/notes/{{ repo }}/">{{ repo|title }}</a>
+            <a href="/notes/{{ repo }}/">{{ repo_title|default:repo|title }}</a>
           </li>
-          {% if slug %}
+          <li></li>
+          {% comment %} {% if slug %}
             <li>
-              <a href="/notes/{{ repo }}/{{ slug }}/">{{ slug|title }}</a>
+              <a href="/notes/{{ repo }}/{{ slug }}/">{{ current_note_title|default:slug|title }}</a>
             </li>
           {% else %}
             <li>
-              <a href="/notes/{{ repo }}/">README</a>
+              <a href="/notes/{{ repo }}/">{{ current_note_title|default:"README" }}</a>
             </li>
-          {% endif %}
+          {% endif %} {% endcomment %}
         </ul>
       </div>
 
@@ -74,7 +75,7 @@
             <span class="text-lg">←</span>
             <span class="text-left">
               <span class="block text-xs text-base-content/60">上一条</span>
-              <span class="block text-base-content">{{ prev_note.slug }}</span>
+              <span class="block text-base-content">{{ prev_note.title }}</span>
             </span>
           </a>
         {% else %}
@@ -85,7 +86,7 @@
           <a class="btn btn-ghost btn-sm gap-2 ml-auto" href="{{ next_note.url }}">
             <span class="text-left">
               <span class="block text-xs text-base-content/60">下一条</span>
-              <span class="block text-base-content">{{ next_note.slug }}</span>
+              <span class="block text-base-content">{{ next_note.title }}</span>
             </span>
             <span class="text-lg">→</span>
           </a>
@@ -98,7 +99,7 @@
 {% endblock %}
 
 {% block right_sidebar %}
-  <aside class="min-w-56 w-fit max-w-80 hidden lg:block bg-base-200 border border-base-300 rounded-lg px-4 pt-8 space-y-2 sticky top-16 max-h-[calc(100vh-4rem)] overflow-y-auto print:hidden">
+  <aside class="min-w-56 w-fit max-w-80 hidden md:block bg-base-200 border border-base-300 rounded-lg px-4 pt-8 space-y-2 sticky top-16 max-h-[calc(100vh-4rem)] overflow-y-auto print:hidden">
     <div class="font-semibold text-base-content">本文大纲</div>
     <div class="prose prose-sm max-w-none">
       {% if toc_html %}

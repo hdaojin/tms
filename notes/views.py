@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import mimetypes
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import Any
 
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpResponseForbidden
@@ -26,6 +26,7 @@ from .utils import (
 	render_note_markdown,
 	resolve_note_markdown_path,
 	rewrite_relative_urls,
+	get_nav_order_from_readme,
 )
 
 logger = logging.getLogger(__name__)
@@ -140,13 +141,6 @@ def note_detail_view(
 			return ""
 		return cleaned
 
-	def _slug_from_relative(relative_path: str) -> str:
-		rel = PurePosixPath(relative_path)
-		if rel.name.lower() == "readme.md":
-			parent = rel.parent.as_posix()
-			return "" if parent == "." else parent
-		return rel.with_suffix("").as_posix()
-
 	def _build_note_url(slug_value: str) -> str:
 		slug_clean = slug_value.strip("/")
 		return f"/notes/{safe_repo}/" if not slug_clean else f"/notes/{safe_repo}/{slug_clean}/"
@@ -202,27 +196,52 @@ def note_detail_view(
 	parse_error = bool(note.meta.get("_parse_error")) if isinstance(note.meta, dict) else False
 
 	base_dir = Path(settings.NOTES_ROOT) / safe_repo
-	note_files = sorted(base_dir.rglob("*.md"))
-	nav_slugs = [_slug_from_relative(p.relative_to(base_dir).as_posix()) for p in note_files]
+	nav_items = get_nav_order_from_readme(base_dir)
+
+	# Ensure README is always the first item, and avoid duplicates if it's also in TOC
+	full_nav_items = [{"slug": "", "title": "README"}] + [item for item in nav_items if item["slug"] != ""]
+
 	current_slug = _normalize_slug_for_nav(slug)
 	prev_note = next_note = None
-	if current_slug in nav_slugs:
-		idx = nav_slugs.index(current_slug)
-		if idx > 0:
-			prev_slug = nav_slugs[idx - 1]
-			prev_note = {"slug": prev_slug or "README", "url": _build_note_url(prev_slug)}
-		if idx + 1 < len(nav_slugs):
-			next_slug = nav_slugs[idx + 1]
-			next_note = {"slug": next_slug or "README", "url": _build_note_url(next_slug)}
+	current_note_title = slug if slug else "README"
+
+	current_idx = -1
+	for idx, item in enumerate(full_nav_items):
+		if item["slug"] == current_slug:
+			current_idx = idx
+			current_note_title = item["title"]
+			break
+
+	if current_idx != -1:
+		if current_idx > 0:
+			prev_item = full_nav_items[current_idx - 1]
+			prev_note = {"title": prev_item["title"], "url": _build_note_url(prev_item["slug"])}
+		if current_idx + 1 < len(full_nav_items):
+			next_item = full_nav_items[current_idx + 1]
+			next_note = {"title": next_item["title"], "url": _build_note_url(next_item["slug"])}
 
 	# markdown2 already provides HTML toc (<ul>...), pass through directly.
 	toc_html = note.toc_tokens
 	readme_toc_html = _read_readme_nav(base_dir)
 
+	# Get repo title and notes root name for breadcrumbs
+	repo_title = repo
+	try:
+		repo_obj = NoteRepo.objects.filter(slug=safe_repo).first()
+		if repo_obj and repo_obj.title:
+			repo_title = repo_obj.title
+	except Exception:
+		pass
+	
+	notes_root_name = Path(settings.NOTES_ROOT).name
+
 	context = {
 		"note": note,
 		"meta": note.meta,
 		"repo": note.repo,
+		"repo_title": repo_title,
+		"notes_root_name": notes_root_name,
+		"current_note_title": current_note_title,
 		"slug": note.slug,
 		"meta_parse_error": parse_error,
 		"meta_parse_error_message": note.meta.get("_parse_error_message") if isinstance(note.meta, dict) else None,
