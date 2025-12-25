@@ -25,16 +25,15 @@
           <li>
             <a href="/notes/{{ repo }}/">{{ repo_title|default:repo|title }}</a>
           </li>
-          <li></li>
-          {% comment %} {% if slug %}
+          {% if slug %}
             <li>
-              <a href="/notes/{{ repo }}/{{ slug }}/">{{ current_note_title|default:slug|title }}</a>
+              <a href="/notes/{{ repo }}/{{ slug }}/">{{ current_note_title|default:slug|title|truncatechars:20 }}</a>
             </li>
           {% else %}
             <li>
-              <a href="/notes/{{ repo }}/">{{ current_note_title|default:"README" }}</a>
+              <a href="/notes/{{ repo }}/">{{ current_note_title|truncatechars:20|default:"README" }}</a>
             </li>
-          {% endif %} {% endcomment %}
+          {% endif %}
         </ul>
       </div>
 
@@ -75,7 +74,7 @@
             <span class="text-lg">←</span>
             <span class="text-left">
               <span class="block text-xs text-base-content/60">上一条</span>
-              <span class="block text-base-content">{{ prev_note.title }}</span>
+              <span class="block text-base-content">{{ prev_note.title|truncatechars:20 }}</span>
             </span>
           </a>
         {% else %}
@@ -86,7 +85,7 @@
           <a class="btn btn-ghost btn-sm gap-2 ml-auto" href="{{ next_note.url }}">
             <span class="text-left">
               <span class="block text-xs text-base-content/60">下一条</span>
-              <span class="block text-base-content">{{ next_note.title }}</span>
+              <span class="block text-base-content">{{ next_note.title|truncatechars:20 }}</span>
             </span>
             <span class="text-lg">→</span>
           </a>

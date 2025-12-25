@@ -70,7 +70,9 @@ def _resolve_section_slug_for_request(request):
 @register.inclusion_tag("core/partials/sidebar_menu.html", takes_context=True)
 def render_section_menu(context, section_slug: str):
     """根据主菜单节点（section）渲染侧边栏。"""
-    request = context["request"]
+    request = context.get("request")
+    if not request:
+        return {"items": []}
     items = get_section_menu(section_slug, request.user, request=request)
     return {"items": items}
 
@@ -78,7 +80,9 @@ def render_section_menu(context, section_slug: str):
 @register.inclusion_tag("core/partials/sidebar_menu.html", takes_context=True)
 def render_section_menu_auto(context):
     """自动根据当前 app 判断所属 section 并渲染侧边栏。"""
-    request = context["request"]
+    request = context.get("request")
+    if not request:
+        return {"items": []}
     section_slug = _resolve_section_slug_for_request(request)
     items = get_section_menu(section_slug, request.user, request=request) if section_slug else []
     return {"items": items}
@@ -90,7 +94,9 @@ def render_menu(context, menu_slug: str):
     如有需要，可以直接按 menu_slug 渲染单个菜单片段。
     例如：{% render_menu "accounts" %}
     """
-    request = context["request"]
+    request = context.get("request")
+    if not request:
+        return {"items": []}
     items = get_menu_by_slug(menu_slug, request.user)
     return {"items": items}
 
@@ -111,7 +117,9 @@ def _filter_sections(slug_string: str | None, default_key: str | None = None) ->
 @register.inclusion_tag("core/partials/sections_nav.html", takes_context=True)
 def render_sections_nav(context, slugs: str | None = None):
     """顶部导航：可按逗号分隔指定，或从 layout.yml.header_sections 读取。"""
-    request = context["request"]
+    request = context.get("request")
+    if not request:
+        return {"sections": []}
     user = request.user
     sections = []
     for section in _filter_sections(slugs, default_key="header_menu"):
@@ -138,7 +146,9 @@ def render_sections_nav(context, slugs: str | None = None):
 @register.inclusion_tag("core/partials/sections_cards.html", takes_context=True)
 def render_sections_cards(context, slugs: str | None = None):
     """账户首页卡片：可按逗号分隔指定，或从 layout.yml.account_home_sections 读取。"""
-    request = context["request"]
+    request = context.get("request")
+    if not request:
+        return {"sections": []}
     user = request.user
     sections = []
     for section in _filter_sections(slugs, default_key="dashboard_home"):
