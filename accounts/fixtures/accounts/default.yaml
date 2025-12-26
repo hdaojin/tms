@@ -6,7 +6,7 @@
     name: "教练"
     permissions:
       - ["add_traininglog", "traininglogs", "traininglog"]
-      - ["view_coach_traininglog", "traininglogs", "traininglog"]
+      # - ["view_coach_traininglog", "traininglogs", "traininglog"]
       - ["view_competitor_traininglog", "traininglogs", "traininglog"]
 
 - model: accounts.groupprofile
@@ -36,6 +36,7 @@
     name: "班务"
     permissions:
       - ["add_notice", "notices", "notice"]
+      - ["add_meeting", "meeting", "meeting"]
 
 - model: accounts.groupprofile
   pk: 3

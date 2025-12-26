@@ -6,6 +6,14 @@ Training Management System (TMS) is a web application that helps organizations m
 
 It is built using Django, Tailwind CSS, DaisyUI, ~~FlyonUI~~, iconify, HTMX, and more.
 
+## Requirements
+
+- Python 3.13+
+- Django 6.0+
+- Tailwind CSS 4.0+
+- DaisyUI 5.0+
+- django-htmx 1.27+
+
 ## Features
 
 - User management and profile
@@ -36,8 +44,6 @@ git clone  git@github.com:hdaojin/tms.git
 cd tms
 uv sync
 npm install
-# Optional: Copy latest JavaScript file to static/js
-# cp node_modules/htmx.org/dist/htmx.min.js static/js
 ```
 
 ### Migrate database
