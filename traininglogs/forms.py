@@ -27,6 +27,7 @@ class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['module'].label_from_instance = lambda obj: f"{obj.code} - {obj.name}" #type: ignore
         # 如果需要，可以在这里添加自定义初始化逻辑
         # 例如，动态设置某些字段的选项或初始值
         # 设置默认日期为今天（每次实例化时动态设置）

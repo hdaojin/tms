@@ -67,3 +67,13 @@
     description: "English communication skills for IT professionals."
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
+
+- model: competitions.module
+  pk: 6
+  fields:
+    project: 1
+    code: "O"
+    name: "Other"
+    description: "Other relevant skills and knowledge."
+    created_at: "2025-01-01T00:00:00Z"
+    updated_at: "2025-01-01T00:00:00Z"
