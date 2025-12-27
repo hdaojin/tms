@@ -7,7 +7,7 @@ from django.middleware.csrf import get_token
 
 class BaseTable(tables.Table):
     class Meta:
-        template_name = "django_tables2/table.html"
+        template_name = "django-tables2/table.html"
         empty_text = "暂无数据"
         row_attrs = { "class": "hover:bg-base-300" }
         attrs = {

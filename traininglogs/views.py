@@ -16,6 +16,9 @@ from core.utils.pdf_response import pdf_inline_response
 from .tables import TrainingLogTable, TrainingLogOthersTable, MonthlyStatTable
 
 
+pagination_per_page = 18
+
+
 # 训练日志上传视图
 class TrainingLogUploadView(PermissionRequiredMixin, CreateView):
     model = TrainingLog
@@ -40,7 +43,8 @@ class TraininglogListView(LoginRequiredMixin, SingleTableView):
     model = TrainingLog
     table_class = TrainingLogTable
     template_name = "traininglogs/traininglog_list.html"
-    table_pagination = {"per_page": 31}  # 每页显示31条记录
+    # table_pagination = {"per_page": 10}  # 每页显示31条记录
+    paginate_by = pagination_per_page
     extra_context = {
         "title": "我的训练日志",
         "title_icon": "icon-[tabler--file-stack]",
@@ -156,7 +160,8 @@ class CoachTraininglogListView(
     template_name = "traininglogs/traininglog_list.html"
     permission_required = "traininglogs.view_coach_traininglog"
     raise_exception = True
-    table_pagination = {"per_page": 31}
+    # table_pagination = {"per_page": 31}
+    paginate_by = pagination_per_page
     extra_context = {
         "title": "教练训练日志",
         "title_icon": "icon-[tabler--file-search]",
@@ -180,7 +185,8 @@ class CompetitorTraininglogListView(
     template_name = "traininglogs/traininglog_list.html"
     permission_required = "traininglogs.view_competitor_traininglog"
     raise_exception = True
-    table_pagination = {"per_page": 31}
+    # table_pagination = {"per_page": 10}
+    paginate_by = pagination_per_page
     extra_context = {
         "title": "选手训练日志",
         "title_icon": "icon-[tabler--file-search]",
