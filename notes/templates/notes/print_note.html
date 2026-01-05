@@ -145,6 +145,15 @@
 {% block extra_css %}
   <!-- Prism.js styles (place actual static path as needed) -->
   <link rel="stylesheet" href="{% static 'css/prism.css' %}" />
+  <style>
+    /* Force code wrapping for print */
+    pre[class*="language-"], code[class*="language-"], .prose pre, .prose code {
+      text-shadow: none !important;
+      white-space: pre-wrap !important;
+      word-break: break-word !important;
+      overflow-x: hidden !important;
+    }
+  </style>
 {% endblock %}
 
 {% block extra_js %}
