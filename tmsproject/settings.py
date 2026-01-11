@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'samba',
     'articles',
     'competitions',
+    'assessment',
     'notes',
     # 'skills',
     'traininglogs',
@@ -190,21 +191,30 @@ LOGIN_REDIRECT_URL = '/accounts/home/'  # 登录成功后跳转的页面
 # FORM_RENDERER = 'tmsproject.settings.CustomFormRenderer'
 
 # 自定义变量
+INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=24*60*60) # type: ignore
 CACHE_TIMEOUT = env('CACHE_TIMEOUT', default=300) # type: ignore
-UPLOAD_MAX_SIZE_MB = 10
+UPLOAD_MAX_SIZE_MB = 100  # 默认上传文件最大尺寸，单位MB
 
+# 私有文件上传目录是通过Django处理的，可以控制权限。
 # 私有文件根目录（请手动创建）：BASE_DIR/media-private
 PRIVATE_MEDIA_ROOT = BASE_DIR / "media-private"
+
 # 笔记根目录（请手动创建）：BASE_DIR/media-private/notes
 NOTES_ROOT = PRIVATE_MEDIA_ROOT / "notes"
 
+# 考核相关文件上传目录：BASE_DIR/media-private/assessment
+ASSESSMENT_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "assessment"
+ASSESSMENT_ALLOWED_EXTENSIONS = ['xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'zip', '7z', 'gz', 'bz2', 'rar']
+
+
+# 公共文件上传目录是通过Web服务器静态文件功能直接提供服务的，无法控制权限。
+# 训练日志根目录：BASE_DIR/media/traininglogs
 TRAININGLOG_UPLOAD_DIR = "traininglogs"
 TRAININGLOG_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf']
 
 MEETING_UPLOAD_DIR = "meetings"
 NOTICE_UPLOAD_DIR = "notices"
 
-INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=24*60*60) # type: ignore
 
 
 

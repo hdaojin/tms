@@ -5,6 +5,7 @@ layouts:
     - home
     - notice
     - training
+    - assessment
     - meeting
     - about
   dashboard_home:
@@ -12,6 +13,7 @@ layouts:
     - "meeting"
     - "training"
     - "notes"
+    - "assessment"
   # - resource
   # - asset
   # - article
@@ -35,6 +37,16 @@ sections:
       color: "success"
     include:
       - "traininglogs"
+
+  - section: "assessment"
+    label: "考核"
+    description: "考核与成绩管理"
+    icon: 
+      pic: "icon-[tabler--wallpaper]"
+      size: 8
+      color: "error"
+    include:
+      - "assessment"
 
   - section: "meeting"
     label: "会议"
