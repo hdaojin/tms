@@ -2,6 +2,10 @@
 {% load static %}
 {% block title %}考核详情 - {{ assessment.name }}{% endblock %}
 
+{% block extra_head %}
+<script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+{% endblock %}
+
 {% block content %}
 <div class="container mx-auto p-4 space-y-6">
     {# 面包屑 #}
@@ -45,6 +49,7 @@
                 </th>
               {% endfor %}
               <th class="font-bold bg-primary/10">总分</th>
+              <th class="w-16 bg-base-200 font-bold text-center">排名</th>
             </tr>
           </thead>
           <tbody>
@@ -74,6 +79,22 @@
                 </td>
               {% endfor %}
               <td class="font-bold font-mono bg-primary/5 text-primary">{{ row.total }}</td>
+              <td class="font-bold text-center">
+                  {% if row.rank <= 3 %}
+                      <div class="flex items-center justify-center gap-1">
+                        {% if row.rank == 1 %}
+                            <span class="iconify text-2xl" data-icon="emojione:1st-place-medal"></span>
+                        {% elif row.rank == 2 %}
+                            <span class="iconify text-2xl" data-icon="emojione:2nd-place-medal"></span>
+                        {% elif row.rank == 3 %}
+                            <span class="iconify text-2xl" data-icon="emojione:3rd-place-medal"></span>
+                        {% endif %}
+                        <span class="text-lg">{{ row.rank }}</span>
+                      </div>
+                  {% else %}
+                      {{ row.rank }}
+                  {% endif %}
+              </td>
             </tr>
             {% endfor %}
           </tbody>

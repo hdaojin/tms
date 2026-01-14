@@ -57,7 +57,63 @@ def assessment_list(request):
             upcoming_assessments.append(assessment)
         else:
             current_assessments.append(assessment)
+    
+    # 为历史考核计算总分和排名（仅限普通用户视图，或管理员查看自己成绩时）
+    if not can_view_all:
+        from django.db.models import Sum
+        
+        for assessment in past_assessments:
+            # 1. 计算个人总分（排除 English）
+            my_total = 0
+            if hasattr(assessment, 'user_modules_info'):
+                for am in assessment.user_modules_info:
+                    # 排除包含 "English" 的模块 (大小写不敏感)
+                    if 'english' not in am.module.name.lower():
+                        if am.user_score:
+                             my_total += am.user_score[0].score
+            assessment.my_total_score = my_total
             
+            # 2. 计算排名
+            # 聚合该次考核所有参与者的总分（排除 English）
+            # 获取该考核下排除 English 的 AssessmentModule ID 列表
+            valid_am_ids = assessment.assessmentmodule_set.exclude(
+                module__name__icontains='English'
+            ).values_list('id', flat=True)
+            
+            # 按用户分组求和
+            # 注意: 只有有成绩记录的用户才会出现在这里。没成绩的默认不算或 0。
+            rank_data = Score.objects.filter(
+                assessment_module_id__in=valid_am_ids
+            ).values('user').annotate(
+                total=Sum('score')
+            ).order_by('-total')
+            
+            # 查找当前用户的排名
+            # 处理同分情况：简单处理，按分数列表的 index + 1
+            # 例如：[100, 90, 90, 80]，用户分数为 90。
+            # 遍历列表找到第一个匹配的分数 (或者直接找 user id)
+            
+            my_rank = '-'
+            # 提取所有总分列表 (排好序的)
+            scores_list = [d['total'] for d in rank_data]
+            
+            try:
+                # 这种方式处理并列排名：100(1), 90(2), 90(2), 80(4) -> index+1
+                # 只要 my_total 在列表中，index 就会返回第一个匹配项的索引
+                if my_total in scores_list:
+                    my_rank = scores_list.index(my_total) + 1
+                else:
+                    # 可能用户虽然是参与者，但没有任何 Score 记录 (总分为0且不在 rank_data 中)
+                    # 如果 my_total 是 0，且 scores_list 包含 0 ? 
+                    # 如果用户完全没成绩记录，Score表中没数据，sum 也不会出来。
+                    # 此时 rank 不显示或显示为最后？
+                    # 简单起见，如果没数据，显示 '-'
+                    pass
+            except ValueError:
+                pass
+                
+            assessment.my_rank = my_rank
+
     context = {
         'can_view_all': can_view_all,
         'current_assessments': current_assessments,
@@ -108,20 +164,37 @@ def assessment_detail(request, pk):
              'scores': []
          }
          total_score = 0
+         rank_score = 0 # English 不计入总分用于排名
+         
          for am in modules: # 注意这里的 modules 其实是 AssessmentModule 列表
              # 我们用 AssessmentModule 的 id 来匹配 Score 中的 assessment_module_id
              score_obj = score_map.get((participant.id, am.id))
              
+             val = score_obj.score if score_obj else 0
              row['scores'].append({
                  'module_id': am.id,
-                 'val': score_obj.score if score_obj else 0, # 或者 '-'
+                 'val': val,
                  'obj': score_obj
              })
              if score_obj:
-                 total_score += score_obj.score
+                 total_score += val
+                 # 排除 English
+                 if 'english' not in am.module.name.lower():
+                     rank_score += val
          
          row['total'] = total_score
+         row['rank_score'] = rank_score
          table_rows.append(row)
+
+    # 排序：按 rank_score 降序
+    table_rows.sort(key=lambda x: x['rank_score'], reverse=True)
+
+    # 计算排名
+    current_rank = 1
+    for i, row in enumerate(table_rows):
+        if i > 0 and row['rank_score'] < table_rows[i-1]['rank_score']:
+            current_rank = i + 1
+        row['rank'] = current_rank
 
     context = {
         'assessment': assessment,

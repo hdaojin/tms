@@ -56,6 +56,9 @@ class Assessment(models.Model):
         verbose_name = "考核"
         verbose_name_plural = "考核"
         ordering = ["-start_date", "name"]
+        permissions = [
+            ("view_all_scores", "可以查看所有人的考核成绩"),
+        ]
 
     def __str__(self):
         return self.name
