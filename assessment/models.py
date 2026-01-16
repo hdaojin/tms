@@ -15,7 +15,7 @@ def validate_file_size(value):
         raise ValidationError(f"文件大小不能超过 {settings.UPLOAD_MAX_SIZE_MB}MB")
 
 def assessment_paper_path(instance, filename):
-    date_path = instance.start_date.strftime('%Y/%m') if instance.start_date else '0000/00'
+    date_path = instance.assessment.start_date.strftime('%Y/%m') if instance.assessment.start_date else '0000/00'
     return f"papers/{date_path}/{filename}"
 
 class Assessment(models.Model):
@@ -23,17 +23,6 @@ class Assessment(models.Model):
     start_date = models.DateField("开始日期", help_text="考核开始的日期")
     end_date = models.DateField("结束日期", help_text="考核结束的日期")
     description = models.TextField("描述", blank=True)
-    paper_file = models.FileField(
-        "试卷及评分文件",
-        storage=assessment_storage,
-        upload_to=assessment_paper_path,
-        blank=True,
-        validators=[
-            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
-            validate_file_size
-        ],
-        help_text=f"请上传文件，支持 {', '.join(settings.ASSESSMENT_ALLOWED_EXTENSIONS)}，大小不超过 {settings.UPLOAD_MAX_SIZE_MB}MB"
-    )
     modules = models.ManyToManyField(
         Module,
         through='AssessmentModule',
@@ -81,6 +70,17 @@ class AssessmentModule(models.Model):
         default=Decimal("25.00"),
         validators=[MinValueValidator(Decimal("0.00"))],
         help_text="该模块在本次考核中的满分值"
+    )
+    paper_file = models.FileField(
+        "试卷及评分文件",
+        storage=assessment_storage,
+        upload_to=assessment_paper_path,
+        blank=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            validate_file_size
+        ],
+        help_text=f"请上传文件，支持 {', '.join(settings.ASSESSMENT_ALLOWED_EXTENSIONS)}，大小不超过 {settings.UPLOAD_MAX_SIZE_MB}MB"
     )
 
     class Meta:

@@ -1,109 +1,102 @@
-{% extends 'base.html' %}
-{% load static %}
-{% block title %}考核详情 - {{ assessment.name }}{% endblock %}
-
-{% block extra_head %}
-<script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
-{% endblock %}
+{% extends 'base_no_right_sidebar.html' %}
 
 {% block content %}
-<div class="container mx-auto p-4 space-y-6">
-    {# 面包屑 #}
-    <div class="text-sm breadcrumbs">
-      <ul>
-        <li><a href="{% url 'assessment:list' %}">考核看板</a></li>
-        <li>{{ assessment.name }}</li>
-      </ul>
+  <div class="flex justify-between items-center">
+    <div>
+      <p class="text-gray-500 mt-1">{{ assessment.start_date }} ~ {{ assessment.end_date }} · 共 {{ table_rows|length }} 位参考人员 ·
+        {{ modules|length }} 个考核模块</p>
     </div>
-
-    <div class="flex justify-between items-center">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-800">{{ assessment.name }} - 成绩总表</h1>
-            <p class="text-gray-500 mt-1">
-                {{ assessment.start_date }} ~ {{ assessment.end_date }} · 
-                共 {{ table_rows|length }} 位参考人员 · 
-                {{ modules|length }} 个考核模块
-            </p>
-        </div>
-        <div>
-            <button onclick="window.print()" class="btn btn-ghost btn-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                打印 / 导出
-            </button>
-        </div>
+    <div class="print:hidden">
+      <button onclick="window.print()" class="btn btn-ghost btn-sm">
+       <span class="icon-[tabler--printer] size-5"></span> 打印 / 导出
+      </button>
     </div>
+  </div>
 
-    <div class="card bg-base-100 shadow-xl overflow-hidden">
-      <div class="overflow-x-auto">
-        <table class="table table-zebra w-full text-center">
-          <thead>
-            <tr class="bg-base-200">
-              <th class="w-16 sticky left-0 z-10 bg-base-200">#</th>
-              <th class="text-left min-w-[120px] sticky left-16 z-10 bg-base-200">姓名</th>
-              {% for am in modules %}
-                <th class="min-w-[100px]">
-                    <div class="flex flex-col">
-                        <span>{{ am.module.code }}</span>
-                        <span class="text-xs font-normal opacity-70">满分: {{ am.max_score }}</span>
-                    </div>
-                </th>
-              {% endfor %}
-              <th class="font-bold bg-primary/10">总分</th>
-              <th class="w-16 bg-base-200 font-bold text-center">排名</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in table_rows %}
+
+  
+
+
+  <div class="card bg-base-100 shadow-xl overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="table table-zebra w-full text-center">
+        <thead>
+          <tr class="bg-base-200">
+            <th class="w-16 sticky left-0 z-10">#</th>
+            <th class="text-left sticky left-16 z-10">姓名</th>
+            {% for am in modules %}
+              <th class="min-w-24">
+                <a class="flex flex-col hover:bg-base-300 rounded p-1 transition-colors" href="?sort=module_{{ am.id }}&dir={% if request.GET.sort == 'module_'|add:am.id|stringformat:'s' and request.GET.dir == 'desc' %}asc{% else %}desc{% endif %}">
+                  <span>{{ am.module.code }} - {{ am.module.name }}</span>
+                  <span class="text-xs font-normal opacity-70">满分: {{ am.max_score }}</span>
+                  {% if request.GET.sort == 'module_'|add:am.id|stringformat:'s' %}
+                    <span class="text-xs opacity-50">
+                      {% if request.GET.dir == 'asc' %}▲{% else %}▼{% endif %}
+                    </span>
+                  {% endif %}
+                </a>
+              </th>
+            {% endfor %}
+            <th class="font-bold bg-primary/10 cursor-pointer" onclick="window.location.href='?sort=total&dir={% if request.GET.sort == 'total' and request.GET.dir == 'desc' %}asc{% else %}desc{% endif %}'">
+              总分
+              {% if request.GET.sort == 'total' or not request.GET.sort %}
+                 <span class="text-xs opacity-50">
+                   {% if request.GET.dir == 'asc' %}▲{% else %}▼{% endif %}
+                 </span>
+              {% endif %}
+            </th>
+            <th class="w-16 bg-base-200 font-bold text-center">排名</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in table_rows %}
             <tr class="hover">
               <td class="sticky left-0 bg-base-100">{{ forloop.counter }}</td>
               <td class="text-left font-medium sticky left-16 bg-base-100">
-                  <div class="flex items-center gap-2">
-                       <div class="avatar placeholder">
-                          <div class="bg-neutral-focus text-neutral-content rounded-full w-8">
-                            <span class="text-xs">{{ row.user.first_name|make_list|first|default:row.user.username|make_list|first|upper }}</span>
-                          </div>
-                        </div> 
-                        <div>
-                         <div class="font-bold">{{ row.user.first_name|default:row.user.username }}</div>
-                         <div class="text-xs opacity-50">{{ row.user.username }}</div>
-                        </div>
+                <div class="flex items-center gap-2">
+                  <div class="avatar placeholder">
+                    <div class="bg-neutral-focus text-neutral-content rounded-full w-8">
+                      <span class="text-xs">{{ row.user.first_name|make_list|first|default:row.user.username|make_list|first|upper }}</span>
+                    </div>
                   </div>
+                  <div>
+                    <div class="font-bold">{{ row.user.first_name|default:row.user.username }}</div>
+                    <div class="text-xs opacity-50">{{ row.user.username }}</div>
+                  </div>
+                </div>
               </td>
               {% for cell in row.scores %}
                 <td>
-                    {% if cell.obj %}
-                         <span class="font-mono">{{ cell.val }}</span>
-                    {% else %}
-                        <span class="text-gray-300">-</span>
-                    {% endif %}
+                  {% if cell.obj %}
+                    <span class="font-mono">{{ cell.val }}</span>
+                  {% else %}
+                    <span class="text-gray-300">-</span>
+                  {% endif %}
                 </td>
               {% endfor %}
               <td class="font-bold font-mono bg-primary/5 text-primary">{{ row.total }}</td>
               <td class="font-bold text-center">
-                  {% if row.rank <= 3 %}
-                      <div class="flex items-center justify-center gap-1">
-                        {% if row.rank == 1 %}
-                            <span class="iconify text-2xl" data-icon="emojione:1st-place-medal"></span>
-                        {% elif row.rank == 2 %}
-                            <span class="iconify text-2xl" data-icon="emojione:2nd-place-medal"></span>
-                        {% elif row.rank == 3 %}
-                            <span class="iconify text-2xl" data-icon="emojione:3rd-place-medal"></span>
-                        {% endif %}
-                        <span class="text-lg">{{ row.rank }}</span>
-                      </div>
-                  {% else %}
-                      {{ row.rank }}
-                  {% endif %}
+                {% if row.rank <= 3 %}
+                  <div class="flex items-center justify-center gap-1">
+                    {% if row.rank == 1 %}
+                      <span class="iconify text-2xl" data-icon="emojione:1st-place-medal"></span>
+                    {% elif row.rank == 2 %}
+                      <span class="iconify text-2xl" data-icon="emojione:2nd-place-medal"></span>
+                    {% elif row.rank == 3 %}
+                      <span class="iconify text-2xl" data-icon="emojione:3rd-place-medal"></span>
+                    {% endif %}
+                    <span class="text-lg">{{ row.rank }}</span>
+                  </div>
+                {% else %}
+                  {{ row.rank }}
+                {% endif %}
               </td>
             </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-    
-    <div class="text-xs text-gray-400 text-center mt-8">
-        Designed for TMS Assessment System
-    </div>
-</div>
+  </div>
+
+  <div class="text-xs text-gray-400 text-center mt-8">Designed for TMS Assessment System</div>
 {% endblock %}

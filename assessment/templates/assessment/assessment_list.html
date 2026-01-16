@@ -1,159 +1,128 @@
-{% extends 'base.html' %}
-{% block title %}考核成绩 - TMS{% endblock %}
-
-{% block extra_head %}
-<script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
-{% endblock %}
+{% extends 'base_no_right_sidebar.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container mx-auto p-4 space-y-8">
-  <div class="flex justify-between items-center border-b pb-4">
-    <h1 class="text-3xl font-bold text-gray-800">考核成绩面板</h1>
-    {% if can_view_all %}
-    <span class="badge badge-primary badge-lg">管理员视角</span>
-    {% endif %}
-  </div>
+  <div class="space-y-8">
+    {# 1. 正在进行的考核 和 即将开始的考核 #}
+    <section class="space-y-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {% if current_assessments %}
+        {% for assessment in current_assessments %}
+          {% include 'assessment/partials/assessment_card.html' with assessment=assessment status='current' %}
+        {% endfor %}
+      {% endif %}
+      {% if upcoming_assessments %}
+        {% for assessment in upcoming_assessments %}
+          {% include 'assessment/partials/assessment_card.html' with assessment=assessment status='upcoming' %}
+        {% endfor %}
+      {% endif %}
+    </section>
 
-  {# 1. 当前考核 (Current) #}
-  {% if current_assessments %}
-  <section class="space-y-4">
-    <h2 class="text-2xl font-semibold text-gray-700 flex items-center gap-2">
-      <span class="p-1 bg-green-100 text-green-600 rounded">
-         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-      </span>
-      正在进行的考核
-    </h2>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {% for assessment in current_assessments %}
-        {% include "assessment/partials/assessment_card.html" with assessment=assessment status="current" %}
-      {% endfor %}
-    </div>
-  </section>
-  {% endif %}
-
-  {# 2. 即将开始 (Upcoming) - 虽然当前为空，但保留 #}
-  {% if upcoming_assessments %}
-   <section class="space-y-4 opacity-70">
-    <h2 class="text-2xl font-semibold text-gray-700 flex items-center gap-2">
-       <span class="p-1 bg-blue-100 text-blue-600 rounded">
-         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-      </span>
-      即将开始
-    </h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {% for assessment in upcoming_assessments %}
-        {% include "assessment/partials/assessment_card.html" with assessment=assessment status="upcoming" %}
-      {% endfor %}
-    </div>
-  </section>
-  {% endif %}
-
-  {# 3. 历史数据 (History) #}
-  <section class="space-y-4">
-    <h2 class="text-2xl font-semibold text-gray-700 flex items-center gap-2">
-       <span class="p-1 bg-gray-100 text-gray-600 rounded">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-       </span>
-      历史考核记录
-    </h2>
-    {% if past_assessments %}
-      <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-        <table class="table table-zebra w-full">
-          <thead>
-            <tr>
-              <th class="whitespace-nowrap">考核名称</th>
-              <th class="whitespace-nowrap">日期</th>
-              {% if not can_view_all %}
-              <th class="min-w-[200px]">模块成绩</th>
-              <th class="whitespace-nowrap">总分 <span class="text-xs font-normal text-gray-500">(除English)</span></th>
-              <th class="whitespace-nowrap">排名</th>
-              {% endif %}
-              {% if can_view_all %}
-              <th>操作</th>
-              {% endif %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for assessment in past_assessments %}
-            <tr class="hover">
-              <td>
-                <div class="font-bold">{{ assessment.name }}</div>
-                {% if assessment.description %}
-                  <div class="text-xs opacity-50 truncate max-w-xs" title="{{ assessment.description }}">{{ assessment.description }}</div>
+    {# 2. 历史数据 (History) #}
+    <section class="space-y-4">
+      <h2 class="text-xl font-semibold text-gray-600 flex items-center gap-2">
+        <span class="icon-[tabler--history] text-gray-400 size-6"></span>
+        历史考核记录
+      </h2>
+      {% if past_assessments %}
+        <div class="overflow-x-auto bg-base-100 rounded-box shadow">
+          <table class="table table-zebra w-full">
+            <thead>
+              <tr>
+                <th class="whitespace-nowrap">考核名称</th>
+                <th class="whitespace-nowrap">日期</th>
+                {% if not can_view_all %}
+                  <th class="min-w-52">模块成绩</th>
+                  <th class="whitespace-nowrap text-center">
+                    <p>总分</p>
+                    <p class="text-xs font-normal text-gray-500">(不含English模块)</p>
+                  </th>
+                  <th class="whitespace-nowrap">排名</th>
                 {% endif %}
-              </td>
-              <td class="text-sm">
-                <div>{{ assessment.start_date|date:"Y-m-d" }}</div>
-                <div class="text-xs text-gray-500">{{ assessment.end_date|date:"Y-m-d" }}</div>
-              </td>
-              
-              {% if not can_view_all %}
-              <td>
-                  {% if assessment.user_modules_info %}
-                      <div class="flex flex-wrap gap-2">
-                      {% for am in assessment.user_modules_info %}
-                          <div class="tooltip" data-tip="{{ am.module.name }}">
-                              <div class="badge badge-sm badge-outline gap-1 {% if 'English' in am.module.name %}opacity-60 border-dashed{% endif %}">
-                                  {{ am.module.name|truncatechars:8 }}
-                                  <span class="font-bold border-l pl-1 ml-1 border-base-content/20">
-                                      {% if am.user_score %}
-                                          {{ am.user_score.0.score }}
-                                      {% else %}
-                                          -
-                                      {% endif %}
-                                  </span>
+                {% if can_view_all %}
+                  <th>操作</th>
+                {% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for assessment in past_assessments %}
+                <tr class="hover">
+                  <td>
+                    <div class="font-bold">{{ assessment.name }}</div>
+                    {% if assessment.description %}
+                      <div class="text-xs opacity-50 truncate max-w-xs" title="{{ assessment.description }}">{{ assessment.description }}</div>
+                    {% endif %}
+                  </td>
+                  <td class="text-sm">
+                    <div>开始：{{ assessment.start_date|date:'Y-m-d' }}</div>
+                    <div>结束：{{ assessment.end_date|date:'Y-m-d' }}</div>
+                  </td>
+
+                  {% if not can_view_all %}
+                    <td>
+                      {% if assessment.user_modules_info %}
+                        <div class="flex flex-wrap gap-2">
+                          {% for am in assessment.user_modules_info %}
+                            <div class="tooltip" data-tip="{{ am.module.name }}">
+                              <div class="badge badge-outline gap-1 {% if 'English' in am.module.name %}opacity-60 border-dashed{% endif %}">
+                                {{ am.module.name|truncatechars:10 }}
+                                <span class="font-bold border-l pl-1 ml-1 border-base-content/20">
+                                  {% if am.user_score %}
+                                    {{ am.user_score.0.score }}
+                                  {% else %}
+                                    -
+                                  {% endif %}
+                                </span>
                               </div>
-                          </div>
-                      {% endfor %}
-                      </div>
-                  {% else %}
-                      <span class="text-gray-400 text-xs italic">无数据</span>
-                  {% endif %}
-              </td>
-              <td>
-                  <span class="text-lg font-bold font-mono">{{ assessment.my_total_score }}</span>
-              </td>
-              <td>
-                  {% if assessment.my_rank != '-' %}
-                      {% if assessment.my_rank <= 3 %}
+                            </div>
+                          {% endfor %}
+                        </div>
+                      {% else %}
+                        <span class="text-gray-400 text-xs italic">无数据</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <span class="text-lg font-bold font-mono">{{ assessment.my_total_score }}</span>
+                    </td>
+                    <td>
+                      {% if assessment.my_rank != '-' %}
+                        {% if assessment.my_rank <= 3 %}
                           <div class="flex items-center gap-1">
                             {% if assessment.my_rank == 1 %}
-                                <span class="iconify text-xl" data-icon="emojione:1st-place-medal"></span>
+                              <span class="icon-[emojione--1st-place-medal] size-5"></span>
                             {% elif assessment.my_rank == 2 %}
-                                <span class="iconify text-xl" data-icon="emojione:2nd-place-medal"></span>
+                              <span class="icon-[emojione--2nd-place-medal] size-5"></span>
                             {% elif assessment.my_rank == 3 %}
-                                <span class="iconify text-xl" data-icon="emojione:3rd-place-medal"></span>
+                              <span class="icon-[emojione--3rd-place-medal] size-5"></span>
                             {% endif %}
                             <span class="font-bold">{{ assessment.my_rank }}</span>
                           </div>
-                      {% else %}
+                        {% else %}
                           <span class="ml-1">{{ assessment.my_rank }}</span>
+                        {% endif %}
+                      {% else %}
+                        <span class="text-gray-400">-</span>
                       {% endif %}
-                  {% else %}
-                     <span class="text-gray-400">-</span>
+                    </td>
                   {% endif %}
-              </td>
-              {% endif %}
 
-              {% if can_view_all %}
-              <td>
-                  <a href="{% url 'assessment:detail' assessment.pk %}" class="btn btn-sm btn-ghost text-primary">
-                      管理详情
-                  </a>
-              </td>
-              {% endif %}
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    {% else %}
-      <div class="alert bg-base-200">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        <span>暂无历史考核数据。</span>
-      </div>
-    {% endif %}
-  </section>
-</div>
+                  {% if can_view_all %}
+                    <td>
+                      <a href="{% url 'assessment:detail' assessment.pk %}" class="btn btn-sm btn-ghost text-primary">查看详情</a>
+                    </td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert bg-base-200">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-info shrink-0 w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span>暂无历史考核数据。</span>
+        </div>
+      {% endif %}
+    </section>
+  </div>
 {% endblock %}

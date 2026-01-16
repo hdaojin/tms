@@ -14,7 +14,7 @@ def assessment_list(request):
     today = timezone.now().date()
     
     # 假设权限名为 assessment.view_all_scores，如果没有定义，暂时用 is_staff
-    can_view_all = request.user.is_staff or request.user.has_perm('assessment.view_all_scores')
+    can_view_all = request.user.is_superuser or request.user.has_perm('assessment.view_all_scores')
 
     if can_view_all:
         assessments = Assessment.objects.all().order_by('-start_date')
@@ -119,6 +119,7 @@ def assessment_list(request):
         'current_assessments': current_assessments,
         'past_assessments': past_assessments,
         'upcoming_assessments': upcoming_assessments,
+        'title': '考核列表',
     }
     return render(request, 'assessment/assessment_list.html', context)
 
@@ -186,20 +187,50 @@ def assessment_detail(request, pk):
          row['rank_score'] = rank_score
          table_rows.append(row)
 
-    # 排序：按 rank_score 降序
-    table_rows.sort(key=lambda x: x['rank_score'], reverse=True)
+    # 排序处理
+    sort_by = request.GET.get('sort', 'total') # 默认按 rank_score 排序 (其实是 total 里的 rank_score 逻辑)
+    # 之前逻辑是按 rank_score 排序，这里默认值给 rank_score 或者 total 都可以，看前端传啥
+    # 为了保持一致，默认走 rank_score 对应的逻辑
+    
+    direction = request.GET.get('dir', 'desc')
+    reverse = (direction == 'desc')
+    
+    def get_sort_value(row):
+        if sort_by == 'total':
+            return row['rank_score'] # 只有 rank_score 才是真正用于排名的总分 (排除 English)
+        elif sort_by.startswith('module_'):
+            try:
+                mod_id = int(sort_by.split('_')[1])
+                for s in row['scores']:
+                    if s['module_id'] == mod_id:
+                        return s['val']
+            except (ValueError, IndexError):
+                pass
+        return 0
 
-    # 计算排名
+    table_rows.sort(key=get_sort_value, reverse=reverse)
+
+    # 计算排名 (始终基于 rank_score 计算，不受显示排序影响，或者如果按模块排序，排名是否重新计算？)
+    # 通常排名字段是固定的（即总分排名），只是列表显示顺序变了。
+    # 所以我们需要先按 rank_score 排算出 rank，然后再按用户选的字段重排。
+    
+    # 1. 先按排名的规则排序一次，计算 rank
+    table_rows.sort(key=lambda x: x['rank_score'], reverse=True)
     current_rank = 1
     for i, row in enumerate(table_rows):
         if i > 0 and row['rank_score'] < table_rows[i-1]['rank_score']:
             current_rank = i + 1
         row['rank'] = current_rank
+        
+    # 2. 如果用户选择了其他排序方式，再排一次
+    if sort_by != 'total' or direction != 'desc':
+         table_rows.sort(key=get_sort_value, reverse=reverse)
 
     context = {
         'assessment': assessment,
         'modules': modules,
-        'table_rows': table_rows,
+        'table_rows': table_rows, # 恢复使用 table_rows
+        'title': f'考核详情 - {assessment.name}',
     }
     return render(request, 'assessment/assessment_detail.html', context)
 
