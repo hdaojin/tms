@@ -4368,6 +4368,9 @@
   .max-w-6xl {
     max-width: var(--container-6xl);
   }
+  .max-w-32 {
+    max-width: calc(var(--spacing) * 32);
+  }
   .max-w-48 {
     max-width: calc(var(--spacing) * 48);
   }
@@ -5081,6 +5084,9 @@
   .font-semibold {
     --tw-font-weight: var(--font-weight-semibold);
     font-weight: var(--font-weight-semibold);
+  }
+  .text-nowrap {
+    text-wrap: nowrap;
   }
   .text-wrap {
     text-wrap: wrap;

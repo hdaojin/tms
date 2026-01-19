@@ -23,10 +23,21 @@
                 {% with am_id_str=am.id|stringformat:'s' %}
                   {% with sort_desc='-module_'|add:am_id_str sort_asc='module_'|add:am_id_str %}
                     <a class="flex hover:bg-base-300 rounded transition-colors justify-center items-center p-1"
-                      href="?sort={% if current_sort == sort_desc %}{{ sort_asc }}{% else %}{{ sort_desc }}{% endif %}">
+                      href="?sort={% if current_sort == sort_desc %}
+                        {{ sort_asc }}
+                      {% else %}
+                        {{ sort_desc }}
+                      {% endif %}">
                       <div class="flex flex-col">
                         <div>{{ am.module.code }} - {{ am.module.name }}</div>
-                        <div class="text-xs font-normal opacity-70">满分: {{ am.max_score }}</div>
+                        <div class="text-xs font-normal opacity-70">
+                          满分: {{ am.max_score }}
+                          {% if am.duration > 0 %}
+                            · {{ am.duration|floatformat:1 }}h
+                          {% else %}
+                            · <span class="opacity-70 text-info italic">(未考核)</span>
+                          {% endif %}
+                        </div>
                       </div>
                       <div class="text-xs opacity-50 ml-2">
                         {% if current_sort == sort_asc %}
@@ -41,7 +52,11 @@
               </th>
             {% endfor %}
             <th class="font-bold bg-primary/10 cursor-pointer"
-              onclick="window.location.href='?sort={% if current_sort == '-total' %}total{% else %}-total{% endif %}'">
+              onclick="window.location.href='?sort={% if current_sort == '-total' %}
+                total
+              {% else %}
+                -total
+              {% endif %}'">
               总分
               <span class="text-xs opacity-50">
                 {% if current_sort == 'total' %}

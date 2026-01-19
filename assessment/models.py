@@ -71,6 +71,14 @@ class AssessmentModule(models.Model):
         validators=[MinValueValidator(Decimal("0.00"))],
         help_text="该模块在本次考核中的满分值"
     )
+    duration = models.DecimalField(
+        "考核时长(小时)",
+        max_digits=4,
+        decimal_places=1,
+        default=Decimal("0.0"),
+        validators=[MinValueValidator(Decimal("0.0"))],
+        help_text="该模块的考核时长，单位为小时"
+    )
     paper_file = models.FileField(
         "试卷及评分文件",
         storage=assessment_storage,

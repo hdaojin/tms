@@ -61,7 +61,14 @@
                     <td>
                       <div class="flex flex-wrap gap-1 justify-start">
                         {% for am in assessment.assessmentmodule_set.all %}
-                          <span class="badge badge-sm badge-ghost border-base-content/20 bg-base-100 text-xs">{{ am.module.name }}</span>
+                          <span class="badge badge-sm badge-ghost border-base-content/20 bg-base-100 text-xs">
+                            {{ am.module.name }}
+                            {% if am.duration > 0 %}
+                              <span class="opacity-70">({{ am.duration|floatformat:1 }}h)</span>
+                            {% else %}
+                              <span class="opacity-70 text-info italic">(未考核)</span>
+                            {% endif %}
+                          </span>
                         {% endfor %}
                       </div>
                     </td>
