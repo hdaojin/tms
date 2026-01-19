@@ -1,6 +1,6 @@
 from django.shortcuts import render, get_object_or_404
 from django.db.models import Prefetch
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, permission_required
 from django.utils import timezone
 from .models import Assessment, Score, AssessmentModule
 
@@ -13,7 +13,7 @@ def assessment_list(request):
     """
     today = timezone.now().date()
     
-    # 假设权限名为 assessment.view_all_scores，如果没有定义，暂时用 is_staff
+    # 假设权限名为 assessment.view_all_scores，如果没有定义，暂时用 is_superuser
     can_view_all = request.user.is_superuser or request.user.has_perm('assessment.view_all_scores')
 
     if can_view_all:
@@ -44,7 +44,7 @@ def assessment_list(request):
     # 分组：当前考核和历史考核
     # Current: start_date <= today <= end_date 
     # History: end_date < today
-    # Upcoming: start_date > today (虽然需求没提，但加上更好)
+    # Upcoming: start_date > today 
     
     current_assessments = []
     past_assessments = []
@@ -77,7 +77,7 @@ def assessment_list(request):
             # 聚合该次考核所有参与者的总分（排除 English）
             # 获取该考核下排除 English 的 AssessmentModule ID 列表
             valid_am_ids = assessment.assessmentmodule_set.exclude(
-                module__name__icontains='English'
+                module__name__icontains='english'
             ).values_list('id', flat=True)
             
             # 按用户分组求和
@@ -125,18 +125,15 @@ def assessment_list(request):
 
 
 @login_required
+@permission_required('assessment.view_all_scores', raise_exception=True)
 def assessment_detail(request, pk):
     """
     管理员查看某次考核的所有人成绩
     """
-    # 简单的权限检查，实际应用中最好用 @permission_required
-    if not (request.user.is_staff or request.user.has_perm('assessment.view_all_scores')):
-         return render(request, '403.html', status=403)
-
     assessment = get_object_or_404(Assessment, pk=pk)
     
     # 获取该考核的所有模块
-    modules = assessment.assessmentmodule_set.select_related('module').all()
+    modules = AssessmentModule.objects.select_related('module').filter(assessment=assessment)
     
     # 获取该考核的所有参与者，并预加载他们的成绩
     # 结构：List of Users. Each User has map of Module -> Score
@@ -155,7 +152,7 @@ def assessment_detail(request, pk):
     for s in all_scores:
         # 注意这里 assessment_module 已经在 all_scores 中被 select_related 了
         # 但是我们要根据 module.pk 来对应列，所以要通过 assessment_module.module_id
-        score_map[(s.user_id, s.assessment_module_id)] = s
+        score_map[(s.user.pk, s.assessment_module.pk)] = s
         
     # 为每个 participant 构建 row_data
     table_rows = []
@@ -169,11 +166,11 @@ def assessment_detail(request, pk):
          
          for am in modules: # 注意这里的 modules 其实是 AssessmentModule 列表
              # 我们用 AssessmentModule 的 id 来匹配 Score 中的 assessment_module_id
-             score_obj = score_map.get((participant.id, am.id))
+             score_obj = score_map.get((participant.pk, am.pk))
              
              val = score_obj.score if score_obj else 0
              row['scores'].append({
-                 'module_id': am.id,
+                 'module_id': am.pk,
                  'val': val,
                  'obj': score_obj
              })
@@ -188,19 +185,23 @@ def assessment_detail(request, pk):
          table_rows.append(row)
 
     # 排序处理
-    sort_by = request.GET.get('sort', 'total') # 默认按 rank_score 排序 (其实是 total 里的 rank_score 逻辑)
-    # 之前逻辑是按 rank_score 排序，这里默认值给 rank_score 或者 total 都可以，看前端传啥
-    # 为了保持一致，默认走 rank_score 对应的逻辑
+    # 优化：采用 sort=-total 这种格式，移除 redundant 的 dir 参数
+    # 默认按 rank_score 降序 (-total)
+    sort_param = request.GET.get('sort', '-total')
     
-    direction = request.GET.get('dir', 'desc')
-    reverse = (direction == 'desc')
+    if sort_param.startswith('-'):
+        sort_key = sort_param[1:]
+        reverse = True
+    else:
+        sort_key = sort_param
+        reverse = False
     
     def get_sort_value(row):
-        if sort_by == 'total':
-            return row['rank_score'] # 只有 rank_score 才是真正用于排名的总分 (排除 English)
-        elif sort_by.startswith('module_'):
+        if sort_key == 'total':
+            return row['rank_score']
+        elif sort_key.startswith('module_'):
             try:
-                mod_id = int(sort_by.split('_')[1])
+                mod_id = int(sort_key.split('_')[1])
                 for s in row['scores']:
                     if s['module_id'] == mod_id:
                         return s['val']
@@ -208,13 +209,8 @@ def assessment_detail(request, pk):
                 pass
         return 0
 
-    table_rows.sort(key=get_sort_value, reverse=reverse)
-
-    # 计算排名 (始终基于 rank_score 计算，不受显示排序影响，或者如果按模块排序，排名是否重新计算？)
-    # 通常排名字段是固定的（即总分排名），只是列表显示顺序变了。
-    # 所以我们需要先按 rank_score 排算出 rank，然后再按用户选的字段重排。
-    
-    # 1. 先按排名的规则排序一次，计算 rank
+    # 1. 计算排名 (始终基于 rank_score 降序计算)
+    # 先按 rank_score 降序排好，填入 rank
     table_rows.sort(key=lambda x: x['rank_score'], reverse=True)
     current_rank = 1
     for i, row in enumerate(table_rows):
@@ -222,15 +218,17 @@ def assessment_detail(request, pk):
             current_rank = i + 1
         row['rank'] = current_rank
         
-    # 2. 如果用户选择了其他排序方式，再排一次
-    if sort_by != 'total' or direction != 'desc':
+    # 2. 应用显示排序
+    # 如果显示排序就是默认的 -total，则不需要再次排序 (因为上面计算排名时已经排过了)
+    if sort_param != '-total':
          table_rows.sort(key=get_sort_value, reverse=reverse)
 
     context = {
         'assessment': assessment,
         'modules': modules,
-        'table_rows': table_rows, # 恢复使用 table_rows
+        'table_rows': table_rows,
         'title': f'考核详情 - {assessment.name}',
+        'current_sort': sort_param,
     }
     return render(request, 'assessment/assessment_detail.html', context)
 

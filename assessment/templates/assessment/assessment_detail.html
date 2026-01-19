@@ -7,63 +7,59 @@
         {{ modules|length }} 个考核模块</p>
     </div>
     <div class="print:hidden">
-      <button onclick="window.print()" class="btn btn-ghost btn-sm">
-       <span class="icon-[tabler--printer] size-5"></span> 打印 / 导出
-      </button>
+      <button onclick="window.print()" class="btn btn-ghost btn-sm"><span class="icon-[tabler--printer] size-5"></span> 打印 / 导出</button>
     </div>
   </div>
 
-
-  
-
-
   <div class="card bg-base-100 shadow-xl overflow-hidden">
     <div class="overflow-x-auto">
-      <table class="table table-zebra w-full text-center">
+      <table class="table table-zebra table-sm w-full text-center">
         <thead>
           <tr class="bg-base-200">
             <th class="w-16 sticky left-0 z-10">#</th>
-            <th class="text-left sticky left-16 z-10">姓名</th>
+            <th class="text-center sticky z-10">姓名</th>
             {% for am in modules %}
-              <th class="min-w-24">
-                <a class="flex flex-col hover:bg-base-300 rounded p-1 transition-colors" href="?sort=module_{{ am.id }}&dir={% if request.GET.sort == 'module_'|add:am.id|stringformat:'s' and request.GET.dir == 'desc' %}asc{% else %}desc{% endif %}">
-                  <span>{{ am.module.code }} - {{ am.module.name }}</span>
-                  <span class="text-xs font-normal opacity-70">满分: {{ am.max_score }}</span>
-                  {% if request.GET.sort == 'module_'|add:am.id|stringformat:'s' %}
-                    <span class="text-xs opacity-50">
-                      {% if request.GET.dir == 'asc' %}▲{% else %}▼{% endif %}
-                    </span>
-                  {% endif %}
-                </a>
+              <th class="px-1">
+                {% with am_id_str=am.id|stringformat:'s' %}
+                  {% with sort_desc='-module_'|add:am_id_str sort_asc='module_'|add:am_id_str %}
+                    <a class="flex hover:bg-base-300 rounded transition-colors justify-center items-center p-1"
+                      href="?sort={% if current_sort == sort_desc %}{{ sort_asc }}{% else %}{{ sort_desc }}{% endif %}">
+                      <div class="flex flex-col">
+                        <div>{{ am.module.code }} - {{ am.module.name }}</div>
+                        <div class="text-xs font-normal opacity-70">满分: {{ am.max_score }}</div>
+                      </div>
+                      <div class="text-xs opacity-50 ml-2">
+                        {% if current_sort == sort_asc %}
+                          ▲
+                        {% elif current_sort == sort_desc %}
+                          ▼
+                        {% endif %}
+                      </div>
+                    </a>
+                  {% endwith %}
+                {% endwith %}
               </th>
             {% endfor %}
-            <th class="font-bold bg-primary/10 cursor-pointer" onclick="window.location.href='?sort=total&dir={% if request.GET.sort == 'total' and request.GET.dir == 'desc' %}asc{% else %}desc{% endif %}'">
+            <th class="font-bold bg-primary/10 cursor-pointer"
+              onclick="window.location.href='?sort={% if current_sort == '-total' %}total{% else %}-total{% endif %}'">
               总分
-              {% if request.GET.sort == 'total' or not request.GET.sort %}
-                 <span class="text-xs opacity-50">
-                   {% if request.GET.dir == 'asc' %}▲{% else %}▼{% endif %}
-                 </span>
-              {% endif %}
+              <span class="text-xs opacity-50">
+                {% if current_sort == 'total' %}
+                  ▲
+                {% elif current_sort == '-total' %}
+                  ▼
+                {% endif %}
+              </span>
             </th>
-            <th class="w-16 bg-base-200 font-bold text-center">排名</th>
+            <th class="bg-base-200 font-bold text-center">排名</th>
           </tr>
         </thead>
         <tbody>
           {% for row in table_rows %}
             <tr class="hover">
               <td class="sticky left-0 bg-base-100">{{ forloop.counter }}</td>
-              <td class="text-left font-medium sticky left-16 bg-base-100">
-                <div class="flex items-center gap-2">
-                  <div class="avatar placeholder">
-                    <div class="bg-neutral-focus text-neutral-content rounded-full w-8">
-                      <span class="text-xs">{{ row.user.first_name|make_list|first|default:row.user.username|make_list|first|upper }}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div class="font-bold">{{ row.user.first_name|default:row.user.username }}</div>
-                    <div class="text-xs opacity-50">{{ row.user.username }}</div>
-                  </div>
-                </div>
+              <td class="text-center font-medium sticky">
+                <div class="font-bold">{{ row.user.first_name|default:row.user.username }}</div>
               </td>
               {% for cell in row.scores %}
                 <td>
@@ -79,11 +75,11 @@
                 {% if row.rank <= 3 %}
                   <div class="flex items-center justify-center gap-1">
                     {% if row.rank == 1 %}
-                      <span class="iconify text-2xl" data-icon="emojione:1st-place-medal"></span>
+                      <span class="icon-[emojione--1st-place-medal] size-5"></span>
                     {% elif row.rank == 2 %}
-                      <span class="iconify text-2xl" data-icon="emojione:2nd-place-medal"></span>
+                      <span class="icon-[emojione--2nd-place-medal] size-5"></span>
                     {% elif row.rank == 3 %}
-                      <span class="iconify text-2xl" data-icon="emojione:3rd-place-medal"></span>
+                      <span class="icon-[emojione--3rd-place-medal] size-5"></span>
                     {% endif %}
                     <span class="text-lg">{{ row.rank }}</span>
                   </div>
@@ -97,6 +93,4 @@
       </table>
     </div>
   </div>
-
-  <div class="text-xs text-gray-400 text-center mt-8">Designed for TMS Assessment System</div>
 {% endblock %}
