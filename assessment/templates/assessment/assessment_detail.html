@@ -3,6 +3,7 @@
 {% block content %}
   <div class="flex justify-between items-center">
     <div>
+      <p class="text-gray-500 mt-1">{% if assessment.description %}{{ assessment.description }}{% else %}{{ assessment.name }}{% endif %}</p>
       <p class="text-gray-500 mt-1">{{ assessment.start_date }} ~ {{ assessment.end_date }} · 共 {{ table_rows|length }} 位参考人员 ·
         {{ modules|length }} 个考核模块</p>
     </div>
