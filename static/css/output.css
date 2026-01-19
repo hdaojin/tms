@@ -4849,8 +4849,29 @@
       background-color: color-mix(in oklab, var(--color-primary) 10%, transparent);
     }
   }
+  .bg-secondary {
+    background-color: var(--color-secondary);
+  }
+  .bg-secondary\/5 {
+    background-color: var(--color-secondary);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-secondary) 5%, transparent);
+    }
+  }
+  .bg-secondary\/10 {
+    background-color: var(--color-secondary);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-secondary) 10%, transparent);
+    }
+  }
   .bg-success {
     background-color: var(--color-success);
+  }
+  .bg-success\/5 {
+    background-color: var(--color-success);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-success) 5%, transparent);
+    }
   }
   .bg-success\/10 {
     background-color: var(--color-success);
@@ -5253,14 +5274,41 @@
       color: color-mix(in oklab, var(--color-primary) 60%, transparent);
     }
   }
+  .text-primary\/70 {
+    color: var(--color-primary);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-primary) 70%, transparent);
+    }
+  }
   .text-red-500 {
     color: var(--color-red-500);
+  }
+  .text-secondary {
+    color: var(--color-secondary);
+  }
+  .text-secondary\/60 {
+    color: var(--color-secondary);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-secondary) 60%, transparent);
+    }
+  }
+  .text-secondary\/70 {
+    color: var(--color-secondary);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-secondary) 70%, transparent);
+    }
   }
   .text-success {
     color: var(--color-success);
   }
   .text-success-content {
     color: var(--color-success-content);
+  }
+  .text-success\/60 {
+    color: var(--color-success);
+    @supports (color: color-mix(in lab, red, red)) {
+      color: color-mix(in oklab, var(--color-success) 60%, transparent);
+    }
   }
   .text-warning {
     color: var(--color-warning);

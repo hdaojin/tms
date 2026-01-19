@@ -47,35 +47,35 @@
                 {% endwith %}
               </th>
             {% endfor %}
-            <th class="font-bold bg-base-200 cursor-pointer"
-              title="用于排名的总分 (不含English)"
-              onclick="window.location.href='?sort={% if current_sort == '-total' %}total{% else %}-total{% endif %}'">
-              <div class="flex items-center justify-center gap-1">
-                <div class="flex flex-col items-center">
-                  <span>排名分</span>
-                  <span class="text-[10px] font-normal opacity-70">满分: {{ max_ranking_score|floatformat:0 }}</span>
-                </div>
-                <span class="text-xs opacity-50">
-                  {% if current_sort == 'total' %}
-                    ▲
-                  {% elif current_sort == '-total' %}
-                    ▼
-                  {% endif %}
-                </span>
-              </div>
-            </th>
             <th class="font-bold bg-primary/10 cursor-pointer"
               title="包含English的所有模块总分"
               onclick="window.location.href='?sort={% if current_sort == '-grand_total' %}grand_total{% else %}-grand_total{% endif %}'">
               <div class="flex items-center justify-center gap-1">
                 <div class="flex flex-col items-center">
-                  <span>总分</span>
-                  <span class="text-[10px] font-normal opacity-70 text-primary/60">满分: {{ max_grand_total_score|floatformat:0 }}</span>
+                  <span class="text-primary">总分</span>
+                  <span class="text-xs font-normal opacity-70 text-primary/60">满分: {{ max_grand_total_score|floatformat:0 }}</span>
                 </div>
-                <span class="text-xs opacity-50">
+                <span class="text-xs opacity-50 text-primary">
                   {% if current_sort == 'grand_total' %}
                     ▲
                   {% elif current_sort == '-grand_total' %}
+                    ▼
+                  {% endif %}
+                </span>
+              </div>
+            </th>
+            <th class="font-bold bg-secondary/10 cursor-pointer"
+              title="用于排名的总分 (不含English)"
+              onclick="window.location.href='?sort={% if current_sort == '-total' %}total{% else %}-total{% endif %}'">
+              <div class="flex items-center justify-center gap-1">
+                <div class="flex flex-col items-center">
+                  <span class="text-secondary">排名分</span>
+                  <span class="text-xs font-normal opacity-70 text-secondary/60">满分: {{ max_ranking_score|floatformat:0 }}</span>
+                </div>
+                <span class="text-xs opacity-50 text-secondary">
+                  {% if current_sort == 'total' %}
+                    ▲
+                  {% elif current_sort == '-total' %}
                     ▼
                   {% endif %}
                 </span>
@@ -100,8 +100,8 @@
                   {% endif %}
                 </td>
               {% endfor %}
-              <td class="font-bold font-mono">{{ row.rank_score }}</td>
               <td class="font-bold font-mono bg-primary/5 text-primary">{{ row.total }}</td>
+              <td class="font-bold font-mono bg-secondary/5 text-secondary">{{ row.rank_score }}</td>
               <td class="font-bold text-center">
                 {% if row.rank <= 3 %}
                   <div class="flex items-center justify-center gap-1">
