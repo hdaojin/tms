@@ -25,20 +25,21 @@
       </h2>
       {% if past_assessments %}
         <div class="overflow-x-auto bg-base-100 rounded-box shadow">
-          <table class="table table-zebra w-full">
+          <table class="table table-zebra w-full text-center">
             <thead>
-              <tr>
-                <th class="whitespace-nowrap">考核名称</th>
-                <th class="whitespace-nowrap">日期</th>
+              <tr class="bg-base-200">
+                <th class="whitespace-nowrap text-start">考核名称</th>
+                <th class="whitespace-nowrap text-start">日期</th>
                 {% if not can_view_all %}
-                  <th class="min-w-52">模块成绩</th>
+                  <th class="text-start">模块成绩</th>
                   <th class="whitespace-nowrap text-center">
                     <p>总分</p>
                     <p class="text-xs font-normal text-gray-500">(不含English模块)</p>
                   </th>
-                  <th class="whitespace-nowrap">排名</th>
+                  <th class="whitespace-nowrap text-center">排名</th>
                 {% endif %}
                 {% if can_view_all %}
+                  <th class="text-start">考核模块</th>
                   <th>操作</th>
                 {% endif %}
               </tr>
@@ -46,21 +47,29 @@
             <tbody>
               {% for assessment in past_assessments %}
                 <tr class="hover">
-                  <td>
+                  <td class="text-start">
                     <div class="font-bold">{{ assessment.name }}</div>
                     {% if assessment.description %}
-                      <div class="text-xs opacity-50 truncate max-w-xs" title="{{ assessment.description }}">{{ assessment.description }}</div>
+                      <div class="text-xs opacity-50 truncate" title="{{ assessment.description }}">{{ assessment.description }}</div>
                     {% endif %}
                   </td>
-                  <td class="text-sm">
+                  <td class="text-sm text-start">
                     <div>开始：{{ assessment.start_date|date:'Y-m-d' }}</div>
                     <div>结束：{{ assessment.end_date|date:'Y-m-d' }}</div>
                   </td>
-
+                  {% if can_view_all %}
+                    <td>
+                      <div class="flex flex-wrap gap-1 justify-start">
+                        {% for am in assessment.assessmentmodule_set.all %}
+                          <span class="badge badge-sm badge-ghost border-base-content/20 bg-base-100 text-xs">{{ am.module.name }}</span>
+                        {% endfor %}
+                      </div>
+                    </td>
+                  {% endif %}
                   {% if not can_view_all %}
                     <td>
                       {% if assessment.user_modules_info %}
-                        <div class="flex flex-wrap gap-2">
+                        <div class="flex flex-wrap gap-2 justify-start">
                           {% for am in assessment.user_modules_info %}
                             <div class="tooltip" data-tip="{{ am.module.name }}">
                               <div class="badge badge-outline gap-1 {% if 'English' in am.module.name %}opacity-60 border-dashed{% endif %}">
@@ -86,7 +95,7 @@
                     <td>
                       {% if assessment.my_rank != '-' %}
                         {% if assessment.my_rank <= 3 %}
-                          <div class="flex items-center gap-1">
+                          <div class="flex items-center justify-center gap-1">
                             {% if assessment.my_rank == 1 %}
                               <span class="icon-[emojione--1st-place-medal] size-5"></span>
                             {% elif assessment.my_rank == 2 %}

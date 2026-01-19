@@ -17,7 +17,7 @@ def assessment_list(request):
     can_view_all = request.user.is_superuser or request.user.has_perm('assessment.view_all_scores')
 
     if can_view_all:
-        assessments = Assessment.objects.all().order_by('-start_date')
+        assessments = Assessment.objects.prefetch_related('assessmentmodule_set__module').order_by('-start_date')
     else:
         # 普通用户：预加载该用户在该次考核中的成绩
         # 我们不能直接 prefetch 'scores'，因为那样会拿到所有人的成绩（如果没有过滤）
