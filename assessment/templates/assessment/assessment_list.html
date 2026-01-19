@@ -33,8 +33,12 @@
                 {% if not can_view_all %}
                   <th class="text-start">模块成绩</th>
                   <th class="whitespace-nowrap text-center">
+                    <p>排名分</p>
+                    <p class="text-xs font-normal text-gray-500">(不含English)</p>
+                  </th>
+                  <th class="whitespace-nowrap text-center">
                     <p>总分</p>
-                    <p class="text-xs font-normal text-gray-500">(不含English模块)</p>
+                    <p class="text-xs font-normal text-gray-500">(含English)</p>
                   </th>
                   <th class="whitespace-nowrap text-center">排名</th>
                 {% endif %}
@@ -83,7 +87,7 @@
                                 {{ am.module.name|truncatechars:10 }}
                                 <span class="font-bold border-l pl-1 ml-1 border-base-content/20">
                                   {% if am.user_score %}
-                                    {{ am.user_score.0.score }}
+                                    {{ am.user_score.0.score }}<span class="text-xs font-normal opacity-50">/{{ am.max_score|floatformat:0 }}</span>
                                   {% else %}
                                     -
                                   {% endif %}
@@ -97,7 +101,16 @@
                       {% endif %}
                     </td>
                     <td>
-                      <span class="text-lg font-bold font-mono">{{ assessment.my_total_score }}</span>
+                      <div class="flex flex-col items-center gap-0.5">
+                        <span class="text-lg font-bold font-mono">{{ assessment.my_total_score }}</span>
+                        <span class="text-[10px] text-gray-400">满分: {{ assessment.max_ranking_score|floatformat:0 }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="flex flex-col items-center gap-0.5">
+                        <span class="text-lg font-bold font-mono text-primary">{{ assessment.my_grand_total_score }}</span>
+                        <span class="text-[10px] text-primary/60">满分: {{ assessment.max_grand_total_score|floatformat:0 }}</span>
+                      </div>
                     </td>
                     <td>
                       {% if assessment.my_rank != '-' %}

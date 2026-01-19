@@ -65,13 +65,26 @@ def assessment_list(request):
         for assessment in past_assessments:
             # 1. 计算个人总分（排除 English）
             my_total = 0
+            my_grand_total = 0
+            assessment.max_ranking_score = 0
+            assessment.max_grand_total_score = 0
+
             if hasattr(assessment, 'user_modules_info'):
                 for am in assessment.user_modules_info:
+                    score_val = 0
+                    if am.user_score:
+                         score_val = am.user_score[0].score
+                    
+                    my_grand_total += score_val
+                    assessment.max_grand_total_score += am.max_score
+                    
                     # 排除包含 "English" 的模块 (大小写不敏感)
                     if 'english' not in am.module.name.lower():
-                        if am.user_score:
-                             my_total += am.user_score[0].score
+                        my_total += score_val
+                        assessment.max_ranking_score += am.max_score
+            
             assessment.my_total_score = my_total
+            assessment.my_grand_total_score = my_grand_total
             
             # 2. 计算排名
             # 聚合该次考核所有参与者的总分（排除 English）
@@ -187,7 +200,7 @@ def assessment_detail(request, pk):
     # 排序处理
     # 优化：采用 sort=-total 这种格式，移除 redundant 的 dir 参数
     # 默认按 rank_score 降序 (-total)
-    sort_param = request.GET.get('sort', '-total')
+    sort_param = request.GET.get('sort', '-total').strip()
     
     if sort_param.startswith('-'):
         sort_key = sort_param[1:]
@@ -199,6 +212,8 @@ def assessment_detail(request, pk):
     def get_sort_value(row):
         if sort_key == 'total':
             return row['rank_score']
+        elif sort_key == 'grand_total':
+            return row['total']
         elif sort_key.startswith('module_'):
             try:
                 mod_id = int(sort_key.split('_')[1])
@@ -223,12 +238,23 @@ def assessment_detail(request, pk):
     if sort_param != '-total':
          table_rows.sort(key=get_sort_value, reverse=reverse)
 
+    # 计算本次考核的满分
+    max_ranking_score = 0 # 排名分满分（不含English）
+    max_grand_total_score = 0 # 总分满分（含English）
+
+    for am in modules:
+        max_grand_total_score += am.max_score
+        if 'english' not in am.module.name.lower():
+            max_ranking_score += am.max_score
+
     context = {
         'assessment': assessment,
         'modules': modules,
         'table_rows': table_rows,
         'title': f'考核详情 - {assessment.name}',
         'current_sort': sort_param,
+        'max_ranking_score': max_ranking_score,
+        'max_grand_total_score': max_grand_total_score,
     }
     return render(request, 'assessment/assessment_detail.html', context)
 
