@@ -5,7 +5,6 @@ from django.core.validators import MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
 
-from competitions.models import Module
 
 assessment_storage = FileSystemStorage(location=str(settings.ASSESSMENT_UPLOAD_DIR))
 
@@ -24,7 +23,7 @@ class Assessment(models.Model):
     end_date = models.DateField("结束日期", help_text="考核结束的日期")
     description = models.TextField("描述", blank=True)
     modules = models.ManyToManyField(
-        Module,
+        'competitions.Module',
         through='AssessmentModule',
         verbose_name="考核模块",
         related_name="assessments",
@@ -59,7 +58,7 @@ class AssessmentModule(models.Model):
         verbose_name="考核"
     )
     module = models.ForeignKey(
-        Module,
+        'competitions.Module',
         on_delete=models.PROTECT,
         verbose_name="模块"
     )
@@ -119,7 +118,7 @@ class Score(models.Model):
         default=Decimal("0.00"),
         validators=[MinValueValidator(Decimal("0.00"))]
     )
-    remarks = models.TextField("备注", blank=True)
+    remarks = models.CharField("备注", max_length=200, blank=True)
     
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)

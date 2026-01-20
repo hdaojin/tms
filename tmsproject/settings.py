@@ -206,6 +206,10 @@ NOTES_ROOT = PRIVATE_MEDIA_ROOT / "notes"
 ASSESSMENT_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "assessment"
 ASSESSMENT_ALLOWED_EXTENSIONS = ['xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'zip', '7z', 'gz', 'bz2', 'rar']
 
+# 竞赛相关文件上传目录：BASE_DIR/media-private/competitions
+COMPETITION_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "competitions"
+COMPETITION_ALLOWED_EXTENSIONS = ['xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'zip', '7z', 'gz', 'bz2', 'rar']
+
 
 # 公共文件上传目录是通过Web服务器静态文件功能直接提供服务的，无法控制权限。
 # 训练日志根目录：BASE_DIR/media/traininglogs

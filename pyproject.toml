@@ -17,4 +17,5 @@ dependencies = [
     "lxml>=6.0.2",
     "markdown2>=2.5.4",
     "psycopg>=3.3.2",
+    "pillow>=12.1.0",
 ]
