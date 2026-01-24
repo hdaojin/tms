@@ -34,7 +34,10 @@ class UserProfile(models.Model):
 
     class Meta:
         verbose_name = '用户信息'
-        verbose_name_plural = '用户信息'    
+        verbose_name_plural = '用户信息'
+        permissions = [
+            ("view_all_profiles", "能查看所有人资料"),
+        ]
 
     def __str__(self):
         return f"{self.user.username} 的信息"

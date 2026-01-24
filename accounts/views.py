@@ -1,12 +1,18 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.decorators import login_not_required # type: ignore
+from django.contrib.auth.decorators import login_not_required  # type: ignore
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth import get_user_model
+from django_tables2 import SingleTableView
 
 from .forms import CustomUserCreationForm, ProfileForm
+from .tables import UserListTable
 from core.utils.invitation import generate_invitation_code
 from core.utils.decorators import superuser_required
 from .models import UserProfile
+
+User = get_user_model()
 
 
 @login_not_required
@@ -83,3 +89,25 @@ def account_profile(request):
         'title_icon': 'icon-[tabler--user-circle]',
         'can_edit': can_edit,
     })
+
+
+class UserListView(LoginRequiredMixin, PermissionRequiredMixin, SingleTableView):
+    """显示所有用户列表（包含 Profile 信息）。
+
+    需要 'accounts.view_all_profiles' 权限才能访问。
+    """
+
+    model = User
+    table_class = UserListTable
+    template_name = "accounts/user_list.html"
+    permission_required = "accounts.view_all_profiles"
+    raise_exception = True
+    paginate_by = 20
+    extra_context = {
+        "title": "用户列表",
+        "title_icon": "icon-[tabler--users]",
+    }
+
+    def get_queryset(self):
+        """获取用户组为"选手"的用户，并预加载 profile 信息以优化查询。"""
+        return User.objects.select_related("profile").filter(groups__name="选手").distinct()
