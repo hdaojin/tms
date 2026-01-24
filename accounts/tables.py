@@ -1,7 +1,7 @@
 # accounts/tables.py
 import django_tables2 as tables
 from django.contrib.auth import get_user_model
-from core.utils.tables import BaseTable
+from core.utils.tables import BaseTable, BaseDateColumn
 
 User = get_user_model()
 
@@ -15,7 +15,10 @@ class UserListTable(BaseTable):
     )
 
     # 姓名（从 User.first_name 获取）
-    first_name = tables.Column(verbose_name="姓名")
+    first_name = tables.Column(
+        verbose_name="姓名",
+        attrs={"td": {"class": "min-w-20 whitespace-nowrap"}}
+    )
 
     # Profile 字段
     name_pronunciation = tables.Column(
@@ -27,7 +30,7 @@ class UserListTable(BaseTable):
     gender = tables.Column(
         verbose_name="性别", accessor="profile__get_gender_display", orderable=False
     )
-    birth_date = tables.DateColumn(
+    birth_date = BaseDateColumn(
         verbose_name="出生日期", accessor="profile__birth_date", orderable=True
     )
     phone_number = tables.Column(
@@ -60,10 +63,10 @@ class UserListTable(BaseTable):
     school_dormitory = tables.Column(
         verbose_name="宿舍", accessor="profile__school_dormitory", orderable=False
     )
-    join_date = tables.DateColumn(
+    join_date = BaseDateColumn(
         verbose_name="入读日期", accessor="profile__join_date", orderable=True
     )
-    leave_date = tables.DateColumn(
+    leave_date = BaseDateColumn(
         verbose_name="离开日期", accessor="profile__leave_date", orderable=True
     )
     notes = tables.Column(

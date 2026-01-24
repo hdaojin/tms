@@ -1,11 +1,11 @@
 # traininglogs/tables.py
 import django_tables2 as tables
-from core.utils.tables import BaseTable, ActionsColumn
+from core.utils.tables import BaseTable, BaseDateColumn, ActionsColumn
 from .models import TrainingLog
 
 
 class TrainingLogTable(BaseTable):
-    training_date = tables.DateColumn(verbose_name="训练日期")
+    training_date = BaseDateColumn(verbose_name="训练日期")
     module = tables.Column(verbose_name="训练模块", accessor="module.name", orderable=True)
     filename = tables.Column(verbose_name="文件名", accessor="filename", orderable=False)
     uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by", orderable=True)
@@ -31,7 +31,7 @@ class TrainingLogTable(BaseTable):
 
 class TrainingLogOthersTable(BaseTable):
     """用于展示他人日志的表格（仅“查看”操作）。"""
-    training_date = tables.DateColumn(verbose_name="训练日期")
+    training_date = BaseDateColumn(verbose_name="训练日期")
     module = tables.Column(verbose_name="训练模块", accessor="module.name", orderable=True)
     filename = tables.Column(verbose_name="文件名", accessor="filename", orderable=False)
     uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by", orderable=True)
@@ -56,7 +56,7 @@ class TrainingLogOthersTable(BaseTable):
 class MonthlyStatTable(BaseTable):
     """月度提交统计表：列为 日期 / 已提交选手 / 未提交选手 / 已提交教练。"""
 
-    date = tables.DateColumn(verbose_name="日期", accessor="date", orderable=False)
+    date = BaseDateColumn(verbose_name="日期", accessor="date", orderable=False)
     submitted_competitors = tables.Column(
         verbose_name="已提交选手",
         orderable=False,

@@ -1,10 +1,10 @@
 # meeting/tables.py
 import django_tables2 as tables
-from core.utils.tables import BaseTable, ActionsColumn
+from core.utils.tables import BaseTable, BaseDateColumn, ActionsColumn
 from .models import Meeting
 
 class MeetingTable(BaseTable):
-    date = tables.DateColumn(verbose_name="会议日期")
+    date = BaseDateColumn(verbose_name="会议日期")
     filename = tables.Column(verbose_name="文件名", accessor="filename", orderable=False)
     uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by.first_name", orderable=True)
     actions = ActionsColumn(

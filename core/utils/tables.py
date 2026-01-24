@@ -5,11 +5,20 @@ from django.utils.safestring import mark_safe
 from django.middleware.csrf import get_token
 
 
+class BaseDateColumn(tables.DateColumn):
+    """自定义日期列，统一日期显示格式为 YYYY-MM-DD（补零）。"""
+
+    def __init__(self, *args, **kwargs):
+        # Django 日期格式: Y = 4位年, m = 月(补零), d = 日(补零)
+        kwargs.setdefault("format", "Y-m-d")
+        super().__init__(*args, **kwargs)
+
+
 class BaseTable(tables.Table):
     class Meta:
         template_name = "django-tables2/table.html"
         empty_text = "暂无数据"
-        row_attrs = { "class": "hover:bg-base-300" }
+        row_attrs = {"class": "hover:bg-base-300"}
         attrs = {
             "class": "table w-full",
             "thead": {"class": "bg-base-300"},
