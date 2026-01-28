@@ -9,12 +9,12 @@ class UserProfile(models.Model):
     class Gender(models.TextChoices):
         MALE = 'M', '男'
         FEMAILE = 'F', '女'
-        SECRET = 'S', '保密'
+        # SECRET = 'S', '保密'
 
     user = models.OneToOneField(get_user_model(), on_delete=models.CASCADE, related_name='profile')
     student_id = models.CharField('学号', max_length=50, null=True, blank=True, unique=True)
     name_pronunciation = models.CharField('姓名全拼', max_length=100, null=True, blank=True)
-    gender = models.CharField('性别', max_length=1, choices=Gender.choices, default=Gender.SECRET, null=True, blank=True)
+    gender = models.CharField('性别', max_length=1, choices=Gender.choices, null=True, blank=True)
     birth_date = models.DateField('出生日期', null=True, blank=True)
     phone_number = models.CharField('电话号码', max_length=20, null=True, blank=True)
     id_number = models.CharField('身份证号', max_length=50, null=True, blank=True)
