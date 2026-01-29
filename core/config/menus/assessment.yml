@@ -17,3 +17,12 @@ items:
             size: 4
           is_visible: true
           login_required: true
+        - name: "资料上传"
+          named_url: "assessment:file_upload_list"
+          icon:
+            pic: "icon-[tabler--upload]"
+            size: 4
+          is_visible: true
+          login_required: true
+          required_perms:
+            - "assessment.add_assessmentattachment"

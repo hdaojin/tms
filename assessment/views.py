@@ -1,8 +1,11 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.db.models import Prefetch
 from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib import messages
 from django.utils import timezone
+from core.constants import GROUP_COACH
 from .models import Assessment, Score, AssessmentModule
+from .forms import AssessmentFileUploadForm, AttachmentFormSet
 
 @login_required
 def assessment_list(request):
@@ -257,4 +260,80 @@ def assessment_detail(request, pk):
         'max_grand_total_score': max_grand_total_score,
     }
     return render(request, 'assessment/assessment_detail.html', context)
+
+
+@login_required
+def assessment_file_upload_list(request):
+    """
+    考核资料上传列表页面
+    显示当前和下次考核的模块，供教练上传资料
+    只有教练有权限访问
+    """
+    # 检查是否是教练
+    if not request.user.groups.filter(name=GROUP_COACH).exists():
+        messages.error(request, "只有教练可以访问此页面")
+        return redirect('assessment:list')
+    
+    today = timezone.now().date()
+    
+    # 获取当前和未来的考核
+    assessments = Assessment.objects.filter(
+        end_date__gte=today
+    ).prefetch_related(
+        'assessmentmodule_set__module',
+        'assessmentmodule_set__attachments'
+    ).order_by('start_date')
+    
+    context = {
+        'assessments': assessments,
+        'title': '考核资料上传',
+        'title_icon': 'icon-[tabler--upload]',
+    }
+    return render(request, 'assessment/file_upload_list.html', context)
+
+
+@login_required
+def assessment_file_upload(request, module_id):
+    """
+    考核资料上传页面
+    针对特定的考核模块上传各种资料
+    只有教练有权限访问
+    """
+    # 检查是否是教练
+    if not request.user.groups.filter(name=GROUP_COACH).exists():
+        messages.error(request, "只有教练可以上传考核资料")
+        return redirect('assessment:list')
+    
+    assessment_module = get_object_or_404(
+        AssessmentModule.objects.select_related('assessment', 'module'),
+        pk=module_id
+    )
+    
+    # 检查考核是否已结束
+    today = timezone.now().date()
+    if assessment_module.assessment.end_date < today:
+        messages.warning(request, "该考核已结束，无法上传资料")
+        return redirect('assessment:file_upload_list')
+    
+    if request.method == 'POST':
+        form = AssessmentFileUploadForm(request.POST, request.FILES, instance=assessment_module)
+        formset = AttachmentFormSet(request.POST, request.FILES, instance=assessment_module)
+        
+        if form.is_valid() and formset.is_valid():
+            form.save()
+            formset.save()
+            messages.success(request, f"已成功保存 {assessment_module.module.name} 的考核资料")
+            return redirect('assessment:file_upload_list')
+    else:
+        form = AssessmentFileUploadForm(instance=assessment_module)
+        formset = AttachmentFormSet(instance=assessment_module)
+    
+    context = {
+        'assessment_module': assessment_module,
+        'form': form,
+        'formset': formset,
+        'title': f'{assessment_module.assessment.name} - {assessment_module.module.name} 资料上传',
+        'title_icon': 'icon-[tabler--file-upload]',
+    }
+    return render(request, 'assessment/file_upload.html', context)
 

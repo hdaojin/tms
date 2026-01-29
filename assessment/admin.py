@@ -1,12 +1,19 @@
 from django.contrib import admin
 from django import forms
-from .models import Assessment, Score, AssessmentModule
+from .models import Assessment, Score, AssessmentModule, AssessmentAttachment
 
 
 class AssessmentModuleInline(admin.TabularInline):
     model = AssessmentModule
     extra = 0
     autocomplete_fields = ['module']
+
+class AssessmentAttachmentInline(admin.TabularInline):
+    """附件内联编辑"""
+    model = AssessmentAttachment
+    extra = 1
+    fields = ['file', 'description', 'uploaded_at']
+    readonly_fields = ['uploaded_at']
 
 class AssessmentForm(forms.ModelForm):
     class Meta:
@@ -53,12 +60,20 @@ class AssessmentModuleAdmin(admin.ModelAdmin):
     list_display = ('assessment', 'module', 'max_score')
     list_filter = ('assessment',)
     search_fields = ('assessment__name', 'module__name')
-    inlines = [ScoreInline]
+    inlines = [ScoreInline, AssessmentAttachmentInline]
     
     def get_form(self, request, obj=None, **kwargs):   # type: ignore
         # 保存 obj 到 request 中，以便在 Inline 中使用
         request._obj_ = obj
         return super().get_form(request, obj, **kwargs)
 
+
+@admin.register(AssessmentAttachment)
+class AssessmentAttachmentAdmin(admin.ModelAdmin):
+    """附件管理"""
+    list_display = ('assessment_module', 'file', 'description', 'uploaded_at')
+    list_filter = ('assessment_module__assessment', 'uploaded_at')
+    search_fields = ('assessment_module__assessment__name', 'assessment_module__module__name', 'description')
+    readonly_fields = ['uploaded_at']
 
 

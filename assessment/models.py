@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.validators import MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
+import os
 
 
 assessment_storage = FileSystemStorage(location=str(settings.ASSESSMENT_UPLOAD_DIR))
@@ -13,7 +14,67 @@ def validate_file_size(value):
     if filesize > settings.UPLOAD_MAX_SIZE_MB * 1024 * 1024:
         raise ValidationError(f"文件大小不能超过 {settings.UPLOAD_MAX_SIZE_MB}MB")
 
+def get_assessment_upload_path(instance, filename, file_type):
+    """
+    生成考核文件上传路径和文件名
+    路径: assessment/{start_date}/{考核名称}/{考核模块}/
+    文件名: 
+        - 试题/评分标准/评分表: {start_date}-{考核名称}-{考核模块}-{文件类型}.{扩展名}
+        - 其他: 保持原文件名
+    """
+    assessment = instance.assessment
+    module = instance.module
+    start_date = assessment.start_date.strftime('%Y%m%d') if assessment.start_date else '00000000'
+    
+    # 构建目录路径
+    dir_path = f"{start_date}/{assessment.name}/{module.name}"
+    
+    # 获取原文件扩展名
+    ext = os.path.splitext(filename)[1]
+    
+    # 根据文件类型决定文件名
+    if file_type in ['question', 'scoring_standard', 'scoring_sheet']:
+        type_name_map = {
+            'question': '试题',
+            'scoring_standard': '评分标准',
+            'scoring_sheet': '评分表',
+        }
+        new_filename = f"{start_date}-{assessment.name}-{module.name}-{type_name_map[file_type]}{ext}"
+    else:
+        # 附件、评分脚本、其他文件保持原文件名
+        new_filename = filename
+    
+    return os.path.join(dir_path, new_filename)
+
+def question_upload_path(instance, filename):
+    return get_assessment_upload_path(instance, filename, 'question')
+
+def scoring_standard_upload_path(instance, filename):
+    return get_assessment_upload_path(instance, filename, 'scoring_standard')
+
+def scoring_sheet_upload_path(instance, filename):
+    return get_assessment_upload_path(instance, filename, 'scoring_sheet')
+
+def scoring_script_upload_path(instance, filename):
+    return get_assessment_upload_path(instance, filename, 'scoring_script')
+
+def other_file_upload_path(instance, filename):
+    return get_assessment_upload_path(instance, filename, 'other')
+
+def attachment_upload_path(instance, filename):
+    """附件上传路径生成函数"""
+    assessment_module = instance.assessment_module
+    assessment = assessment_module.assessment
+    module = assessment_module.module
+    start_date = assessment.start_date.strftime('%Y%m%d') if assessment.start_date else '00000000'
+    
+    dir_path = f"{start_date}/{assessment.name}/{module.name}"
+    # 附件保持原文件名
+    return os.path.join(dir_path, filename)
+
+# 兼容旧迁移文件的函数（已废弃，保留用于迁移）
 def assessment_paper_path(instance, filename):
+    """旧版上传路径函数 - 仅用于迁移兼容性"""
     date_path = instance.assessment.start_date.strftime('%Y/%m') if instance.assessment.start_date else '0000/00'
     return f"papers/{date_path}/{filename}"
 
@@ -78,25 +139,94 @@ class AssessmentModule(models.Model):
         validators=[MinValueValidator(Decimal("0.0"))],
         help_text="该模块的考核时长，单位为小时"
     )
-    paper_file = models.FileField(
-        "试卷及评分文件",
+    
+    # 考核资料文件字段
+    question_file = models.FileField(
+        "试题文件",
         storage=assessment_storage,
-        upload_to=assessment_paper_path,
+        upload_to=question_upload_path,
         blank=True,
         validators=[
             FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
             validate_file_size
         ],
-        help_text=f"请上传文件，支持 {', '.join(settings.ASSESSMENT_ALLOWED_EXTENSIONS)}，大小不超过 {settings.UPLOAD_MAX_SIZE_MB}MB"
+        help_text=f"上传试题文件，支持 {', '.join(settings.ASSESSMENT_ALLOWED_EXTENSIONS)}，大小不超过 {settings.UPLOAD_MAX_SIZE_MB}MB"
     )
+    
+    scoring_standard_file = models.FileField(
+        "评分标准文件",
+        storage=assessment_storage,
+        upload_to=scoring_standard_upload_path,
+        blank=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            validate_file_size
+        ],
+        help_text="上传评分标准文件"
+    )
+    
+    scoring_sheet_file = models.FileField(
+        "评分表文件",
+        storage=assessment_storage,
+        upload_to=scoring_sheet_upload_path,
+        blank=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            validate_file_size
+        ],
+        help_text="上传评分表文件（非必须）"
+    )
+    
+    scoring_script_file = models.FileField(
+        "评分脚本文件",
+        storage=assessment_storage,
+        upload_to=scoring_script_upload_path,
+        blank=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            validate_file_size
+        ],
+        help_text="上传评分脚本文件（非必须）"
+    )
+    
+    # 移除旧的 paper_file 字段，数据迁移时需要处理
 
     class Meta:
-        verbose_name = "成绩录入"
-        verbose_name_plural = "成绩录入"
+        verbose_name = "考核模块"
+        verbose_name_plural = "考核模块"
         unique_together = ['assessment', 'module']
 
     def __str__(self):
         return f"{self.assessment.name} - {self.module.name}"
+
+class AssessmentAttachment(models.Model):
+    """考核模块附件模型 - 支持上传多个附件文件"""
+    assessment_module = models.ForeignKey(
+        AssessmentModule,
+        on_delete=models.CASCADE,
+        related_name="attachments",
+        verbose_name="考核模块"
+    )
+    file = models.FileField(
+        "附件文件",
+        storage=assessment_storage,
+        upload_to=attachment_upload_path,
+        validators=[
+            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            validate_file_size
+        ],
+        help_text="上传附件文件"
+    )
+    description = models.CharField("文件说明", max_length=200, blank=True)
+    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
+    
+    class Meta:
+        verbose_name = "考核附件"
+        verbose_name_plural = "考核附件"
+        ordering = ['uploaded_at']
+    
+    def __str__(self):
+        return f"{self.assessment_module} - {os.path.basename(self.file.name)}"
 
 class Score(models.Model):
     assessment_module = models.ForeignKey(

@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-xl">
+  <div class="card-body">
+    <h2 class="card-title">
+      <span class="icon-[tabler--info-circle] size-6"></span>
+      考核资料上传说明
+    </h2>
+    <div class="prose">
+      <ul>
+        <li><strong>试题文件</strong>：考核使用的试题文档</li>
+        <li><strong>评分标准</strong>：详细的评分规则和标准</li>
+        <li><strong>评分表</strong>：用于记录成绩的表格（可选）</li>
+        <li><strong>评分脚本</strong>：自动化评分脚本（可选）</li>
+        <li><strong>附件</strong>：其他相关资料，可上传多个（可选）</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+{% for assessment in assessments %}
+<div class="card bg-base-100 shadow-xl mt-4">
+  <div class="card-body">
+    <h2 class="card-title">
+      <span class="icon-[tabler--calendar-event] size-6 text-primary"></span>
+      {{ assessment.name }}
+      <div class="badge badge-info">{{ assessment.start_date }} ~ {{ assessment.end_date }}</div>
+    </h2>
+    
+    {% if assessment.description %}
+    <p class="text-base-content/70">{{ assessment.description }}</p>
+    {% endif %}
+    
+    <div class="divider">考核模块</div>
+    
+    <div class="overflow-x-auto">
+      <table class="table table-zebra">
+        <thead>
+          <tr>
+            <th>模块名称</th>
+            <th>满分</th>
+            <th>时长（小时）</th>
+            <th>已上传文件</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for am in assessment.assessmentmodule_set.all %}
+          <tr>
+            <td>
+              <div class="flex items-center gap-2">
+                <span class="icon-[tabler--puzzle] size-5"></span>
+                <span class="font-semibold">{{ am.module.name }}</span>
+              </div>
+            </td>
+            <td>{{ am.max_score }}</td>
+            <td>{{ am.duration }}</td>
+            <td>
+              <div class="flex flex-wrap gap-1">
+                {% if am.question_file %}
+                <div class="badge badge-success badge-sm">试题</div>
+                {% endif %}
+                {% if am.scoring_standard_file %}
+                <div class="badge badge-success badge-sm">评分标准</div>
+                {% endif %}
+                {% if am.scoring_sheet_file %}
+                <div class="badge badge-info badge-sm">评分表</div>
+                {% endif %}
+                {% if am.scoring_script_file %}
+                <div class="badge badge-info badge-sm">评分脚本</div>
+                {% endif %}
+                {% if am.attachments.exists %}
+                <div class="badge badge-accent badge-sm">附件({{ am.attachments.count }})</div>
+                {% endif %}
+                {% if not am.question_file and not am.scoring_standard_file %}
+                <span class="text-base-content/50 text-sm">未上传</span>
+                {% endif %}
+              </div>
+            </td>
+            <td>
+              <a href="{% url 'assessment:file_upload' am.pk %}" class="btn btn-primary btn-sm">
+                <span class="icon-[tabler--upload] size-4"></span>
+                上传资料
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% empty %}
+<div class="alert alert-info mt-4">
+  <span class="icon-[tabler--info-circle] size-6"></span>
+  <span>当前没有可上传资料的考核</span>
+</div>
+{% endfor %}
+
+{% endblock %}
