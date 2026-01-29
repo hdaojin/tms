@@ -3,12 +3,14 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.shortcuts import redirect
 from django.urls import reverse
 
+from core.utils.mixins import TitleMixin
 
-class HomeView(TemplateView):
+
+class HomeView(TitleMixin, TemplateView):
     template_name = "home/homepage.html"
+    title = "首页"
+    title_icon = "icon-[tabler--home]"
     extra_context = {
-        "title": "首页", 
-        "title_icon": "icon-[tabler--home]",
         "login_form": AuthenticationForm(),
     }
     

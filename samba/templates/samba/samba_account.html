@@ -1,10 +1,7 @@
-{% extends "base_no_right_sidebar.html" %}
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
 
 {% block content %}
-{% for message in messages %}
-  <div class="alert {% if message.tags %}alert-{{ message.tags }}{% endif %}">{{ message }}</div>
-{% endfor %}
-
 {% if enabled %}
   <div class="card mb-4">
     <div class="card-body">
@@ -16,7 +13,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card mb-4">
     <div class="card-body">
       <h5 class="card-title">修改 Samba 密码</h5>
       <form method="post" novalidate>
@@ -40,7 +37,7 @@
   </div>
 
 {% else %}
-  <div class="card">
+  <div class="card mb-4">
     <div class="card-body">
       <h5 class="card-title">开通 Samba 账户</h5>
       <p class="card-text">
@@ -66,5 +63,61 @@
     </div>
   </div>
 {% endif %}
+
+{# Samba 访问方法说明 #}
+<div class="collapse collapse-arrow bg-base-200">
+  <input type="checkbox" />
+  <div class="collapse-title font-semibold flex items-center gap-2">
+    <span class="icon-[tabler--help-circle] size-5"></span>
+    如何访问 Samba 共享文件夹？
+  </div>
+  <div class="collapse-content text-sm">
+    <div class="tabs tabs-box mt-2">
+      <input type="radio" name="os_tabs" class="tab" aria-label="Windows" checked="checked" />
+      <div class="tab-content bg-base-100 border-base-300 p-4">
+        <ol class="list-decimal list-inside space-y-2">
+          <li>打开<strong>文件资源管理器</strong></li>
+          <li>在地址栏中输入 <code class="bg-base-300 px-2 py-0.5 rounded">\\{{ server_host }}</code></li>
+          <li>按 <kbd class="kbd kbd-sm">Enter</kbd> 回车</li>
+          <li>在弹出的登录窗口中输入你的 Samba 用户名和密码</li>
+          <li>点击确定即可访问共享文件夹</li>
+        </ol>
+        <div class="mt-3 text-base-content/70">
+          <span class="icon-[tabler--bulb] size-4 align-text-bottom"></span>
+          提示：可以右键点击共享文件夹选择"映射网络驱动器"，方便日后快速访问。
+        </div>
+      </div>
+
+      <input type="radio" name="os_tabs" class="tab" aria-label="Linux" />
+      <div class="tab-content bg-base-100 border-base-300 p-4">
+        <p class="mb-2"><strong>方法一：使用文件管理器</strong></p>
+        <ol class="list-decimal list-inside space-y-2 mb-4">
+          <li>打开文件管理器（如 Nautilus、Dolphin 等）</li>
+          <li>按 <kbd class="kbd kbd-sm">Ctrl</kbd> + <kbd class="kbd kbd-sm">L</kbd> 打开地址栏</li>
+          <li>输入 <code class="bg-base-300 px-2 py-0.5 rounded">smb://{{ server_host }}</code></li>
+          <li>按提示输入用户名和密码</li>
+        </ol>
+        <p class="mb-2"><strong>方法二：使用命令行挂载</strong></p>
+        <pre class="bg-base-300 p-3 rounded text-xs overflow-x-auto"><code>sudo mount -t cifs //{{ server_host }}/共享名 /mnt/samba -o username=你的用户名</code></pre>
+      </div>
+
+      <input type="radio" name="os_tabs" class="tab" aria-label="macOS" />
+      <div class="tab-content bg-base-100 border-base-300 p-4">
+        <ol class="list-decimal list-inside space-y-2">
+          <li>打开<strong>访达（Finder）</strong></li>
+          <li>点击菜单栏 <strong>前往</strong> → <strong>连接服务器</strong>（或按 <kbd class="kbd kbd-sm">⌘</kbd> + <kbd class="kbd kbd-sm">K</kbd>）</li>
+          <li>在服务器地址中输入 <code class="bg-base-300 px-2 py-0.5 rounded">smb://{{ server_host }}</code></li>
+          <li>点击<strong>连接</strong></li>
+          <li>选择"注册用户"，输入你的 Samba 用户名和密码</li>
+          <li>选择要挂载的共享文件夹</li>
+        </ol>
+        <div class="mt-3 text-base-content/70">
+          <span class="icon-[tabler--bulb] size-4 align-text-bottom"></span>
+          提示：勾选"在我的钥匙串中记住此密码"可以免去下次输入密码。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

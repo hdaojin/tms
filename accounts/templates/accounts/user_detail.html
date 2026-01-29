@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% load form_extras %}
+{% block right_sidebar %}{% endblock %}
+
+{% block content %}
+<!-- 返回按钮 -->
+<div class="mb-4">
+  <a href="{% url 'accounts:user_list' %}" class="btn btn-ghost btn-sm">
+    <span class="icon-[tabler--arrow-left] size-5"></span>
+    返回列表
+  </a>
+</div>
+
+<!-- 用户账号信息卡片 -->
+{% include 'accounts/partials/user_info_card.html' with target_user=target_user %}
+
+<!-- 详细资料卡片 -->
+<div class="card bg-base-100 shadow-xl">
+  <div class="card-body">
+    <h2 class="card-title mb-4">
+      <span class="icon-[tabler--user-circle]"></span>
+      详细资料
+      {% if profile.locked %}
+        <span class="badge badge-warning gap-1">
+          <span class="icon-[tabler--lock] size-4"></span>
+          已锁定
+        </span>
+      {% endif %}
+    </h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {% for field in form.visible_fields %}
+        {% include 'accounts/partials/form_field.html' with field=field %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

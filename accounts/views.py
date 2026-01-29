@@ -1,15 +1,17 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import login_not_required  # type: ignore
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth import get_user_model
+from django.views.generic import DetailView
 from django_tables2 import SingleTableView
 
 from .forms import CustomUserCreationForm, ProfileForm
 from .tables import UserListTable
 from core.utils.invitation import generate_invitation_code
 from core.utils.decorators import superuser_required
+from core.utils.mixins import TitleMixin
 from .models import UserProfile
 
 User = get_user_model()
@@ -60,22 +62,30 @@ def generate_invitation(request):
 
 @login_required
 def account_profile(request):
-    """用户查看和编辑个人资料：提交成功后锁定, 不可再次修改。"""
+    """用户查看和编辑个人资料。锁定后不可修改，需管理员在后台解锁。"""
 
     profile, _created = UserProfile.objects.get_or_create(user=request.user)
 
     if request.method == 'POST':
-        # 前台行为与管理员无关：若已锁定则禁止提交
+        # 若已锁定则禁止任何提交
         if profile.locked:
             messages.info(request, "资料已锁定，如需修改请联系管理员在后台解锁。")
             return redirect('accounts:profile')
+        
+        action = request.POST.get('action', 'save')
         form = ProfileForm(request.POST, instance=profile, request=request)
+        
         if form.is_valid():
             obj = form.save(commit=False)
-            # 提交后一律锁定
-            obj.locked = True
-            obj.save()
-            messages.success(request, "个人资料已保存并锁定，无法再次修改。")
+            # 锁定操作：保存并锁定
+            if action == 'lock':
+                obj.locked = True
+                obj.save()
+                messages.success(request, "个人资料已保存并锁定，无法再次修改。如需更改请联系管理员解锁。")
+            else:
+                # 仅保存
+                obj.save()
+                messages.success(request, "个人资料已保存。")
             return redirect('accounts:profile')
     else:
         form = ProfileForm(instance=profile, request=request)
@@ -91,7 +101,7 @@ def account_profile(request):
     })
 
 
-class UserListView(LoginRequiredMixin, PermissionRequiredMixin, SingleTableView):
+class UserListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableView):
     """显示所有用户列表（包含 Profile 信息）。
 
     需要 'accounts.view_all_profiles' 权限才能访问。
@@ -103,11 +113,39 @@ class UserListView(LoginRequiredMixin, PermissionRequiredMixin, SingleTableView)
     permission_required = "accounts.view_all_profiles"
     raise_exception = True
     paginate_by = 20
-    extra_context = {
-        "title": "用户列表",
-        "title_icon": "icon-[tabler--users]",
-    }
+    title = "用户列表"
+    title_icon = "icon-[tabler--users]"
 
     def get_queryset(self):
         """获取用户组为"选手"的用户，并预加载 profile 信息以优化查询。"""
         return User.objects.select_related("profile").filter(groups__name="选手").distinct()
+
+
+class UserDetailView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+    """显示用户详细信息。
+
+    需要 'accounts.view_all_profiles' 权限才能访问。
+    """
+
+    model = User
+    template_name = "accounts/user_detail.html"
+    context_object_name = "target_user"
+    permission_required = "accounts.view_all_profiles"
+    raise_exception = True
+    title = "{first_name}的详细信息"
+    title_icon = "icon-[tabler--user-circle]"
+
+    def get_queryset(self):
+        return User.objects.select_related("profile")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        target_user = context["target_user"]
+        profile, _ = UserProfile.objects.get_or_create(user=target_user)
+        # 复用 ProfileForm，设置为只读模式
+        form = ProfileForm(instance=profile)
+        for field in form.fields.values():
+            field.disabled = True
+        context["form"] = form
+        context["profile"] = profile
+        return context

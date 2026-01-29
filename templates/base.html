@@ -9,20 +9,36 @@
   </head>
 
   <body class="min-h-screen flex flex-col" hx-headers='{"x-csrftoken": "{{ csrf_token }}"}'>
-    {# Header：默认显示；若子模板要隐藏，覆盖 block 为“空”即可 #}
+    {# Header：默认显示；设置 show_header=False 可隐藏 #}
     {% block header %}
-      {% include 'partials/header.html' %}
+      {% if show_header|default:True %}
+        {% include 'partials/header.html' %}
+      {% endif %}
     {% endblock %}
 
     <div class="flex flex-1">
-      {# Sidebar：默认显示；若子模板要隐藏，覆盖 block 为“空”即可 #}
+      {# 左侧边栏：默认显示；设置 show_left_sidebar=False 可隐藏 #}
       {% block left_sidebar %}
-        {% include 'partials/left_sidebar.html' %}
+        {% if show_left_sidebar|default:True %}
+          {% include 'partials/left_sidebar.html' %}
+        {% endif %}
       {% endblock %}
 
       {% block main %}
         <main class="flex-1 p-4">
           <div class="flex flex-col space-y-4 w-full md:max-w-9/10 p-2 mx-auto">
+            {# 全局消息提示区域 #}
+            {% if messages %}
+              <div class="space-y-2">
+                {% for message in messages %}
+                  <div role="alert" class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-error{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
+                    <span class="{% if message.tags == 'success' %}icon-[tabler--circle-check]{% elif message.tags == 'error' %}icon-[tabler--alert-circle]{% elif message.tags == 'warning' %}icon-[tabler--alert-triangle]{% else %}icon-[tabler--info-circle]{% endif %} size-6"></span>
+                    <span>{{ message }}</span>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
             {% block title %}
               {% if title and show_title|default:True %}
                 <div class="flex items-center gap-3">
@@ -38,15 +54,19 @@
         </main>
       {% endblock %}
 
-      {# 右侧边栏：默认显示；若子模板要隐藏，覆盖 block 为“空”即可 #}
+      {# 右侧边栏：默认显示；设置 show_right_sidebar=False 可隐藏 #}
       {% block right_sidebar %}
-        {% include 'partials/right_sidebar.html' %}
+        {% if show_right_sidebar|default:True %}
+          {% include 'partials/right_sidebar.html' %}
+        {% endif %}
       {% endblock %}
     </div>
 
     {% block footer %}
-      {# Footer：默认显示；若子模板要隐藏，覆盖 block 为“空”即可 #}
-      {% include 'partials/footer.html' %}
+      {# Footer：默认显示；设置 show_footer=False 可隐藏 #}
+      {% if show_footer|default:True %}
+        {% include 'partials/footer.html' %}
+      {% endif %}
     {% endblock %}
 
     {% include 'partials/foot.html' %}

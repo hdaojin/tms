@@ -8,7 +8,7 @@ from django.core.validators import RegexValidator
 class UserProfile(models.Model):
     class Gender(models.TextChoices):
         MALE = 'M', '男'
-        FEMAILE = 'F', '女'
+        FEMALE = 'F', '女'
         # SECRET = 'S', '保密'
 
     user = models.OneToOneField(get_user_model(), on_delete=models.CASCADE, related_name='profile')

@@ -1,6 +1,7 @@
 {# meeting/templates/meeting/meeting_detail.html #}
 
-{% extends 'base_no_right_sidebar.html' %}
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
 
 {% block content %}
   {% include 'components/doc_detail_with_pdf.html' with uploaded_at=meeting.uploaded_at|date:'Y-m-d H:i' uploader_name=meeting.uploaded_by.first_name|default:meeting.uploaded_by.username file_size=meeting.file.size|filesizeformat file_name=meeting.filename file_url=meeting.file.url show_preview=True preview_url=pdf_preview_url %}

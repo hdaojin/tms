@@ -9,6 +9,8 @@ from .samba_sync import enable_samba_for_user, change_samba_password, is_samba_e
 def samba_account_view(request):
     user = request.user
     enabled = is_samba_enabled(user)
+    # 获取服务器 IP（从请求的 host 中提取，去掉端口号）
+    server_host = request.get_host().split(':')[0]
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -23,6 +25,7 @@ def samba_account_view(request):
             return render(request, "samba/samba_account.html", {
                 "enabled": enabled,
                 "form": form,
+                "server_host": server_host,
                 "title": "Samba 账户管理",
                 "title_icon" : "icon-[tabler--users-plus]"
             })
@@ -52,6 +55,7 @@ def samba_account_view(request):
     return render(request, "samba/samba_account.html", {
         "enabled": enabled,
         "form": form,
+        "server_host": server_host,
         "title": "Samba 账户管理",
         "title_icon" : "icon-[tabler--users-plus]"
     })

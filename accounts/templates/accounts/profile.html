@@ -1,59 +1,95 @@
-{% extends 'base_no_right_sidebar.html' %} {% block content %}
-  <!-- 用户信息卡片 -->
+{% extends 'base.html' %}
+{% load form_extras %}
+{% block right_sidebar %}{% endblock %}
+
+{% block content %}
+  <!-- 用户账号信息卡片 -->
+  {% include 'accounts/partials/user_info_card.html' with target_user=user %}
+  
+  <!-- 详细资料卡片 -->
   <div class="card bg-base-100 shadow-xl">
     <div class="card-body">
-      <h2 class="card-title">
-        <span class="icon-[tabler--id-badge]"></span>
-        基本信息
-      </h2>
-
-      <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <label class="input">
-          <span class="label">账号</span>
-          <input type="text" value="{{ user.username }}" disabled />
-        </label>
-
-        <label class="input">
-          <span class="label">姓名</span>
-          <input type="text" value="{{ user.first_name|default:'未设置' }}" disabled />
-        </label>
-
-        <label class="input">
-          <span class="label">邮箱</span>
-          <input type="email" value="{{ user.email|default:'未设置' }}" disabled />
-        </label>
-
-        <div class="label">
-          <span class="label-text">角色</span>
-          <div class="flex flex-wrap gap-2">
-            {# 系统内置角色 #} {% if user.is_superuser %}
-              <span class="badge badge-lg badge-error">超级管理员</span>
-            {% elif user.is_staff %}
-              <span class="badge badge-lg badge-secondary">工作人员</span>
-            {% endif %} {# 用户所属分组，全部列出 #} {% for g in user.groups.all %}
-              <span class="badge badge-lg badge-primary">{{ g.name }}</span>
-            {% empty %}
-              {% if not user.is_superuser and not user.is_staff %}
-                <span class="badge badge-outline badge-lg">普通用户</span>
-              {% endif %}
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="card bg-base-100 shadow-xl">
-    <div class="card-body">
-      <h2 class="card-titile mb-4 font-bold text-lg">
+      <h2 class="card-title mb-4">
         <span class="icon-[tabler--user-circle]"></span>
         详细资料
+        {% if profile.locked %}
+          <span class="badge badge-warning gap-1">
+            <span class="icon-[tabler--lock] size-4"></span>
+            已锁定
+          </span>
+        {% endif %}
       </h2>
 
       <div class="mx-auto w-full">
         {% if not can_edit %}
-          <div class="alert alert-info mb-4">资料已锁定，如需修改请联系管理员。</div>
+          <div class="alert alert-info mb-4">
+            <span class="icon-[tabler--lock] size-5"></span>
+            <span>资料已锁定，如需修改请联系管理员解锁。</span>
+          </div>
         {% endif %}
-        {% include 'accounts/profile_form_snippet.html' with form=form action=request.path show_submit=can_edit cancel_url=None %}
+        
+        <form action="{{ request.path }}" method="post">
+          {% csrf_token %}
+          
+          {# 隐藏字段 #}
+          {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+          {% endfor %}
+
+          {# 非字段错误 #}
+          {% if form.non_field_errors %}
+          <div class="alert alert-error mb-4">
+            <ul class="list-disc list-inside">
+              {% for error in form.non_field_errors %}
+              <li>{{ error }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+
+          {# 表单字段 - 两列布局 #}
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for field in form.visible_fields %}
+              {% if field.errors %}
+              <div class="alert alert-error mb-2 md:col-span-2">
+                <ul class="list-disc list-inside">
+                  {% for error in field.errors %}
+                  <li>{{ error }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% endif %}
+
+              {% include 'accounts/partials/form_field.html' with field=field %}
+            {% endfor %}
+          </div>
+          
+          {# 操作按钮 #}
+          {% if can_edit %}
+          <div class="mt-6 flex items-center gap-3">
+            <button type="submit" name="action" value="save" class="btn btn-primary">
+              <span class="icon-[tabler--device-floppy] size-5"></span>
+              保存
+            </button>
+            <button type="submit" name="action" value="lock" class="btn btn-warning"
+                    onclick="return confirm('确定要锁定资料吗？锁定后将无法修改，需联系管理员解锁。')">
+              <span class="icon-[tabler--lock] size-5"></span>
+              锁定资料
+            </button>
+          </div>
+          {% else %}
+          <div class="mt-6 flex items-center gap-3">
+            <button type="button" class="btn btn-primary btn-disabled" disabled>
+              <span class="icon-[tabler--device-floppy] size-5"></span>
+              保存
+            </button>
+            <button type="button" class="btn btn-warning btn-disabled" disabled>
+              <span class="icon-[tabler--lock] size-5"></span>
+              已锁定
+            </button>
+          </div>
+          {% endif %}
+        </form>
       </div>
     </div>
   </div>

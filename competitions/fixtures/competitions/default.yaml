@@ -1,9 +1,10 @@
-- model: competitions.competition
+- model: competitions.competitiontype
   pk: 1
   fields:
     code: "WSC"
     name: "WorldSkills Competition"
     level: "international"
+    weight: "7.0"
     description: "WorldSkills Competition (WSC) is the world championship of skills, held every two years."
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
@@ -11,7 +12,7 @@
 - model: competitions.project
   pk: 1
   fields:
-    competition: 1
+    competition_type: 1
     code: "ITNSA"
     name: "IT Network Systems Administration"
     description: "The IT Network Systems Administration (ITNSA) project focuses on skills related to managing and maintaining IT network systems."

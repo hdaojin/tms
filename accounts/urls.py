@@ -1,6 +1,6 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
-from .views import account_signup, account_home, account_profile, generate_invitation, UserListView
+from .views import account_signup, account_home, account_profile, generate_invitation, UserListView, UserDetailView
 
 app_name = 'accounts'
 
@@ -13,4 +13,5 @@ urlpatterns = [
     path('signup/', account_signup, name="signup"),
     path('generate-invite/', generate_invitation, name='generate_invitation'),
     path('users/', UserListView.as_view(), name='user_list'),
+    path('users/<int:pk>/', UserDetailView.as_view(), name='user_detail'),
 ]

@@ -3,16 +3,18 @@ from django.contrib.auth.mixins import (
     LoginRequiredMixin,
     PermissionRequiredMixin,
 )
-from django.http import Http404
 from django.views.generic import CreateView, DetailView, DeleteView
 from django.urls import reverse_lazy, reverse
-from django.shortcuts import get_object_or_404
 from django.contrib import messages
+from django.db.models import Q
 from django_tables2 import SingleTableView
+
+from core.constants import GROUP_COACH, GROUP_COMPETITOR
+from core.utils.mixins import TitleMixin, CrossGroupAccessMixin, OwnerRequiredMixin
+from core.utils.pdf_response import create_pdf_preview_view
 
 from .models import TrainingLog
 from .forms import TrainingLogCreateForm
-from core.utils.pdf_response import pdf_inline_response
 from .tables import TrainingLogTable, TrainingLogOthersTable, MonthlyStatTable
 
 
@@ -20,17 +22,15 @@ pagination_per_page = 18
 
 
 # 训练日志上传视图
-class TrainingLogUploadView(PermissionRequiredMixin, CreateView):
+class TrainingLogUploadView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingLog
     form_class = TrainingLogCreateForm
     template_name = "traininglogs/traininglog_upload.html"
     success_url = reverse_lazy("traininglogs:traininglog_list")
     permission_required = "traininglogs.add_traininglog"
     raise_exception = True
-    extra_context = {
-        "title": "上传训练日志",
-        "title_icon": "icon-[tabler--upload]",
-    }
+    title = "上传训练日志"
+    title_icon = "icon-[tabler--upload]"
 
     def form_valid(self, form):
         form.instance.uploaded_by = self.request.user
@@ -39,119 +39,82 @@ class TrainingLogUploadView(PermissionRequiredMixin, CreateView):
 
 
 # 训练日志列表视图
-class TraininglogListView(LoginRequiredMixin, SingleTableView):
+class TraininglogListView(TitleMixin, LoginRequiredMixin, SingleTableView):
     model = TrainingLog
     table_class = TrainingLogTable
     template_name = "traininglogs/traininglog_list.html"
-    # table_pagination = {"per_page": 10}  # 每页显示31条记录
     paginate_by = pagination_per_page
-    extra_context = {
-        "title": "我的训练日志",
-        "title_icon": "icon-[tabler--file-stack]",
-    }
+    title = "我的训练日志"
+    title_icon = "icon-[tabler--file-stack]"
 
     def get_queryset(self):
-        # 只显示当前登录用户自己的日志
-        qs = super().get_queryset()
+        qs = super().get_queryset().select_related('uploaded_by', 'module')
         if self.request.user.is_authenticated:
             return qs.filter(uploaded_by=self.request.user)
         return qs.none()
 
 
-def traininglog_pdf_inline(request, pk):
-    # 仅允许查看自己的日志
-    tl = get_object_or_404(TrainingLog, pk=pk)
+def _check_traininglog_cross_group_access(request, obj):
+    """检查训练日志的跨组访问权限"""
     user = request.user
     if not user.is_authenticated:
-        raise Http404("无法预览该PDF文件。")
-    # 超管放行；本人放行；选手可看教练；教练可看选手
+        return False
     if getattr(user, "is_superuser", False):
-        pass
-    else:
-        owner_id = getattr(tl, "uploaded_by_id", None)
-        if owner_id == getattr(user, "pk", None):
-            pass
-        else:
-            owner_user = getattr(tl, "uploaded_by", None)
-            owner_groups = (
-                set(owner_user.groups.values_list("name", flat=True))
-                if owner_user is not None
-                else set()
-            )
-            user_groups = (
-                set(getattr(user, "groups").values_list("name", flat=True))
-                if getattr(user, "pk", None)
-                else set()
-            )
-            allow = ("选手" in user_groups and "教练" in owner_groups) or (
-                "教练" in user_groups and "选手" in owner_groups
-            )
-            if not allow:
-                raise Http404("无法预览该PDF文件。")
-    resp = pdf_inline_response(tl.file.path, filename=tl.filename)
-    if resp is None:
-        raise Http404("无法预览该PDF文件。")
-    return resp
+        return True
+    if getattr(obj, "uploaded_by_id", None) == getattr(user, "pk", None):
+        return True
+    
+    owner_user = getattr(obj, "uploaded_by", None)
+    owner_groups = (
+        set(owner_user.groups.values_list("name", flat=True))
+        if owner_user is not None
+        else set()
+    )
+    user_groups = (
+        set(user.groups.values_list("name", flat=True))
+        if getattr(user, "pk", None)
+        else set()
+    )
+    return (GROUP_COMPETITOR in user_groups and GROUP_COACH in owner_groups) or (
+        GROUP_COACH in user_groups and GROUP_COMPETITOR in owner_groups
+    )
 
 
-class TrainingLogDetailView(LoginRequiredMixin, DetailView):
+# 使用工厂函数创建 PDF 预览视图
+traininglog_pdf_inline = create_pdf_preview_view(
+    TrainingLog,
+    permission_checker=_check_traininglog_cross_group_access
+)
+
+
+class TrainingLogDetailView(TitleMixin, CrossGroupAccessMixin, LoginRequiredMixin, DetailView):
     model = TrainingLog
     template_name = "traininglogs/traininglog_detail.html"
     context_object_name = "traininglog"
+    owner_field = "uploaded_by"
+    title = "{uploaded_by}的{training_date}训练日志"
+    title_icon = "icon-[tabler--file-text]"
 
-    def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        user = self.request.user
-        # 超管放行；本人放行；选手可看教练；教练可看选手
-        if getattr(user, "is_superuser", False):
-            return obj
-        if getattr(obj, "uploaded_by_id", None) == getattr(user, "pk", None):
-            return obj
-        owner_user = getattr(obj, "uploaded_by", None)
-        owner_groups = (
-            set(owner_user.groups.values_list("name", flat=True))
-            if owner_user is not None
-            else set()
-        )
-        user_groups = (
-            set(getattr(user, "groups").values_list("name", flat=True))
-            if getattr(user, "pk", None)
-            else set()
-        )
-        allow = ("选手" in user_groups and "教练" in owner_groups) or (
-            "教练" in user_groups and "选手" in owner_groups
-        )
-        if not allow:
-            raise Http404
-        return obj
+    def get_queryset(self):
+        return super().get_queryset().select_related('uploaded_by', 'module')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["pdf_preview_url"] = reverse(
-            "traininglogs:traininglog_pdf_inline", args=[self.object.pk]   # type: ignore
-        )  # type: ignore
+            "traininglogs:traininglog_pdf_inline", args=[self.object.pk]  # type: ignore
+        )
         return context
 
 
-class TrainingLogDeleteView(LoginRequiredMixin, DeleteView):
+class TrainingLogDeleteView(OwnerRequiredMixin, LoginRequiredMixin, DeleteView):
     model = TrainingLog
-    # template_name = "traininglogs/traininglog_confirm_delete.html"
     success_url = reverse_lazy("traininglogs:traininglog_list")
-    # permission_required = 'traininglogs.delete_traininglog'
     raise_exception = True
-
-    def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        # 仅允许删除自己的
-        if getattr(obj, "uploaded_by_id", None) != getattr(
-            self.request.user, "pk", None
-        ):
-            raise Http404
-        return obj
+    owner_field = "uploaded_by"
 
 
 class CoachTraininglogListView(
-    LoginRequiredMixin, PermissionRequiredMixin, SingleTableView
+    TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableView
 ):
     """教练训练日志：展示所有“教练”上传的日志。"""
 
@@ -160,23 +123,19 @@ class CoachTraininglogListView(
     template_name = "traininglogs/traininglog_list.html"
     permission_required = "traininglogs.view_coach_traininglog"
     raise_exception = True
-    # table_pagination = {"per_page": 31}
     paginate_by = pagination_per_page
-    extra_context = {
-        "title": "教练训练日志",
-        "title_icon": "icon-[tabler--file-search]",
-    }
+    title = "教练训练日志"
+    title_icon = "icon-[tabler--file-search]"
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        user = self.request.user
-        if not user.is_authenticated:
+        qs = super().get_queryset().select_related('uploaded_by', 'module')
+        if not self.request.user.is_authenticated:
             return qs.none()
-        return qs.filter(uploaded_by__groups__name="教练").distinct()
+        return qs.filter(uploaded_by__groups__name=GROUP_COACH).distinct()
 
 
 class CompetitorTraininglogListView(
-    LoginRequiredMixin, PermissionRequiredMixin, SingleTableView
+    TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableView
 ):
     """选手训练日志：展示所有“选手”上传的日志。"""
 
@@ -185,23 +144,18 @@ class CompetitorTraininglogListView(
     template_name = "traininglogs/traininglog_list.html"
     permission_required = "traininglogs.view_competitor_traininglog"
     raise_exception = True
-    # table_pagination = {"per_page": 10}
     paginate_by = pagination_per_page
-    extra_context = {
-        "title": "选手训练日志",
-        "title_icon": "icon-[tabler--file-search]",
-    }
+    title = "选手训练日志"
+    title_icon = "icon-[tabler--file-search]"
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        user = self.request.user
-        if not user.is_authenticated:
+        qs = super().get_queryset().select_related('uploaded_by', 'module')
+        if not self.request.user.is_authenticated:
             return qs.none()
-        return qs.filter(uploaded_by__groups__name="选手").distinct()
+        return qs.filter(uploaded_by__groups__name=GROUP_COMPETITOR).distinct()
 
 
-
-class TraininglogMonthlyStatView(LoginRequiredMixin, SingleTableView):
+class TraininglogMonthlyStatView(TitleMixin, LoginRequiredMixin, SingleTableView):
     """按月统计提交情况：列为 日期 / 已提交选手 / 未提交选手 / 已提交教练。
 
     查询参数：
@@ -212,10 +166,9 @@ class TraininglogMonthlyStatView(LoginRequiredMixin, SingleTableView):
 
     template_name = 'traininglogs/traininglog_statistics.html'
     table_class = MonthlyStatTable
-    # 为 ListView 提供占位 QuerySet（实际数据来自 get_table_data）
     model = TrainingLog
-    # 不分页：一个月内按天展示
     table_pagination = False
+    title_icon = 'icon-[tabler--chart-bar]'
 
     def get_queryset(self):
         return TrainingLog.objects.none()
@@ -236,10 +189,7 @@ class TraininglogMonthlyStatView(LoginRequiredMixin, SingleTableView):
         return year, month
 
     def _get_add_perm_users(self, group_name: str):
-        # 仅返回属于指定分组且拥有 add_traininglog 权限（来自个人或所在分组）的活跃用户
         from django.contrib.auth import get_user_model
-        from django.db.models import Q
-
         User = get_user_model()
         return (
             User.objects.filter(is_active=True, groups__name=group_name)
@@ -259,22 +209,18 @@ class TraininglogMonthlyStatView(LoginRequiredMixin, SingleTableView):
         days_in_month = monthrange(year, month)[1]
         start = date(year, month, 1)
         end = date(year, month, days_in_month)
-        # 若为当前月，只显示到今天
         today = timezone.localdate()
         if year == today.year and month == today.month:
             end = min(end, today)
 
-        # 只统计具有 add 权限的选手与教练
-        comp_qs = self._get_add_perm_users('选手').values('id', 'first_name', 'username')
-        coach_qs = self._get_add_perm_users('教练').values('id', 'first_name', 'username')
+        comp_qs = self._get_add_perm_users(GROUP_COMPETITOR).values('id', 'first_name', 'username')
+        coach_qs = self._get_add_perm_users(GROUP_COACH).values('id', 'first_name', 'username')
 
-        # id -> name（优先显示 first_name）
         comp_names = {u['id']: (u['first_name'] or u['username']) for u in comp_qs}
         coach_names = {u['id']: (u['first_name'] or u['username']) for u in coach_qs}
         comp_ids = set(comp_names.keys())
         coach_ids = set(coach_names.keys())
 
-        # 当月日志，仅关心上述用户
         user_ids = comp_ids | coach_ids
         rows = (
             TrainingLog.objects
@@ -282,7 +228,6 @@ class TraininglogMonthlyStatView(LoginRequiredMixin, SingleTableView):
             .values_list('training_date', 'uploaded_by_id')
         )
 
-        # d -> set(user_id)
         by_day = {}
         for d, uid in rows:
             by_day.setdefault(d, set()).add(uid)
@@ -309,7 +254,6 @@ class TraininglogMonthlyStatView(LoginRequiredMixin, SingleTableView):
         from django.utils import timezone
         ctx = super().get_context_data(**kwargs)
         year, month = self._get_selected_year_month()
-        # 下拉月份（近 12 个月，倒序，最近在上）
         t = timezone.localdate()
         y, m = t.year, t.month
         months = []
@@ -320,10 +264,12 @@ class TraininglogMonthlyStatView(LoginRequiredMixin, SingleTableView):
                 m = 12
                 y -= 1
         ctx.update({
-            'title': f"训练日志提交统计（{year}年{month:02d}月）",
-            'title_icon': 'icon-[tabler--chart-bar]',
             'months': months,
             'selected_year': year,
             'selected_month': month,
         })
         return ctx
+    
+    def get_title(self):
+        year, month = self._get_selected_year_month()
+        return f"训练日志提交统计（{year}年{month:02d}月）"

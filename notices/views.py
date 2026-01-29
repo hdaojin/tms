@@ -8,6 +8,7 @@ from django.views.generic import CreateView, DetailView, ListView, DeleteView
 from django.urls import reverse_lazy
 from django.http import Http404
 
+from core.utils.mixins import TitleMixin
 from .models import Notice, NoticeAttachment
 from .forms import NoticeForm
 
@@ -39,16 +40,14 @@ def _get_notices_with_read_status(user):
     return notices
 
 
-class NoticeListView(LoginRequiredMixin, ListView):
+class NoticeListView(TitleMixin, LoginRequiredMixin, ListView):
     model = Notice
     template_name = 'notices/notice_list.html'
     partial_template_name = 'notices/notice_list_partial.html'
     context_object_name = 'notices'
     paginate_by = 10
-    extra_context = {
-        "title": "通知列表",
-        "title_icon" : "icon-[tabler--list]"
-    }
+    title = "通知列表"
+    title_icon = "icon-[tabler--list]"
 
     def get_queryset(self):
         return _get_notices_with_read_status(self.request.user)
@@ -60,26 +59,22 @@ class NoticeListView(LoginRequiredMixin, ListView):
         return [self.template_name]
 
     
-class NoticeDetailView(LoginRequiredMixin, DetailView):
+class NoticeDetailView(TitleMixin, LoginRequiredMixin, DetailView):
     model = Notice
     template_name = 'notices/notice_detail.html'
     context_object_name = 'notice'
-    extra_context = {
-        "title": "通知详情",
-        "title_icon" : "icon-[tabler--bell]"
-    }
+    title = "{title}"
+    title_icon = "icon-[tabler--bell]"
 
     def get_queryset(self):
         return _get_notices_with_read_status(self.request.user)
 
 
-class NoticeDeleteView(LoginRequiredMixin, DeleteView):
+class NoticeDeleteView(TitleMixin, LoginRequiredMixin, DeleteView):
     model = Notice
     success_url = reverse_lazy('notices:notice_list')
-    extra_context = {
-        "title": "删除通知",
-        "title_icon" : "icon-[tabler--trash]"
-    }
+    title = "删除通知"
+    title_icon = "icon-[tabler--trash]"
 
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
@@ -90,15 +85,13 @@ class NoticeDeleteView(LoginRequiredMixin, DeleteView):
 
 
 
-class NoticeCreateView(LoginRequiredMixin, CreateView):
+class NoticeCreateView(TitleMixin, LoginRequiredMixin, CreateView):
     model = Notice
     form_class = NoticeForm
     template_name = 'notices/notice_create.html'
     success_url = reverse_lazy('notices:notice_list')
-    extra_context = {
-        "title": "发布通知",
-        "title_icon" : "icon-[tabler--plus]"
-    }
+    title = "发布通知"
+    title_icon = "icon-[tabler--plus]"
     def form_valid(self, form):
         form.instance.published_by = self.request.user
         # 直接发布：设置发布时间

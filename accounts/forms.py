@@ -78,7 +78,7 @@ class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
         fields = ("username", "full_name", "invitation_code", "password1", "password2")
 
 
-class ProfileForm(forms.ModelForm):
+class ProfileForm(StyledFormMixin, forms.ModelForm):
     """用户资料表单，用于编辑用户的个人信息。"""
     class Meta:
         model = UserProfile
@@ -106,7 +106,7 @@ class ProfileForm(forms.ModelForm):
             "student_id": forms.TextInput(attrs={"placeholder": "学号"}),
             "name_pronunciation": forms.TextInput(attrs={"placeholder": "姓名全拼"}),
             "gender": forms.Select(attrs={"class":"select select-sm select-ghost"}),
-            "birth_date": forms.DateInput(attrs={"type": "text", "placeholder": "YYYY/MM/DD"}),
+            "birth_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "phone_number": forms.TextInput(attrs={"placeholder": "电话号码"}),
             "id_number": forms.TextInput(attrs={"placeholder": "你的身份证号码"}),
             "emergency_contact": forms.TextInput(attrs={"placeholder": "紧急联系人姓名"}),
@@ -117,8 +117,8 @@ class ProfileForm(forms.ModelForm):
             "original_headteacher": forms.TextInput(attrs={"placeholder": "原班主任姓名"}),
             "original_headteacher_phone": forms.TextInput(attrs={"placeholder": "原班主任联系电话"}),
             "school_dormitory": forms.TextInput(attrs={"placeholder": "学校宿舍房间号，如走读则填写“走读”"}),
-            "join_date": forms.DateInput(attrs={"type": "text", "placeholder": "YYYY/MM/DD"}),
-            "leave_date": forms.DateInput(attrs={"type": "text", "placeholder": "YYYY/MM/DD"}),
+            "join_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+            "leave_date": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
             "notes": forms.Textarea(attrs={"rows": 4, "placeholder": "其他信息","class":"textarea w-full"}),
         }
 
