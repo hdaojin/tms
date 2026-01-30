@@ -7,9 +7,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-from django.conf import settings
-
 from core.utils.markdown import render_markdown_text
+from core.constants import NOTES_ROOT
 
 
 class InvalidNotePathError(Exception):
@@ -49,7 +48,7 @@ def _safe_join(base: Path, *parts: str) -> Path:
     """
 
     candidate = base.joinpath(*parts)
-    notes_root = Path(settings.NOTES_ROOT).resolve()
+    notes_root = Path(NOTES_ROOT).resolve()
     resolved = candidate.resolve(strict=False)
     if not resolved.is_relative_to(notes_root):
         raise InvalidNotePathError("Path traversal detected")
@@ -66,7 +65,7 @@ def resolve_note_markdown_path(repo: str, slug: str | None) -> Path:
     """
 
     safe_repo = normalize_repo_name(repo)
-    base = Path(settings.NOTES_ROOT) / safe_repo
+    base = Path(NOTES_ROOT) / safe_repo
 
     def _readme_or_raise() -> Path:
         candidate = _safe_join(base, "README.md")
@@ -184,7 +183,7 @@ def render_note_markdown(path: Path, repo: str, slug: str) -> NoteContent:
     """读取 markdown（可选 front matter），渲染为 HTML，并改写相对链接。"""
 
     # current_dir 用于把相对链接（例如 `../img.png`）解析为正确的仓库内路径。
-    repo_base = Path(settings.NOTES_ROOT) / repo
+    repo_base = Path(NOTES_ROOT) / repo
     try:
         current_dir = path.parent.relative_to(repo_base).as_posix()
     except ValueError:

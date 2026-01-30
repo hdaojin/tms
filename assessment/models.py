@@ -6,8 +6,9 @@ from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
 import os
 
+from core.constants import ASSESSMENT_UPLOAD_DIR, ASSESSMENT_ALLOWED_EXTENSIONS
 
-assessment_storage = FileSystemStorage(location=str(settings.ASSESSMENT_UPLOAD_DIR))
+assessment_storage = FileSystemStorage(location=str(ASSESSMENT_UPLOAD_DIR))
 
 def validate_file_size(value):
     filesize = value.size
@@ -147,10 +148,10 @@ class AssessmentModule(models.Model):
         upload_to=question_upload_path,
         blank=True,
         validators=[
-            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            FileExtensionValidator(allowed_extensions=ASSESSMENT_ALLOWED_EXTENSIONS),
             validate_file_size
         ],
-        help_text=f"上传试题文件，支持 {', '.join(settings.ASSESSMENT_ALLOWED_EXTENSIONS)}，大小不超过 {settings.UPLOAD_MAX_SIZE_MB}MB"
+        help_text=f"上传试题文件，支持 {', '.join(ASSESSMENT_ALLOWED_EXTENSIONS)}，大小不超过 {settings.UPLOAD_MAX_SIZE_MB}MB"
     )
     
     scoring_standard_file = models.FileField(
@@ -159,7 +160,7 @@ class AssessmentModule(models.Model):
         upload_to=scoring_standard_upload_path,
         blank=True,
         validators=[
-            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            FileExtensionValidator(allowed_extensions=ASSESSMENT_ALLOWED_EXTENSIONS),
             validate_file_size
         ],
         help_text="上传评分标准文件"
@@ -171,7 +172,7 @@ class AssessmentModule(models.Model):
         upload_to=scoring_sheet_upload_path,
         blank=True,
         validators=[
-            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            FileExtensionValidator(allowed_extensions=ASSESSMENT_ALLOWED_EXTENSIONS),
             validate_file_size
         ],
         help_text="上传评分表文件（非必须）"
@@ -183,7 +184,7 @@ class AssessmentModule(models.Model):
         upload_to=scoring_script_upload_path,
         blank=True,
         validators=[
-            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            FileExtensionValidator(allowed_extensions=ASSESSMENT_ALLOWED_EXTENSIONS),
             validate_file_size
         ],
         help_text="上传评分脚本文件（非必须）"
@@ -212,7 +213,7 @@ class AssessmentAttachment(models.Model):
         storage=assessment_storage,
         upload_to=attachment_upload_path,
         validators=[
-            FileExtensionValidator(allowed_extensions=settings.ASSESSMENT_ALLOWED_EXTENSIONS),
+            FileExtensionValidator(allowed_extensions=ASSESSMENT_ALLOWED_EXTENSIONS),
             validate_file_size
         ],
         help_text="上传附件文件"

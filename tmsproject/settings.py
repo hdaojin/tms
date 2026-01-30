@@ -15,6 +15,11 @@ from pathlib import Path
 
 import environ
 
+from core.constants import (
+    DEFAULT_CACHE_TIMEOUT,
+    DEFAULT_UPLOAD_MAX_SIZE_MB,
+)
+
 env = environ.Env(DEBUG=(bool, False))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -104,13 +109,6 @@ TEMPLATES = [
 ]
 
 
-# class CustomFormRenderer(TemplatesSetting):
-#     form_template_name = "components/form_snippet.html"
-#     # field_template_name = "field_snippet.html"
-
-# FORM_RENDERER = "tmsproject.settings.CustomFormRenderer"
-
-
 WSGI_APPLICATION = 'tmsproject.wsgi.application'
 
 
@@ -171,6 +169,7 @@ STATICFILES_DIRS = [
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files (user uploaded files)
+# 注意：公共文件上传目录是通过Web服务器静态文件功能直接提供服务的，无法控制用户权限。
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -185,41 +184,6 @@ LOGIN_REDIRECT_URL = '/accounts/home/'  # 登录成功后跳转的页面
 # LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 
-# class CustomFormRenderer(TemplatesSetting):
-#     form_template_name = BASE_DIR /  'templates' / 'form_snippet.html'
-
-# FORM_RENDERER = 'tmsproject.settings.CustomFormRenderer'
-
-# 自定义变量
-INVITATION_CODE_TIMEOUT = env('INVITATION_CODE_TIMEOUT', default=24*60*60) # type: ignore
-CACHE_TIMEOUT = env('CACHE_TIMEOUT', default=300) # type: ignore
-UPLOAD_MAX_SIZE_MB = 100  # 默认上传文件最大尺寸，单位MB
-
-# 私有文件上传目录是通过Django处理的，可以控制权限。
-# 私有文件根目录（请手动创建）：BASE_DIR/media-private
-PRIVATE_MEDIA_ROOT = BASE_DIR / "media-private"
-
-# 笔记根目录（请手动创建）：BASE_DIR/media-private/notes
-NOTES_ROOT = PRIVATE_MEDIA_ROOT / "notes"
-
-# 考核相关文件上传目录：BASE_DIR/media-private/assessment
-ASSESSMENT_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "assessment"
-ASSESSMENT_ALLOWED_EXTENSIONS = ['xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'zip', '7z', 'gz', 'bz2', 'rar']
-
-# 竞赛相关文件上传目录：BASE_DIR/media-private/competitions
-COMPETITION_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "competitions"
-COMPETITION_ALLOWED_EXTENSIONS = ['xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png', 'zip', '7z', 'gz', 'bz2', 'rar']
-
-
-# 公共文件上传目录是通过Web服务器静态文件功能直接提供服务的，无法控制权限。
-# 训练日志根目录：BASE_DIR/media/traininglogs
-TRAININGLOG_UPLOAD_DIR = "traininglogs"
-TRAININGLOG_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf']
-
-MEETING_UPLOAD_DIR = "meetings"
-NOTICE_UPLOAD_DIR = "notices"
-
-
-
-
-
+# 自定义变量（默认值定义在 core/constants.py，可通过环境变量覆盖）
+CACHE_TIMEOUT = env.int('CACHE_TIMEOUT', default=DEFAULT_CACHE_TIMEOUT)  # type: ignore
+UPLOAD_MAX_SIZE_MB = env.int('UPLOAD_MAX_SIZE_MB', default=DEFAULT_UPLOAD_MAX_SIZE_MB)  # type: ignore

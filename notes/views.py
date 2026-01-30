@@ -16,6 +16,7 @@ from django.conf import settings
 from django.db.models import Prefetch
 
 from core.utils.markdown import render_markdown_text
+from core.constants import NOTES_ROOT
 
 from .models import NoteRepo
 from .utils import (
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 def notes_repo_list_view(request: HttpRequest) -> HttpResponse:
 	"""List top-level note repositories under NOTES_ROOT."""
 
-	notes_root = Path(settings.NOTES_ROOT)
+	notes_root = Path(NOTES_ROOT)
 	repo_dirs: set[str] = set()
 	if notes_root.exists():
 		for child in notes_root.iterdir():
@@ -195,7 +196,7 @@ def note_detail_view(
 
 	parse_error = bool(note.meta.get("_parse_error")) if isinstance(note.meta, dict) else False
 
-	base_dir = Path(settings.NOTES_ROOT) / safe_repo
+	base_dir = Path(NOTES_ROOT) / safe_repo
 	nav_items = get_nav_order_from_readme(base_dir)
 
 	# Ensure README is always the first item, and avoid duplicates if it's also in TOC
@@ -233,7 +234,7 @@ def note_detail_view(
 	except Exception:
 		pass
 	
-	notes_root_name = Path(settings.NOTES_ROOT).name
+	notes_root_name = Path(NOTES_ROOT).name
 
 	context = {
 		"note": note,
@@ -333,7 +334,7 @@ def note_asset_view(request: HttpRequest, repo: str, asset_path: str) -> HttpRes
 		logger.warning("Invalid asset repo: %s", repo)
 		raise Http404("Invalid repo") from exc
 
-	base = Path(settings.NOTES_ROOT) / safe_repo
+	base = Path(NOTES_ROOT) / safe_repo
 	candidate = base / asset_path
 
 	try:
