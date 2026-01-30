@@ -6,7 +6,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 
-from core.utils.validators import FileSizeValidator
+from core.utils.validators import validate_file_size
 from core.constants import COMPETITION_UPLOAD_DIR, COMPETITION_ALLOWED_EXTENSIONS
 
 competition_storage = FileSystemStorage(location=str(COMPETITION_UPLOAD_DIR))
@@ -126,7 +126,7 @@ class CompetitionProject(models.Model):
         blank=True,
         validators=[
             FileExtensionValidator(allowed_extensions=COMPETITION_ALLOWED_EXTENSIONS, message=f"仅支持以下格式的文件：{', '.join(COMPETITION_ALLOWED_EXTENSIONS)}"),
-            FileSizeValidator(),
+            validate_file_size,
         ],
         help_text=f"上传与该赛项相关的归档文件，支持格式：{', '.join(COMPETITION_ALLOWED_EXTENSIONS)}，文件大小不超过{settings.UPLOAD_MAX_SIZE_MB}MB"
     )

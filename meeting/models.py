@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from pathlib import Path
 
-from core.utils.validators import FileSizeValidator, DateNotFutureValidator, validate_pdf_file
+from core.utils.validators import validate_file_size, validate_date_not_future, validate_pdf_file
 from core.utils.signals import register_file_cleanup_signals
 
 
@@ -22,7 +22,7 @@ def meeting_file_upload_to(instance, original_name: str) -> str:
 def meeting_file_validator(file):
     """验证会议记录文件（PDF 格式和大小）"""
     validate_pdf_file(file)
-    FileSizeValidator()(file)
+    validate_file_size(file)
 
 
 class Meeting(models.Model):
@@ -31,7 +31,7 @@ class Meeting(models.Model):
         verbose_name="会议日期",
         default=timezone.localdate,
         help_text="特别注意：请填写会议的实际日期, 而非上传日期",
-        validators=[DateNotFutureValidator("会议日期")]
+        validators=[validate_date_not_future]
     )
     file = models.FileField(
         "会议记录文件",

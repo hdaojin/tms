@@ -7,7 +7,7 @@ from django.utils.text import slugify
 from pathlib import Path
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
-from core.utils.validators import FileSizeValidator, DateNotFutureValidator
+from core.utils.validators import validate_file_size, validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
 
 """避免循环导入：使用字符串引用外键模型。"""
@@ -62,7 +62,7 @@ class TrainingLog(models.Model):
     training_date = models.DateField(
         "训练日期", default=timezone.now,
         help_text="*特别注意：请填写日志对应的实际训练日期，而非上传日期",
-        validators=[DateNotFutureValidator("训练日期")]
+        validators=[validate_date_not_future]
     )
     file = models.FileField(
         "日志文件",
@@ -73,7 +73,7 @@ class TrainingLog(models.Model):
                 allowed_extensions=TRAININGLOG_ALLOWED_EXTENSIONS,
                 message=f"仅支持以下格式的文件：{', '.join(TRAININGLOG_ALLOWED_EXTENSIONS)}"
             ),
-            FileSizeValidator(),
+            validate_file_size,
         ],
     )
     uploaded_by = models.ForeignKey(

@@ -12,6 +12,7 @@ from .tables import UserListTable
 from core.utils.invitation import generate_invitation_code
 from core.utils.decorators import superuser_required
 from core.utils.mixins import TitleMixin
+from core.constants import GROUP_COMPETITOR
 from .models import UserProfile
 
 User = get_user_model()
@@ -118,7 +119,7 @@ class UserListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, Sing
 
     def get_queryset(self):
         """获取用户组为"选手"的用户，并预加载 profile 信息以优化查询。"""
-        return User.objects.select_related("profile").filter(groups__name="选手").distinct()
+        return User.objects.select_related("profile").filter(groups__name=GROUP_COMPETITOR).distinct().order_by("username")
 
 
 class UserDetailView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, DetailView):

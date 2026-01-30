@@ -24,8 +24,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('task', models.CharField(max_length=100, verbose_name='训练任务')),
-                ('training_date', models.DateField(default=django.utils.timezone.now, help_text='*特别注意：请填写日志对应的实际训练日期，而非上传日期', validators=[core.utils.validators.DateNotFutureValidator(field_name='训练日期')], verbose_name='训练日期')),
-                ('file', models.FileField(help_text='支持格式：doc, docx, pdf，文件大小不超过 100MB', upload_to=traininglogs.models.traininglog_upload_to, validators=[django.core.validators.FileExtensionValidator(allowed_extensions=['doc', 'docx', 'pdf'], message='仅支持以下格式的文件：doc, docx, pdf'), core.utils.validators.FileSizeValidator(max_size_mb=None)], verbose_name='日志文件')),
+                ('training_date', models.DateField(default=django.utils.timezone.now, help_text='*特别注意：请填写日志对应的实际训练日期，而非上传日期', validators=[core.utils.validators.validate_date_not_future], verbose_name='训练日期')),
+                ('file', models.FileField(help_text='支持格式：doc, docx, pdf，文件大小不超过 100MB', upload_to=traininglogs.models.traininglog_upload_to, validators=[django.core.validators.FileExtensionValidator(allowed_extensions=['doc', 'docx', 'pdf'], message='仅支持以下格式的文件：doc, docx, pdf'), core.utils.validators.validate_file_size], verbose_name='日志文件')),
                 ('uploaded_at', models.DateTimeField(auto_now_add=True, verbose_name='上传时间')),
                 ('module', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='training_logs', to='competitions.module', verbose_name='训练模块')),
                 ('uploaded_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='training_logs', to=settings.AUTH_USER_MODEL, verbose_name='上传者')),

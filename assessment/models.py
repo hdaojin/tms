@@ -1,19 +1,15 @@
 from decimal import Decimal
+from pathlib import PurePosixPath
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.core.files.storage import FileSystemStorage
-import os
 
 from core.constants import ASSESSMENT_UPLOAD_DIR, ASSESSMENT_ALLOWED_EXTENSIONS
+from core.utils.validators import validate_file_size
 
 assessment_storage = FileSystemStorage(location=str(ASSESSMENT_UPLOAD_DIR))
-
-def validate_file_size(value):
-    filesize = value.size
-    if filesize > settings.UPLOAD_MAX_SIZE_MB * 1024 * 1024:
-        raise ValidationError(f"文件大小不能超过 {settings.UPLOAD_MAX_SIZE_MB}MB")
 
 def get_assessment_upload_path(instance, filename, file_type):
     """
@@ -31,7 +27,7 @@ def get_assessment_upload_path(instance, filename, file_type):
     dir_path = f"{start_date}/{assessment.name}/{module.name}"
     
     # 获取原文件扩展名
-    ext = os.path.splitext(filename)[1]
+    ext = PurePosixPath(filename).suffix
     
     # 根据文件类型决定文件名
     if file_type in ['question', 'scoring_standard', 'scoring_sheet']:
@@ -45,7 +41,7 @@ def get_assessment_upload_path(instance, filename, file_type):
         # 附件、评分脚本、其他文件保持原文件名
         new_filename = filename
     
-    return os.path.join(dir_path, new_filename)
+    return str(PurePosixPath(dir_path) / new_filename)
 
 def question_upload_path(instance, filename):
     return get_assessment_upload_path(instance, filename, 'question')
@@ -71,7 +67,7 @@ def attachment_upload_path(instance, filename):
     
     dir_path = f"{start_date}/{assessment.name}/{module.name}"
     # 附件保持原文件名
-    return os.path.join(dir_path, filename)
+    return str(PurePosixPath(dir_path) / filename)
 
 # 兼容旧迁移文件的函数（已废弃，保留用于迁移）
 def assessment_paper_path(instance, filename):
@@ -227,7 +223,7 @@ class AssessmentAttachment(models.Model):
         ordering = ['uploaded_at']
     
     def __str__(self):
-        return f"{self.assessment_module} - {os.path.basename(self.file.name)}"
+        return f"{self.assessment_module} - {PurePosixPath(self.file.name).name}"
 
 class Score(models.Model):
     assessment_module = models.ForeignKey(

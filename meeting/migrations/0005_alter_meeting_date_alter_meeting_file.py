@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='meeting',
             name='date',
-            field=models.DateField(default=django.utils.timezone.localdate, help_text='特别注意：请填写会议的实际日期, 而非上传日期', validators=[core.utils.validators.DateNotFutureValidator(field_name='会议日期')], verbose_name='会议日期'),
+            field=models.DateField(default=django.utils.timezone.localdate, help_text='特别注意：请填写会议的实际日期, 而非上传日期', validators=[core.utils.validators.validate_date_not_future], verbose_name='会议日期'),
         ),
         migrations.AlterField(
             model_name='meeting',

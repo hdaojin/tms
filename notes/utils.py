@@ -172,9 +172,17 @@ def rewrite_relative_urls(html: str, repo: str, current_dir: str = "") -> str:
     root = soup.body if (is_fragment and soup.body) else soup
 
     for tag in root.find_all(href=True):
-        tag["href"] = rewrite_url(tag.get("href"))
+        href = tag.get("href")
+        if isinstance(href, str) or href is None:
+            rewritten = rewrite_url(href)
+            if rewritten is not None:
+                tag["href"] = rewritten
     for tag in root.find_all(src=True):
-        tag["src"] = rewrite_url(tag.get("src"))
+        src = tag.get("src")
+        if isinstance(src, str) or src is None:
+            rewritten = rewrite_url(src)
+            if rewritten is not None:
+                tag["src"] = rewritten
 
     return root.decode_contents() if root is soup.body else str(root)
 
