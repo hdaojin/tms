@@ -98,5 +98,7 @@ npm outdated
 npm update    
 ```
 
+Copy-Item "d:\04-01-Codes\GitHub\hdaojin\tms\node_modules\alpinejs\dist\cdn.min.js" "d:\04-01-Codes\GitHub\hdaojin\tms\static\js\alpinejs.min.js"
+
 
 

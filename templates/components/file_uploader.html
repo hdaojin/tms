@@ -1,0 +1,245 @@
+{% comment%}
+文件上传组件 - 支持拖拽、多文件、预览、进度条
+使用 Alpine.js + HTMX 实现
+
+使用方式：
+{% include 'components/file_uploader.html' with 
+    name="file"                      # 必填：表单字段名
+    accept=".pdf,.doc,.docx"         # 可选：允许的文件类型
+    max_size_mb=100                  # 可选：最大文件大小(MB)，默认100
+    multiple=False                   # 可选：是否多文件，默认False
+    required=True                    # 可选：是否必填，默认True
+    existing_file=object.file        # 可选：已上传的文件对象
+    help_text="支持 PDF 格式"         # 可选：帮助文本
+    label="上传文件"                  # 可选：标签文本
+%}
+
+注意：
+1. 组件需要放在 <form enctype="multipart/form-data"> 内
+2. 确保页面已引入 Alpine.js
+{% endcomment %} 
+
+{% load static %}
+
+<div 
+    x-data="{
+        files: [],
+        isDragging: false,
+        existingFile: '{{ existing_file.name|default:""|escapejs }}',
+        maxSizeMB: {{ max_size_mb|default:100 }},
+        multiple: {{ multiple|yesno:'true,false' }},
+        errors: [],
+        
+        // 添加文件
+        addFiles(fileList) {
+            this.errors = [];
+            const newFiles = Array.from(fileList);
+            
+            for (const file of newFiles) {
+                // 验证文件大小
+                if (file.size > this.maxSizeMB * 1024 * 1024) {
+                    this.errors.push(`「${file.name}」超过最大限制 ${this.maxSizeMB}MB`);
+                    continue;
+                }
+                
+                // 单文件模式：替换；多文件模式：追加
+                if (this.multiple) {
+                    // 检查重复
+                    if (!this.files.some(f => f.name === file.name && f.size === file.size)) {
+                        this.files.push(file);
+                    }
+                } else {
+                    this.files = [file];
+                    this.existingFile = '';  // 清除已有文件显示
+                }
+            }
+            
+            // 更新隐藏的 input
+            this.syncToInput();
+        },
+        
+        // 移除文件
+        removeFile(index) {
+            this.files.splice(index, 1);
+            this.syncToInput();
+        },
+        
+        // 清除已有文件（标记删除）
+        clearExisting() {
+            this.existingFile = '';
+            // 如果需要通知后端删除，可以设置一个隐藏字段
+            const clearInput = this.$refs.clearExisting;
+            if (clearInput) clearInput.value = 'true';
+        },
+        
+        // 同步到真实的 file input
+        syncToInput() {
+            const dt = new DataTransfer();
+            this.files.forEach(file => dt.items.add(file));
+            this.$refs.fileInput.files = dt.files;
+        },
+        
+        // 格式化文件大小
+        formatSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+        },
+        
+        // 获取文件图标
+        getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'pdf': 'icon-[tabler--file-type-pdf]',
+                'doc': 'icon-[tabler--file-type-doc]',
+                'docx': 'icon-[tabler--file-type-docx]',
+                'xls': 'icon-[tabler--file-type-xls]',
+                'xlsx': 'icon-[tabler--file-type-xls]',
+                'ppt': 'icon-[tabler--file-type-ppt]',
+                'pptx': 'icon-[tabler--file-type-ppt]',
+                'zip': 'icon-[tabler--file-zip]',
+                'rar': 'icon-[tabler--file-zip]',
+                '7z': 'icon-[tabler--file-zip]',
+                'jpg': 'icon-[tabler--photo]',
+                'jpeg': 'icon-[tabler--photo]',
+                'png': 'icon-[tabler--photo]',
+                'gif': 'icon-[tabler--photo]',
+            };
+            return icons[ext] || 'icon-[tabler--file]';
+        },
+        
+        // 是否为图片
+        isImage(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            return ['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext);
+        }
+    }"
+    class="w-full"
+>
+    {# 标签 #}
+    {% if label %}
+    <label class="label">
+        <span class="label-text font-semibold">
+            {{ label }}
+            {% if required|default:True %}<span class="text-error">*</span>{% endif %}
+        </span>
+    </label>
+    {% endif %}
+
+    {# 拖拽上传区域 #}
+    <div 
+        class="border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200"
+        :class="isDragging ? 'border-primary bg-primary/5 scale-[1.02]' : 'border-base-300 hover:border-primary/50 hover:bg-base-200/50'"
+        @dragover.prevent="isDragging = true"
+        @dragleave.prevent="isDragging = false"
+        @drop.prevent="isDragging = false; addFiles($event.dataTransfer.files)"
+        @click="$refs.fileInput.click()"
+    >
+        <div class="flex flex-col items-center gap-3">
+            <div class="rounded-full bg-base-200 p-4" :class="isDragging ? 'bg-primary/20' : ''">
+                <span class="icon-[tabler--cloud-upload] size-10 text-primary"></span>
+            </div>
+            <div>
+                <p class="font-medium text-base-content">
+                    拖拽文件到此处，或
+                    <span class="text-primary underline">点击选择</span>
+                </p>
+                <p class="text-sm text-base-content/60 mt-1">
+                    {% if help_text %}{{ help_text }}{% else %}最大 {{ max_size_mb|default:100 }}MB{% endif %}
+                </p>
+            </div>
+        </div>
+        
+        {# 真实的文件 input（隐藏） #}
+        <input 
+            type="file" 
+            name="{{ name }}"
+            x-ref="fileInput"
+            class="hidden"
+            {% if accept %}accept="{{ accept }}"{% endif %}
+            {% if multiple %}multiple{% endif %}
+            {% if required|default:True %}required{% endif %}
+            @change="addFiles($event.target.files)"
+        >
+    </div>
+
+    {# 错误提示 #}
+    <template x-if="errors.length > 0">
+        <div class="alert alert-error mt-3">
+            <span class="icon-[tabler--alert-circle] size-5"></span>
+            <div>
+                <template x-for="error in errors" :key="error">
+                    <p x-text="error" class="text-sm"></p>
+                </template>
+            </div>
+        </div>
+    </template>
+
+    {# 已有文件显示 #}
+    <template x-if="existingFile && files.length === 0">
+        <div class="mt-3 p-3 bg-success/10 border border-success/30 rounded-lg">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <span class="icon-[tabler--file-check] size-6 text-success"></span>
+                    <div>
+                        <p class="font-medium text-sm">已上传文件</p>
+                        <p class="text-xs text-base-content/70" x-text="existingFile.split('/').pop()"></p>
+                    </div>
+                </div>
+                <button 
+                    type="button" 
+                    class="btn btn-ghost btn-sm btn-circle text-error"
+                    @click.stop="clearExisting()"
+                    title="移除已有文件"
+                >
+                    <span class="icon-[tabler--x] size-4"></span>
+                </button>
+            </div>
+        </div>
+    </template>
+    
+    {# 隐藏字段：标记是否清除已有文件 #}
+    <input type="hidden" name="{{ name }}-clear" x-ref="clearExisting" value="">
+
+    {# 新选择的文件列表 #}
+    <template x-if="files.length > 0">
+        <div class="mt-3 space-y-2">
+            <p class="text-sm text-base-content/70 font-medium">
+                已选择 <span x-text="files.length"></span> 个文件
+            </p>
+            <template x-for="(file, index) in files" :key="file.name + file.size">
+                <div class="flex items-center gap-3 p-3 bg-base-200 rounded-lg group">
+                    {# 图片预览 / 文件图标 #}
+                    <template x-if="isImage(file.name)">
+                        <img 
+                            :src="URL.createObjectURL(file)" 
+                            class="size-12 object-cover rounded-lg"
+                            :alt="file.name"
+                        >
+                    </template>
+                    <template x-if="!isImage(file.name)">
+                        <div class="size-12 flex items-center justify-center bg-base-300 rounded-lg">
+                            <span :class="getFileIcon(file.name)" class="size-6 text-primary"></span>
+                        </div>
+                    </template>
+                    
+                    {# 文件信息 #}
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-sm truncate" x-text="file.name"></p>
+                        <p class="text-xs text-base-content/60" x-text="formatSize(file.size)"></p>
+                    </div>
+                    
+                    {# 删除按钮 #}
+                    <button 
+                        type="button" 
+                        class="btn btn-ghost btn-sm btn-circle opacity-0 group-hover:opacity-100 transition-opacity"
+                        @click.stop="removeFile(index)"
+                        title="移除"
+                    >
+                        <span class="icon-[tabler--x] size-4 text-error"></span>
+                    </button>
+                </div>
+            </template>
+        </div>
+    </template>
+</div>

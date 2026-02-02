@@ -32,6 +32,14 @@ class NoticeForm(StyledFormMixin, forms.ModelForm):
     """
     通知创建和编辑表单
     """
+    # 添加"所有人"选项，默认勾选
+    send_to_all = forms.BooleanField(
+        required=False,
+        initial=True,
+        label='所有人',
+        help_text='勾选后将向所有用户发送通知'
+    )
+    
     attachments = MultipleFileField(
         widget=MultipleFileInput(attrs={
             'type': 'file',
@@ -47,7 +55,7 @@ class NoticeForm(StyledFormMixin, forms.ModelForm):
 
     class Meta:
         model = Notice
-        fields = ['title', 'content', 'attachments', 'target_groups']
+        fields = ['title', 'content', 'attachments', 'send_to_all', 'target_groups']
         widgets = {
             'title': forms.TextInput(attrs={
                 'type': 'text',
@@ -68,12 +76,12 @@ class NoticeForm(StyledFormMixin, forms.ModelForm):
         labels = {
             'title': '通知标题',
             'content': '通知内容',
-            'target_groups': '目标用户组',
+            'target_groups': '指定用户组',
         }
         help_texts = {
             'title': '留空将显示为"无标题"',
             'content': '支持换行和简单格式',
-            'target_groups': '不选择任何组将向所有用户发送',
+            'target_groups': '勾选"所有人"时此项无效；取消"所有人"后可选择特定用户组',
         }
 
 
@@ -87,7 +95,12 @@ class NoticeForm(StyledFormMixin, forms.ModelForm):
         
         if commit:
             notice.save()
-            self.save_m2m()  # 保存多对多关系
+            
+            # 处理目标用户组：如果勾选"所有人"，清空 target_groups
+            if self.cleaned_data.get('send_to_all'):
+                notice.target_groups.clear()
+            else:
+                self.save_m2m()  # 保存多对多关系
         
         return notice
 

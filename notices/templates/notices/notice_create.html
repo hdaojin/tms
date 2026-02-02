@@ -1,17 +1,105 @@
 {% extends 'base.html' %}
+{% load form_extras %}
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
 <div class="max-w-lg mx-auto p-2 w-full">
-    {% include 'components/form_snippet.html' with form=form action=request.path submit_label="发布通知" %}
-    {% comment %} {% for field in form  %}
-        <div class="mb-4">
-            {{ field.label_tag }}
-            {{ field }}
-            {% if field.help_text %}
-                <p class="label text-info">{{ field.help_text|safe }}</p>
-            {% endif %}
+    <form method="post" enctype="multipart/form-data" x-data="{ sendToAll: true }">
+        {% csrf_token %}
+        
+        {# 非字段错误 #}
+        {% if form.non_field_errors %}
+        <div class="alert alert-error mb-4">
+            <ul class="list-disc list-inside">
+                {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
         </div>
-    {% endfor %} {% endcomment %}
+        {% endif %}
+
+        {# 标题字段 #}
+        <fieldset class="fieldset mt-4">
+            <legend class="fieldset-legend">{{ form.title.label }}</legend>
+            {{ form.title }}
+            {% if form.title.help_text %}
+            <p class="text-info text-xs">{{ form.title.help_text|safe }}</p>
+            {% endif %}
+        </fieldset>
+
+        {# 内容字段 #}
+        <fieldset class="fieldset mt-4">
+            <legend class="fieldset-legend">
+                <span class="text-red-500">*</span>{{ form.content.label }}
+            </legend>
+            {{ form.content }}
+            {% if form.content.help_text %}
+            <p class="text-info text-xs">{{ form.content.help_text|safe }}</p>
+            {% endif %}
+        </fieldset>
+
+        {# 附件上传 #}
+        <fieldset class="fieldset mt-4">
+            <legend class="fieldset-legend">{{ form.attachments.label }}</legend>
+            {% include 'components/file_uploader.html' with name=form.attachments.html_name accept=form.attachments|get_accept_types multiple=form.attachments|is_multiple_file required=form.attachments.field.required help_text=form.attachments.help_text %}
+        </fieldset>
+
+        {# 目标用户组 - 带"所有人"选项 #}
+        <fieldset class="fieldset mt-4">
+            <legend class="fieldset-legend">目标用户组</legend>
+            
+            {# 所有人选项 #}
+            <div class="flex items-center gap-2 mb-3 p-2 bg-base-200 rounded-lg">
+                <input 
+                    type="checkbox" 
+                    name="{{ form.send_to_all.html_name }}" 
+                    id="{{ form.send_to_all.id_for_label }}"
+                    class="checkbox checkbox-primary"
+                    x-model="sendToAll"
+                    {% if form.send_to_all.value %}checked{% endif %}
+                >
+                <label for="{{ form.send_to_all.id_for_label }}" class="font-medium cursor-pointer">
+                    <span class="icon-[tabler--users-group] size-4 mr-1"></span>
+                    {{ form.send_to_all.label }}
+                </label>
+                {% if form.send_to_all.help_text %}
+                <span class="text-xs text-base-content/60">- {{ form.send_to_all.help_text }}</span>
+                {% endif %}
+            </div>
+            
+            {# 指定用户组选项 - 当"所有人"取消勾选时显示 #}
+            <div 
+                x-show="!sendToAll" 
+                x-transition:enter="transition ease-out duration-200"
+                x-transition:enter-start="opacity-0 -translate-y-2"
+                x-transition:enter-end="opacity-100 translate-y-0"
+                class="pl-4 border-l-2 border-primary/30"
+            >
+                <p class="text-sm text-base-content/70 mb-2">{{ form.target_groups.label }}：</p>
+                <div class="flex flex-wrap gap-4">
+                    {% for checkbox in form.target_groups %}
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        {{ checkbox.tag }}
+                        <span>{{ checkbox.choice_label }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% if form.target_groups.help_text %}
+                <p class="text-info text-xs mt-2">{{ form.target_groups.help_text|safe }}</p>
+                {% endif %}
+            </div>
+        </fieldset>
+
+        {# 提交按钮 #}
+        <div class="mt-6 space-y-3">
+            <button type="submit" class="btn btn-primary w-full">
+                <span class="icon-[tabler--send] size-5"></span>
+                发布通知
+            </button>
+            <button type="reset" class="btn btn-outline w-full" @click="sendToAll = true">
+                重置
+            </button>
+        </div>
+    </form>
 </div>
 {% endblock %}

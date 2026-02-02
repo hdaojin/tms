@@ -1,6 +1,6 @@
 {# django-template #}
 {# templates/django/forms/for_snippet.html #}
-{# 入参: form, action, method="post", submit_label="提交", htmlx=dict #}
+{# 入参: form, action, method="post", submit_label="提交", htmlx=dict, use_fancy_upload=True #}
 
 {% load form_extras %}
 
@@ -55,6 +55,16 @@
     </div>
     </fieldset>
 
+    {% elif field|is_file_input and use_fancy_upload|default:True %}
+    {# 文件上传字段 - 使用高级上传组件 #}
+    <fieldset class="fieldset mt-4">
+        <legend class="fieldset-legend">
+            {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+            {{ field.label }}
+        </legend>
+        {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types multiple=field|is_multiple_file required=field.field.required help_text=field.help_text %}
+    </fieldset>
+
     {% else %}
     <fieldset class="fieldset mt-4">
         <legend class="fieldset-legend">{% if field.field.required %}<span class="text-red-500">*</span>{% endif %}{{ field.label_tag }}</legend>
@@ -62,7 +72,7 @@
     </fieldset>
     {% endif %}
 
-    {% if field.help_text %}
+    {% if field.help_text and not field|is_file_input %}
     <p class="text-info text-xs">{{ field.help_text|safe }}</p>
     {% endif %}
 
