@@ -45,6 +45,10 @@ urlpatterns = [
     path("", login_not_required(HomeView.as_view()), name="home"),
 ]
 
+# ===== 开发模式：组件演示应用 =====
+if settings.DEBUG:
+    urlpatterns.append(path("demo/", include("demo.urls", namespace="demo")))
+
 # 在开发环境中添加静态文件和媒体文件的URL配置
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=getattr(settings, 'STATICFILES_DIRS', [settings.BASE_DIR / 'static'])[0])

@@ -1,4 +1,4 @@
-{# 
+{% comment "upload" %}
 带进度条的文件上传组件 - 支持 HTMX 异步上传
 使用 Alpine.js + HTMX 实现真实的上传进度显示
 
@@ -14,8 +14,7 @@
 %}
 
 后端需要返回 HTML 片段或 JSON 响应
-#}
-
+{% endcomment %}
 {% load static %}
 
 <div 

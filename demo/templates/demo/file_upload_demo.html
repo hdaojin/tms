@@ -1,16 +1,16 @@
-{# 
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
+
+{% comment %}
 文件上传组件使用示例
 路径：templates/examples/file_upload_demo.html
 
 这是一个演示页面，展示如何使用 file_uploader 组件
 在实际项目中，将此模板复制到你的应用中使用
-#}
-
-{% extends 'base.html' %}
-{% block right_sidebar %}{% endblock %}
+{% endcomment %}
 
 {% block content %}
-<div class="max-w-2xl mx-auto space-y-8">
+<div class="space-y-8">
 
     {# ========== 示例 1: 基础单文件上传 ========== #}
     <div class="card bg-base-100 shadow-lg">
@@ -26,13 +26,7 @@
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 
-                {% include 'components/file_uploader.html' with 
-                    name="document"
-                    label="上传文档"
-                    accept=".pdf,.doc,.docx"
-                    max_size_mb=50
-                    help_text="支持 PDF、Word 格式，最大 50MB"
-                %}
+                {% include 'components/file_uploader.html' with name="document" label="上传文档" accept=".pdf,.doc,.docx" max_size_mb=50 help_text="支持 PDF、Word 格式，最大 50MB" %}
                 
                 <div class="mt-4">
                     <button type="submit" class="btn btn-primary">
@@ -58,14 +52,7 @@
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 
-                {% include 'components/file_uploader.html' with 
-                    name="attachments"
-                    label="上传附件"
-                    accept=".pdf,.jpg,.jpeg,.png,.zip"
-                    max_size_mb=100
-                    multiple=True
-                    help_text="支持多选，可上传文档、图片、压缩包"
-                %}
+                {% include 'components/file_uploader.html' with name="attachments" label="上传附件" accept=".pdf,.jpg,.jpeg,.png,.zip" max_size_mb=100 multiple=True help_text="支持多选，可上传文档、图片、压缩包" %}
                 
                 <div class="mt-4">
                     <button type="submit" class="btn btn-primary">
@@ -91,14 +78,7 @@
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 
-                {% include 'components/file_uploader.html' with 
-                    name="images"
-                    label="上传图片"
-                    accept=".jpg,.jpeg,.png,.gif,.webp"
-                    max_size_mb=20
-                    multiple=True
-                    help_text="支持 JPG、PNG、GIF、WebP 格式"
-                %}
+                {% include 'components/file_uploader.html' with name="images" label="上传图片" accept=".jpg,.jpeg,.png,.gif,.webp" max_size_mb=20 multiple=True help_text="支持 JPG、PNG、GIF、WebP 格式" %}
                 
                 <div class="mt-4">
                     <button type="submit" class="btn btn-primary">
@@ -110,37 +90,26 @@
         </div>
     </div>
 
-    {# ========== 示例 4: 带已有文件显示 ========== #}
+    {# ========== 示例 4: 非必填字段 ========== #}
     <div class="card bg-base-100 shadow-lg">
         <div class="card-body">
             <h2 class="card-title">
                 <span class="icon-[tabler--number-4] size-6 text-primary"></span>
-                编辑模式（显示已有文件）
+                可选文件上传
             </h2>
             <p class="text-base-content/70 text-sm mb-4">
-                用于编辑页面，显示之前上传的文件
+                设置 required=False，字段变为可选
             </p>
             
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 
-                {# 模拟已有文件对象 #}
-                {% with existing_file_mock="uploads/2024/example-document.pdf" %}
-                {% include 'components/file_uploader.html' with 
-                    name="file"
-                    label="更新文件"
-                    accept=".pdf"
-                    max_size_mb=100
-                    existing_file=existing_file_mock
-                    required=False
-                    help_text="可选择新文件替换，或保留现有文件"
-                %}
-                {% endwith %}
+                {% include 'components/file_uploader.html' with name="optional_file" label="可选文件" accept=".pdf" max_size_mb=100 required=False help_text="此字段为可选，可以不上传" %}
                 
                 <div class="mt-4">
                     <button type="submit" class="btn btn-primary">
-                        <span class="icon-[tabler--device-floppy] size-5"></span>
-                        保存更改
+                        <span class="icon-[tabler--upload] size-5"></span>
+                        提交
                     </button>
                 </div>
             </form>
@@ -158,14 +127,7 @@
                 大文件上传时显示实时进度，无需表单提交
             </p>
             
-            {% include 'components/file_uploader_with_progress.html' with 
-                name="large_file"
-                upload_url="/api/upload/"
-                accept=".zip,.7z,.rar"
-                max_size_mb=500
-                multiple=True
-                target_id="upload-result"
-            %}
+            {% include 'components/file_uploader_with_progress.html' with name="large_file" upload_url="/api/upload/" accept=".zip,.7z,.rar" max_size_mb=500 multiple=True target_id="upload-result" %}
             
             <div id="upload-result" class="mt-4">
                 {# 上传结果会显示在这里 #}
@@ -189,12 +151,40 @@
 <pre data-prefix="5"><code>    max_size_mb=100       {# 可选：最大大小 #}</code></pre>
 <pre data-prefix="6"><code>    multiple=True         {# 可选：多文件 #}</code></pre>
 <pre data-prefix="7"><code>    required=True         {# 可选：是否必填 #}</code></pre>
-<pre data-prefix="8"><code>    existing_file=obj.file {# 可选：已有文件 #}</code></pre>
-<pre data-prefix="9"><code>    help_text="帮助文本"   {# 可选：说明文字 #}</code></pre>
-<pre data-prefix="10"><code>{% verbatim %}%}{% endverbatim %}</code></pre>
+<pre data-prefix="8"><code>    help_text="帮助文本"   {# 可选：说明文字 #}</code></pre>
+<pre data-prefix="9"><code>{% verbatim %}%}{% endverbatim %}</code></pre>
             </div>
         </div>
     </div>
 
 </div>
+
+{# 表单验证脚本 #}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 为所有包含 file_uploader 的表单添加验证
+    document.querySelectorAll('form[enctype="multipart/form-data"]').forEach(form => {
+        form.addEventListener('submit', (e) => {
+            // 查找表单内所有的 file uploader 组件
+            const uploaders = form.querySelectorAll('[x-data]');
+            let isValid = true;
+            
+            uploaders.forEach(uploader => {
+                if (uploader._x_dataStack && uploader._x_dataStack[0]) {
+                    const data = uploader._x_dataStack[0];
+                    // 如果组件有 validate 方法，调用它
+                    if (typeof data.validate === 'function' && !data.validate()) {
+                        isValid = false;
+                    }
+                }
+            });
+            
+            if (!isValid) {
+                e.preventDefault();
+                return false;
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

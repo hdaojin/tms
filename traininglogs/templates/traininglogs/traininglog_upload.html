@@ -2,7 +2,7 @@
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
-  <div class="max-w-lg mx-auto p-2 w-full">
+  <div class="w-full">
     {% include 'components/form_snippet.html' with form=form action=request.path submit_label="上传" %}
   </div>
 {% endblock %}

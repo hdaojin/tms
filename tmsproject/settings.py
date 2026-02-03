@@ -73,6 +73,10 @@ INSTALLED_APPS = [
     'notices',
 ]
 
+# 开发模式下添加 demo 应用
+if DEBUG:
+    INSTALLED_APPS.append('demo')
+
 SITE_ID = 1
 
 MIDDLEWARE = [

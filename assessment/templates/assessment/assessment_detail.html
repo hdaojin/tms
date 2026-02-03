@@ -2,19 +2,78 @@
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
-  <div class="flex justify-between items-center">
-    <div>
-      <p class="text-gray-500 mt-1">{% if assessment.description %}{{ assessment.description }}{% else %}{{ assessment.name }}{% endif %}</p>
-      <p class="text-gray-500 mt-1">{{ assessment.start_date }} ~ {{ assessment.end_date }} · 共 {{ table_rows|length }} 位参考人员 ·
-        {{ modules|length }} 个考核模块</p>
-    </div>
-    <div class="print:hidden">
-      <button onclick="window.print()" class="btn btn-ghost btn-sm"><span class="icon-[tabler--printer] size-5"></span> 打印 / 导出</button>
-    </div>
+  <div>
+    <p class="text-gray-500 mt-1">{% if assessment.description %}{{ assessment.description }}{% else %}{{ assessment.name }}{% endif %}</p>
+    <p class="text-gray-500 mt-1">{{ assessment.start_date }} ~ {{ assessment.end_date }} · 共 {{ table_rows|length }} 位参考人员 ·
+      {{ modules|length }} 个考核模块</p>
   </div>
 
-  <div class="card bg-base-100 shadow-xl overflow-hidden">
-    <div class="overflow-x-auto">
+  {# 考核模块与资料 #}
+  <div class="mt-6 print:hidden">
+    <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+      <span class="icon-[tabler--folders] size-5 text-primary"></span>
+      考核模块
+    </h2>
+    <div class="overflow-x-auto border border-base-300 rounded-lg">
+      <table class="table table-zebra">
+        <thead>
+          <tr class="bg-base-200">
+              <th>模块名称</th>
+              <th class="text-center">满分</th>
+              <th class="text-center">时长</th>
+              <th>考核资料</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for am in modules %}
+            <tr>
+              <td>
+                <span class="font-semibold">{{ am.module.code }} - {{ am.module.name }}</span>
+              </td>
+              <td class="text-center">{{ am.max_score }}</td>
+              <td class="text-center">
+                {% if am.duration > 0 %}
+                  {{ am.duration|floatformat:1 }}h
+                {% else %}
+                  <span class="text-base-content/50">-</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="flex flex-wrap gap-1">
+                  {% if am.question_file %}
+                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-success badge-sm hover:badge-primary cursor-pointer" title="点击管理">试题</a>
+                  {% endif %}
+                  {% if am.scoring_standard_file %}
+                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-success badge-sm hover:badge-primary cursor-pointer" title="点击管理">评分标准</a>
+                  {% endif %}
+                  {% if am.scoring_sheet_file %}
+                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-info badge-sm hover:badge-primary cursor-pointer" title="点击管理">评分表</a>
+                  {% endif %}
+                  {% if am.scoring_script_file %}
+                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-info badge-sm hover:badge-primary cursor-pointer" title="点击管理">评分脚本</a>
+                  {% endif %}
+                  {% if am.attachments.exists %}
+                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-accent badge-sm hover:badge-primary cursor-pointer" title="点击管理">附件({{ am.attachments.count }})</a>
+                  {% endif %}
+                  {% if not am.question_file and not am.scoring_standard_file and not am.scoring_sheet_file and not am.scoring_script_file and not am.attachments.exists %}
+                    <a href="{% url 'assessment:file_upload' am.pk %}" class="text-base-content/50 text-sm hover:text-primary hover:underline">未上传，点击上传</a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+  </div>
+
+  {# 成绩列表 #}
+  <div class="mt-6">
+    <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+      <span class="icon-[tabler--report-analytics] size-5 text-primary"></span>
+      考核成绩
+    </h2>
+    <div class="overflow-x-auto border border-base-300 rounded-lg">
       <table class="table table-zebra table-sm w-full text-center">
         <thead>
           <tr class="bg-base-200">

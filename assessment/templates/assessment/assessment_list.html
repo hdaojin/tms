@@ -5,7 +5,8 @@
 {% block content %}
   <div class="space-y-8">
     {# 1. 正在进行的考核 和 即将开始的考核 #}
-    <section class="space-y-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% comment %} <section class="space-y-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"> {% endcomment %}
+    <section class="space-y-4 flex flex-row flex-wrap justify-start gap-6">
       {% if current_assessments %}
         {% for assessment in current_assessments %}
           {% include 'assessment/partials/assessment_card.html' with assessment=assessment status='current' %}

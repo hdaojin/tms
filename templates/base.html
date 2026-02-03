@@ -1,5 +1,5 @@
 {% load django_htmx %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-hans" data-theme="light">
   <head>
     {% include 'partials/head.html' %}
@@ -8,7 +8,7 @@
     {% htmx_script %}
   </head>
 
-  <body class="min-h-screen flex flex-col" hx-headers='{"x-csrftoken": "{{ csrf_token }}"}'>
+  <body class="flex min-h-screen flex-col" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
     {# Header：默认显示；设置 show_header=False 可隐藏 #}
     {% block header %}
       {% if show_header|default:True %}
@@ -26,13 +26,13 @@
 
       {% block main %}
         <main class="flex-1 p-4">
-          <div class="flex flex-col space-y-4 w-full md:max-w-9/10 p-2 mx-auto">
+          <div class="mx-auto flex w-full flex-col space-y-4 md:w-8/12">
             {# 全局消息提示区域 #}
             {% if messages %}
               <div class="space-y-2">
                 {% for message in messages %}
                   <div role="alert" class="alert {% if message.tags == 'success' %}alert-success{% elif message.tags == 'error' %}alert-error{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %}">
-                    <span class="{% if message.tags == 'success' %}icon-[tabler--circle-check]{% elif message.tags == 'error' %}icon-[tabler--alert-circle]{% elif message.tags == 'warning' %}icon-[tabler--alert-triangle]{% else %}icon-[tabler--info-circle]{% endif %} size-6"></span>
+                    <span class="size-6 {% if message.tags == 'success' %}icon-[tabler--circle-check]{% elif message.tags == 'error' %}icon-[tabler--alert-circle]{% elif message.tags == 'warning' %}icon-[tabler--alert-triangle]{% else %}icon-[tabler--info-circle]{% endif %}"></span>
                     <span>{{ message }}</span>
                   </div>
                 {% endfor %}
@@ -47,8 +47,8 @@
                 </div>
               {% endif %}
             {% endblock %}
-            {% block content %}
 
+            {% block content %}
             {% endblock %}
           </div>
         </main>

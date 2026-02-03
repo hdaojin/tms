@@ -10,6 +10,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "daisyui": "^5.0.50",
     "prettier": "^3.6.2",
+    "prettier-plugin-jinja-template": "^2.1.0",
     "prettier-plugin-tailwindcss": "^0.7.1"
   },
   "scripts": {
@@ -18,8 +19,17 @@
   },
   "prettier": {
     "plugins": [
+      "prettier-plugin-jinja-template",
       "prettier-plugin-tailwindcss"
     ],
-    "tailwindStylesheet": "static/css/main.css"
+    "tailwindStylesheet": "static/css/main.css",
+    "overrides": [
+      {
+        "files": ["*.html"],
+        "options": {
+          "parser": "jinja-template"
+        }
+      }
+    ]
   }
 }

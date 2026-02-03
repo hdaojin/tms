@@ -21,6 +21,13 @@ class BaseDateColumn(tables.DateColumn):
         kwargs.setdefault("format", "Y-m-d")
         super().__init__(*args, **kwargs)
 
+class BaseDateTimeColumn(tables.DateTimeColumn):
+    """自定义日期时间列，统一显示格式为 YYYY-MM-DD HH:MM:SS（补零）。"""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        # Django 日期时间格式: Y = 4位年, m = 月(补零), d = 日(补零), H = 24小时制(补零), i = 分(补零), s = 秒(补零)
+        kwargs.setdefault("format", "Y-m-d H:i:s")
+        super().__init__(*args, **kwargs)
 
 class BaseTable(tables.Table):
     """表格基类，统一样式配置"""

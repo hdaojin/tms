@@ -79,12 +79,12 @@
     {% endfor %}
 
     {# 提交按钮 #}
-    <div class="mt-4 space-y-4">
-        <button type="submit" class="btn btn-primary w-full">
-            {{ submit_label|default:"提交" }}
-        </button>
-        <button type="reset" class="btn btn-outline w-full">
+    <div class="mt-4 flex flex-wrap gap-4 justify-center">
+        <button type="reset" class="btn btn-outline btn-wide">
             重置
+        </button>
+        <button type="submit" class="btn btn-primary btn-wide">
+            {{ submit_label|default:"提交" }}
         </button>
     </div>
 </form>

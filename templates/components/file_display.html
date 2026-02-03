@@ -1,0 +1,57 @@
+{% comment %}
+已上传文件显示组件
+用于显示已上传的文件信息，带删除按钮
+
+参数:
+  - file: 文件字段对象 (Django FileField)
+  - delete_url_name: 删除文件的 URL name (用于 {% url %} 标签)
+  - module_id: 模块 ID (用于构建删除 URL)
+  - field_name: 字段名称 (用于构建删除 URL)
+  - label: 文件标签名称
+  - help_text: 帮助文本（可选）
+
+使用示例:
+  {% include 'components/file_display.html' with file=object.question_file delete_url_name="assessment:delete_module_file" module_id=object.pk field_name="question_file" label="试题文件" %}
+{% endcomment %}
+{% load form_extras %}
+
+<div class="form-control w-full" id="file-display-{{ field_name }}">
+  {% if label %}
+    <label class="label">
+      <span class="label-text font-medium">{{ label }}</span>
+    </label>
+  {% endif %}
+  
+  <div class="flex items-center gap-3 p-4 bg-success/10 rounded-lg border border-success/30">
+    {# 文件图标 - 根据扩展名显示不同图标 #}
+    {% with ext=file.name|slice:"-4:"|lower %}
+      <span class="{% if ext == '.pdf' %}icon-[tabler--file-type-pdf] text-error{% elif ext == '.doc' or ext == 'docx' %}icon-[tabler--file-type-doc] text-info{% elif ext == '.xls' or ext == 'xlsx' %}icon-[tabler--file-type-xls] text-success{% elif ext == '.zip' or ext == '.rar' %}icon-[tabler--file-type-zip] text-warning{% elif ext == '.py' %}icon-[tabler--brand-python] text-primary{% else %}icon-[tabler--file] text-base-content{% endif %} size-8 shrink-0"></span>
+    {% endwith %}
+    
+    {# 文件信息 #}
+    <div class="flex-1 min-w-0">
+      <div class="font-medium truncate text-success">
+        {{ file.name|filename }}
+      </div>
+      <div class="text-xs text-base-content/60">
+        {{ file.size|filesize_display }}
+        <span class="text-success">• 已上传</span>
+      </div>
+    </div>
+    
+    {# 删除按钮 #}
+    <div class="shrink-0">
+      {% if delete_url_name and module_id and field_name %}
+        <button type="button" class="btn btn-sm btn-ghost btn-circle text-error hover:bg-error/10" title="删除文件" hx-delete="{% url delete_url_name module_id field_name %}" hx-target="#file-display-{{ field_name }}" hx-swap="outerHTML" hx-confirm="确定要删除这个文件吗？删除后需要重新上传。">
+          <span class="icon-[tabler--trash] size-4"></span>
+        </button>
+      {% endif %}
+    </div>
+  </div>
+  
+  {% if help_text %}
+    <label class="label">
+      <span class="label-text-alt text-base-content/60">{{ help_text }}</span>
+    </label>
+  {% endif %}
+</div>

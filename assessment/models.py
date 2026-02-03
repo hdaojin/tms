@@ -8,6 +8,7 @@ from django.core.files.storage import FileSystemStorage
 
 from core.constants import ASSESSMENT_UPLOAD_DIR, ASSESSMENT_ALLOWED_EXTENSIONS
 from core.utils.validators import validate_file_size
+from core.utils.signals import register_file_cleanup_signals
 
 assessment_storage = FileSystemStorage(location=str(ASSESSMENT_UPLOAD_DIR))
 
@@ -277,4 +278,12 @@ class Score(models.Model):
     def __str__(self):
         user_name = self.user.first_name if self.user.first_name else self.user.username
         return f"{self.assessment_module} - {user_name}: {self.score}"
+
+
+# 注册文件清理信号 - 删除/更新模型时自动清理旧文件
+register_file_cleanup_signals(AssessmentModule, file_field="question_file")
+register_file_cleanup_signals(AssessmentModule, file_field="scoring_standard_file")
+register_file_cleanup_signals(AssessmentModule, file_field="scoring_sheet_file")
+register_file_cleanup_signals(AssessmentModule, file_field="scoring_script_file")
+register_file_cleanup_signals(AssessmentAttachment, file_field="file")
 

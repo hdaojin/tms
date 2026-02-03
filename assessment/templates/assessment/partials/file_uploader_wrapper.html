@@ -1,0 +1,15 @@
+{% comment %}
+文件上传组件包装器 - 用于 HTMX 动态替换
+仅用于删除文件后返回上传组件
+
+参数:
+  - name: 表单字段名称
+  - accept: 接受的文件类型
+  - required: 是否必填
+  - label: 标签文字
+  - help_text: 帮助文字
+  - field_name: 字段名称（用于 ID）
+{% endcomment %}
+<div id="file-display-{{ field_name }}">
+  {% include 'components/file_uploader.html' with name=name accept=accept required=required label=label help_text=help_text %}
+</div>

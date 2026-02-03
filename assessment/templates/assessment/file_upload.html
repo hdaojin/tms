@@ -1,133 +1,185 @@
 {% extends 'base.html' %}
-{% block right_sidebar %}{% endblock %}
+{% load form_extras %}
+
+{% block right_sidebar %}
+{% endblock %}
 
 {% block content %}
-
-<div class="max-w-lg mx-auto p-2 w-full">
-  <div class="flex items-center justify-between mb-6">
-    <div>
-      <h2 class="text-xl font-bold">{{ assessment_module.assessment.name }}</h2>
-      <p class="text-base-content/70">
-        模块：{{ assessment_module.module.name }} | 
-        满分：{{ assessment_module.max_score }} | 
-        时长：{{ assessment_module.duration }} 小时
-      </p>
+  <div class="w-full">
+    {# 模块信息卡片 #}
+    <div class="card bg-base-200 mb-6">
+      <div class="card-body p-4">
+        <div class="flex flex-wrap items-center gap-4 text-sm">
+          <div class="flex items-center gap-2">
+            <span class="icon-[tabler--book] size-5 text-primary"></span>
+            <span>{{ assessment_module.module.name }}</span>
+          </div>
+          <div class="divider divider-horizontal m-0"></div>
+          <div class="flex items-center gap-2">
+            <span class="icon-[tabler--star] size-5 text-warning"></span>
+            <span>满分：{{ assessment_module.max_score }}</span>
+          </div>
+          <div class="divider divider-horizontal m-0"></div>
+          <div class="flex items-center gap-2">
+            <span class="icon-[tabler--clock] size-5 text-info"></span>
+            <span>时长：{{ assessment_module.duration }} 小时</span>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <form method="post" enctype="multipart/form-data" class="space-y-6">
+      {% csrf_token %}
+
+      {# 非字段错误 #}
+      {% if form.non_field_errors %}
+        <div class="alert alert-error">
+          <span class="icon-[tabler--alert-circle] size-5"></span>
+          <ul class="list-disc list-inside">
+            {% for error in form.non_field_errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      {# 主要文件上传区域 #}
+      <div class="card bg-base-100 border border-base-300">
+        <div class="card-body">
+          <h2 class="card-title text-lg mb-4">
+            <span class="icon-[tabler--files] size-6 text-primary"></span>
+            考核资料文件
+          </h2>
+          
+          <div class="grid gap-6">
+            {# 试题文件 #}
+            {% with field=form.question_file file=assessment_module.question_file %}
+              {% if field.errors %}
+                <div class="alert alert-error alert-sm">
+                  <span class="icon-[tabler--alert-circle] size-4"></span>
+                  <span>{{ field.label }}：{{ field.errors.0 }}</span>
+                </div>
+              {% endif %}
+              {% if file %}
+                {% include 'components/file_display.html' with file=file delete_url_name="assessment:delete_module_file" module_id=assessment_module.pk field_name="question_file" label=field.label help_text=field.help_text %}
+              {% else %}
+                {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types required=field.field.required label=field.label help_text=field.help_text %}
+              {% endif %}
+            {% endwith %}
+
+            {# 评分标准文件 #}
+            {% with field=form.scoring_standard_file file=assessment_module.scoring_standard_file %}
+              {% if field.errors %}
+                <div class="alert alert-error alert-sm">
+                  <span class="icon-[tabler--alert-circle] size-4"></span>
+                  <span>{{ field.label }}：{{ field.errors.0 }}</span>
+                </div>
+              {% endif %}
+              {% if file %}
+                {% include 'components/file_display.html' with file=file delete_url_name="assessment:delete_module_file" module_id=assessment_module.pk field_name="scoring_standard_file" label=field.label help_text=field.help_text %}
+              {% else %}
+                {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types required=field.field.required label=field.label help_text=field.help_text %}
+              {% endif %}
+            {% endwith %}
+
+            {# 评分表文件 #}
+            {% with field=form.scoring_sheet_file file=assessment_module.scoring_sheet_file %}
+              {% if field.errors %}
+                <div class="alert alert-error alert-sm">
+                  <span class="icon-[tabler--alert-circle] size-4"></span>
+                  <span>{{ field.label }}：{{ field.errors.0 }}</span>
+                </div>
+              {% endif %}
+              {% if file %}
+                {% include 'components/file_display.html' with file=file delete_url_name="assessment:delete_module_file" module_id=assessment_module.pk field_name="scoring_sheet_file" label=field.label help_text=field.help_text %}
+              {% else %}
+                {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types required=field.field.required label=field.label help_text=field.help_text %}
+              {% endif %}
+            {% endwith %}
+
+            {# 评分脚本文件 #}
+            {% with field=form.scoring_script_file file=assessment_module.scoring_script_file %}
+              {% if field.errors %}
+                <div class="alert alert-error alert-sm">
+                  <span class="icon-[tabler--alert-circle] size-4"></span>
+                  <span>{{ field.label }}：{{ field.errors.0 }}</span>
+                </div>
+              {% endif %}
+              {% if file %}
+                {% include 'components/file_display.html' with file=file delete_url_name="assessment:delete_module_file" module_id=assessment_module.pk field_name="scoring_script_file" label=field.label help_text=field.help_text %}
+              {% else %}
+                {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types required=field.field.required label=field.label help_text=field.help_text %}
+              {% endif %}
+            {% endwith %}
+
+            {# 附件文件 #}
+            {% with field=form.attachments %}
+              {% if field.errors %}
+                <div class="alert alert-error alert-sm">
+                  <span class="icon-[tabler--alert-circle] size-4"></span>
+                  <span>{{ field.label }}：{{ field.errors.0 }}</span>
+                </div>
+              {% endif %}
+              
+              {# 已上传的附件列表 #}
+              {% if existing_attachments %}
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text font-medium">{{ field.label }} - 已上传</span>
+                  </label>
+                  <div class="space-y-2">
+                    {% for attachment in existing_attachments %}
+                      <div class="flex items-center gap-3 p-3 bg-base-200 rounded-lg border border-base-300" id="attachment-{{ attachment.pk }}">
+                        {# 文件图标 #}
+                        {% with ext=attachment.file.name|slice:"-4:"|lower %}
+                          <span class="{% if ext == '.pdf' %}icon-[tabler--file-type-pdf] text-error{% elif ext == '.doc' or ext == 'docx' %}icon-[tabler--file-type-doc] text-info{% elif ext == '.xls' or ext == 'xlsx' %}icon-[tabler--file-type-xls] text-success{% elif ext == '.zip' or ext == '.rar' %}icon-[tabler--file-type-zip] text-warning{% elif ext == '.py' %}icon-[tabler--brand-python] text-primary{% else %}icon-[tabler--file] text-base-content{% endif %} size-6 shrink-0"></span>
+                        {% endwith %}
+                        
+                        {# 文件信息 #}
+                        <div class="flex-1 min-w-0">
+                          <div class="text-sm font-medium truncate">
+                            {{ attachment.file.name|filename }}
+                          </div>
+                          <div class="text-xs text-base-content/60">
+                            {{ attachment.file.size|filesize_display }}
+                            {% if attachment.description %} • {{ attachment.description }}{% endif %}
+                          </div>
+                        </div>
+                        
+                        {# 删除按钮 #}
+                        <div class="shrink-0">
+                          <button type="button" class="btn btn-xs btn-ghost btn-circle text-error hover:bg-error/10" title="删除附件" hx-delete="{% url 'assessment:delete_attachment' attachment.pk %}" hx-target="#attachment-{{ attachment.pk }}" hx-swap="outerHTML" hx-confirm="确定要删除这个附件吗？">
+                            <span class="icon-[tabler--trash] size-4"></span>
+                          </button>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+              
+              {# 上传新附件 #}
+              {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types multiple=True required=field.field.required label="添加附件" help_text=field.help_text %}
+            {% endwith %}
+          </div>
+        </div>
+      </div>
+
+      {# 操作按钮 #}
+      <div class="flex justify-center gap-3">
+        <a href="{% url 'assessment:detail' assessment_module.assessment.pk %}" class="btn btn-ghost">
+          <span class="icon-[tabler--arrow-left] size-5"></span>
+          返回
+        </a>
+        <button type="reset" class="btn btn-outline btn-wide">
+          <span class="icon-[tabler--refresh] size-5"></span>
+          重置
+        </button>
+        <button type="submit" class="btn btn-primary btn-wide">
+          <span class="icon-[tabler--device-floppy] size-5"></span>
+          提交
+        </button>
+      </div>
+    </form>
   </div>
-
-  <form method="post" enctype="multipart/form-data" class="space-y-6">
-    {% csrf_token %}
-    
-    {# 主要文件上传 #}
-    <div class="space-y-4">
-      <h3 class="text-lg font-semibold flex items-center gap-2">
-        <span class="icon-[tabler--file-upload] size-5"></span>
-        考核文件上传
-      </h3>
-      
-      {% for field in form %}
-      <div class="form-control">
-        <label class="label">
-          <span class="label-text font-semibold">
-            {{ field.label }}
-            {% if field.field.required %}<span class="text-error">*</span>{% endif %}
-          </span>
-        </label>
-        {{ field }}
-        {% if field.help_text %}
-        <label class="label">
-          <span class="label-text-alt text-base-content/70">{{ field.help_text }}</span>
-        </label>
-        {% endif %}
-        {% if field.errors %}
-        <label class="label">
-          <span class="label-text-alt text-error">{{ field.errors.0 }}</span>
-        </label>
-        {% endif %}
-        
-        {# 显示已上传的文件 #}
-        {% if field.value %}
-        <div class="alert alert-success mt-2">
-          <span class="icon-[tabler--file-check] size-5"></span>
-          <span>已上传：{{ field.value.name|default:"文件" }}</span>
-        </div>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-
-    {# 附件上传 FormSet #}
-    <div class="divider"></div>
-    <div class="space-y-4">
-      <h3 class="text-lg font-semibold flex items-center gap-2">
-        <span class="icon-[tabler--paperclip] size-5"></span>
-        附件文件（可选，支持多个）
-      </h3>
-      
-      {{ formset.management_form }}
-      
-      <div id="attachment-formset" class="space-y-3">
-        {% for form in formset %}
-        <div class="attachment-form border border-base-300 rounded-lg p-4 {% if form.instance.pk %}bg-base-200{% endif %}">
-          {% if form.instance.pk %}
-          <div class="flex items-center gap-2 mb-2">
-            <span class="badge badge-success">已上传</span>
-            <span class="text-sm">{{ form.instance.file.name }}</span>
-          </div>
-          {% endif %}
-          
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text">{{ form.file.label }}</span>
-              </label>
-              {{ form.file }}
-              {% if form.file.errors %}
-              <label class="label">
-                <span class="label-text-alt text-error">{{ form.file.errors.0 }}</span>
-              </label>
-              {% endif %}
-            </div>
-            
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text">{{ form.description.label }}</span>
-              </label>
-              {{ form.description }}
-              {% if form.description.errors %}
-              <label class="label">
-                <span class="label-text-alt text-error">{{ form.description.errors.0 }}</span>
-              </label>
-              {% endif %}
-            </div>
-          </div>
-          
-          {% if form.instance.pk %}
-          <div class="form-control mt-2">
-            <label class="label cursor-pointer justify-start gap-2">
-              {{ form.DELETE }}
-              <span class="label-text text-error">删除此附件</span>
-            </label>
-          </div>
-          {% endif %}
-          
-          {{ form.id }}
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-
-    <div class="flex justify-end gap-2 mt-6">
-      <a href="{% url 'assessment:file_upload_list' %}" class="btn btn-ghost">
-        <span class="icon-[tabler--arrow-left] size-4"></span>
-        返回
-      </a>
-      <button type="submit" class="btn btn-primary">
-        <span class="icon-[tabler--device-floppy] size-4"></span>
-        保存
-      </button>
-    </div>
-  </form>
-</div>
-
 {% endblock %}

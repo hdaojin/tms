@@ -3,7 +3,7 @@
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
-<div class="max-w-lg mx-auto p-2 w-full">
+<div class="w-full">
     <form method="post" enctype="multipart/form-data" x-data="{ sendToAll: true }">
         {% csrf_token %}
         
@@ -59,7 +59,6 @@
                     {% if form.send_to_all.value %}checked{% endif %}
                 >
                 <label for="{{ form.send_to_all.id_for_label }}" class="font-medium cursor-pointer">
-                    <span class="icon-[tabler--users-group] size-4 mr-1"></span>
                     {{ form.send_to_all.label }}
                 </label>
                 {% if form.send_to_all.help_text %}
@@ -91,15 +90,20 @@
         </fieldset>
 
         {# 提交按钮 #}
-        <div class="mt-6 space-y-3">
-            <button type="submit" class="btn btn-primary w-full">
-                <span class="icon-[tabler--send] size-5"></span>
-                发布通知
-            </button>
-            <button type="reset" class="btn btn-outline w-full" @click="sendToAll = true">
-                重置
-            </button>
-        </div>
+        <div class="flex justify-center gap-3 mt-4">
+        <a href="{% url 'notices:notice_list' %}" class="btn btn-ghost">
+          <span class="icon-[tabler--arrow-left] size-5"></span>
+          返回
+        </a>
+        <button type="reset" class="btn btn-outline btn-wide">
+          <span class="icon-[tabler--refresh] size-5"></span>
+          重置
+        </button>
+        <button type="submit" class="btn btn-primary btn-wide">
+          <span class="icon-[tabler--send] size-5"></span>
+          发布
+        </button>
+      </div>
     </form>
 </div>
 {% endblock %}

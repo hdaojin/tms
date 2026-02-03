@@ -4,8 +4,8 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib import messages
 from django.utils import timezone
 from core.constants import GROUP_COACH
-from .models import Assessment, Score, AssessmentModule
-from .forms import AssessmentFileUploadForm, AttachmentFormSet
+from .models import Assessment, Score, AssessmentModule, AssessmentAttachment
+from .forms import AssessmentFileUploadForm
 
 @login_required
 def assessment_list(request):
@@ -148,8 +148,8 @@ def assessment_detail(request, pk):
     """
     assessment = get_object_or_404(Assessment, pk=pk)
     
-    # 获取该考核的所有模块
-    modules = AssessmentModule.objects.select_related('module').filter(assessment=assessment)
+    # 获取该考核的所有模块（预取附件用于显示考核资料）
+    modules = AssessmentModule.objects.select_related('module').prefetch_related('attachments').filter(assessment=assessment)
     
     # 获取该考核的所有参与者，并预加载他们的成绩
     # 结构：List of Users. Each User has map of Module -> Score
@@ -263,36 +263,6 @@ def assessment_detail(request, pk):
 
 
 @login_required
-def assessment_file_upload_list(request):
-    """
-    考核资料上传列表页面
-    显示当前和下次考核的模块，供教练上传资料
-    只有教练有权限访问
-    """
-    # 检查是否是教练
-    if not request.user.groups.filter(name=GROUP_COACH).exists():
-        messages.error(request, "只有教练可以访问此页面")
-        return redirect('assessment:list')
-    
-    today = timezone.now().date()
-    
-    # 获取当前和未来的考核
-    assessments = Assessment.objects.filter(
-        end_date__gte=today
-    ).prefetch_related(
-        'assessmentmodule_set__module',
-        'assessmentmodule_set__attachments'
-    ).order_by('start_date')
-    
-    context = {
-        'assessments': assessments,
-        'title': '考核资料上传',
-        'title_icon': 'icon-[tabler--upload]',
-    }
-    return render(request, 'assessment/file_upload_list.html', context)
-
-
-@login_required
 def assessment_file_upload(request, module_id):
     """
     考核资料上传页面
@@ -313,27 +283,143 @@ def assessment_file_upload(request, module_id):
     today = timezone.now().date()
     if assessment_module.assessment.end_date < today:
         messages.warning(request, "该考核已结束，无法上传资料")
-        return redirect('assessment:file_upload_list')
+        return redirect('assessment:detail', pk=assessment_module.assessment.pk)
     
     if request.method == 'POST':
         form = AssessmentFileUploadForm(request.POST, request.FILES, instance=assessment_module)
-        formset = AttachmentFormSet(request.POST, request.FILES, instance=assessment_module)
         
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid():
+            # 保存主表单
             form.save()
-            formset.save()
+            
+            # 处理多个附件文件
+            attachment_files = request.FILES.getlist('attachments')
+            if attachment_files:
+                for file in attachment_files:
+                    AssessmentAttachment.objects.create(
+                        assessment_module=assessment_module,
+                        file=file
+                    )
+            
             messages.success(request, f"已成功保存 {assessment_module.module.name} 的考核资料")
-            return redirect('assessment:file_upload_list')
+            return redirect('assessment:detail', pk=assessment_module.assessment.pk)
     else:
         form = AssessmentFileUploadForm(instance=assessment_module)
-        formset = AttachmentFormSet(instance=assessment_module)
+    
+    # 获取已有附件
+    existing_attachments = assessment_module.attachments.all()
     
     context = {
         'assessment_module': assessment_module,
         'form': form,
-        'formset': formset,
+        'existing_attachments': existing_attachments,
         'title': f'{assessment_module.assessment.name} - {assessment_module.module.name} 资料上传',
         'title_icon': 'icon-[tabler--file-upload]',
     }
     return render(request, 'assessment/file_upload.html', context)
+
+
+@login_required
+def delete_module_file(request, module_id, field_name):
+    """
+    删除考核模块的单个文件（试题、评分标准、评分表、评分脚本）
+    """
+    # 检查是否是教练
+    if not request.user.groups.filter(name=GROUP_COACH).exists():
+        messages.error(request, "只有教练可以删除考核资料")
+        return redirect('assessment:list')
+    
+    assessment_module = get_object_or_404(AssessmentModule, pk=module_id)
+    
+    # 检查考核是否已结束
+    today = timezone.now().date()
+    if assessment_module.assessment.end_date < today:
+        messages.warning(request, "该考核已结束，无法删除资料")
+        return redirect('assessment:detail', pk=assessment_module.assessment.pk)
+    
+    # 允许的字段名及其对应的标签和 accept 类型
+    field_config = {
+        'question_file': {
+            'label': '试题文件',
+            'accept': '.pdf,.doc,.docx,.xls,.xlsx,.zip',
+            'required': False,
+            'help_text': '上传试题文件',
+        },
+        'scoring_standard_file': {
+            'label': '评分标准文件',
+            'accept': '.pdf,.doc,.docx,.xls,.xlsx',
+            'required': False,
+            'help_text': '上传评分标准文件',
+        },
+        'scoring_sheet_file': {
+            'label': '评分表文件',
+            'accept': '.pdf,.xls,.xlsx',
+            'required': False,
+            'help_text': '上传评分表文件（非必须）',
+        },
+        'scoring_script_file': {
+            'label': '评分脚本文件',
+            'accept': '.py,.sh,.zip',
+            'required': False,
+            'help_text': '上传评分脚本文件（非必须）',
+        },
+    }
+    
+    if field_name not in field_config:
+        messages.error(request, "无效的文件字段")
+        return redirect('assessment:file_upload', module_id=module_id)
+    
+    # 删除文件
+    file_field = getattr(assessment_module, field_name)
+    if file_field:
+        file_field.delete(save=True)
+        messages.success(request, "文件已删除")
+    
+    # 如果是 HTMX 请求，返回上传组件的 HTML
+    if request.headers.get('HX-Request'):
+        config = field_config[field_name]
+        from django.template.loader import render_to_string
+        html = render_to_string('assessment/partials/file_uploader_wrapper.html', {
+            'name': field_name,
+            'accept': config['accept'],
+            'required': config['required'],
+            'label': config['label'],
+            'help_text': config['help_text'],
+            'field_name': field_name,
+        })
+        from django.http import HttpResponse
+        return HttpResponse(html)
+    
+    return redirect('assessment:file_upload', module_id=module_id)
+
+
+@login_required
+def delete_attachment(request, attachment_id):
+    """
+    删除考核模块附件
+    """
+    # 检查是否是教练
+    if not request.user.groups.filter(name=GROUP_COACH).exists():
+        messages.error(request, "只有教练可以删除附件")
+        return redirect('assessment:list')
+    
+    attachment = get_object_or_404(AssessmentAttachment, pk=attachment_id)
+    module_id = attachment.assessment_module_id
+    
+    # 检查考核是否已结束
+    today = timezone.now().date()
+    if attachment.assessment_module.assessment.end_date < today:
+        messages.warning(request, "该考核已结束，无法删除附件")
+        return redirect('assessment:detail', pk=attachment.assessment_module.assessment.pk)
+    
+    # 删除附件（文件会通过信号自动清理）
+    attachment.delete()
+    messages.success(request, "附件已删除")
+    
+    # 如果是 HTMX 请求，返回空内容
+    if request.headers.get('HX-Request'):
+        from django.http import HttpResponse
+        return HttpResponse('')
+    
+    return redirect('assessment:file_upload', module_id=module_id)
 
