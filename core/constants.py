@@ -24,38 +24,55 @@ SPECIAL_GROUPS = [GROUP_COACH, GROUP_COMPETITOR]
 
 
 # ============ 默认配置值 ============
-DEFAULT_UPLOAD_MAX_SIZE_MB = 100  # 默认上传文件最大尺寸，单位 MB
 DEFAULT_CACHE_TIMEOUT = 300  # 默认缓存超时时间，单位秒
 INVITATION_CODE_TIMEOUT = 24 * 60 * 60  # 邀请码超时时间，单位秒
 
 
-# ============ 文件扩展名常量 ============
-# 默认允许的文件扩展名
+# ============ 允许上传的文件扩展名和大小常量 ============
+# 默认允许的文件扩展名和大小
 DEFAULT_ALLOWED_EXTENSIONS = ['pdf']
+DEFAULT_UPLOAD_MAX_SIZE_MB = 100 
 
-# 考核文件允许的扩展名
-ASSESSMENT_ALLOWED_EXTENSIONS = [
-    'xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx',
-    'jpg', 'jpeg', 'png',
-    'zip', '7z', 'gz', 'bz2', 'rar',
+# 考核试题文件允许的扩展名和大小
+ASSESSMENT_TP_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx']
+ASSESSMENT_TP_UPLOAD_MAX_SIZE_MB = 50  
+# 考核评分标准文件允许的扩展名
+ASSESSMENT_MC_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv']
+ASSESSMENT_MC_UPLOAD_MAX_SIZE_MB = 50
+# 考核评分表文件允许的扩展名
+ASSESSMENT_MT_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv']
+ASSESSMENT_MT_UPLOAD_MAX_SIZE_MB = 50
+# 考核评分脚本文件允许的扩展名
+ASSESSMENT_MS_ALLOWED_EXTENSIONS = ['py', 'sh', 'bat', 'exe', 'ps1', 'yml', 'yaml']
+ASSESSMENT_MS_UPLOAD_MAX_SIZE_MB = 50
+# 考核附件文件允许的扩展名
+ASSESSMENT_ATTACHMENT_ALLOWED_EXTENSIONS = [
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'md',
+    'jpg', 'jpeg', 'png', 'gif',
+    'zip', '7z', 'gz', 'bz2', 'rar', 'tar',
 ]
+ASSESSMENT_ATTACHMENT_UPLOAD_MAX_SIZE_MB = 100
 
-# 竞赛文件允许的扩展名
+# 竞赛文件允许的扩展名和大小
 COMPETITION_ALLOWED_EXTENSIONS = [
     'xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx',
     'jpg', 'jpeg', 'png',
-    'zip', '7z', 'gz', 'bz2', 'rar',
+    'zip', '7z', 'gz', 'bz2', 'rar', 'tar',
 ]
+COMPETITION_UPLOAD_MAX_SIZE_MB = 200
 
-# 训练日志允许的扩展名
+# 训练日志允许的扩展名和大小
 TRAININGLOG_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf']
+TRAININGLOG_UPLOAD_MAX_SIZE_MB = 20
 
-# 通知附件允许的扩展名
+
+# 通知附件允许的扩展名和大小
 NOTICE_ALLOWED_EXTENSIONS = [
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'md',
-    'jpg', 'jpeg', 'png', 'gif', 'txt',
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'md', 'txt',
+    'jpg', 'jpeg', 'png', 'gif',
     'zip', 'rar', '7z', 'tar', 'gz', 'bz2',
 ]
+NOTICE_UPLOAD_MAX_SIZE_MB = 100
 
 
 # ============ 文件上传路径 ============

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TMS Dev"
+  short_description: "TMS Django dev workflow and conventions"
+  default_prompt: "Use $tms-dev to implement or update TMS features while following project conventions."

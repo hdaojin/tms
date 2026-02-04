@@ -2,6 +2,7 @@
 {% load form_extras %}
 
 {% block right_sidebar %}
+
 {% endblock %}
 
 {% block content %}
@@ -50,7 +51,7 @@
             <span class="icon-[tabler--files] size-6 text-primary"></span>
             考核资料文件
           </h2>
-          
+
           <div class="grid gap-6">
             {# 试题文件 #}
             {% with field=form.question_file file=assessment_module.question_file %}
@@ -61,7 +62,7 @@
                 </div>
               {% endif %}
               {% if file %}
-                {% include 'components/file_display.html' with file=file delete_url_name="assessment:delete_module_file" module_id=assessment_module.pk field_name="question_file" label=field.label help_text=field.help_text %}
+                {% include 'components/file_display.html' with file=file delete_url_name='assessment:delete_module_file' module_id=assessment_module.pk field_name='question_file' label=field.label help_text=field.help_text %}
               {% else %}
                 {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types required=field.field.required label=field.label help_text=field.help_text %}
               {% endif %}
@@ -76,7 +77,7 @@
                 </div>
               {% endif %}
               {% if file %}
-                {% include 'components/file_display.html' with file=file delete_url_name="assessment:delete_module_file" module_id=assessment_module.pk field_name="scoring_standard_file" label=field.label help_text=field.help_text %}
+                {% include 'components/file_display.html' with file=file delete_url_name='assessment:delete_module_file' module_id=assessment_module.pk field_name='scoring_standard_file' label=field.label help_text=field.help_text %}
               {% else %}
                 {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types required=field.field.required label=field.label help_text=field.help_text %}
               {% endif %}
@@ -91,7 +92,7 @@
                 </div>
               {% endif %}
               {% if file %}
-                {% include 'components/file_display.html' with file=file delete_url_name="assessment:delete_module_file" module_id=assessment_module.pk field_name="scoring_sheet_file" label=field.label help_text=field.help_text %}
+                {% include 'components/file_display.html' with file=file delete_url_name='assessment:delete_module_file' module_id=assessment_module.pk field_name='scoring_sheet_file' label=field.label help_text=field.help_text %}
               {% else %}
                 {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types required=field.field.required label=field.label help_text=field.help_text %}
               {% endif %}
@@ -106,7 +107,7 @@
                 </div>
               {% endif %}
               {% if file %}
-                {% include 'components/file_display.html' with file=file delete_url_name="assessment:delete_module_file" module_id=assessment_module.pk field_name="scoring_script_file" label=field.label help_text=field.help_text %}
+                {% include 'components/file_display.html' with file=file delete_url_name='assessment:delete_module_file' module_id=assessment_module.pk field_name='scoring_script_file' label=field.label help_text=field.help_text %}
               {% else %}
                 {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types required=field.field.required label=field.label help_text=field.help_text %}
               {% endif %}
@@ -120,46 +121,56 @@
                   <span>{{ field.label }}：{{ field.errors.0 }}</span>
                 </div>
               {% endif %}
-              
+
+              {# 上传新附件 #}
+              {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types multiple=True required=field.field.required label='添加附件' help_text=field.help_text %}
+
               {# 已上传的附件列表 #}
               {% if existing_attachments %}
                 <div class="form-control w-full">
-                  <label class="label">
-                    <span class="label-text font-medium">{{ field.label }} - 已上传</span>
-                  </label>
+                  <label class="label"><span class="label-text font-medium">{{ field.label }} - 已上传</span></label>
                   <div class="space-y-2">
                     {% for attachment in existing_attachments %}
                       <div class="flex items-center gap-3 p-3 bg-base-200 rounded-lg border border-base-300" id="attachment-{{ attachment.pk }}">
                         {# 文件图标 #}
-                        {% with ext=attachment.file.name|slice:"-4:"|lower %}
-                          <span class="{% if ext == '.pdf' %}icon-[tabler--file-type-pdf] text-error{% elif ext == '.doc' or ext == 'docx' %}icon-[tabler--file-type-doc] text-info{% elif ext == '.xls' or ext == 'xlsx' %}icon-[tabler--file-type-xls] text-success{% elif ext == '.zip' or ext == '.rar' %}icon-[tabler--file-type-zip] text-warning{% elif ext == '.py' %}icon-[tabler--brand-python] text-primary{% else %}icon-[tabler--file] text-base-content{% endif %} size-6 shrink-0"></span>
+                        {% with ext=attachment.file.name|slice:'-4:'|lower %}
+                          <span class="{% if ext == '.pdf' %}
+                              icon-[tabler--file-type-pdf] text-error
+                            {% elif ext == '.doc' or ext == 'docx' %}
+                              icon-[tabler--file-type-doc] text-info
+                            {% elif ext == '.xls' or ext == 'xlsx' %}
+                              icon-[tabler--file-type-xls] text-success
+                            {% elif ext == '.zip' or ext == '.rar' %}
+                              icon-[tabler--file-type-zip] text-warning
+                            {% elif ext == '.py' %}
+                              icon-[tabler--brand-python] text-primary
+                            {% else %}
+                              icon-[tabler--file] text-base-content
+                            {% endif %} size-6 shrink-0">
+
+                          </span>
                         {% endwith %}
-                        
+
                         {# 文件信息 #}
                         <div class="flex-1 min-w-0">
-                          <div class="text-sm font-medium truncate">
-                            {{ attachment.file.name|filename }}
-                          </div>
+                          <div class="text-sm font-medium truncate">{{ attachment.file.name|filename }}</div>
                           <div class="text-xs text-base-content/60">
                             {{ attachment.file.size|filesize_display }}
-                            {% if attachment.description %} • {{ attachment.description }}{% endif %}
+                            {% if attachment.description %}
+                              • {{ attachment.description }}
+                            {% endif %}
                           </div>
                         </div>
-                        
+
                         {# 删除按钮 #}
                         <div class="shrink-0">
-                          <button type="button" class="btn btn-xs btn-ghost btn-circle text-error hover:bg-error/10" title="删除附件" hx-delete="{% url 'assessment:delete_attachment' attachment.pk %}" hx-target="#attachment-{{ attachment.pk }}" hx-swap="outerHTML" hx-confirm="确定要删除这个附件吗？">
-                            <span class="icon-[tabler--trash] size-4"></span>
-                          </button>
+                          <button type="button" class="btn btn-xs btn-ghost btn-circle text-error hover:bg-error/10" title="删除附件" hx-delete="{% url 'assessment:delete_attachment' attachment.pk %}" hx-target="#attachment-{{ attachment.pk }}" hx-swap="outerHTML" hx-confirm="确定要删除这个附件吗？"><span class="icon-[tabler--trash] size-4"></span></button>
                         </div>
                       </div>
                     {% endfor %}
                   </div>
                 </div>
               {% endif %}
-              
-              {# 上传新附件 #}
-              {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types multiple=True required=field.field.required label="添加附件" help_text=field.help_text %}
             {% endwith %}
           </div>
         </div>

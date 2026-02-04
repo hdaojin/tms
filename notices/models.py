@@ -1,12 +1,20 @@
 from django.db import models
 from django.utils import timezone
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db.models.signals import post_delete, pre_save
 from django.dispatch import receiver
 from django.core.validators import FileExtensionValidator
 from pathlib import Path
+
+from functools import partial
+
+from core.constants import (
+    NOTICE_ALLOWED_EXTENSIONS,
+    NOTICE_UPLOAD_DIR,
+    NOTICE_UPLOAD_MAX_SIZE_MB,
+)
+from core.utils.validators import validate_file_size
 
 # Create your models here.
 # 站内通知模型
@@ -52,17 +60,10 @@ class Notice(models.Model):
 
 
 
-# 通知相关附件上传模型
-ALLOWED_EXTENSIONS = [
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'md',
-    'jpg', 'jpeg', 'png', 'gif', 'txt',
-    'zip', 'rar', '7z', 'tar', 'gz', 'bz2',
-]
-
 def notice_attachment_upload_to(instance, original_name: str) -> str:
     """上传通知相关附件的路径。
     符合 Django FileField upload_to 回调签名 (instance, filename)。"""
-    notice_attachment_dir = getattr(settings, 'NOTICE_UPLOAD_DIR', 'notices')
+    notice_attachment_dir = NOTICE_UPLOAD_DIR
     # 使用当前时间构建路径，避免使用可能为 None 的 instance.id
     return f"{notice_attachment_dir}/{timezone.now().strftime('%Y/%m/%d')}/{original_name}"
 
@@ -71,7 +72,18 @@ class NoticeAttachment(models.Model):
     通知附件模型 - 支持多个附件
     """
     notice = models.ForeignKey(Notice, on_delete=models.CASCADE, related_name='attachments', verbose_name='通知')
-    file = models.FileField(upload_to=notice_attachment_upload_to, verbose_name='附件文件', help_text="支持多个文件上传", validators=[FileExtensionValidator(allowed_extensions=ALLOWED_EXTENSIONS, message=f"仅支持以下格式的文件：{', '.join(ALLOWED_EXTENSIONS)}")])   # type: ignore[arg-type]
+    file = models.FileField(
+        upload_to=notice_attachment_upload_to,
+        verbose_name='附件文件',
+        help_text="支持多个文件上传",
+        validators=[
+            FileExtensionValidator(
+                allowed_extensions=NOTICE_ALLOWED_EXTENSIONS,
+                message=f"仅支持以下格式的文件：{', '.join(NOTICE_ALLOWED_EXTENSIONS)}"
+            ),
+            partial(validate_file_size, max_size_mb=NOTICE_UPLOAD_MAX_SIZE_MB),
+        ],
+    )   # type: ignore[arg-type]
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name='上传时间')
     file_size = models.BigIntegerField(null=True, blank=True, verbose_name='文件大小(字节)')
 

@@ -18,11 +18,11 @@
 <div class="form-control w-full" id="file-display-{{ field_name }}">
   {% if label %}
     <label class="label">
-      <span class="label-text font-medium">{{ label }}</span>
+      <span class="label-text font-semibold">{{ label }}</span>
     </label>
   {% endif %}
   
-  <div class="flex items-center gap-3 p-4 bg-success/10 rounded-lg border border-success/30">
+  <div class="flex items-center gap-3 p-4 rounded-lg border border-base-300 bg-base-200">
     {# 文件图标 - 根据扩展名显示不同图标 #}
     {% with ext=file.name|slice:"-4:"|lower %}
       <span class="{% if ext == '.pdf' %}icon-[tabler--file-type-pdf] text-error{% elif ext == '.doc' or ext == 'docx' %}icon-[tabler--file-type-doc] text-info{% elif ext == '.xls' or ext == 'xlsx' %}icon-[tabler--file-type-xls] text-success{% elif ext == '.zip' or ext == '.rar' %}icon-[tabler--file-type-zip] text-warning{% elif ext == '.py' %}icon-[tabler--brand-python] text-primary{% else %}icon-[tabler--file] text-base-content{% endif %} size-8 shrink-0"></span>
@@ -30,7 +30,7 @@
     
     {# 文件信息 #}
     <div class="flex-1 min-w-0">
-      <div class="font-medium truncate text-success">
+      <div class="font-medium truncate">
         {{ file.name|filename }}
       </div>
       <div class="text-xs text-base-content/60">

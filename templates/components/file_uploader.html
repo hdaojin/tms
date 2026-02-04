@@ -120,7 +120,7 @@
     <label class="label">
         <span class="label-text font-semibold">
             {{ label }}
-            {% if required|default:True %}<span class="text-error">*</span>{% endif %}
+            {% if required %}<span class="text-error">*</span>{% endif %}
         </span>
     </label>
     {% endif %}
@@ -142,7 +142,7 @@
                     <template x-for="(file, index) in files" :key="file.name + file.size">
                         <div class="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/20 border border-primary/40 rounded-lg text-sm">
                             <span :class="getFileIcon(file.name)" class="size-4 text-primary"></span>
-                            <span class="text-primary font-medium truncate max-w-[150px]" x-text="file.name"></span>
+                            <span class="text-primary font-medium truncate max-w-36" x-text="file.name"></span>
                             <span class="text-xs text-base-content/60" x-text="formatSize(file.size)"></span>
                             <button 
                                 type="button" 
@@ -171,7 +171,7 @@
                         <span>拖拽文件到此处，或<span class="text-primary underline">点击选择</span></span>
                     </template>
                 </p>
-                <p class="text-sm text-base-content/60 mt-1">
+                <p class="text-sm text-info mt-1">
                     {% if help_text %}{{ help_text }}{% else %}最大 {{ max_size_mb|default:100 }}MB{% endif %}
                 </p>
             </div>

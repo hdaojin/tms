@@ -1,10 +1,8 @@
 from django import forms
 from django.utils import timezone
-from django.conf import settings
 from .models import TrainingLog
 from core.utils.forms import StyledFormMixin
-
-ALLOWED_EXTENSIONS = getattr(settings, "TRAININGLOG_ALLOWED_EXTENSIONS", ['pdf'])
+from core.constants import TRAININGLOG_ALLOWED_EXTENSIONS
 
 class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
     class Meta:
@@ -15,7 +13,7 @@ class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
             'training_date': forms.DateInput(attrs={'type': 'date', 'aria-label': 'date-input'}),
             'module': forms.Select(attrs={'type': 'select', 'aria-label': 'select'}),
             'task': forms.TextInput(attrs={'type':'text', 'aria-label': 'input', 'placeholder': '例如: Nginx安装与配置'}),
-            'file': forms.ClearableFileInput(attrs={'type':'file', 'aria-label': 'file-input', 'accept': ','.join(['.' + ext for ext in ALLOWED_EXTENSIONS])})
+            'file': forms.ClearableFileInput(attrs={'type':'file', 'aria-label': 'file-input', 'accept': ','.join(['.' + ext for ext in TRAININGLOG_ALLOWED_EXTENSIONS])})
             }
 
         # labels = {

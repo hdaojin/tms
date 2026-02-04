@@ -1,13 +1,13 @@
 from decimal import Decimal
 
-from django.conf import settings
 from django.core.files.storage import FileSystemStorage
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
 
 from core.utils.validators import validate_file_size
-from core.constants import COMPETITION_UPLOAD_DIR, COMPETITION_ALLOWED_EXTENSIONS
+from core.constants import COMPETITION_UPLOAD_DIR, COMPETITION_ALLOWED_EXTENSIONS, DEFAULT_UPLOAD_MAX_SIZE_MB
+from functools import partial
 
 competition_storage = FileSystemStorage(location=str(COMPETITION_UPLOAD_DIR))
 
@@ -126,9 +126,9 @@ class CompetitionProject(models.Model):
         blank=True,
         validators=[
             FileExtensionValidator(allowed_extensions=COMPETITION_ALLOWED_EXTENSIONS, message=f"仅支持以下格式的文件：{', '.join(COMPETITION_ALLOWED_EXTENSIONS)}"),
-            validate_file_size,
+            partial(validate_file_size, max_size_mb=DEFAULT_UPLOAD_MAX_SIZE_MB),
         ],
-        help_text=f"上传与该赛项相关的归档文件，支持格式：{', '.join(COMPETITION_ALLOWED_EXTENSIONS)}，文件大小不超过{settings.UPLOAD_MAX_SIZE_MB}MB"
+        help_text=f"上传与该赛项相关的归档文件，支持格式：{', '.join(COMPETITION_ALLOWED_EXTENSIONS)}，文件大小不超过 {DEFAULT_UPLOAD_MAX_SIZE_MB}MB"
     )
     description = models.TextField("本届赛项描述", blank=True) 
 

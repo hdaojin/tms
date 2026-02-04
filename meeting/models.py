@@ -1,12 +1,12 @@
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from pathlib import Path
 
 from core.utils.validators import validate_file_size, validate_date_not_future, validate_pdf_file
 from core.utils.signals import register_file_cleanup_signals
+from core.constants import MEETING_UPLOAD_DIR, DEFAULT_UPLOAD_MAX_SIZE_MB
 
 
 def meeting_file_upload_to(instance, original_name: str) -> str:
@@ -15,14 +15,14 @@ def meeting_file_upload_to(instance, original_name: str) -> str:
     date_part = instance.date or timezone.localdate()
     safe_title = slugify(instance.title or 'untitled', allow_unicode=True)
     basename = f"{date_part:%Y.%m.%d}-{safe_title}{ext}"
-    base_dir = getattr(settings, 'MEETING_UPLOAD_DIR', 'meetings')
+    base_dir = MEETING_UPLOAD_DIR
     return f"{base_dir}/{date_part:%Y}/{basename}"
 
 
 def meeting_file_validator(file):
     """验证会议记录文件（PDF 格式和大小）"""
     validate_pdf_file(file)
-    validate_file_size(file)
+    validate_file_size(file, max_size_mb=DEFAULT_UPLOAD_MAX_SIZE_MB)
 
 
 class Meeting(models.Model):
@@ -36,7 +36,7 @@ class Meeting(models.Model):
     file = models.FileField(
         "会议记录文件",
         upload_to=meeting_file_upload_to,
-        help_text="支持 PDF 格式, 文件大小不超过 100MB",
+        help_text=f"支持 PDF 格式, 文件大小不超过 {DEFAULT_UPLOAD_MAX_SIZE_MB}MB",
         validators=[meeting_file_validator]
     )
     uploaded_by = models.ForeignKey(

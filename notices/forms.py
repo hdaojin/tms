@@ -1,6 +1,7 @@
 from django import forms
-from .models import Notice, NoticeAttachment, ALLOWED_EXTENSIONS
+from .models import Notice, NoticeAttachment
 from core.utils.forms import StyledFormMixin
+from core.constants import NOTICE_ALLOWED_EXTENSIONS
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -45,7 +46,7 @@ class NoticeForm(StyledFormMixin, forms.ModelForm):
             'type': 'file',
             'aria-label': 'file-input',
             'class': 'file-input w-full file-input-primary',
-            'accept': ','.join(['.' + ext for ext in ALLOWED_EXTENSIONS]),
+            'accept': ','.join(['.' + ext for ext in NOTICE_ALLOWED_EXTENSIONS]),
         }),
         required=False,
         label='附件',
@@ -115,6 +116,6 @@ class NoticeAttachmentForm(forms.ModelForm):
         widgets = {
             'file': forms.ClearableFileInput(attrs={
                 'class': 'file-input file-input-bordered file-input-sm w-full',
-                'accept': '.pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip,.rar'
+                'accept': ','.join(['.' + ext for ext in NOTICE_ALLOWED_EXTENSIONS])
             })
         }
