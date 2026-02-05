@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load form_extras %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-3xl">
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-2xl mb-6">
+                <span class="{{ title_icon }} size-6"></span>
+                {{ title }}
+            </h2>
+
+            <form method="post" enctype="multipart/form-data" class="space-y-4">
+                {% csrf_token %}
+                
+                {% for field in form %}
+                    {% include 'accounts/partials/form_field.html' with field=field %}
+                {% endfor %}
+
+                <div class="alert alert-info mt-4">
+                    <span class="icon-[tabler--info-circle] size-5"></span>
+                    <span>记录提交后将进入待审核状态，审核通过后才会计入总分</span>
+                </div>
+
+                <div class="card-actions justify-end mt-6">
+                    <a href="{% url 'conduct:record_list' %}" class="btn btn-ghost">取消</a>
+                    <button type="submit" class="btn btn-primary">提交</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -74,6 +74,10 @@ NOTICE_ALLOWED_EXTENSIONS = [
 ]
 NOTICE_UPLOAD_MAX_SIZE_MB = 100
 
+# 操行记录附件允许的扩展名和大小
+CONDUCT_ALLOWED_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png']
+CONDUCT_UPLOAD_MAX_SIZE_MB = 50
+
 
 # ============ 文件上传路径 ============
 # 笔记目录（私有，完整路径）
@@ -84,6 +88,9 @@ ASSESSMENT_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "assessment"
 
 # 竞赛文件上传目录（私有，完整路径）
 COMPETITION_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "competitions"
+
+# conduct 操行记录附件上传目录（私有，完整路径）
+CONDUCT_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "conduct"
 
 # 训练日志上传目录（公共，相对于 MEDIA_ROOT）
 TRAININGLOG_UPLOAD_DIR = "traininglogs"

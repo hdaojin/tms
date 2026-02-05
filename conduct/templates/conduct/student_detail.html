@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+    <!-- 汇总卡片 -->
+    <div class="card bg-gradient-to-r from-primary to-secondary text-primary-content shadow-2xl mb-8">
+        <div class="card-body">
+            <h2 class="card-title text-3xl mb-4">
+                <span class="icon-[tabler--user-circle] size-10"></span>
+                {{ student.first_name|default:student.username }} 的奖惩档案
+            </h2>
+            
+            <div class="stats stats-vertical lg:stats-horizontal shadow">
+                <div class="stat">
+                    <div class="stat-figure text-primary">
+                        <span class="icon-[tabler--star] size-10"></span>
+                    </div>
+                    <div class="stat-title">总分</div>
+                    <div class="stat-value {% if summary.total_score > 0 %}text-success{% elif summary.total_score < 0 %}text-error{% endif %}">
+                        {{ summary.total_score|floatformat:1|add:"0" }}
+                    </div>
+                    <div class="stat-desc">累计得分</div>
+                </div>
+                
+                <div class="stat">
+                    <div class="stat-figure text-success">
+                        <span class="icon-[tabler--thumb-up] size-10"></span>
+                    </div>
+                    <div class="stat-title">奖励次数</div>
+                    <div class="stat-value text-success">{{ summary.reward_count }}</div>
+                    <div class="stat-desc">已通过的奖励</div>
+                </div>
+                
+                <div class="stat">
+                    <div class="stat-figure text-error">
+                        <span class="icon-[tabler--thumb-down] size-10"></span>
+                    </div>
+                    <div class="stat-title">惩罚次数</div>
+                    <div class="stat-value text-error">{{ summary.penalty_count }}</div>
+                    <div class="stat-desc">已通过的惩罚</div>
+                </div>
+                
+                <div class="stat">
+                    <div class="stat-figure text-info">
+                        <span class="icon-[tabler--list-check] size-10"></span>
+                    </div>
+                    <div class="stat-title">记录总数</div>
+                    <div class="stat-value">{{ stats.total_records }}</div>
+                    <div class="stat-desc">
+                        待审核: {{ stats.pending_count }} | 
+                        已驳回: {{ stats.rejected_count }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 记录列表 -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h3 class="card-title text-2xl mb-4">
+                <span class="icon-[tabler--history] size-6"></span>
+                奖惩记录
+            </h3>
+
+            {% if records %}
+            <div class="overflow-x-auto">
+                <table class="table table-zebra">
+                    <thead>
+                        <tr>
+                            <th>日期</th>
+                            <th>类型</th>
+                            <th>得分</th>
+                            <th>原因</th>
+                            <th>状态</th>
+                            <th>记录人</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr>
+                            <td>{{ record.occurred_date }}</td>
+                            <td>
+                                {% if record.record_type.category == 'REWARD' %}
+                                    <span class="badge badge-success">奖励</span>
+                                {% else %}
+                                    <span class="badge badge-error">惩罚</span>
+                                {% endif %}
+                                {{ record.record_type.name }}
+                            </td>
+                            <td>
+                                <span class="font-bold {% if record.score > 0 %}text-success{% else %}text-error{% endif %}">
+                                    {{ record.score|floatformat:1|add:"0" }}
+                                </span>
+                            </td>
+                            <td class="max-w-xs truncate">{{ record.reason }}</td>
+                            <td>
+                                {% if record.status == 'PENDING' %}
+                                    <span class="badge badge-warning">待审核</span>
+                                {% elif record.status == 'APPROVED' %}
+                                    <span class="badge badge-success">已通过</span>
+                                {% else %}
+                                    <span class="badge badge-error">已驳回</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ record.recorded_by.first_name|default:record.recorded_by.username }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <span class="icon-[tabler--inbox] size-16 text-base-300"></span>
+                <p class="text-lg text-base-content/60 mt-4">暂无奖惩记录</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="mt-6 text-center">
+        <a href="{% url 'conduct:summary_list' %}" class="btn btn-ghost">返回排行榜</a>
+    </div>
+</div>
+{% endblock %}

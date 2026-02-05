@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8 max-w-2xl">
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title text-2xl mb-6">
+                <span class="icon-[tabler--alert-triangle] size-6 text-error"></span>
+                确认删除
+            </h2>
+
+            <div class="alert alert-warning">
+                <span class="icon-[tabler--info-circle] size-6"></span>
+                <span>确定要删除奖惩类型 <strong>{{ object.name }}</strong> 吗？此操作不可恢复！</span>
+            </div>
+
+            <form method="post" class="mt-6">
+                {% csrf_token %}
+                <div class="card-actions justify-end">
+                    <a href="{% url 'conduct:type_list' %}" class="btn btn-ghost">取消</a>
+                    <button type="submit" class="btn btn-error">确认删除</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

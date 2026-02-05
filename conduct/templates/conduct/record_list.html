@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load render_table from django_tables2 %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-3xl font-bold">{{ title }}</h1>
+        {% if perms.conduct.add_conduct_record %}
+        <a href="{% url 'conduct:record_create' %}" class="btn btn-primary">
+            <span class="icon-[tabler--plus] size-5"></span>
+            录入记录
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- 筛选器 -->
+    <div class="card bg-base-100 shadow-xl mb-6">
+        <div class="card-body">
+            <h3 class="card-title text-lg mb-4">筛选条件</h3>
+            <form method="get" class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {% for field in filter_form %}
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">{{ field.label }}</span>
+                        </label>
+                        {{ field }}
+                    </div>
+                {% endfor %}
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text opacity-0">.</span>
+                    </label>
+                    <button type="submit" class="btn btn-primary">
+                        <span class="icon-[tabler--search] size-5"></span>
+                        筛选
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 记录列表 -->
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            {% render_table table %}
+        </div>
+    </div>
+</div>
+{% endblock %}

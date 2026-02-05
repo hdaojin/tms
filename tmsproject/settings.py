@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     'traininglogs',
     'meeting',
     'notices',
+    'conduct',
 ]
 
 # 开发模式下添加 demo 应用
