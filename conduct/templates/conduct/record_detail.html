@@ -15,7 +15,7 @@
                     <label class="label">
                         <span class="label-text font-semibold">学生</span>
                     </label>
-                    <p class="text-lg">{{ record.student.first_name|default:record.student.username }}</p>
+                    <p class="text-lg">{{ record.student.display_name }}</p>
                 </div>
 
                 <div>
@@ -67,7 +67,7 @@
                     <label class="label">
                         <span class="label-text font-semibold">记录人</span>
                     </label>
-                    <p>{{ record.recorded_by.first_name|default:record.recorded_by.username }}</p>
+                    <p>{{ record.recorded_by.display_name }}</p>
                 </div>
             </div>
 
@@ -102,7 +102,7 @@
                     <label class="label">
                         <span class="label-text font-semibold">审核人</span>
                     </label>
-                    <p>{{ record.reviewed_by.first_name|default:record.reviewed_by.username }}</p>
+                    <p>{{ record.reviewed_by.display_name }}</p>
                 </div>
 
                 <div>

@@ -30,7 +30,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       {% for field in form.visible_fields %}
-        {% include 'accounts/partials/form_field.html' with field=field %}
+        {% include 'components/field.html' with field=field %}
       {% endfor %}
     </div>
   </div>

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load form_extras %}
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
@@ -19,19 +20,18 @@
       <form method="post" novalidate>
         {% csrf_token %}
         <input type="hidden" name="action" value="change">
-        {{ form.non_field_errors }}
-        <div class="mb-3">
-          <label class="form-label">{{ form.password1.label }}</label>
-          {{ form.password1 }}
-          {% if form.password1.help_text %}<div class="form-text">{{ form.password1.help_text|safe }}</div>{% endif %}
-          {% if form.password1.errors %}<div class="text-danger">{{ form.password1.errors }}</div>{% endif %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-error mb-4">
+          <ul class="list-disc list-inside">
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
         </div>
-        <div class="mb-3">
-          <label class="form-label">{{ form.password2.label }}</label>
-          {{ form.password2 }}
-          {% if form.password2.errors %}<div class="text-danger">{{ form.password2.errors }}</div>{% endif %}
-        </div>
-        <button type="submit" class="btn btn-primary">修改密码</button>
+        {% endif %}
+        {% include 'components/field.html' with field=form.password1 %}
+        {% include 'components/field.html' with field=form.password2 %}
+        <button type="submit" class="btn btn-primary mt-4">修改密码</button>
       </form>
     </div>
   </div>
@@ -46,19 +46,18 @@
       <form method="post" novalidate>
         {% csrf_token %}
         <input type="hidden" name="action" value="enable">
-        {{ form.non_field_errors }}
-        <div class="mb-3">
-          <label class="form-label">{{ form.password1.label }}</label>
-          {{ form.password1 }}
-          {% if form.password1.help_text %}<div class="form-text">{{ form.password1.help_text|safe }}</div>{% endif %}
-          {% if form.password1.errors %}<div class="text-danger">{{ form.password1.errors }}</div>{% endif %}
+        {% if form.non_field_errors %}
+        <div class="alert alert-error mb-4">
+          <ul class="list-disc list-inside">
+            {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
         </div>
-        <div class="mb-3">
-          <label class="form-label">{{ form.password2.label }}</label>
-          {{ form.password2 }}
-          {% if form.password2.errors %}<div class="text-danger">{{ form.password2.errors }}</div>{% endif %}
-        </div>
-        <button type="submit" class="btn btn-primary">开通并设置密码</button>
+        {% endif %}
+        {% include 'components/field.html' with field=form.password1 %}
+        {% include 'components/field.html' with field=form.password2 %}
+        <button type="submit" class="btn btn-primary mt-4">开通并设置密码</button>
       </form>
     </div>
   </div>

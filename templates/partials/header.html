@@ -35,11 +35,7 @@
             </div>
           </div>
           <span class="text-primary font-medium">
-            {% if user.first_name %}
-              {{ user.first_name }}
-            {% else %}
-              {{ user.username }}
-            {% endif %}
+            {{ user.display_name }}
           </span>
         </div>
         <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-48 p-2 shadow-lg border border-base-300">

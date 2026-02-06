@@ -55,7 +55,7 @@ def main():
     if summary_count > 0:
         top_student = ConductSummary.objects.order_by('-total_score').first()
         if top_student:
-            print(f"   排名第一: {top_student.student.first_name or top_student.student.username}")
+            print(f"   排名第一: {top_student.student.display_name}")
             print(f"   总分: {top_student.total_score:+.1f}")
     
     # 5. 检查URL配置

@@ -24,8 +24,7 @@ def account_signup(request):
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
-            # 设置用户姓名，可根据需要拆分为 first_name 与 last_name
-            user.first_name = form.cleaned_data.get("full_name")
+            # 姓名已由表单处理（last_name 和 first_name）
             # 新注册用户默认不激活（例如等待邮件激活）
             user.is_active = False
             user.save()

@@ -1,9 +1,9 @@
 from django.views.generic import TemplateView
-from django.contrib.auth.forms import AuthenticationForm
 from django.shortcuts import redirect
 from django.urls import reverse
 
 from core.utils.mixins import TitleMixin
+from accounts.forms import CustomAuthenticationForm
 
 
 class HomeView(TitleMixin, TemplateView):
@@ -11,7 +11,7 @@ class HomeView(TitleMixin, TemplateView):
     title = "首页"
     title_icon = "icon-[tabler--home]"
     extra_context = {
-        "login_form": AuthenticationForm(),
+        "login_form": CustomAuthenticationForm(),
     }
     
     def dispatch(self, request, *args, **kwargs):

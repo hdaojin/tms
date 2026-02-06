@@ -9,12 +9,12 @@
         邀请码
       </h2>
 
-      <p class="text-base-content/70 mb-4">请将以下邀请码提供给需要注册的用户：</p>
+      <p class="text-base-content/70 mb-4">请将以下邀请码提供给需要注册的用户（建议复制后通过安全渠道发送）：</p>
 
       <div class="flex gap-2 items-end">
         <label class="input input-bordered flex-1">
           <span class="label">邀请码</span>
-          <input type="text" readonly value="{{ code }}" id="inviteCode" />
+          <input type="text" readonly value="{{ code }}" id="inviteCode" class="font-mono text-sm" />
         </label>
         <button id="copyBtn" class="btn btn-primary">
           <span class="icon-[tabler--copy]"></span>
@@ -24,7 +24,14 @@
 
       <div class="alert alert-info mt-4">
         <span class="icon-[tabler--info-circle] shrink-0"></span>
-        <span>请妥善保管邀请码，只分享给需要注册的用户。</span>
+        <div>
+          <p class="font-semibold">使用说明：</p>
+          <ul class="list-disc list-inside text-sm mt-1">
+            <li>点击"复制"按钮，将邀请码发送给用户</li>
+            <li>邀请码有效期：24小时</li>
+            <li>使用 Django 签名技术，安全防伪造</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>

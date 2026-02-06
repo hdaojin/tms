@@ -6,9 +6,69 @@
 {% endblock %}
 
 {% block content %}
-  <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 max-lg mx-auto shadow-xl">
+  <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 w-fit max-w-lg mx-auto shadow-xl">
     <legend class="fieldset-legend text-2xl font-bold text-center mb-4">{{ title }}</legend>
-    {% include 'components/form_snippet.html' with form=form action=request.path submit_label='注册' %}
+    
+    <form action="{% url 'accounts:signup' %}" method="post">
+      {% csrf_token %}
+      
+      {# 非字段错误 #}
+      {% if form.non_field_errors %}
+      <div class="alert alert-error mb-4">
+        <ul class="list-disc list-inside">
+          {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+      
+      {# 用户名字段 #}
+      {% include 'components/field.html' with field=form.username %}
+      
+      {# 姓名字段（姓和名两个输入框并排） #}
+      <fieldset class="fieldset mt-4">
+        <legend class="fieldset-legend">
+          <span class="text-red-500">*</span> 姓名
+        </legend>
+        <div class="flex gap-2">
+          <div class="flex-1">
+            {{ form.last_name }}
+            {% if form.last_name.errors %}
+            <div class="alert alert-error mt-2">
+              {% for error in form.last_name.errors %}
+              <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+          <div class="flex-1">
+            {{ form.first_name }}
+            {% if form.first_name.errors %}
+            <div class="alert alert-error mt-2">
+              {% for error in form.first_name.errors %}
+              <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        <p class="text-info text-xs mt-1">必填，请分别填写真实的姓和名</p>
+      </fieldset>
+      
+      {# 邀请码字段 #}
+      {% include 'components/field.html' with field=form.invitation_code %}
+      
+      {# 密码字段 #}
+      {% include 'components/field.html' with field=form.password1 %}
+      
+      {# 确认密码字段 #}
+      {% include 'components/field.html' with field=form.password2 %}
+      
+      {# 提交按钮 #}
+      {% include 'components/field.html' with field_role="button" show_reset=False submit_label="注册" %}
+    </form>
+    
   </fieldset>
   <div class="text-center mt-4">
     <p>

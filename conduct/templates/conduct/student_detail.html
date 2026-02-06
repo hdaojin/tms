@@ -103,7 +103,7 @@
                                     <span class="badge badge-error">已驳回</span>
                                 {% endif %}
                             </td>
-                            <td>{{ record.recorded_by.first_name|default:record.recorded_by.username }}</td>
+                            <td>{{ record.recorded_by.display_name }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

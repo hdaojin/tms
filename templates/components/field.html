@@ -1,0 +1,133 @@
+{# components/field.html #}
+{# 统一的表单字段渲染组件 #}
+{#                                                                        #}
+{# 用法: {% include 'components/field.html' with field=field %}            #}
+{#       {% include 'components/field.html' with field_role="button" %}  #}
+{#                                                                        #}
+{# 参数:                                                                  #}
+{#   field            - 必填, Django BoundField 对象 (除非 field_role="button") #}
+{#   show_label       - 可选, 是否显示标签, 默认 True                      #}
+{#   show_help        - 可选, 是否显示帮助文本, 默认 True                   #}
+{#   show_errors      - 可选, 是否显示错误信息, 默认 True                   #}
+{#   use_fancy_upload - 可选, 文件字段使用高级上传组件, 默认 True            #}
+{#   wrapper_class    - 可选, 外层 fieldset 额外 CSS 类                    #}
+{#   field_role       - 可选, 字段角色. 设为 "button" 时渲染为提交/重置按钮  #}
+{#   submit_label     - 可选, 提交按钮标签, 默认"提交" (仅当 field_role="button") #}
+{#   reset_label      - 可选, 重置按钮标签, 默认"重置" (仅当 field_role="button") #}
+{#   show_reset       - 可选, 是否显示重置按钮, 默认 True (仅当 field_role="button") #}
+{#                                                                        #}
+{# 特性:                                                                  #}
+{#   - textarea / file 字段自动添加 md:col-span-2 (网格布局占满整行)        #}
+{#   - 支持 checkbox / checkbox_multiple / file / textarea / 默认 五种类型 #}
+{#   - field_role="button" 时渲染提交/重置按钮字段                        #}
+{#   - 使用 DaisyUI fieldset + legend 结构, 与 form_snippet.html 风格一致  #}
+
+{% load form_extras %}
+
+{# --- 提交/重置按钮字段 --- #}
+{% if field_role == "button" %}
+<div class="mt-4 flex flex-wrap gap-4 justify-center">
+    {% if show_reset|default:True %}
+    <button type="reset" class="btn btn-outline btn-wide">
+        {{ reset_label|default:"重置" }}
+    </button>
+    {% endif %}
+    <button type="submit" class="btn btn-primary btn-wide">
+        {{ submit_label|default:"提交" }}
+    </button>
+</div>
+
+{# --- 错误信息 --- #}
+{% else %}
+{% if show_errors|default:True and field.errors %}
+<div class="alert alert-error mb-2">
+    <ul class="list-disc list-inside">
+        {% for error in field.errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+{# --- 多选复选框 --- #}
+{% if field|is_checkbox_multiple %}
+<fieldset class="fieldset mt-4 {{ wrapper_class }}">
+    {% if show_label|default:True %}
+    <legend class="fieldset-legend">
+        {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+        {{ field.label }}
+    </legend>
+    {% endif %}
+    <div class="flex flex-wrap flex-row gap-4">
+        {% for cb in field %}
+        <div class="gap-x-2 flex items-center">
+            {{ cb.tag }} <span>{{ cb.choice_label }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% if show_help|default:True and field.help_text %}
+    <p class="text-info text-xs mt-1">{{ field.help_text|safe }}</p>
+    {% endif %}
+</fieldset>
+
+{# --- 单个复选框 --- #}
+{% elif field|is_checkbox_input %}
+<fieldset class="fieldset mt-4 {{ wrapper_class }}">
+    <div class="gap-x-2 flex items-center">
+        {{ field }} <span class="ml-1">{{ field.label }}</span>
+    </div>
+    {% if show_help|default:True and field.help_text %}
+    <p class="text-info text-xs mt-1">{{ field.help_text|safe }}</p>
+    {% endif %}
+</fieldset>
+
+{# --- 文件上传 --- #}
+{% elif field|is_file_input %}
+<fieldset class="fieldset mt-4 md:col-span-2 {{ wrapper_class }}">
+    {% if show_label|default:True %}
+    <legend class="fieldset-legend">
+        {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+        {{ field.label }}
+    </legend>
+    {% endif %}
+    {% if use_fancy_upload|default:True %}
+    {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types multiple=field|is_multiple_file required=field.field.required help_text=field.help_text %}
+    {% else %}
+    {{ field }}
+    {% if show_help|default:True and field.help_text %}
+    <p class="text-info text-xs mt-1">{{ field.help_text|safe }}</p>
+    {% endif %}
+    {% endif %}
+</fieldset>
+
+{# --- 多行文本 (textarea) --- #}
+{% elif field|is_textarea_input %}
+<fieldset class="fieldset mt-4 md:col-span-2 {{ wrapper_class }}">
+    {% if show_label|default:True %}
+    <legend class="fieldset-legend">
+        {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+        {{ field.label }}
+    </legend>
+    {% endif %}
+    {{ field }}
+    {% if show_help|default:True and field.help_text %}
+    <p class="text-info text-xs mt-1">{{ field.help_text|safe }}</p>
+    {% endif %}
+</fieldset>
+
+{# --- 默认字段 (text, select, date, number 等) --- #}
+{% else %}
+<fieldset class="fieldset mt-4 {{ wrapper_class }}">
+    {% if show_label|default:True %}
+    <legend class="fieldset-legend">
+        {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+        {{ field.label }}
+    </legend>
+    {% endif %}
+    {{ field }}
+    {% if show_help|default:True and field.help_text %}
+    <p class="text-info text-xs mt-1">{{ field.help_text|safe }}</p>
+    {% endif %}
+</fieldset>
+{% endif %}
+{% endif %}

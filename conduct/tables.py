@@ -56,8 +56,8 @@ class ConductRecordTable(BaseTable):
     
     student = tables.Column(
         verbose_name='学生',
-        accessor='student__first_name',
-        order_by=('student__first_name', 'student__username')
+        accessor='student.display_name',
+        order_by=('student__last_name', 'student__first_name', 'student__username')
     )
     record_type = tables.Column(verbose_name='奖惩类型')
     occurred_date = BaseDateColumn(verbose_name='发生日期')
@@ -65,7 +65,7 @@ class ConductRecordTable(BaseTable):
     status = tables.Column(verbose_name='状态')
     recorded_by = tables.Column(
         verbose_name='记录人',
-        accessor='recorded_by__first_name'
+        accessor='recorded_by.display_name'
     )
     recorded_at = BaseDateColumn(verbose_name='记录时间')
     
@@ -91,7 +91,7 @@ class ConductRecordTable(BaseTable):
     
     def render_student(self, record):
         """显示学生姓名"""
-        return record.student.first_name or record.student.username
+        return record.student.display_name
     
     def render_score(self, value):
         """格式化得分显示"""
@@ -119,7 +119,7 @@ class ConductRecordTable(BaseTable):
     def render_recorded_by(self, record):
         """显示记录人姓名"""
         if record.recorded_by:
-            return record.recorded_by.first_name or record.recorded_by.username
+            return record.recorded_by.display_name
         return '-'
 
 
@@ -188,7 +188,7 @@ class ConductSummaryTable(BaseTable):
     
     def render_student(self, record):
         """显示学生姓名"""
-        return record.student.first_name or record.student.username
+        return record.student.display_name
     
     def render_total_score(self, value):
         """格式化总分显示"""

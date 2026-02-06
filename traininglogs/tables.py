@@ -25,8 +25,7 @@ class TrainingLogTable(BaseTable):
     def render_uploaded_by(self, value):
         if not value:
             return "-"
-        name = (getattr(value, "first_name", "") or "").strip()
-        return name or value.get_username()
+        return value.display_name
 
 
 class TrainingLogOthersTable(BaseTable):
@@ -49,8 +48,7 @@ class TrainingLogOthersTable(BaseTable):
     def render_uploaded_by(self, value):
         if not value:
             return "-"
-        name = (getattr(value, "first_name", "") or "").strip()
-        return name or value.get_username()
+        return value.display_name
 
 
 class MonthlyStatTable(BaseTable):

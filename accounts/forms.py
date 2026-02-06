@@ -6,7 +6,7 @@ from core.utils.forms import StyledFormMixin
 from .models import UserProfile
 
 
-class CustomAuthenticationForm(AuthenticationForm):
+class CustomAuthenticationForm(StyledFormMixin, AuthenticationForm):
     """自定义登录表单，用于首页登录"""
     username = forms.CharField(
         max_length=254,
@@ -33,24 +33,31 @@ class CustomAuthenticationForm(AuthenticationForm):
 
 class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
     """
-    自定义用户注册表单，添加姓名和邀请码字段。
+    自定义用户注册表单，添加姓、名和邀请码字段。
     """
-    full_name = forms.CharField(
-        max_length=100, 
+    last_name = forms.CharField(
+        max_length=150, 
         required=True, 
-        label="姓名",
-        help_text="必填; 必须是中文真实姓名。",
+        label="姓",
         widget=forms.TextInput(attrs={
-            'placeholder': '请填写真实姓名',
+            'placeholder': '姓',
+        })
+    )
+    first_name = forms.CharField(
+        max_length=150, 
+        required=True, 
+        label="名",
+        widget=forms.TextInput(attrs={
+            'placeholder': '名',
         })
     )
     invitation_code = forms.CharField(
-        max_length=255, 
+        max_length=100, 
         required=True, 
         label="邀请码",
-        help_text="请填写管理员提供的邀请码。",
+        help_text="请填写管理员提供的邀请码（复制粘贴即可）。",
         widget=forms.TextInput(attrs={
-            'placeholder': '输入邀请码',
+            'placeholder': '粘贴邀请码',
         })
     )
 
@@ -68,14 +75,14 @@ class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
         })
 
     def clean_invitation_code(self):
-        code_str = self.cleaned_data.get('invitation_code')
-        if not validate_invitation_code(code_str):
+        code_str = self.cleaned_data.get('invitation_code', '').strip()
+        if not code_str or not validate_invitation_code(code_str):
             raise forms.ValidationError("邀请码无效或已过期")
         return code_str
     
     class Meta:
         model = User
-        fields = ("username", "full_name", "invitation_code", "password1", "password2")
+        fields = ("username", "last_name", "first_name", "invitation_code", "password1", "password2")
 
 
 class ProfileForm(StyledFormMixin, forms.ModelForm):

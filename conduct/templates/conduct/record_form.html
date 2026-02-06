@@ -14,7 +14,7 @@
                 {% csrf_token %}
                 
                 {% for field in form %}
-                    {% include 'accounts/partials/form_field.html' with field=field %}
+                    {% include 'components/field.html' with field=field %}
                 {% endfor %}
 
                 <div class="alert alert-info mt-4">

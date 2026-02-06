@@ -6,7 +6,7 @@ from .models import Meeting
 class MeetingTable(BaseTable):
     date = BaseDateColumn(verbose_name="会议日期")
     filename = tables.Column(verbose_name="文件名", accessor="filename", orderable=False)
-    uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by.first_name", orderable=True)
+    uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by.display_name", orderable=True)
     uploaded_at = BaseDateTimeColumn(verbose_name="上传时间", accessor="uploaded_at")
     actions = ActionsColumn(
         view_url="meeting:meeting_detail",

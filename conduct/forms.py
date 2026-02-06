@@ -10,6 +10,13 @@ from .models import ConductType, ConductRecord
 User = get_user_model()
 
 
+class StudentChoiceField(forms.ModelChoiceField):
+    """自定义学生选择字段，显示学生的 display_name（姓名） 而不是用户名"""
+    
+    def label_from_instance(self, obj):
+        return obj.display_name
+
+
 class ConductTypeForm(StyledFormMixin, forms.ModelForm):
     """奖惩类型表单"""
     
@@ -37,13 +44,19 @@ class ConductTypeForm(StyledFormMixin, forms.ModelForm):
 class ConductRecordForm(StyledFormMixin, forms.ModelForm):
     """奖惩记录表单"""
     
+    # 使用自定义的学生选择字段，显示 display_name
+    student = StudentChoiceField(
+        queryset=User.objects.none(),
+        label='学生',
+        required=True
+    )
+    
     class Meta:
         model = ConductRecord
         fields = [
             'student',
             'record_type',
             'occurred_date',
-            'score',
             'reason',
             'attachment'
         ]
@@ -55,13 +68,13 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
-        # 只显示选手组的学生
+        # 只显示选手组的学生，按姓名和用户名排序
         try:
             competitor_group = Group.objects.get(name=GROUP_COMPETITOR)
             self.fields['student'].queryset = User.objects.filter(
                 groups=competitor_group,
                 is_active=True
-            ).order_by('first_name', 'username')
+            ).order_by('last_name', 'first_name', 'username')
         except Group.DoesNotExist:
             self.fields['student'].queryset = User.objects.none()
         
@@ -69,13 +82,6 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
         self.fields['record_type'].queryset = ConductType.objects.filter(
             is_active=True
         )
-        
-        # score字段提示
-        self.fields['score'].help_text = '默认使用类型分值，可根据实际情况微调'
-        
-        # 如果是编辑模式，设置默认分值
-        if self.instance.pk and self.instance.record_type:
-            self.fields['score'].initial = self.instance.record_type.score
 
 
 class ConductRecordReviewForm(StyledFormMixin, forms.ModelForm):
@@ -114,7 +120,7 @@ class ConductRecordFilterForm(forms.Form):
         ('PENALTY', '惩罚'),
     ]
     
-    student = forms.ModelChoiceField(
+    student = StudentChoiceField(
         queryset=User.objects.none(),
         required=False,
         label='学生',
@@ -152,7 +158,7 @@ class ConductRecordFilterForm(forms.Form):
                 self.fields['student'].queryset = User.objects.filter(
                     groups=competitor_group,
                     is_active=True
-                ).order_by('first_name', 'username')
+                ).order_by('last_name', 'first_name', 'username')
             except Group.DoesNotExist:
                 self.fields['student'].queryset = User.objects.none()
         else:

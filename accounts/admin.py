@@ -18,7 +18,9 @@ class CustomUserAdmin(DefaultUserAdmin):
     inlines =[UserProfileInline]
     
     def full_name(self, obj):
-        return obj.first_name
+        """显示姓名（姓+名），无则显示用户名"""
+        full_name = f"{obj.last_name}{obj.first_name}".strip()
+        return full_name or obj.username
     full_name.short_description = '姓名' # type: ignore
 
     def groups_name(self, obj):

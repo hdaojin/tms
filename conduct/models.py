@@ -7,6 +7,7 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from pathlib import Path
 from functools import partial
+from decimal import Decimal
 
 from core.constants import (
     GROUP_COMPETITOR,
@@ -124,14 +125,6 @@ class ConductRecord(models.Model):
         validators=[validate_date_not_future],
         help_text='请填写实际发生日期'
     )
-    score = models.DecimalField(
-        '实际得分',
-        max_digits=6,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        help_text='默认使用选中类型的分值，可微调'
-    )
     reason = models.TextField('具体原因/描述')
     attachment = models.FileField(
         '附件',
@@ -188,19 +181,17 @@ class ConductRecord(models.Model):
         ]
 
     def __str__(self):
-        student_name = getattr(self.student, 'first_name', None) or self.student.username
-        return f"{student_name} - {self.record_type.name} - {self.occurred_date}"
+        return f"{self.student.display_name} - {self.record_type.name} - {self.occurred_date}"
     
     @property
     def filename(self):
         """返回去掉路径的文件名"""
         return Path(self.attachment.name).name if self.attachment else ''
     
-    def save(self, *args, **kwargs):
-        # 如果未设置score，使用类型默认分值
-        if self.score is None:
-            self.score = self.record_type.score
-        super().save(*args, **kwargs)
+    @property
+    def score(self):
+        """返回奖惩类型对应的分值"""
+        return self.record_type.score if self.record_type else 0
 
 
 class ConductSummary(models.Model):
@@ -217,7 +208,7 @@ class ConductSummary(models.Model):
         '总分',
         max_digits=8,
         decimal_places=2,
-        default=0
+        default=Decimal('0')
     )
     reward_count = models.PositiveIntegerField('奖励次数', default=0)
     penalty_count = models.PositiveIntegerField('惩罚次数', default=0)
@@ -229,12 +220,11 @@ class ConductSummary(models.Model):
         ordering = ['-total_score']
 
     def __str__(self):
-        student_name = getattr(self.student, 'first_name', None) or self.student.username
-        return f"{student_name} - 总分: {self.total_score:+.1f}"
+        return f"{self.student.display_name} - 总分: {self.total_score:+.1f}"
     
     def update_summary(self):
         """更新汇总信息（仅统计已通过的记录）"""
-        approved_records = self.student.conduct_records.filter(status='APPROVED')
+        approved_records = self.student.conduct_records.filter(status='APPROVED').select_related('record_type')
         
         self.total_score = sum(
             record.score for record in approved_records

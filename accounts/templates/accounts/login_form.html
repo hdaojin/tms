@@ -1,4 +1,5 @@
 {# accounts/templates/accounts/login_form.html #}
+{% load form_extras %}
 
 {% if form.errors %}
   <div class="alert alert-error mb-4" role="alert">
@@ -12,21 +13,9 @@
 
 <form method="post" action="{% url 'accounts:login' %}">
   {% csrf_token %}
-  <div class="space-y-4">
+  <div class="space-y-2">
     {% for field in form %}
-      <div>
-        {% if field.errors %}
-          <div class="alert alert-error alert-outline mt-2" role="alert">{{ field.errors }}</div>
-        {% endif %}
-        <label class="input input-bordered w-full">
-          <span class="label">{{ field.label }}</span>
-          {{ field }}
-        </label>
-
-        {% if field.help_text %}
-          <p class="label text-sm opacity-70 text-primary" id="{{ field.auto_id }}_helptext">{{ field.help_text|safe }}</p>
-        {% endif %}
-      </div>
+      {% include 'components/field.html' with field=field show_errors=False %}
     {% endfor %}
   </div>
 

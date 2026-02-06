@@ -26,8 +26,7 @@ def traininglog_upload_to(instance: "TrainingLog", filename: str) -> str:
     date_part = f"{date:%Y年%m月%d日}"
 
     if instance.uploaded_by:
-        first_name = (getattr(instance.uploaded_by, 'first_name', '') or '').strip()
-        user_src = first_name or instance.uploaded_by.get_username()
+        user_src = instance.uploaded_by.display_name
     else:
         user_src = "unknown"
     user_part = slugify(user_src, allow_unicode=True)

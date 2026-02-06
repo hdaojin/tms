@@ -15,7 +15,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <span class="font-semibold">学生：</span>
-                        <span class="text-lg">{{ object.student.first_name|default:object.student.username }}</span>
+                        <span class="text-lg">{{ object.student.display_name }}</span>
                     </div>
                     <div>
                         <span class="font-semibold">奖惩类型：</span>
@@ -48,7 +48,7 @@
                 {% csrf_token %}
                 
                 {% for field in form %}
-                    {% include 'accounts/partials/form_field.html' with field=field %}
+                    {% include 'components/field.html' with field=field %}
                 {% endfor %}
 
                 <div class="alert alert-warning">

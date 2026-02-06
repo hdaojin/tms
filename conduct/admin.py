@@ -56,7 +56,7 @@ class ConductRecordAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('基本信息', {
-            'fields': ('student', 'record_type', 'occurred_date', 'score', 'reason')
+            'fields': ('student', 'record_type', 'occurred_date', 'reason')
         }),
         ('附件', {
             'fields': ('attachment',)
@@ -102,3 +102,4 @@ class ConductSummaryAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         """不允许删除汇总记录"""
         return False
+        # return super().has_delete_permission(request, obj)

@@ -213,11 +213,11 @@ class TraininglogMonthlyStatView(TitleMixin, LoginRequiredMixin, SingleTableView
         if year == today.year and month == today.month:
             end = min(end, today)
 
-        comp_qs = self._get_add_perm_users(GROUP_COMPETITOR).values('id', 'first_name', 'username')
-        coach_qs = self._get_add_perm_users(GROUP_COACH).values('id', 'first_name', 'username')
+        comp_qs = self._get_add_perm_users(GROUP_COMPETITOR)
+        coach_qs = self._get_add_perm_users(GROUP_COACH)
 
-        comp_names = {u['id']: (u['first_name'] or u['username']) for u in comp_qs}
-        coach_names = {u['id']: (u['first_name'] or u['username']) for u in coach_qs}
+        comp_names = {u.id: u.display_name for u in comp_qs}
+        coach_names = {u.id: u.display_name for u in coach_qs}
         comp_ids = set(comp_names.keys())
         coach_ids = set(coach_names.keys())
 

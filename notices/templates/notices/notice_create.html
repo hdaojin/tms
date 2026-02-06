@@ -19,30 +19,13 @@
         {% endif %}
 
         {# 标题字段 #}
-        <fieldset class="fieldset mt-4">
-            <legend class="fieldset-legend">{{ form.title.label }}</legend>
-            {{ form.title }}
-            {% if form.title.help_text %}
-            <p class="text-info text-xs">{{ form.title.help_text|safe }}</p>
-            {% endif %}
-        </fieldset>
+        {% include 'components/field.html' with field=form.title %}
 
         {# 内容字段 #}
-        <fieldset class="fieldset mt-4">
-            <legend class="fieldset-legend">
-                <span class="text-red-500">*</span>{{ form.content.label }}
-            </legend>
-            {{ form.content }}
-            {% if form.content.help_text %}
-            <p class="text-info text-xs">{{ form.content.help_text|safe }}</p>
-            {% endif %}
-        </fieldset>
+        {% include 'components/field.html' with field=form.content %}
 
         {# 附件上传 #}
-        <fieldset class="fieldset mt-4">
-            <legend class="fieldset-legend">{{ form.attachments.label }}</legend>
-            {% include 'components/file_uploader.html' with name=form.attachments.html_name accept=form.attachments|get_accept_types multiple=form.attachments|is_multiple_file required=form.attachments.field.required help_text=form.attachments.help_text %}
-        </fieldset>
+        {% include 'components/field.html' with field=form.attachments %}
 
         {# 目标用户组 - 带"所有人"选项 #}
         <fieldset class="fieldset mt-4">
