@@ -13,105 +13,16 @@ from django_tables2 import SingleTableView
 
 from core.utils.mixins import TitleMixin
 from core.constants import GROUP_COMPETITOR, GROUP_COACH
-from .models import ConductType, ConductRecord, ConductSummary
+from .models import ConductCategory, ConductItem, ConductRecord, ConductSummary
 from .forms import (
-    ConductTypeForm,
     ConductRecordForm,
     ConductRecordReviewForm,
     ConductRecordFilterForm
 )
-from .tables import ConductTypeTable, ConductRecordTable, ConductSummaryTable
+from .tables import ConductRecordTable, ConductSummaryTable
 
 
 User = get_user_model()
-
-
-# ==================== 奖惩类型视图 ====================
-
-class ConductTypeListView(
-    TitleMixin,
-    PermissionRequiredMixin,
-    SingleTableView
-):
-    """奖惩类型列表"""
-    model = ConductType
-    table_class = ConductTypeTable
-    template_name = 'conduct/type_list.html'
-    title = '奖惩类型管理'
-    title_icon = 'icon-[tabler--category]'
-    permission_required = 'conduct.manage_conduct_types'
-    paginate_by = 20
-
-
-class ConductTypeDetailView(
-    TitleMixin,
-    PermissionRequiredMixin,
-    DetailView
-):
-    """奖惩类型详情"""
-    model = ConductType
-    template_name = 'conduct/type_detail.html'
-    context_object_name = 'conduct_type'
-    title = '{name}'
-    title_icon = 'icon-[tabler--info-circle]'
-    permission_required = 'conduct.view_conducttype'
-
-
-class ConductTypeCreateView(
-    TitleMixin,
-    PermissionRequiredMixin,
-    CreateView
-):
-    """创建奖惩类型"""
-    model = ConductType
-    form_class = ConductTypeForm
-    template_name = 'conduct/type_form.html'
-    title = '创建奖惩类型'
-    title_icon = 'icon-[tabler--plus]'
-    permission_required = 'conduct.manage_conduct_types'
-    success_url = reverse_lazy('conduct:type_list')
-    
-    def form_valid(self, form):
-        form.instance.created_by = self.request.user
-        messages.success(self.request, f'奖惩类型 "{form.instance.name}" 创建成功！')
-        return super().form_valid(form)
-
-
-class ConductTypeUpdateView(
-    TitleMixin,
-    PermissionRequiredMixin,
-    UpdateView
-):
-    """更新奖惩类型"""
-    model = ConductType
-    form_class = ConductTypeForm
-    template_name = 'conduct/type_form.html'
-    title = '编辑奖惩类型'
-    title_icon = 'icon-[tabler--edit]'
-    permission_required = 'conduct.manage_conduct_types'
-    success_url = reverse_lazy('conduct:type_list')
-    
-    def form_valid(self, form):
-        messages.success(self.request, f'奖惩类型 "{form.instance.name}" 更新成功！')
-        return super().form_valid(form)
-
-
-class ConductTypeDeleteView(
-    TitleMixin,
-    PermissionRequiredMixin,
-    DeleteView
-):
-    """删除奖惩类型"""
-    model = ConductType
-    template_name = 'conduct/type_confirm_delete.html'
-    title = '删除奖惩类型'
-    title_icon = 'icon-[tabler--trash]'
-    permission_required = 'conduct.manage_conduct_types'
-    success_url = reverse_lazy('conduct:type_list')
-    
-    def form_valid(self, form):
-        messages.success(self.request, f'奖惩类型 "{self.object.name}" 已删除！')
-        return super().form_valid(form)
 
 
 # ==================== 奖惩记录视图 ====================
@@ -133,7 +44,7 @@ class ConductRecordListView(
     def get_queryset(self):
         queryset = super().get_queryset().select_related(
             'student',
-            'record_type',
+            'item__category',
             'recorded_by',
             'reviewed_by'
         )
@@ -157,7 +68,7 @@ class ConductRecordListView(
             if student:
                 queryset = queryset.filter(student=student)
             if category:
-                queryset = queryset.filter(record_type__category=category)
+                queryset = queryset.filter(item__category=category)
             if status:
                 queryset = queryset.filter(status=status)
             if date_from:
@@ -194,7 +105,7 @@ class ConductRecordDetailView(
     model = ConductRecord
     template_name = 'conduct/record_detail.html'
     context_object_name = 'record'
-    title = '{student} - {record_type}'
+    title = '{student} - {item}'
     title_icon = 'icon-[tabler--info-circle]'
     permission_required = 'conduct.view_conductrecord'
     
@@ -377,7 +288,7 @@ class StudentConductDetailView(
         
         # 获取所有记录
         context['records'] = student.conduct_records.select_related(
-            'record_type',
+            'item__category',
             'recorded_by',
             'reviewed_by'
         ).order_by('-occurred_date')
@@ -421,7 +332,7 @@ class MyConductView(TitleMixin, PermissionRequiredMixin, DetailView):
         
         # 获取记录
         context['records'] = user.conduct_records.select_related(
-            'record_type',
+            'item__category',
             'recorded_by',
             'reviewed_by'
         ).order_by('-occurred_date')[:20]  # 最近20条

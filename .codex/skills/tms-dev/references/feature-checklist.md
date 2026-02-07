@@ -22,7 +22,7 @@
 
 ## Templates & UI
 - Extend `templates/base.html`.
-- Use Iconify syntax `icon-[tabler--...]`.
+- Use Iconify syntax `icon-[tabler--calendar]`.
 - Ensure sidebar menus are updated in `core/config/menus/*.yml` or app `menus.yml`.
 
 ## URLs & Menus

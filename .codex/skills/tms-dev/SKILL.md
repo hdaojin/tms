@@ -23,7 +23,7 @@ description: TMS 项目开发规范与流程。用于在该仓库中新增或修
 - Use `CrossGroupAccessMixin` for coach/competitor cross-group access.
 - For HTMX, check `request.htmx` and return partial templates for fragment updates.
 - Extend `templates/base.html`; hide sidebars via `left_sidebar` / `right_sidebar` blocks.
-- Use Iconify class format `icon-[tabler--...]` for icons.
+- Use Iconify class format `icon-[tabler--calendar]` for icons.
 
 ## Feature Workflow
 - Identify the target app and reuse its patterns by reading `models.py`, `views.py`, `forms.py`, `tables.py`, `urls.py`, and templates.

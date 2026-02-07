@@ -5,13 +5,6 @@ from . import views
 app_name = 'conduct'
 
 urlpatterns = [
-    # 奖惩类型
-    path('types/', views.ConductTypeListView.as_view(), name='type_list'),
-    path('types/create/', views.ConductTypeCreateView.as_view(), name='type_create'),
-    path('types/<int:pk>/', views.ConductTypeDetailView.as_view(), name='type_detail'),
-    path('types/<int:pk>/update/', views.ConductTypeUpdateView.as_view(), name='type_update'),
-    path('types/<int:pk>/delete/', views.ConductTypeDeleteView.as_view(), name='type_delete'),
-    
     # 奖惩记录
     path('records/', views.ConductRecordListView.as_view(), name='record_list'),
     path('records/create/', views.ConductRecordCreateView.as_view(), name='record_create'),

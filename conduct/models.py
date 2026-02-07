@@ -14,51 +14,56 @@ from core.constants import (
     CONDUCT_ALLOWED_EXTENSIONS,
     CONDUCT_UPLOAD_MAX_SIZE_MB,
     CONDUCT_UPLOAD_DIR,
+    CONDUCT_NATURE_REWARD,
+    CONDUCT_NATURE_PENALTY,
+    CONDUCT_NATURE_WARNING,
+    CONDUCT_NATURE_CHOICES,
 )
 from core.utils.validators import validate_file_size, validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
 
 
-def conduct_attachment_upload_to(instance, filename):
-    """
-    生成奖惩记录附件上传路径
-    格式: CONDUCT_UPLOAD_DIR/username/first_name-YYYYMMDD-ConductType-originalfilename.ext
-    其中 CONDUCT_UPLOAD_DIR 定义于 core.constants
-    """
-    student = instance.student
-    user_name = student.username if student else 'unknown'
-    first_name = getattr(student, 'first_name', '') or user_name
-    date_part = timezone.now().strftime('%Y%m%d')
+class ConductCategory(models.Model):
+    """奖惩分类模型（第二层：可添加修改）"""
     
-    # 获取record_type名称，处理可能的None情况
-    conduct_type_name = 'unknown'
-    if hasattr(instance, 'record_type') and instance.record_type:
-        conduct_type_name = instance.record_type.name
-    
-    original_filename = Path(filename).stem
-    ext = Path(filename).suffix
-    
-    # 使用 CONDUCT_UPLOAD_DIR 的基础名称（conduct）作为相对路径基础
-    base_dir = CONDUCT_UPLOAD_DIR.name if isinstance(CONDUCT_UPLOAD_DIR, Path) else 'conduct'
-    new_filename = f"{first_name}-{date_part}-{conduct_type_name}-{original_filename}{ext}"
-    return f"{base_dir}/{user_name}/{new_filename}"
+    nature = models.CharField(
+        '性质',
+        max_length=20,
+        choices=CONDUCT_NATURE_CHOICES,
+        help_text='行为性质：奖励、惩罚或警告'
+    )
+    name = models.CharField('分类名称', max_length=50)
+    description = models.TextField('说明', blank=True)
+    order = models.IntegerField('排序', default=0, help_text='数字越小越靠前')
+    is_active = models.BooleanField('启用状态', default=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '奖惩分类'
+        verbose_name_plural = '奖惩分类'
+        ordering = ['nature', 'order', 'name']
+        unique_together = [['nature', 'name']]
+
+    def __str__(self):
+        return f"{self.get_nature_display()} - {self.name}"
 
 
-class ConductType(models.Model):
-    """奖惩类型模型"""
+class ConductItem(models.Model):
+    """奖惩具体事项模型（第三层：可添加修改）"""
     
-    CATEGORY_CHOICES = [
-        ('REWARD', '奖励'),
-        ('PENALTY', '惩罚'),
-    ]
-    
-    name = models.CharField('类型名称', max_length=100, unique=True)
-    category = models.CharField('分类', max_length=10, choices=CATEGORY_CHOICES)
+    category = models.ForeignKey(
+        ConductCategory,
+        on_delete=models.PROTECT,
+        related_name='items',
+        verbose_name='所属分类'
+    )
+    name = models.CharField('事项名称', max_length=100)
     score = models.DecimalField(
-        '对应分值',
+        '分值',
         max_digits=6,
         decimal_places=2,
-        help_text='正数为奖励分，负数为惩罚分'
+        help_text='奖励为正数，惩罚为负数，警告为0'
     )
     description = models.TextField('说明', blank=True)
     is_active = models.BooleanField('启用状态', default=True)
@@ -67,33 +72,59 @@ class ConductType(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='created_conduct_types',
+        related_name='created_conduct_items',
         verbose_name='创建人'
     )
     created_at = models.DateTimeField('创建时间', auto_now_add=True)
     updated_at = models.DateTimeField('更新时间', auto_now=True)
 
     class Meta:
-        verbose_name = '奖惩类型'
-        verbose_name_plural = '奖惩类型'
-        ordering = ['category', '-score', 'name']
-        permissions = [
-            ('manage_conduct_types', '管理奖惩类型'),
-        ]
-
-    def get_category_display(self):
-        """返回分类的中文显示名称"""
-        return dict(self.CATEGORY_CHOICES).get(self.category, self.category)
+        verbose_name = '奖惩事项'
+        verbose_name_plural = '奖惩事项'
+        ordering = ['category__nature', 'category__order', '-score', 'name']
+        unique_together = [['category', 'name']]
 
     def __str__(self):
-        return f"{self.get_category_display()} - {self.name} ({self.score:+.1f}分)"
+        return f"{self.category.name} - {self.name} ({self.score:+.1f}分)"
     
     def clean(self):
-        """验证分值符合类别"""
-        if self.category == 'REWARD' and self.score < 0:
-            raise ValidationError({'score': '奖励分值应为正数'})
-        if self.category == 'PENALTY' and self.score > 0:
-            raise ValidationError({'score': '惩罚分值应为负数'})
+        """验证分值符合性质"""
+        if self.category:
+            nature = self.category.nature
+            # 奖励应为正分
+            if nature == CONDUCT_NATURE_REWARD and self.score < 0:
+                raise ValidationError({'score': '奖励类事项的分值应为正数'})
+            # 惩罚应为负分
+            elif nature == CONDUCT_NATURE_PENALTY and self.score > 0:
+                raise ValidationError({'score': '惩罚类事项的分值应为负数'})
+            # 警告应为0分
+            elif nature == CONDUCT_NATURE_WARNING and self.score != 0:
+                raise ValidationError({'score': '警告类事项的分值应为0'})
+
+
+def conduct_attachment_upload_to(instance, filename):
+    """
+    生成奖惩记录附件上传路径
+    格式: CONDUCT_UPLOAD_DIR/username/display_name-YYYYMMDD-ItemName-originalfilename.ext
+    其中 CONDUCT_UPLOAD_DIR 定义于 core.constants
+    """
+    student = instance.student
+    user_name = student.username if student else 'unknown'
+    display_name = getattr(student, 'display_name', user_name) or user_name
+    date_part = timezone.now().strftime('%Y%m%d')
+    
+    # 获取item名称，处理可能的None情况
+    item_name = 'unknown'
+    if hasattr(instance, 'item') and instance.item:
+        item_name = instance.item.name
+    
+    original_filename = Path(filename).stem
+    ext = Path(filename).suffix
+    
+    # 使用 CONDUCT_UPLOAD_DIR 的基础名称（conduct）作为相对路径基础
+    base_dir = CONDUCT_UPLOAD_DIR.name if isinstance(CONDUCT_UPLOAD_DIR, Path) else 'conduct'
+    new_filename = f"{display_name}-{date_part}-{item_name}-{original_filename}{ext}"
+    return f"{base_dir}/{user_name}/{new_filename}"
 
 
 class ConductRecord(models.Model):
@@ -112,11 +143,11 @@ class ConductRecord(models.Model):
         verbose_name='学生',
         limit_choices_to={'groups__name': GROUP_COMPETITOR}
     )
-    record_type = models.ForeignKey(
-        ConductType,
+    item = models.ForeignKey(
+        ConductItem,
         on_delete=models.PROTECT,
         related_name='records',
-        verbose_name='奖惩类型',
+        verbose_name='奖惩事项',
         limit_choices_to={'is_active': True}
     )
     occurred_date = models.DateField(
@@ -181,7 +212,7 @@ class ConductRecord(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.student.display_name} - {self.record_type.name} - {self.occurred_date}"
+        return f"{self.student.display_name} - {self.item.name} - {self.occurred_date}"
     
     @property
     def filename(self):
@@ -190,8 +221,8 @@ class ConductRecord(models.Model):
     
     @property
     def score(self):
-        """返回奖惩类型对应的分值"""
-        return self.record_type.score if self.record_type else 0
+        """返回奖惩事项对应的分值"""
+        return self.item.score if self.item else 0
 
 
 class ConductSummary(models.Model):
@@ -224,18 +255,18 @@ class ConductSummary(models.Model):
     
     def update_summary(self):
         """更新汇总信息（仅统计已通过的记录）"""
-        approved_records = self.student.conduct_records.filter(status='APPROVED').select_related('record_type')
+        approved_records = self.student.conduct_records.filter(status='APPROVED').select_related('item__category')
         
         self.total_score = sum(
             record.score for record in approved_records
         ) or 0
         
         self.reward_count = approved_records.filter(
-            record_type__category='REWARD'
+            item__category__nature='REWARD'
         ).count()
         
         self.penalty_count = approved_records.filter(
-            record_type__category='PENALTY'
+            item__category__nature='PENALTY'
         ).count()
         
         self.save()

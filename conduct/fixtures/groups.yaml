@@ -1,0 +1,57 @@
+---
+# 奖惩大类默认数据
+- model: conduct.ConductGroup
+  pk: 1
+  fields:
+    name: 考勤
+    description: 迟到、早退、请假等考勤相关事项
+    order: 1
+    is_active: true
+
+- model: conduct.ConductGroup
+  pk: 2
+  fields:
+    name: 纪律
+    description: 打架、喧哗、违纪等纪律相关事项
+    order: 2
+    is_active: true
+
+- model: conduct.ConductGroup
+  pk: 3
+  fields:
+    name: 卫生
+    description: 值日、个人卫生等卫生相关事项
+    order: 3
+    is_active: true
+
+- model: conduct.ConductGroup
+  pk: 4
+  fields:
+    name: 学习
+    description: 作业、考试、进步等学习相关事项
+    order: 4
+    is_active: true
+
+- model: conduct.ConductGroup
+  pk: 5
+  fields:
+    name: 活动
+    description: 班级活动、社团活动等
+    order: 5
+    is_active: true
+
+- model: conduct.ConductGroup
+  pk: 6
+  fields:
+    name: 竞赛
+    description: 各类竞赛获奖、参赛等
+    order: 6
+    is_active: true
+
+- model: conduct.ConductGroup
+  pk: 7
+  fields:
+    name: 其他
+    description: 其他未分类事项
+    order: 99
+    is_active: true

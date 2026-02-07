@@ -1,0 +1,200 @@
+---
+# 奖惩具体事项（第三层：可添加修改）
+
+# 学习-奖励
+- model: conduct.ConductItem
+  pk: 1
+  fields:
+    category: 1  # 奖励-学习
+    name: 作业优秀
+    score: 2.0
+    description: 作业完成质量优秀
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 2
+  fields:
+    category: 1  # 奖励-学习
+    name: 成绩进步
+    score: 5.0
+    description: 考试成绩有明显进步
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 3
+  fields:
+    category: 1  # 奖励-学习
+    name: 课堂表现优秀
+    score: 1.0
+    description: 课堂积极回答问题，表现优秀
+    is_active: true
+
+# 竞赛-奖励
+- model: conduct.ConductItem
+  pk: 4
+  fields:
+    category: 2  # 奖励-竞赛
+    name: 国家级竞赛获奖
+    score: 20.0
+    description: 获得国家级竞赛奖项
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 5
+  fields:
+    category: 2  # 奖励-竞赛
+    name: 省级竞赛获奖
+    score: 10.0
+    description: 获得省级竞赛奖项
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 6
+  fields:
+    category: 2  # 奖励-竞赛
+    name: 市级竞赛获奖
+    score: 5.0
+    description: 获得市级竞赛奖项
+    is_active: true
+
+# 活动-奖励
+- model: conduct.ConductItem
+  pk: 7
+  fields:
+    category: 3  # 奖励-活动
+    name: 积极参与班级活动
+    score: 2.0
+    description: 积极参与班级组织的各类活动
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 8
+  fields:
+    category: 3  # 奖励-活动
+    name: 志愿服务
+    score: 3.0
+    description: 参与志愿服务活动
+    is_active: true
+
+# 卫生-奖励
+- model: conduct.ConductItem
+  pk: 9
+  fields:
+    category: 4  # 奖励-卫生
+    name: 卫生优秀
+    score: 2.0
+    description: 值日或个人卫生表现优秀
+    is_active: true
+
+# 考勤-惩罚
+- model: conduct.ConductItem
+  pk: 10
+  fields:
+    category: 5  # 惩罚-考勤
+    name: 迟到
+    score: -2.0
+    description: 上课或活动迟到
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 11
+  fields:
+    category: 5  # 惩罚-考勤
+    name: 早退
+    score: -2.0
+    description: 未经批准提前离开
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 12
+  fields:
+    category: 5  # 惩罚-考勤
+    name: 旷课
+    score: -5.0
+    description: 无故缺勤
+    is_active: true
+
+# 纪律-惩罚
+- model: conduct.ConductItem
+  pk: 13
+  fields:
+    category: 6  # 惩罚-纪律
+    name: 打架斗殴
+    score: -20.0
+    description: 与他人发生肢体冲突
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 14
+  fields:
+    category: 6  # 惩罚-纪律
+    name: 课堂喧哗
+    score: -3.0
+    description: 课堂上大声喧哗影响秩序
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 15
+  fields:
+    category: 6  # 惩罚-纪律
+    name: 不服从管理
+    score: -5.0
+    description: 不服从老师或管理人员的管理
+    is_active: true
+
+# 卫生-惩罚
+- model: conduct.ConductItem
+  pk: 16
+  fields:
+    category: 7  # 惩罚-卫生
+    name: 值日未完成
+    score: -2.0
+    description: 未按要求完成值日任务
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 17
+  fields:
+    category: 7  # 惩罚-卫生
+    name: 乱扔垃圾
+    score: -1.0
+    description: 在公共区域乱扔垃圾
+    is_active: true
+
+# 学习-惩罚
+- model: conduct.ConductItem
+  pk: 18
+  fields:
+    category: 8  # 惩罚-学习
+    name: 作业未交
+    score: -2.0
+    description: 未按时提交作业
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 19
+  fields:
+    category: 8  # 惩罚-学习
+    name: 作业抄袭
+    score: -5.0
+    description: 抄袭他人作业
+    is_active: true
+
+# 警告
+- model: conduct.ConductItem
+  pk: 20
+  fields:
+    category: 9  # 警告-行为规范
+    name: 言行不当
+    score: 0
+    description: 言语或行为不符合规范，提出警告
+    is_active: true
+
+- model: conduct.ConductItem
+  pk: 21
+  fields:
+    category: 9  # 警告-行为规范
+    name: 仪容仪表不合格
+    score: 0
+    description: 仪容仪表不符合要求，提出警告
+    is_active: true

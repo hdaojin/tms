@@ -7,7 +7,7 @@
       <div tabindex="0" role="button" class="btn btn-ghost md:hidden">
         <span class="icon-[tabler--menu-2] size-6"></span>
       </div>
-      <div tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow">
+      <div tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow">
         {% render_sections_nav %}
       </div>
     </div>
@@ -38,7 +38,7 @@
             {{ user.display_name }}
           </span>
         </div>
-        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-[1] w-48 p-2 shadow-lg border border-base-300">
+        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-2 shadow-lg border border-base-300">
           <li>
             <a href="{% url 'accounts:home' %}" class="flex items-center gap-3">
               <span class="icon-[tabler--user] size-5 text-primary"></span>

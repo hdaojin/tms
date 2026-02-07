@@ -3,52 +3,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 
 from core.utils.tables import BaseTable, BaseDateColumn, ActionsColumn
-from .models import ConductType, ConductRecord, ConductSummary
-
-
-class ConductTypeTable(BaseTable):
-    """奖惩类型表格"""
-    
-    category = tables.Column(verbose_name='分类')
-    name = tables.Column(verbose_name='类型名称')
-    score = tables.Column(verbose_name='对应分值')
-    is_active = tables.BooleanColumn(
-        verbose_name='状态',
-        yesno='启用,停用'
-    )
-    created_at = BaseDateColumn(verbose_name='创建时间')
-    
-    actions = ActionsColumn(
-        view_url='conduct:type_detail',
-        edit_url='conduct:type_update',
-        delete_url='conduct:type_delete',
-        edit_perm='conduct.change_conducttype',
-        delete_perm='conduct.delete_conducttype',
-    )
-    
-    class Meta(BaseTable.Meta):
-        model = ConductType
-        fields = ['category', 'name', 'score', 'is_active', 'created_at']
-    
-    def render_score(self, value):
-        """格式化分值显示"""
-        color_class = 'text-success' if value > 0 else 'text-error'
-        return format_html(
-            '<span class="{}">{}</span>',
-            color_class,
-            f'{float(value):+.1f}'
-        )
-    
-    def render_category(self, record):
-        """格式化分类显示"""
-        if record.category == 'REWARD':
-            return mark_safe(
-                '<span class="badge badge-success">\u5956\u52b1</span>'
-            )
-        else:
-            return mark_safe(
-                '<span class="badge badge-error">惩罚</span>'
-            )
+from .models import ConductRecord, ConductSummary
 
 
 class ConductRecordTable(BaseTable):
@@ -59,7 +14,7 @@ class ConductRecordTable(BaseTable):
         accessor='student.display_name',
         order_by=('student__last_name', 'student__first_name', 'student__username')
     )
-    record_type = tables.Column(verbose_name='奖惩类型')
+    item = tables.Column(verbose_name='奖惩事项')
     occurred_date = BaseDateColumn(verbose_name='发生日期')
     score = tables.Column(verbose_name='得分')
     status = tables.Column(verbose_name='状态')
@@ -81,7 +36,7 @@ class ConductRecordTable(BaseTable):
         model = ConductRecord
         fields = [
             'student',
-            'record_type',
+            'item',
             'occurred_date',
             'score',
             'status',

@@ -10,8 +10,8 @@ django.setup()
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from conduct.models import ConductType, ConductRecord, ConductSummary
-from core.constants import GROUP_COMPETITOR
+from conduct.models import ConductCategory, ConductItem, ConductRecord, ConductSummary
+from core.constants import GROUP_COMPETITOR, CONDUCT_NATURE_CHOICES, CONDUCT_NATURE_REWARD, CONDUCT_NATURE_PENALTY
 
 User = get_user_model()
 
@@ -20,12 +20,16 @@ def main():
     print("Conduct 应用功能验证")
     print("=" * 60)
     
-    # 1. 检查奖惩类型
-    print("\n1. 奖惩类型统计：")
-    reward_count = ConductType.objects.filter(category='REWARD').count()
-    penalty_count = ConductType.objects.filter(category='PENALTY').count()
-    print(f"   奖励类型: {reward_count} 个")
-    print(f"   惩罚类型: {penalty_count} 个")
+    # 1. 检查奖惩分类和事项
+    print("\n1. 奖惰分类和事项统计：")
+    reward_categories = ConductCategory.objects.filter(nature=CONDUCT_NATURE_REWARD).count()
+    penalty_categories = ConductCategory.objects.filter(nature=CONDUCT_NATURE_PENALTY).count()
+    reward_items = ConductItem.objects.filter(category__nature=CONDUCT_NATURE_REWARD).count()
+    penalty_items = ConductItem.objects.filter(category__nature=CONDUCT_NATURE_PENALTY).count()
+    print(f"   奖励分类: {reward_categories} 个")
+    print(f"   奖励事项: {reward_items} 个")
+    print(f"   惩罚分类: {penalty_categories} 个")
+    print(f"   惩罚事项: {penalty_items} 个")
     
     # 2. 检查选手组
     print("\n2. 选手组信息：")

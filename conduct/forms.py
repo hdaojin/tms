@@ -4,7 +4,7 @@ from django.contrib.auth.models import Group
 
 from core.utils.forms import StyledFormMixin
 from core.constants import GROUP_COMPETITOR
-from .models import ConductType, ConductRecord
+from .models import ConductItem, ConductRecord
 
 
 User = get_user_model()
@@ -15,30 +15,6 @@ class StudentChoiceField(forms.ModelChoiceField):
     
     def label_from_instance(self, obj):
         return obj.display_name
-
-
-class ConductTypeForm(StyledFormMixin, forms.ModelForm):
-    """奖惩类型表单"""
-    
-    class Meta:
-        model = ConductType
-        fields = ['name', 'category', 'score', 'description', 'is_active']
-        widgets = {
-            'description': forms.Textarea(attrs={'rows': 3}),
-        }
-    
-    def clean(self):
-        cleaned_data = super().clean()
-        category = cleaned_data.get('category')
-        score = cleaned_data.get('score')
-        
-        if category and score is not None:
-            if category == 'REWARD' and score < 0:
-                raise forms.ValidationError('奖励分值应为正数')
-            if category == 'PENALTY' and score > 0:
-                raise forms.ValidationError('惩罚分值应为负数')
-        
-        return cleaned_data
 
 
 class ConductRecordForm(StyledFormMixin, forms.ModelForm):
@@ -55,7 +31,7 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
         model = ConductRecord
         fields = [
             'student',
-            'record_type',
+            'item',
             'occurred_date',
             'reason',
             'attachment'
@@ -78,9 +54,13 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
         except Group.DoesNotExist:
             self.fields['student'].queryset = User.objects.none()
         
-        # 只显示启用的奖惩类型
-        self.fields['record_type'].queryset = ConductType.objects.filter(
+        # 只显启用的奖惩事项，按分类和名称排序
+        self.fields['item'].queryset = ConductItem.objects.filter(
             is_active=True
+        ).select_related('category').order_by(
+            'category__nature',
+            'category__order',
+            'name'
         )
 
 
