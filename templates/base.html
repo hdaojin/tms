@@ -26,7 +26,8 @@
 
       {% block main %}
         <main class="flex-1 p-4">
-          <div class="mx-auto flex w-full flex-col space-y-4 max-w-7xl">
+        {#  <div class="mx-auto flex w-full flex-col space-y-4 max-w-7xl"> #}
+          <div class="mx-auto flex flex-col w-full md:max-w-9/10 space-y-4">
             {# 全局消息提示区域 #}
             {% if messages %}
               <div class="space-y-2">

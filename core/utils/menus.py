@@ -14,7 +14,7 @@ from django.core.cache import cache
 from django.urls import NoReverseMatch, reverse
 
 # 缓存命名空间（版本化以便更新配置后强制刷新）
-CACHE_NS = "tms:menus:v3"
+CACHE_NS = "tms:menus:v5"
 
 logger = logging.getLogger(__name__)
 

@@ -48,7 +48,7 @@ class StyledFormMixin:
         # 单个复选框
         (forms.CheckboxInput,): 'checkbox checkbox-primary',
         # 多个复选框
-        (forms.CheckboxSelectMultiple,): 'checkbox checkbox-primary',
+        (forms.RadioSelect,): 'radio radio-primary',
     }
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

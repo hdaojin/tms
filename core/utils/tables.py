@@ -40,8 +40,8 @@ class BaseTable(tables.Table):
             "class": "table w-full",
             "thead": {"class": "bg-base-300"},
             "tbody": {"class": ""},
-            "th": {"class": "text-left whitespace-nowrap"},
-            "td": {"class": "align-center"},
+            "th": {"class": "text-center whitespace-nowrap"},
+            "td": {"class": "align-center text-center"},
         }
 
 

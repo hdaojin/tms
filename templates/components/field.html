@@ -18,7 +18,7 @@
 {#                                                                        #}
 {# 特性:                                                                  #}
 {#   - textarea / file 字段自动添加 md:col-span-2 (网格布局占满整行)        #}
-{#   - 支持 checkbox / checkbox_multiple / file / textarea / 默认 五种类型 #}
+{#   - 支持 radio / checkbox / checkbox_multiple / file / textarea / 默认 六种类型 #}
 {#   - field_role="button" 时渲染提交/重置按钮字段                        #}
 {#   - 使用 DaisyUI fieldset + legend 结构, 与 form_snippet.html 风格一致  #}
 
@@ -49,8 +49,30 @@
 </div>
 {% endif %}
 
+{# --- 单选框组 --- #}
+{% if field|is_radio_select %}
+<fieldset class="fieldset mt-4 {{ wrapper_class }}">
+    {% if show_label|default:True %}
+    <legend class="fieldset-legend">
+        {% if field.field.required %}<span class="text-red-500">*</span>{% endif %}
+        {{ field.label }}
+    </legend>
+    {% endif %}
+    <div class="flex flex-wrap gap-x-6 gap-y-3">
+        {% for radio in field %}
+        <label class="flex cursor-pointer items-center gap-3">
+            {{ radio.tag }}
+            <span class="label-text whitespace-nowrap">{{ radio.choice_label }}</span>
+        </label>
+        {% endfor %}
+    </div>
+    {% if show_help|default:True and field.help_text %}
+    <p class="text-info text-xs mt-1">{{ field.help_text|safe }}</p>
+    {% endif %}
+</fieldset>
+
 {# --- 多选复选框 --- #}
-{% if field|is_checkbox_multiple %}
+{% elif field|is_checkbox_multiple %}
 <fieldset class="fieldset mt-4 {{ wrapper_class }}">
     {% if show_label|default:True %}
     <legend class="fieldset-legend">

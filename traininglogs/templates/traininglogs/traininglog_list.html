@@ -2,5 +2,38 @@
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
-  {% include 'components/table_block.html' %}
+  <div class="flex flex-col gap-4">
+    {% if months %}
+      <div class="flex items-center gap-2">
+        <span class="icon-[tabler--clock] text-base-content/80 size-5 shrink-0"></span>
+        <select id="month-select" class="select select-bordered max-w-48" onchange="window.location.href=this.value">
+          {% for month_item in months %}
+            {% if month_item.year == selected_year and month_item.month == selected_month %}
+              <option value="?year={{ month_item.year }}&month={{ month_item.month }}" selected>{{ month_item.name }}</option>
+            {% else %}
+              <option value="?year={{ month_item.year }}&month={{ month_item.month }}">{{ month_item.name }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+    {% endif %}
+
+    {% include 'components/table_block.html' %}
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  {% if months %}
+    <script>
+      (function() {
+        var sel = document.getElementById('month-select');
+        if (!sel) return;
+        if (!sel.onchange) {
+          sel.addEventListener('change', function() {
+            window.location.href = this.value;
+          });
+        }
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

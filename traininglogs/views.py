@@ -1,4 +1,7 @@
 # traininglogs/views.py
+from calendar import monthrange
+from datetime import date, timedelta
+
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
     PermissionRequiredMixin,
@@ -7,6 +10,7 @@ from django.views.generic import CreateView, DetailView, DeleteView
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db.models import Q
+from django.utils import timezone
 from django_tables2 import SingleTableView
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
@@ -19,6 +23,51 @@ from .tables import TrainingLogTable, TrainingLogOthersTable, MonthlyStatTable
 
 
 pagination_per_page = 18
+
+
+class TraininglogMonthFilterMixin:
+    month_option_count = 12
+
+    def _get_selected_year_month(self):
+        today = timezone.localdate()
+        try:
+            year = int(self.request.GET.get('year') or today.year)
+        except (TypeError, ValueError):
+            year = today.year
+        try:
+            month = int(self.request.GET.get('month') or today.month)
+        except (TypeError, ValueError):
+            month = today.month
+        if month < 1 or month > 12:
+            month = today.month
+        return year, month
+
+    def _get_selected_month_range(self):
+        year, month = self._get_selected_year_month()
+        days_in_month = monthrange(year, month)[1]
+        return date(year, month, 1), date(year, month, days_in_month)
+
+    def _get_recent_months(self):
+        today = timezone.localdate()
+        year, month = today.year, today.month
+        months = []
+        for _ in range(self.month_option_count):
+            months.append({'year': year, 'month': month, 'name': f"{year}年{month:02d}月"})
+            month -= 1
+            if month == 0:
+                month = 12
+                year -= 1
+        return months
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        year, month = self._get_selected_year_month()
+        context.update({
+            'months': self._get_recent_months(),
+            'selected_year': year,
+            'selected_month': month,
+        })
+        return context
 
 
 # 训练日志上传视图
@@ -39,7 +88,12 @@ class TrainingLogUploadView(TitleMixin, PermissionRequiredMixin, CreateView):
 
 
 # 训练日志列表视图
-class TraininglogListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class TraininglogListView(
+    TraininglogMonthFilterMixin,
+    TitleMixin,
+    LoginRequiredMixin,
+    SingleTableView,
+):
     model = TrainingLog
     table_class = TrainingLogTable
     template_name = "traininglogs/traininglog_list.html"
@@ -50,7 +104,11 @@ class TraininglogListView(TitleMixin, LoginRequiredMixin, SingleTableView):
     def get_queryset(self):
         qs = super().get_queryset().select_related('uploaded_by', 'module')
         if self.request.user.is_authenticated:
-            return qs.filter(uploaded_by=self.request.user)
+            start, end = self._get_selected_month_range()
+            return qs.filter(
+                uploaded_by=self.request.user,
+                training_date__range=(start, end),
+            )
         return qs.none()
 
 
@@ -114,7 +172,11 @@ class TrainingLogDeleteView(OwnerRequiredMixin, LoginRequiredMixin, DeleteView):
 
 
 class CoachTraininglogListView(
-    TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableView
+    TraininglogMonthFilterMixin,
+    TitleMixin,
+    LoginRequiredMixin,
+    PermissionRequiredMixin,
+    SingleTableView,
 ):
     """教练训练日志：展示所有“教练”上传的日志。"""
 
@@ -131,11 +193,19 @@ class CoachTraininglogListView(
         qs = super().get_queryset().select_related('uploaded_by', 'module')
         if not self.request.user.is_authenticated:
             return qs.none()
-        return qs.filter(uploaded_by__groups__name=GROUP_COACH).distinct()
+        start, end = self._get_selected_month_range()
+        return qs.filter(
+            uploaded_by__groups__name=GROUP_COACH,
+            training_date__range=(start, end),
+        ).distinct()
 
 
 class CompetitorTraininglogListView(
-    TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableView
+    TraininglogMonthFilterMixin,
+    TitleMixin,
+    LoginRequiredMixin,
+    PermissionRequiredMixin,
+    SingleTableView,
 ):
     """选手训练日志：展示所有“选手”上传的日志。"""
 
@@ -152,10 +222,19 @@ class CompetitorTraininglogListView(
         qs = super().get_queryset().select_related('uploaded_by', 'module')
         if not self.request.user.is_authenticated:
             return qs.none()
-        return qs.filter(uploaded_by__groups__name=GROUP_COMPETITOR).distinct()
+        start, end = self._get_selected_month_range()
+        return qs.filter(
+            uploaded_by__groups__name=GROUP_COMPETITOR,
+            training_date__range=(start, end),
+        ).distinct()
 
 
-class TraininglogMonthlyStatView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class TraininglogMonthlyStatView(
+    TraininglogMonthFilterMixin,
+    TitleMixin,
+    LoginRequiredMixin,
+    SingleTableView,
+):
     """按月统计提交情况：列为 日期 / 已提交选手 / 未提交选手 / 已提交教练。
 
     查询参数：
@@ -173,21 +252,6 @@ class TraininglogMonthlyStatView(TitleMixin, LoginRequiredMixin, SingleTableView
     def get_queryset(self):
         return TrainingLog.objects.none()
 
-    def _get_selected_year_month(self):
-        from django.utils import timezone
-        today = timezone.localdate()
-        try:
-            year = int(self.request.GET.get('year') or today.year)
-        except ValueError:
-            year = today.year
-        try:
-            month = int(self.request.GET.get('month') or today.month)
-        except ValueError:
-            month = today.month
-        if month < 1 or month > 12:
-            month = today.month
-        return year, month
-
     def _get_add_perm_users(self, group_name: str):
         from django.contrib.auth import get_user_model
         User = get_user_model()
@@ -201,14 +265,8 @@ class TraininglogMonthlyStatView(TitleMixin, LoginRequiredMixin, SingleTableView
         )
 
     def get_table_data(self):
-        from datetime import date, timedelta
-        from calendar import monthrange
-        from django.utils import timezone
-
         year, month = self._get_selected_year_month()
-        days_in_month = monthrange(year, month)[1]
-        start = date(year, month, 1)
-        end = date(year, month, days_in_month)
+        start, end = self._get_selected_month_range()
         today = timezone.localdate()
         if year == today.year and month == today.month:
             end = min(end, today)
@@ -250,26 +308,6 @@ class TraininglogMonthlyStatView(TitleMixin, LoginRequiredMixin, SingleTableView
             cur += timedelta(days=1)
         return data
 
-    def get_context_data(self, **kwargs):
-        from django.utils import timezone
-        ctx = super().get_context_data(**kwargs)
-        year, month = self._get_selected_year_month()
-        t = timezone.localdate()
-        y, m = t.year, t.month
-        months = []
-        for _ in range(12):
-            months.append({'year': y, 'month': m, 'name': f"{y}年{m:02d}月"})
-            m -= 1
-            if m == 0:
-                m = 12
-                y -= 1
-        ctx.update({
-            'months': months,
-            'selected_year': year,
-            'selected_month': month,
-        })
-        return ctx
-    
     def get_title(self):
         year, month = self._get_selected_year_month()
         return f"训练日志提交统计（{year}年{month:02d}月）"

@@ -18,6 +18,7 @@ PRIVATE_MEDIA_ROOT = BASE_DIR / "media-private"
 # ============ 用户组名称常量 ============
 GROUP_COACH = "教练"
 GROUP_COMPETITOR = "选手"
+GROUP_ASSISTANT = "班务"
 
 # 所有需要特殊处理的组名列表
 SPECIAL_GROUPS = [GROUP_COACH, GROUP_COMPETITOR]

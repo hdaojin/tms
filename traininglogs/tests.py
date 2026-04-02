@@ -1,3 +1,180 @@
-from django.test import TestCase
+import shutil
+import tempfile
+from datetime import date
+from pathlib import Path
 
-# Create your tests here.
+from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import TestCase
+from django.test import override_settings
+from django.urls import reverse
+from django.utils import timezone
+
+from core.constants import GROUP_COACH, GROUP_COMPETITOR
+from competitions.models import CompetitionType, Module, Project
+
+from .forms import TrainingLogCreateForm
+from .models import TrainingLog
+
+
+TEST_MEDIA_ROOT = Path(tempfile.mkdtemp())
+User = get_user_model()
+
+
+class TrainingLogCreateFormTestCase(TestCase):
+	def setUp(self):
+		competition_type = CompetitionType.objects.create(
+			code='WSC',
+			name='世界技能大赛',
+		)
+		project = Project.objects.create(
+			competition_type=competition_type,
+			code='ITNSA',
+			name='网络系统管理',
+		)
+		Module.objects.create(project=project, code='A', name='网络配置')
+		Module.objects.create(project=project, code='B', name='服务部署')
+
+	def test_module_field_uses_radio_select_widget(self):
+		form = TrainingLogCreateForm()
+		module_field = form.fields['module']
+
+		self.assertIsInstance(module_field.widget, forms.RadioSelect)
+		self.assertTrue(module_field.required)
+		self.assertIsNone(module_field.empty_label)
+		self.assertEqual(module_field.widget.attrs['class'], 'radio radio-primary')
+		self.assertEqual(
+			[choice.choice_label for choice in form['module']],
+			['A - 网络配置', 'B - 服务部署'],
+		)
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class TrainingLogListViewTestCase(TestCase):
+	@classmethod
+	def tearDownClass(cls):
+		super().tearDownClass()
+		shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+	def setUp(self):
+		competition_type = CompetitionType.objects.create(
+			code='WSC-LIST',
+			name='列表测试赛事',
+		)
+		project = Project.objects.create(
+			competition_type=competition_type,
+			code='ITNSA-LIST',
+			name='列表测试项目',
+		)
+		self.module = Module.objects.create(project=project, code='M1', name='模块一')
+
+		self.superuser = User.objects.create_superuser(
+			username='admin',
+			email='admin@example.com',
+			password='testpass123',
+		)
+		self.client.force_login(self.superuser)
+
+		coach_group = Group.objects.create(name=GROUP_COACH)
+		competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+
+		self.coach_user = User.objects.create_user(username='coach1', password='testpass123')
+		self.coach_user.groups.add(coach_group)
+
+		self.competitor_user = User.objects.create_user(username='competitor1', password='testpass123')
+		self.competitor_user.groups.add(competitor_group)
+
+		today = timezone.localdate()
+		self.current_month_date = date(today.year, today.month, 10)
+		prev_year = today.year if today.month > 1 else today.year - 1
+		prev_month = today.month - 1 or 12
+		self.previous_month_date = date(prev_year, prev_month, 10)
+
+		self.current_coach_log = self._create_traininglog(
+			user=self.coach_user,
+			training_date=self.current_month_date,
+			suffix='coach-current',
+		)
+		self.previous_coach_log = self._create_traininglog(
+			user=self.coach_user,
+			training_date=self.previous_month_date,
+			suffix='coach-previous',
+		)
+		self.current_competitor_log = self._create_traininglog(
+			user=self.competitor_user,
+			training_date=self.current_month_date,
+			suffix='competitor-current',
+		)
+		self.previous_competitor_log = self._create_traininglog(
+			user=self.competitor_user,
+			training_date=self.previous_month_date,
+			suffix='competitor-previous',
+		)
+
+	def _create_traininglog(self, user, training_date, suffix):
+		return TrainingLog.objects.create(
+			module=self.module,
+			task=f'任务-{suffix}',
+			training_date=training_date,
+			file=SimpleUploadedFile(
+				f'{suffix}.pdf',
+				b'%PDF-1.4 test file',
+				content_type='application/pdf',
+			),
+			uploaded_by=user,
+		)
+
+	def test_coach_list_defaults_to_current_month(self):
+		response = self.client.get(reverse('traininglogs:traininglog_coach_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'id="month-select"')
+		self.assertEqual(list(response.context['object_list']), [self.current_coach_log])
+		self.assertEqual(response.context['selected_year'], self.current_month_date.year)
+		self.assertEqual(response.context['selected_month'], self.current_month_date.month)
+		self.assertEqual(len(response.context['months']), 12)
+		self.assertNotContains(response, self.current_competitor_log.task)
+
+	def test_coach_list_can_filter_specific_month(self):
+		response = self.client.get(
+			reverse('traininglogs:traininglog_coach_list'),
+			{'year': self.previous_month_date.year, 'month': self.previous_month_date.month},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(list(response.context['object_list']), [self.previous_coach_log])
+		self.assertEqual(response.context['selected_year'], self.previous_month_date.year)
+		self.assertEqual(response.context['selected_month'], self.previous_month_date.month)
+
+	def test_competitor_list_defaults_to_current_month(self):
+		response = self.client.get(reverse('traininglogs:traininglog_competitor_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(list(response.context['object_list']), [self.current_competitor_log])
+		self.assertNotContains(response, self.current_coach_log.task)
+
+	def test_my_list_defaults_to_current_month_for_current_user(self):
+		self.client.force_login(self.coach_user)
+		response = self.client.get(reverse('traininglogs:traininglog_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'id="month-select"')
+		self.assertEqual(list(response.context['object_list']), [self.current_coach_log])
+		self.assertEqual(response.context['selected_year'], self.current_month_date.year)
+		self.assertEqual(response.context['selected_month'], self.current_month_date.month)
+		self.assertEqual(len(response.context['months']), 12)
+		self.assertNotContains(response, self.current_competitor_log.task)
+
+	def test_my_list_can_filter_specific_month_for_current_user(self):
+		self.client.force_login(self.coach_user)
+		response = self.client.get(
+			reverse('traininglogs:traininglog_list'),
+			{'year': self.previous_month_date.year, 'month': self.previous_month_date.month},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(list(response.context['object_list']), [self.previous_coach_log])
+		self.assertEqual(response.context['selected_year'], self.previous_month_date.year)
+		self.assertEqual(response.context['selected_month'], self.previous_month_date.month)
