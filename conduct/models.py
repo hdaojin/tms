@@ -3,6 +3,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.core.validators import FileExtensionValidator
 from django.core.exceptions import ValidationError
+from django.db.models import Count, Q, Sum
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from pathlib import Path
@@ -92,10 +93,10 @@ class ConductItem(models.Model):
         if self.category:
             nature = self.category.nature
             # 奖励应为正分
-            if nature == CONDUCT_NATURE_REWARD and self.score < 0:
+            if nature == CONDUCT_NATURE_REWARD and self.score <= 0:
                 raise ValidationError({'score': '奖励类事项的分值应为正数'})
             # 惩罚应为负分
-            elif nature == CONDUCT_NATURE_PENALTY and self.score > 0:
+            elif nature == CONDUCT_NATURE_PENALTY and self.score >= 0:
                 raise ValidationError({'score': '惩罚类事项的分值应为负数'})
             # 警告应为0分
             elif nature == CONDUCT_NATURE_WARNING and self.score != 0:
@@ -129,11 +130,15 @@ def conduct_attachment_upload_to(instance, filename):
 
 class ConductRecord(models.Model):
     """奖惩记录模型"""
+
+    STATUS_PENDING = 'PENDING'
+    STATUS_APPROVED = 'APPROVED'
+    STATUS_REJECTED = 'REJECTED'
     
     STATUS_CHOICES = [
-        ('PENDING', '待审核'),
-        ('APPROVED', '已通过'),
-        ('REJECTED', '已驳回'),
+        (STATUS_PENDING, '待审核'),
+        (STATUS_APPROVED, '已通过'),
+        (STATUS_REJECTED, '已驳回'),
     ]
     
     student = models.ForeignKey(
@@ -175,7 +180,7 @@ class ConductRecord(models.Model):
         '状态',
         max_length=10,
         choices=STATUS_CHOICES,
-        default='PENDING'
+        default=STATUS_PENDING
     )
     
     # 记录信息
@@ -213,6 +218,34 @@ class ConductRecord(models.Model):
 
     def __str__(self):
         return f"{self.student.display_name} - {self.item.name} - {self.occurred_date}"
+
+    def clean(self):
+        """验证学生范围与审核状态流。"""
+        errors = {}
+
+        if self.student and not self.student.groups.filter(name=GROUP_COMPETITOR).exists():
+            errors['student'] = '只能为选手组用户录入奖惩记录。'
+
+        if self.status == self.STATUS_PENDING:
+            if self.review_note.strip():
+                errors['review_note'] = '待审核记录不能填写审核意见。'
+            if self.reviewed_by or self.reviewed_at:
+                errors['status'] = '待审核记录不能包含审核信息。'
+
+        if self.status == self.STATUS_REJECTED and not self.review_note.strip():
+            errors['review_note'] = '驳回时必须填写审核意见。'
+
+        if self.pk:
+            original_status = type(self).objects.filter(pk=self.pk).values_list('status', flat=True).first()
+            if (
+                original_status
+                and original_status != self.status
+                and original_status != self.STATUS_PENDING
+            ):
+                errors['status'] = '已审核记录不允许再次变更状态。'
+
+        if errors:
+            raise ValidationError(errors)
     
     @property
     def filename(self):
@@ -221,7 +254,7 @@ class ConductRecord(models.Model):
     
     @property
     def score(self):
-        """返回奖惩事项对应的分值"""
+        """返回当前奖惩事项分值。历史记录始终跟随事项当前分值。"""
         return self.item.score if self.item else 0
 
 
@@ -255,21 +288,37 @@ class ConductSummary(models.Model):
     
     def update_summary(self):
         """更新汇总信息（仅统计已通过的记录）"""
-        approved_records = self.student.conduct_records.filter(status='APPROVED').select_related('item__category')
-        
-        self.total_score = sum(
-            record.score for record in approved_records
-        ) or 0
-        
-        self.reward_count = approved_records.filter(
-            item__category__nature='REWARD'
-        ).count()
-        
-        self.penalty_count = approved_records.filter(
-            item__category__nature='PENALTY'
-        ).count()
+        approved_records = self.student.conduct_records.filter(status=ConductRecord.STATUS_APPROVED)
+        stats = approved_records.aggregate(
+            total_score=Sum('item__score'),
+            reward_count=Count(
+                'pk',
+                filter=Q(item__category__nature=CONDUCT_NATURE_REWARD),
+            ),
+            penalty_count=Count(
+                'pk',
+                filter=Q(item__category__nature=CONDUCT_NATURE_PENALTY),
+            ),
+        )
+
+        self.total_score = stats['total_score'] or Decimal('0')
+        self.reward_count = stats['reward_count'] or 0
+        self.penalty_count = stats['penalty_count'] or 0
         
         self.save()
+
+
+def refresh_conduct_summary(student_id):
+    """重算单个学生的奖惩汇总。"""
+    summary, _ = ConductSummary.objects.get_or_create(student_id=student_id)
+    summary.update_summary()
+
+
+def refresh_conduct_summaries(student_ids):
+    """批量重算多个学生的奖惩汇总。"""
+    for student_id in set(student_ids):
+        if student_id is not None:
+            refresh_conduct_summary(student_id)
 
 
 # 注册文件清理信号
@@ -280,18 +329,35 @@ register_file_cleanup_signals(ConductRecord, 'attachment')
 @receiver(post_save, sender=ConductRecord)
 def update_conduct_summary_on_save(sender, instance, **kwargs):
     """当记录状态变为已通过或已驳回时，更新汇总表"""
-    if instance.status in ['APPROVED', 'REJECTED']:
-        summary, created = ConductSummary.objects.get_or_create(
-            student=instance.student
-        )
-        summary.update_summary()
+    if instance.status in [ConductRecord.STATUS_APPROVED, ConductRecord.STATUS_REJECTED]:
+        refresh_conduct_summary(instance.student_id)
 
 
 @receiver(post_delete, sender=ConductRecord)
 def update_conduct_summary_on_delete(sender, instance, **kwargs):
     """当记录被删除时，更新汇总表"""
     try:
-        summary = ConductSummary.objects.get(student=instance.student)
+        summary = ConductSummary.objects.get(student_id=instance.student_id)
         summary.update_summary()
     except ConductSummary.DoesNotExist:
         pass
+
+
+@receiver(post_save, sender=ConductItem)
+def update_conduct_summary_on_item_save(sender, instance, **kwargs):
+    """事项分值或分类变化后，重算受影响学生汇总。"""
+    student_ids = ConductRecord.objects.filter(
+        item=instance,
+        status=ConductRecord.STATUS_APPROVED,
+    ).values_list('student_id', flat=True).distinct()
+    refresh_conduct_summaries(student_ids)
+
+
+@receiver(post_save, sender=ConductCategory)
+def update_conduct_summary_on_category_save(sender, instance, **kwargs):
+    """分类性质变化后，重算受影响学生汇总。"""
+    student_ids = ConductRecord.objects.filter(
+        item__category=instance,
+        status=ConductRecord.STATUS_APPROVED,
+    ).values_list('student_id', flat=True).distinct()
+    refresh_conduct_summaries(student_ids)

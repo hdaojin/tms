@@ -9,7 +9,7 @@
 ## 运行与验证
 
 - 所有 Django 命令和脚本都从项目根目录运行；`.env` 中 `DATABASE_URL` 使用相对路径 `sqlite:///db.sqlite3`，如果从子目录启动脚本，可能连到错误的 SQLite 文件。
-- 首次设置：`uv sync`、`npm install`、复制 `.env.example` 到 `.env`、`uv run manage.py migrate`、`uv run manage.py loaddata core/default accounts/default competitions/default conduct/default`。
+- 首次设置：`uv sync`、`npm install`、复制 `.env.example` 到 `.env`、`uv run manage.py migrate`、`uv run manage.py loaddata core/default accounts/default competitions/default`。
 - 常用开发命令：`uv run manage.py runserver`、`npm run watch:css`、`npm run build:css`。
 - 运行测试时优先执行受影响 app 的测试，例如 `uv run manage.py test meeting`；不要默认跑全量测试。
 
@@ -28,7 +28,7 @@
 - 表单优先继承 [core/utils/forms.py](../core/utils/forms.py) 中的 `StyledFormMixin`，保持 DaisyUI 类名一致。
 - 模板、表格和业务代码展示用户时，统一使用 `user.display_name` 或 `user.full_info`。
 - 带文件字段的模型应复用 [core/utils/signals.py](../core/utils/signals.py) 的清理信号；PDF 内嵌预览优先使用 [core/utils/pdf_response.py](../core/utils/pdf_response.py) 中的 `create_pdf_preview_view`。
-- 需要审核的记录遵循 `conduct` 的状态流：`PENDING`、`APPROVED`、`REJECTED`，并按角色限制查询集。业务背景见 [conduct/README.md](../conduct/README.md)。
+- 需要审核的记录遵循 `PENDING`、`APPROVED`、`REJECTED` 状态流，并按角色限制查询集。
 - 新 app 需要补齐 app 内 `menus.yml`、[core/config/menus](../core/config/menus/) 下的菜单片段、`app_name` 命名空间和 `<app>:<model>_<action>` URL 命名。
 
 ## 模板与前端
@@ -40,5 +40,4 @@
 ## 参考文档
 
 - 项目启动、依赖和基础开发流程见 [README.md](../README.md)。
-- `conduct` 应用的详细业务说明见 [conduct/README.md](../conduct/README.md)。
 - `demo` 应用的用途和限制见 [demo/README.md](../demo/README.md)。
