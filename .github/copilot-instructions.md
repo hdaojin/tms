@@ -9,7 +9,7 @@
 ## 运行与验证
 
 - 所有 Django 命令和脚本都从项目根目录运行；`.env` 中 `DATABASE_URL` 使用相对路径 `sqlite:///db.sqlite3`，如果从子目录启动脚本，可能连到错误的 SQLite 文件。
-- 首次设置：`uv sync`、`npm install`、复制 `.env.example` 到 `.env`、`uv run manage.py migrate`、`uv run manage.py loaddata core/default accounts/default competitions/default`。
+- 首次设置：`uv sync`、`npm install`、复制 `.env.example` 到 `.env`、`uv run manage.py migrate`、`uv run manage.py loaddata core/default accounts/default competitions/default conduct/default`。
 - 常用开发命令：`uv run manage.py runserver`、`npm run watch:css`、`npm run build:css`。
 - 运行测试时优先执行受影响 app 的测试，例如 `uv run manage.py test meeting`；不要默认跑全量测试。
 

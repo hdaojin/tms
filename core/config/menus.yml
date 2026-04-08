@@ -14,6 +14,7 @@ layouts:
     - "training"
     - "notes"
     - "assessment"
+    - "conduct"
   # - resource
   # - asset
   # - article
@@ -93,5 +94,15 @@ sections:
       color: "warning"
     include:
       - "notes"
+
+  - section: "conduct"
+    label: "奖惩"
+    description: "学生奖惩管理"
+    icon: 
+      pic: "icon-[tabler--gavel]"
+      size: 8
+      color: "secondary"
+    include:
+      - "conduct"
 
 

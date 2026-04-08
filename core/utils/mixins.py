@@ -174,3 +174,19 @@ class TitleMixin:
         context['title'] = self.get_title()
         context['title_icon'] = self.title_icon
         return context
+
+
+class CreatedUpdatedAdminMixin:
+    """为 admin 保存动作统一写入创建人与更新人。"""
+
+    created_by_field = 'created_by'
+    updated_by_field = 'updated_by'
+
+    def save_model(self, request, obj, form, change):
+        if not change and hasattr(obj, self.created_by_field):
+            if getattr(obj, f'{self.created_by_field}_id', None) is None:
+                setattr(obj, self.created_by_field, request.user)
+        elif change and hasattr(obj, self.updated_by_field):
+            setattr(obj, self.updated_by_field, request.user)
+
+        super().save_model(request, obj, form, change)

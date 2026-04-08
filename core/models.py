@@ -1,6 +1,32 @@
-from django.db import models
-from django.core.cache import cache
 from django.conf import settings
+from django.core.cache import cache
+from django.db import models
+
+
+class AuditedModel(models.Model):
+    """通用创建/更新审计字段。"""
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+        verbose_name='创建人',
+    )
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+        verbose_name='更新人',
+    )
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
+
+    class Meta:
+        abstract = True
 
 class SiteConfig(models.Model):
     """站点配置模型，存储全局站点设置，如名称、描述等。"""

@@ -57,6 +57,7 @@ uv run manage.py migrate
 uv run manage.py loaddata core/default
 uv run manage.py loaddata accounts/default
 uv run manage.py loaddata competitions/default
+uv run manage.py loaddata conduct/default
 ```
 
 ### Create superuser
