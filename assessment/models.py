@@ -18,6 +18,7 @@ from core.constants import (
     ASSESSMENT_MS_UPLOAD_MAX_SIZE_MB,
     ASSESSMENT_ATTACHMENT_ALLOWED_EXTENSIONS,
     ASSESSMENT_ATTACHMENT_UPLOAD_MAX_SIZE_MB,
+    GROUP_COACH,
 )
 from core.utils.validators import validate_file_size
 from core.utils.signals import register_file_cleanup_signals
@@ -153,6 +154,21 @@ class AssessmentModule(models.Model):
         on_delete=models.PROTECT,
         verbose_name="模块"
     )
+    responsible_coach = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="responsible_assessment_modules",
+        verbose_name="负责教练",
+        help_text="只有该教练可以上传资料和录入成绩",
+        limit_choices_to={"groups__name": GROUP_COACH},
+    )
+    sort_order = models.PositiveIntegerField(
+        "显示顺序",
+        default=0,
+        help_text="数值越小越靠前显示"
+    )
     max_score = models.DecimalField(
         "模块总分",
         max_digits=5,
@@ -169,7 +185,25 @@ class AssessmentModule(models.Model):
         validators=[MinValueValidator(Decimal("0.0"))],
         help_text="该模块的考核时长，单位为小时"
     )
-    
+    is_locked = models.BooleanField(
+        "已锁定",
+        default=False,
+        help_text="锁定后成绩不可修改",
+    )
+    locked_at = models.DateTimeField(
+        "锁定时间",
+        null=True,
+        blank=True,
+    )
+    locked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="locked_assessment_modules",
+        verbose_name="锁定人",
+    )
+
     # 考核资料文件字段
     question_file = models.FileField(
         "试题文件",
@@ -224,7 +258,12 @@ class AssessmentModule(models.Model):
     class Meta:
         verbose_name = "考核模块"
         verbose_name_plural = "考核模块"
+        ordering = ["assessment", "sort_order", "module__code", "pk"]
         unique_together = ['assessment', 'module']
+
+    def clean(self):
+        if self.responsible_coach and not self.responsible_coach.groups.filter(name=GROUP_COACH).exists():
+            raise ValidationError({"responsible_coach": "负责教练必须属于教练组"})
 
     def __str__(self):
         return f"{self.assessment.name} - {self.module.name}"

@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="mb-4">
+    <a href="{% url 'assessment:detail' assessment.pk %}" class="btn btn-ghost btn-sm gap-1">
+      <span class="icon-[tabler--arrow-left] size-4"></span>
+      返回考核详情
+    </a>
+  </div>
+
+  {# 模块信息卡片 #}
+  <div class="card border border-base-300 bg-base-100 mb-6">
+    <div class="card-body gap-2 py-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="text-lg font-semibold">
+            {{ assessment_module.module.code }} - {{ assessment_module.module.name }}
+          </h2>
+          <p class="text-sm text-base-content/70">
+            满分：{{ assessment_module.max_score }}
+            {% if assessment_module.duration > 0 %}
+              · 时长：{{ assessment_module.duration|floatformat:1 }}h
+            {% endif %}
+            · 考核：{{ assessment.name }}
+          </p>
+        </div>
+        {% if assessment_module.is_locked %}
+          <div class="badge badge-error gap-1">
+            <span class="icon-[tabler--lock] size-4"></span>
+            已锁定
+            {% if assessment_module.locked_by %}
+              · {{ assessment_module.locked_by.display_name }}
+            {% endif %}
+          </div>
+        {% else %}
+          <div class="badge badge-success gap-1">
+            <span class="icon-[tabler--lock-open] size-4"></span>
+            可编辑
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if assessment_module.is_locked %}
+    {# ---- 锁定后只读模式 ---- #}
+    <div class="overflow-x-auto rounded-lg border border-base-300">
+      <table class="table table-zebra">
+        <thead>
+          <tr class="bg-base-200">
+            <th class="w-12">#</th>
+            <th>选手</th>
+            <th class="text-center">成绩</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for field in form.score_fields %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ field.label }}</td>
+              <td class="text-center font-mono">
+                {% if field.value is not None and field.value != "" %}
+                  {{ field.value }}
+                {% else %}
+                  <span class="text-base-content/30">-</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if can_unlock %}
+      <form method="post" class="mt-4 flex justify-center">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="unlock">
+        <button type="submit" class="btn btn-warning gap-1"
+          onclick="return confirm('确定要解锁该模块成绩吗？解锁后负责教练可以修改成绩。')">
+          <span class="icon-[tabler--lock-open] size-5"></span>
+          解锁模块
+        </button>
+      </form>
+    {% endif %}
+
+  {% else %}
+    {# ---- 可编辑模式 ---- #}
+    <form method="post">
+      {% csrf_token %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-error mb-4">
+          <ul class="list-inside list-disc">
+            {% for error in form.non_field_errors %}
+              <li>{{ error }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      <div class="overflow-x-auto rounded-lg border border-base-300">
+        <table class="table table-zebra">
+          <thead>
+            <tr class="bg-base-200">
+              <th class="w-12">#</th>
+              <th>选手</th>
+              <th class="w-48 text-center">成绩</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for field in form.score_fields %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>
+                  <label for="{{ field.id_for_label }}" class="cursor-pointer">{{ field.label }}</label>
+                  {% if field.errors %}
+                    <div class="text-sm text-error mt-1">
+                      {% for error in field.errors %}{{ error }}{% endfor %}
+                    </div>
+                  {% endif %}
+                </td>
+                <td class="text-center">{{ field }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 flex flex-wrap justify-center gap-3">
+        <button type="submit" name="action" value="save" class="btn btn-primary gap-1">
+          <span class="icon-[tabler--device-floppy] size-5"></span>
+          保存
+        </button>
+        <button type="submit" name="action" value="lock" class="btn btn-warning gap-1"
+          onclick="return confirm('锁定后将无法修改成绩，确定要保存并锁定吗？')">
+          <span class="icon-[tabler--lock] size-5"></span>
+          保存并锁定
+        </button>
+      </div>
+    </form>
+  {% endif %}
+{% endblock %}

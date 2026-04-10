@@ -21,7 +21,7 @@
     <p class="text-sm text-gray-600 line-clamp-2 mb-4">{{ assessment.description }}</p>
     {% endif %}
 
-    {% if can_view_all %}
+    {% if show_management_actions %}
         {# 管理员视图：简单统计或链接 #}
         <div class="card-actions justify-end mt-4">
              <a href="{% url 'assessment:detail' assessment.pk %}" class="btn btn-primary btn-sm btn-outline">

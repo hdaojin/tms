@@ -3,32 +3,43 @@
 
 {% block content %}
   <div>
-    <p class="text-gray-500 mt-1">{% if assessment.description %}{{ assessment.description }}{% else %}{{ assessment.name }}{% endif %}</p>
-    <p class="text-gray-500 mt-1">{{ assessment.start_date }} ~ {{ assessment.end_date }} · 共 {{ table_rows|length }} 位参考人员 ·
+    <p class="mt-1 text-gray-500">{% if assessment.description %}{{ assessment.description }}{% else %}{{ assessment.name }}{% endif %}</p>
+    <p class="mt-1 text-gray-500">{{ assessment.start_date }} ~ {{ assessment.end_date }} · 共 {{ table_rows|length }} 位参考人员 ·
       {{ modules|length }} 个考核模块</p>
   </div>
 
-  {# 考核模块与资料 #}
   <div class="mt-6 print:hidden">
-    <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
+    <h2 class="mb-3 flex items-center gap-2 text-lg font-semibold">
       <span class="icon-[tabler--folders] size-5 text-primary"></span>
       考核模块
     </h2>
-    <div class="overflow-x-auto border border-base-300 rounded-lg">
+    <div class="overflow-x-auto rounded-lg border border-base-300">
       <table class="table table-zebra">
         <thead>
           <tr class="bg-base-200">
-              <th>模块名称</th>
-              <th class="text-center">满分</th>
-              <th class="text-center">时长</th>
-              <th>考核资料</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for am in modules %}
+            <th>模块名称</th>
+            <th>负责教练</th>
+            <th class="text-center">满分</th>
+            <th class="text-center">时长</th>
+            <th>考核资料</th>
+            <th class="text-center print:hidden">操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for am in modules %}
             <tr>
               <td>
                 <span class="font-semibold">{{ am.module.code }} - {{ am.module.name }}</span>
+              </td>
+              <td>
+                {% if am.responsible_coach %}
+                  <span>{{ am.responsible_coach.display_name }}</span>
+                  {% if am.can_manage %}
+                    <span class="badge badge-primary badge-sm ml-2">我负责</span>
+                  {% endif %}
+                {% else %}
+                  <span class="text-base-content/50">未指定</span>
+                {% endif %}
               </td>
               <td class="text-center">{{ am.max_score }}</td>
               <td class="text-center">
@@ -41,142 +52,61 @@
               <td>
                 <div class="flex flex-wrap gap-1">
                   {% if am.question_file %}
-                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-success badge-sm hover:badge-primary cursor-pointer" title="点击管理">试题</a>
+                    {% if am.can_manage %}
+                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-success badge-sm cursor-pointer hover:badge-primary" title="点击管理">试题</a>
+                    {% else %}
+                      <span class="badge badge-success badge-sm">试题</span>
+                    {% endif %}
                   {% endif %}
                   {% if am.scoring_standard_file %}
-                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-success badge-sm hover:badge-primary cursor-pointer" title="点击管理">评分标准</a>
+                    {% if am.can_manage %}
+                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-success badge-sm cursor-pointer hover:badge-primary" title="点击管理">评分标准</a>
+                    {% else %}
+                      <span class="badge badge-success badge-sm">评分标准</span>
+                    {% endif %}
                   {% endif %}
                   {% if am.scoring_sheet_file %}
-                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-info badge-sm hover:badge-primary cursor-pointer" title="点击管理">评分表</a>
+                    {% if am.can_manage %}
+                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-info badge-sm cursor-pointer hover:badge-primary" title="点击管理">评分表</a>
+                    {% else %}
+                      <span class="badge badge-info badge-sm">评分表</span>
+                    {% endif %}
                   {% endif %}
                   {% if am.scoring_script_file %}
-                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-info badge-sm hover:badge-primary cursor-pointer" title="点击管理">评分脚本</a>
-                  {% endif %}
-                  {% if am.attachments.exists %}
-                    <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-accent badge-sm hover:badge-primary cursor-pointer" title="点击管理">附件({{ am.attachments.count }})</a>
-                  {% endif %}
-                  {% if not am.question_file and not am.scoring_standard_file and not am.scoring_sheet_file and not am.scoring_script_file and not am.attachments.exists %}
-                    <a href="{% url 'assessment:file_upload' am.pk %}" class="text-base-content/50 text-sm hover:text-primary hover:underline">未上传，点击上传</a>
-                  {% endif %}
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-  </div>
-
-  {# 成绩列表 #}
-  <div class="mt-6">
-    <h2 class="text-lg font-semibold mb-3 flex items-center gap-2">
-      <span class="icon-[tabler--report-analytics] size-5 text-primary"></span>
-      考核成绩
-    </h2>
-    <div class="overflow-x-auto border border-base-300 rounded-lg">
-      <table class="table table-zebra table-sm w-full text-center">
-        <thead>
-          <tr class="bg-base-200">
-            <th class="w-16 sticky left-0 z-10">#</th>
-            <th class="text-center sticky z-10">姓名</th>
-            {% for am in modules %}
-              <th class="px-1">
-                {% with am_id_str=am.id|stringformat:'s' %}
-                  {% with sort_desc='-module_'|add:am_id_str sort_asc='module_'|add:am_id_str %}
-                    <a class="flex hover:bg-base-300 rounded transition-colors justify-center items-center p-1"
-                      href="?sort={% if current_sort == sort_desc %}{{ sort_asc }}{% else %}{{ sort_desc }}{% endif %}">
-                      <div class="flex flex-col">
-                        <div>{{ am.module.code }} - {{ am.module.name }}</div>
-                        <div class="text-xs font-normal opacity-70">
-                          满分: {{ am.max_score }}
-                          {% if am.duration > 0 %}
-                            · {{ am.duration|floatformat:1 }}h
-                          {% else %}
-                            · <span class="opacity-70 text-info italic">(未考核)</span>
-                          {% endif %}
-                        </div>
-                      </div>
-                      <div class="text-xs opacity-50 ml-2">
-                        {% if current_sort == sort_asc %}
-                          ▲
-                        {% elif current_sort == sort_desc %}
-                          ▼
-                        {% endif %}
-                      </div>
-                    </a>
-                  {% endwith %}
-                {% endwith %}
-              </th>
-            {% endfor %}
-            <th class="font-bold bg-primary/10 cursor-pointer"
-              title="包含English的所有模块总分"
-              onclick="window.location.href='?sort={% if current_sort == '-grand_total' %}grand_total{% else %}-grand_total{% endif %}'">
-              <div class="flex items-center justify-center gap-1">
-                <div class="flex flex-col items-center">
-                  <span class="text-primary">总分</span>
-                  <span class="text-xs font-normal opacity-70 text-primary/60">满分: {{ max_grand_total_score|floatformat:0 }}</span>
-                </div>
-                <span class="text-xs opacity-50 text-primary">
-                  {% if current_sort == 'grand_total' %}
-                    ▲
-                  {% elif current_sort == '-grand_total' %}
-                    ▼
-                  {% endif %}
-                </span>
-              </div>
-            </th>
-            <th class="font-bold bg-secondary/10 cursor-pointer"
-              title="用于排名的总分 (不含English)"
-              onclick="window.location.href='?sort={% if current_sort == '-total' %}total{% else %}-total{% endif %}'">
-              <div class="flex items-center justify-center gap-1">
-                <div class="flex flex-col items-center">
-                  <span class="text-secondary">排名分</span>
-                  <span class="text-xs font-normal opacity-70 text-secondary/60">满分: {{ max_ranking_score|floatformat:0 }}</span>
-                </div>
-                <span class="text-xs opacity-50 text-secondary">
-                  {% if current_sort == 'total' %}
-                    ▲
-                  {% elif current_sort == '-total' %}
-                    ▼
-                  {% endif %}
-                </span>
-              </div>
-            </th>
-            <th class="bg-base-200 font-bold text-center">排名</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in table_rows %}
-            <tr class="hover">
-              <td class="sticky left-0 bg-base-100">{{ forloop.counter }}</td>
-              <td class="text-center font-medium sticky">
-                <div class="font-bold">{{ row.user.first_name|default:row.user.username }}</div>
-              </td>
-              {% for cell in row.scores %}
-                <td>
-                  {% if cell.obj %}
-                    <span class="font-mono">{{ cell.val }}</span>
-                  {% else %}
-                    <span class="text-gray-300">-</span>
-                  {% endif %}
-                </td>
-              {% endfor %}
-              <td class="font-bold font-mono bg-primary/5 text-primary">{{ row.total }}</td>
-              <td class="font-bold font-mono bg-secondary/5 text-secondary">{{ row.rank_score }}</td>
-              <td class="font-bold text-center">
-                {% if row.rank <= 3 %}
-                  <div class="flex items-center justify-center gap-1">
-                    {% if row.rank == 1 %}
-                      <span class="icon-[emojione--1st-place-medal] size-5"></span>
-                    {% elif row.rank == 2 %}
-                      <span class="icon-[emojione--2nd-place-medal] size-5"></span>
-                    {% elif row.rank == 3 %}
-                      <span class="icon-[emojione--3rd-place-medal] size-5"></span>
+                    {% if am.can_manage %}
+                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-info badge-sm cursor-pointer hover:badge-primary" title="点击管理">评分脚本</a>
+                    {% else %}
+                      <span class="badge badge-info badge-sm">评分脚本</span>
                     {% endif %}
-                    <span class="text-lg">{{ row.rank }}</span>
-                  </div>
-                {% else %}
-                  {{ row.rank }}
+                  {% endif %}
+                  {% if am.has_attachments %}
+                    {% if am.can_manage %}
+                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-accent badge-sm cursor-pointer hover:badge-primary" title="点击管理">附件({{ am.attachment_count }})</a>
+                    {% else %}
+                      <span class="badge badge-accent badge-sm">附件({{ am.attachment_count }})</span>
+                    {% endif %}
+                  {% endif %}
+                  {% if not am.has_any_material %}
+                    {% if am.can_manage %}
+                      <a href="{% url 'assessment:file_upload' am.pk %}" class="text-sm text-base-content/50 hover:text-primary hover:underline">未上传，点击上传</a>
+                    {% else %}
+                      <span class="text-sm text-base-content/50">未上传</span>
+                    {% endif %}
+                  {% endif %}
+                </div>
+              </td>
+              <td class="text-center print:hidden">
+                {% if am.can_manage %}
+                  {% if am.is_locked %}
+                    <span class="badge badge-error badge-sm gap-1">
+                      <span class="icon-[tabler--lock] size-3"></span>已锁定
+                    </span>
+                  {% else %}
+                    <a href="{% url 'assessment:module_score_entry' am.pk %}" class="btn btn-primary btn-sm gap-1">
+                      <span class="icon-[tabler--edit-circle] size-4"></span>
+                      录入成绩
+                    </a>
+                  {% endif %}
                 {% endif %}
               </td>
             </tr>
@@ -185,4 +115,6 @@
       </table>
     </div>
   </div>
+
+  {% include 'assessment/partials/score_table.html' %}
 {% endblock %}

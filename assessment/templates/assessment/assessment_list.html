@@ -32,7 +32,7 @@
               <tr class="bg-base-200">
                 <th class="whitespace-nowrap text-start">考核名称</th>
                 <th class="whitespace-nowrap text-start">日期</th>
-                {% if not can_view_all %}
+                {% if not show_management_actions %}
                   <th class="text-start">模块成绩</th>
                   <th class="whitespace-nowrap text-center bg-primary/10">
                     <p class="font-bold text-primary">总分</p>
@@ -44,7 +44,7 @@
                   </th>
                   <th class="whitespace-nowrap text-center">排名</th>
                 {% endif %}
-                {% if can_view_all %}
+                {% if show_management_actions %}
                   <th class="text-start">考核模块</th>
                   <th>操作</th>
                 {% endif %}
@@ -63,7 +63,7 @@
                     <div>开始：{{ assessment.start_date|date:'Y-m-d' }}</div>
                     <div>结束：{{ assessment.end_date|date:'Y-m-d' }}</div>
                   </td>
-                  {% if can_view_all %}
+                  {% if show_management_actions %}
                     <td>
                       <div class="flex flex-wrap gap-1 justify-start">
                         {% for am in assessment.assessmentmodule_set.all %}
@@ -79,7 +79,7 @@
                       </div>
                     </td>
                   {% endif %}
-                  {% if not can_view_all %}
+                  {% if not show_management_actions %}
                     <td>
                       {% if assessment.user_modules_info %}
                         <div class="flex flex-wrap gap-2 justify-start">
@@ -136,7 +136,7 @@
                     </td>
                   {% endif %}
 
-                  {% if can_view_all %}
+                  {% if show_management_actions %}
                     <td>
                       <a href="{% url 'assessment:detail' assessment.pk %}" class="btn btn-sm btn-ghost text-primary">查看详情</a>
                     </td>

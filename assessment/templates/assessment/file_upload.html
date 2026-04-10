@@ -25,6 +25,11 @@
             <span class="icon-[tabler--clock] size-5 text-info"></span>
             <span>时长：{{ assessment_module.duration }} 小时</span>
           </div>
+          <div class="divider divider-horizontal m-0"></div>
+          <div class="flex items-center gap-2">
+            <span class="icon-[tabler--user-star] size-5 text-secondary"></span>
+            <span>负责教练：{% if assessment_module.responsible_coach %}{{ assessment_module.responsible_coach.display_name }}{% else %}未指定{% endif %}</span>
+          </div>
         </div>
       </div>
     </div>

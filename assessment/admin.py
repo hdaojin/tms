@@ -1,12 +1,63 @@
 from django.contrib import admin
 from django import forms
+from django.contrib.auth import get_user_model
+from django.db.models import Max
+
+from core.constants import GROUP_COACH
+
 from .models import Assessment, Score, AssessmentModule, AssessmentAttachment
+
+
+User = get_user_model()
 
 
 class AssessmentModuleInline(admin.TabularInline):
     model = AssessmentModule
-    extra = 0
+    extra = 1
     autocomplete_fields = ['module']
+    ordering = ('sort_order', 'id')
+    fields = ('sort_order', 'module', 'responsible_coach', 'max_score', 'duration', 'is_locked')
+    readonly_fields = ('is_locked',)
+
+    def get_formset(self, request, obj=None, **kwargs):
+        formset = super().get_formset(request, obj, **kwargs)
+        next_sort_order = 0
+        if obj and obj.pk:
+            max_sort_order = obj.assessmentmodule_set.aggregate(
+                max_sort_order=Max('sort_order')
+            )['max_sort_order']
+            if max_sort_order is not None:
+                next_sort_order = max_sort_order + 1
+
+        class PrefilledAssessmentModuleInlineFormSet(formset):
+            def __init__(self, *args, **inner_kwargs):
+                super().__init__(*args, **inner_kwargs)
+                for index, form in enumerate(self.extra_forms):
+                    if 'sort_order' in form.fields and form.initial.get('sort_order') in (None, ''):
+                        initial_value = next_sort_order + index
+                        form.fields['sort_order'].initial = initial_value
+                        form.initial['sort_order'] = initial_value
+
+            @property
+            def empty_form(self):
+                form = super().empty_form
+                if 'sort_order' in form.fields and form.initial.get('sort_order') in (None, ''):
+                    form.fields['sort_order'].initial = next_sort_order
+                    form.initial['sort_order'] = next_sort_order
+                return form
+
+        return PrefilledAssessmentModuleInlineFormSet
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "responsible_coach":
+            kwargs["queryset"] = User.objects.filter(groups__name=GROUP_COACH).order_by(
+                "last_name", "first_name", "username"
+            )
+
+        form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if form_field and db_field.name == "responsible_coach":
+            form_field.label_from_instance = lambda obj: obj.full_info  # type: ignore
+        return form_field
 
 class AssessmentAttachmentInline(admin.TabularInline):
     """附件内联编辑"""
@@ -25,7 +76,7 @@ class AssessmentForm(forms.ModelForm):
         # 为 participants 字段设置 label_from_instance
         participants_field = self.fields.get('participants')
         if participants_field:
-            participants_field.label_from_instance = lambda obj: obj.first_name if obj.first_name else obj.username # type: ignore
+            participants_field.label_from_instance = lambda obj: obj.full_info # type: ignore
 
 @admin.register(Assessment)
 class AssessmentAdmin(admin.ModelAdmin):
@@ -51,16 +102,49 @@ class ScoreInline(admin.TabularInline):
             
             form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
             if form_field:
-                 form_field.label_from_instance = lambda obj: obj.first_name if obj.first_name else obj.username # type: ignore
+                 form_field.label_from_instance = lambda obj: obj.full_info # type: ignore
             return form_field
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 @admin.register(AssessmentModule)
 class AssessmentModuleAdmin(admin.ModelAdmin):
-    list_display = ('assessment', 'module', 'max_score')
-    list_filter = ('assessment',)
+    list_display = ('assessment', 'sort_order', 'module', 'responsible_coach', 'max_score', 'is_locked')
+    list_display_links = ('assessment', 'module')
+    list_editable = ('sort_order',)
+    list_filter = ('assessment', 'responsible_coach', 'is_locked')
     search_fields = ('assessment__name', 'module__name')
+    readonly_fields = ('locked_at', 'locked_by')
     inlines = [ScoreInline, AssessmentAttachmentInline]
+    ordering = ('assessment', 'sort_order', 'module__code', 'pk')
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        assessment_id = request.GET.get('assessment')
+        if not assessment_id:
+            return initial
+
+        try:
+            assessment_id = int(assessment_id)
+        except (TypeError, ValueError):
+            return initial
+
+        max_sort_order = AssessmentModule.objects.filter(
+            assessment_id=assessment_id
+        ).aggregate(max_sort_order=Max('sort_order'))['max_sort_order']
+        initial['assessment'] = assessment_id
+        initial['sort_order'] = (max_sort_order + 1) if max_sort_order is not None else 0
+        return initial
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "responsible_coach":
+            kwargs["queryset"] = User.objects.filter(groups__name=GROUP_COACH).order_by(
+                "last_name", "first_name", "username"
+            )
+
+        form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
+        if form_field and db_field.name == "responsible_coach":
+            form_field.label_from_instance = lambda obj: obj.full_info  # type: ignore
+        return form_field
     
     def get_form(self, request, obj=None, **kwargs):   # type: ignore
         # 保存 obj 到 request 中，以便在 Inline 中使用

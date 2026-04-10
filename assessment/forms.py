@@ -1,4 +1,7 @@
+from decimal import Decimal
+
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.validators import FileExtensionValidator
 
 from core.utils.forms import StyledFormMixin
@@ -15,7 +18,10 @@ from core.constants import (
     ASSESSMENT_ATTACHMENT_ALLOWED_EXTENSIONS,
     ASSESSMENT_ATTACHMENT_UPLOAD_MAX_SIZE_MB,
 )
-from .models import AssessmentModule
+from .models import AssessmentModule, Score
+
+
+User = get_user_model()
 
 
 def _accept_attr(allowed_extensions: list[str]) -> str:
@@ -126,3 +132,66 @@ class AssessmentFileUploadForm(StyledFormMixin, forms.ModelForm):
             ext_validator(file)
             validate_file_size(file, ASSESSMENT_ATTACHMENT_UPLOAD_MAX_SIZE_MB)
         return files
+
+
+class ModuleScoreBatchForm(StyledFormMixin, forms.Form):
+    """批量录入某模块所有参考人员成绩的表单"""
+
+    def __init__(self, *args, assessment_module, **kwargs):
+        self.assessment_module = assessment_module
+        super().__init__(*args, **kwargs)
+        participants = assessment_module.assessment.participants.all().order_by(
+            "last_name", "first_name", "username"
+        )
+        existing_scores = {
+            s.user_id: s.score
+            for s in assessment_module.scores.all()
+        }
+        for participant in participants:
+            field_name = f"score_{participant.pk}"
+            self.fields[field_name] = forms.DecimalField(
+                label=participant.display_name,
+                max_digits=5,
+                decimal_places=2,
+                min_value=Decimal("0.00"),
+                required=False,
+                initial=existing_scores.get(participant.pk),
+                widget=forms.NumberInput(attrs={
+                    "step": "0.01",
+                    "min": "0",
+                    "max": str(assessment_module.max_score),
+                    "placeholder": f"满分 {assessment_module.max_score}",
+                    "class": "input w-full",
+                }),
+            )
+
+    def score_fields(self):
+        for name, field in self.fields.items():
+            if name.startswith("score_"):
+                yield self[name]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        max_score = self.assessment_module.max_score
+        for name, value in cleaned_data.items():
+            if not name.startswith("score_") or value is None:
+                continue
+            if value > max_score:
+                self.add_error(name, f"分数不能超过满分 {max_score}")
+        return cleaned_data
+
+    def save(self):
+        saved = []
+        for name, value in self.cleaned_data.items():
+            if not name.startswith("score_"):
+                continue
+            user_id = int(name.split("_", 1)[1])
+            if value is None:
+                continue
+            obj, _ = Score.objects.update_or_create(
+                assessment_module=self.assessment_module,
+                user_id=user_id,
+                defaults={"score": value},
+            )
+            saved.append(obj)
+        return saved
