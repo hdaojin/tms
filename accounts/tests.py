@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
+from conduct.models import ConductSummary
 
 User = get_user_model()
 
@@ -14,14 +15,36 @@ class AccountHomeTestCase(TestCase):
 		)
 		self.client.force_login(self.user)
 
-	def test_account_home_hides_conduct_section(self):
+	def test_account_home_shows_conduct_section(self):
 		response = self.client.get(reverse('accounts:home'))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertNotContains(response, '学生奖惩管理')
-		self.assertNotContains(response, '>奖惩<', html=False)
+		self.assertContains(response, '奖惩')
 
 	def test_conduct_root_is_not_accessible(self):
 		response = self.client.get('/conduct/')
 
 		self.assertEqual(response.status_code, 404)
+
+
+class UserAdminDeleteTest(TestCase):
+	def setUp(self):
+		self.admin = User.objects.create_superuser('admin', password='testpass')
+		self.student = User.objects.create_user('student', password='testpass')
+		ConductSummary.objects.create(student=self.student)
+		self.client.force_login(self.admin)
+
+	def test_delete_user_with_conduct_summary_shows_confirmation(self):
+		"""删除用户时，ConductSummary 不应阻止权限检查"""
+		url = reverse('admin:auth_user_delete', args=[self.student.pk])
+		resp = self.client.get(url)
+		self.assertEqual(resp.status_code, 200)
+		self.assertContains(resp, '奖惩汇总')
+		self.assertNotContains(resp, 'permissions to delete')
+
+	def test_delete_user_cascades_conduct_summary(self):
+		"""删除用户后，关联的 ConductSummary 也被级联删除"""
+		url = reverse('admin:auth_user_delete', args=[self.student.pk])
+		self.client.post(url, {'post': 'yes'})
+		self.assertFalse(User.objects.filter(pk=self.student.pk).exists())
+		self.assertFalse(ConductSummary.objects.filter(student=self.student).exists())

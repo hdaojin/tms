@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin, GroupAdmin as DefaultGroupAdmin
 
+from conduct.models import ConductSummary
 from .models import UserProfile, GroupProfile
 
 class UserProfileInline(admin.StackedInline):
@@ -26,6 +27,14 @@ class CustomUserAdmin(DefaultUserAdmin):
     def groups_name(self, obj):
         return ", ".join([group.name for group in obj.groups.all()])
     groups_name.short_description = '角色' # type: ignore
+
+    def get_deleted_objects(self, objs, request):
+        deleted_objects, model_count, perms_needed, protected = (
+            super().get_deleted_objects(objs, request)
+        )
+        # 允许级联删除奖惩汇总（单独删除仍被 ConductSummaryAdmin 拦截）
+        perms_needed.discard(ConductSummary._meta.verbose_name)
+        return deleted_objects, model_count, perms_needed, protected
 
 
 class GroupProfileInline(admin.StackedInline):
