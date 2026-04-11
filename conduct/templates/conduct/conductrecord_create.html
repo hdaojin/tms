@@ -1,8 +1,11 @@
 {% extends 'base.html' %}
 {% block right_sidebar %}{% endblock %}
 
+{% block title %}{% endblock %}
+
 {% block content %}
-  <div class="w-full">
+  <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 w-full max-w-2xl mx-auto shadow-xl mb-6">
+    <legend class="fieldset-legend text-2xl font-bold text-center mb-4">{{ title }}</legend>
     {% include 'components/form_snippet.html' with form=form action=request.path submit_label="录入" %}
-  </div>
+  </fieldset>
 {% endblock %}

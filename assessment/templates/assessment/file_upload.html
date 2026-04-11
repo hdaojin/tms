@@ -5,34 +5,25 @@
 
 {% endblock %}
 
+{% block title %}{% endblock %}
+
 {% block content %}
-  <div class="w-full">
-    {# 模块信息卡片 #}
-    <div class="card bg-base-200 mb-6">
-      <div class="card-body p-4">
-        <div class="flex flex-wrap items-center gap-4 text-sm">
-          <div class="flex items-center gap-2">
-            <span class="icon-[tabler--book] size-5 text-primary"></span>
-            <span>{{ assessment_module.module.name }}</span>
-          </div>
-          <div class="divider divider-horizontal m-0"></div>
-          <div class="flex items-center gap-2">
-            <span class="icon-[tabler--star] size-5 text-warning"></span>
-            <span>满分：{{ assessment_module.max_score }}</span>
-          </div>
-          <div class="divider divider-horizontal m-0"></div>
-          <div class="flex items-center gap-2">
-            <span class="icon-[tabler--clock] size-5 text-info"></span>
-            <span>时长：{{ assessment_module.duration }} 小时</span>
-          </div>
-          <div class="divider divider-horizontal m-0"></div>
-          <div class="flex items-center gap-2">
-            <span class="icon-[tabler--user-star] size-5 text-secondary"></span>
-            <span>负责教练：{% if assessment_module.responsible_coach %}{{ assessment_module.responsible_coach.display_name }}{% else %}未指定{% endif %}</span>
-          </div>
-        </div>
-      </div>
-    </div>
+  <div class="mb-4 max-w-2xl mx-auto w-full">
+    <a href="{% url 'assessment:detail' assessment_module.assessment.pk %}" class="btn btn-ghost btn-sm gap-1">
+      <span class="icon-[tabler--arrow-left] size-4"></span>
+      返回考核详情
+    </a>
+  </div>
+
+  <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 w-full max-w-2xl mx-auto shadow-xl mb-6">
+    <legend class="fieldset-legend text-xl font-bold text-center mb-2">
+      {{ assessment_module.module.code }} - {{ assessment_module.module.name }}
+    </legend>
+    <p class="text-sm text-base-content/60 text-center mb-6">
+      满分：{{ assessment_module.max_score }}
+      {% if assessment_module.duration > 0 %} · 时长：{{ assessment_module.duration }} 小时{% endif %}
+      · 负责教练：{% if assessment_module.responsible_coach %}{{ assessment_module.responsible_coach.display_name }}{% else %}未指定{% endif %}
+    </p>
 
     <form method="post" enctype="multipart/form-data" class="space-y-6">
       {% csrf_token %}
@@ -49,15 +40,8 @@
         </div>
       {% endif %}
 
-      {# 主要文件上传区域 #}
-      <div class="card bg-base-100 border border-base-300">
-        <div class="card-body">
-          <h2 class="card-title text-lg mb-4">
-            <span class="icon-[tabler--files] size-6 text-primary"></span>
-            考核资料文件
-          </h2>
-
-          <div class="grid gap-6">
+      {# 文件上传区域 #}
+      <div class="grid gap-6">
             {# 试题文件 #}
             {% with field=form.question_file file=assessment_module.question_file %}
               {% if field.errors %}
@@ -177,16 +161,10 @@
                 </div>
               {% endif %}
             {% endwith %}
-          </div>
-        </div>
       </div>
 
       {# 操作按钮 #}
-      <div class="flex justify-center gap-3">
-        <a href="{% url 'assessment:detail' assessment_module.assessment.pk %}" class="btn btn-ghost">
-          <span class="icon-[tabler--arrow-left] size-5"></span>
-          返回
-        </a>
+      <div class="flex justify-center gap-3 pt-2">
         <button type="reset" class="btn btn-outline btn-wide">
           <span class="icon-[tabler--refresh] size-5"></span>
           重置
@@ -197,5 +175,5 @@
         </button>
       </div>
     </form>
-  </div>
+  </fieldset>
 {% endblock %}
