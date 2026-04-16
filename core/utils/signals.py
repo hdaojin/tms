@@ -46,7 +46,7 @@ def register_file_cleanup_signals(
                     storage.delete(file_obj.name)
                     logger.debug(f"已删除文件: {file_obj.name}")
             except Exception as e:
-                logger.warning(f"删除文件失败 {file_obj.name}: {e}")
+                logger.exception(f"删除文件失败 {file_obj.name}: {e}")
     
     def delete_old_file_on_change(sender: Type[models.Model], instance: Any, **kwargs: Any) -> None:
         """更新记录时，若文件被替换则删除旧文件"""
@@ -70,7 +70,7 @@ def register_file_cleanup_signals(
                         storage.delete(old_file.name)
                         logger.debug(f"已删除旧文件: {old_file.name}")
                 except Exception as e:
-                    logger.warning(f"删除旧文件失败 {old_file.name}: {e}")
+                    logger.exception(f"删除旧文件失败 {old_file.name}: {e}")
     
     # 使用 dispatch_uid 避免重复注册
     uid_prefix = f"{model._meta.app_label}_{model._meta.model_name}"
@@ -78,11 +78,13 @@ def register_file_cleanup_signals(
     post_delete.connect(
         delete_file_on_delete,
         sender=model,
-        dispatch_uid=f"{uid_prefix}_delete_file"
+        dispatch_uid=f"{uid_prefix}_delete_file",
+        weak=False,
     )
     
     pre_save.connect(
         delete_old_file_on_change,
         sender=model,
-        dispatch_uid=f"{uid_prefix}_delete_old_file"
+        dispatch_uid=f"{uid_prefix}_delete_old_file",
+        weak=False,
     )

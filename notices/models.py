@@ -2,8 +2,6 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db.models.signals import post_delete, pre_save
-from django.dispatch import receiver
 from django.core.validators import FileExtensionValidator
 from pathlib import Path
 
@@ -14,6 +12,7 @@ from core.constants import (
     NOTICE_UPLOAD_DIR,
     NOTICE_UPLOAD_MAX_SIZE_MB,
 )
+from core.utils.signals import register_file_cleanup_signals
 from core.utils.validators import validate_file_size
 
 # Create your models here.
@@ -140,61 +139,4 @@ class NoticeAttachment(models.Model):
             size /= 1024.0
         return f"{size:.1f} TB"
 
-
-# 删除信号处理器
-@receiver(post_delete, sender=NoticeAttachment)
-def delete_attachment_file(sender, instance, **kwargs):
-    """
-    删除附件时，同时删除对应的文件
-    """
-    if instance.file and instance.file.name:
-        try:
-            storage = instance.file.storage
-            if storage.exists(instance.file.name):
-                storage.delete(instance.file.name)
-        except Exception:
-            # 如果文件删除失败，记录错误但不阻止删除
-            pass
-
-
-@receiver(post_delete, sender=Notice)
-def delete_notice_attachments(sender, instance, **kwargs):
-    """
-    删除通知时，同时删除所有相关的附件文件
-    """
-    # 删除所有相关的附件文件
-    for attachment in instance.attachments.all():
-        if attachment.file:
-            try:
-                # 删除物理文件
-                if attachment.file.storage.exists(attachment.file.name):
-                    attachment.file.storage.delete(attachment.file.name)
-            except Exception:
-                # 如果文件删除失败，记录错误但不阻止删除
-                pass
-
-
-@receiver(pre_save, sender=NoticeAttachment)
-def auto_delete_old_attachment_on_change(sender, instance, **kwargs):
-    """
-    更新附件时，若文件被替换，则删除旧文件，避免孤儿文件
-    """
-    if not instance.pk:
-        return
-    try:
-        old_instance = NoticeAttachment.objects.get(pk=instance.pk)
-    except NoticeAttachment.DoesNotExist:
-        return
-    
-    old_file = getattr(old_instance, 'file', None)
-    new_file = getattr(instance, 'file', None)
-
-    if old_file and getattr(old_file, 'name', None):
-        if (not new_file) or (old_file.name != getattr(new_file, 'name', None)):
-            try:
-                storage = old_file.storage
-                if storage.exists(old_file.name):
-                    storage.delete(old_file.name)
-            except Exception:
-                # 如果文件删除失败，记录错误但不阻止保存
-                pass
+register_file_cleanup_signals(NoticeAttachment, file_field='file')
