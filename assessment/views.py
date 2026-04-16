@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from core.constants import GROUP_COACH
 
@@ -15,6 +16,10 @@ from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
 
 def _is_coach(user):
     return user.is_authenticated and user.groups.filter(name=GROUP_COACH).exists()
+
+
+def _is_superuser(user):
+    return user.is_authenticated and user.is_superuser
 
 
 def _get_managed_modules_queryset(user, assessment=None):
@@ -42,6 +47,34 @@ def _can_manage_assessment_module(user, assessment_module):
     return _is_coach(user) and assessment_module.responsible_coach_id == user.id
 
 
+def _can_lock_assessment_module(user, assessment_module):
+    return _is_superuser(user) or _can_manage_assessment_module(user, assessment_module)
+
+
+def _can_unlock_assessment_module(user):
+    return _is_superuser(user)
+
+
+def _set_score_lock_state(assessment_module, *, is_locked, user=None):
+    assessment_module.is_locked = is_locked
+    assessment_module.locked_at = timezone.now() if is_locked else None
+    assessment_module.locked_by = user if is_locked else None
+    assessment_module.save(update_fields=["is_locked", "locked_at", "locked_by"])
+
+
+def _set_material_lock_state(assessment_module, *, is_locked, user=None):
+    assessment_module.is_material_locked = is_locked
+    assessment_module.material_locked_at = timezone.now() if is_locked else None
+    assessment_module.material_locked_by = user if is_locked else None
+    assessment_module.save(
+        update_fields=[
+            "is_material_locked",
+            "material_locked_at",
+            "material_locked_by",
+        ]
+    )
+
+
 def _get_assessment_modules_queryset(assessment):
     return (
         AssessmentModule.objects.select_related("module", "responsible_coach")
@@ -66,8 +99,19 @@ def _build_assessment_score_table_context(assessment, sort_param, user=None):
             or assessment_module.scoring_script_file
             or assessment_module.has_attachments
         )
-        assessment_module.can_manage = (
-            _can_manage_assessment_module(user, assessment_module) if user else False
+        can_manage = _can_manage_assessment_module(user, assessment_module) if user else False
+        can_lock = _can_lock_assessment_module(user, assessment_module) if user else False
+        can_unlock = _can_unlock_assessment_module(user) if user else False
+        assessment_module.can_manage = can_manage
+        assessment_module.can_manage_scores = can_manage
+        assessment_module.can_manage_materials = can_manage
+        assessment_module.can_lock_scores = can_lock and not assessment_module.is_locked
+        assessment_module.can_unlock_scores = can_unlock and assessment_module.is_locked
+        assessment_module.can_lock_materials = (
+            can_lock and not assessment_module.is_material_locked
+        )
+        assessment_module.can_unlock_materials = (
+            can_unlock and assessment_module.is_material_locked
         )
 
     participants = assessment.participants.all().order_by(
@@ -296,8 +340,7 @@ def module_score_entry(request, module_id):
     """
     独立的模块分数录入页面
     - 负责教练可以批量录入 / 修改所有参考人员的成绩
-    - 保存后可继续修改，锁定后不可编辑
-    - 超管 / 有 view_all_scores 权限的用户可以解锁
+    - 成绩锁定与解锁统一在考核详情页操作
     """
     assessment_module = get_object_or_404(
         AssessmentModule.objects.select_related(
@@ -306,53 +349,15 @@ def module_score_entry(request, module_id):
         pk=module_id,
     )
     if not _can_manage_assessment_module(request.user, assessment_module):
-        # 允许有解锁权限的用户访问已锁定模块（用于解锁操作）
-        can_unlock = (
-            request.user.is_superuser
-            or request.user.has_perm("assessment.view_all_scores")
-        )
-        if not (assessment_module.is_locked and can_unlock):
-            raise PermissionDenied("只有负责该模块的教练可以录入成绩")
-    else:
-        can_unlock = (
-            request.user.is_superuser
-            or request.user.has_perm("assessment.view_all_scores")
-        )
+        raise PermissionDenied("只有负责该模块的教练可以录入成绩")
 
     if request.method == "POST":
-        action = request.POST.get("action")
-
-        if action == "unlock":
-            if not can_unlock:
-                raise PermissionDenied("只有管理员可以解锁")
-            assessment_module.is_locked = False
-            assessment_module.locked_at = None
-            assessment_module.locked_by = None
-            assessment_module.save(update_fields=["is_locked", "locked_at", "locked_by"])
-            messages.success(request, "模块成绩已解锁，可以继续编辑。")
-            return redirect("assessment:module_score_entry", module_id=module_id)
-
         if assessment_module.is_locked:
             raise PermissionDenied("该模块成绩已锁定，无法修改")
 
         form = ModuleScoreBatchForm(request.POST, assessment_module=assessment_module)
         if form.is_valid():
             saved = form.save()
-
-            if action == "lock":
-                assessment_module.is_locked = True
-                assessment_module.locked_at = timezone.now()
-                assessment_module.locked_by = request.user
-                assessment_module.save(update_fields=["is_locked", "locked_at", "locked_by"])
-                messages.success(
-                    request,
-                    f"已保存 {len(saved)} 条成绩并锁定模块。",
-                )
-                return redirect(
-                    "assessment:detail",
-                    pk=assessment_module.assessment.pk,
-                )
-
             messages.success(request, f"已保存 {len(saved)} 条成绩。")
             return redirect("assessment:module_score_entry", module_id=module_id)
     else:
@@ -362,7 +367,6 @@ def module_score_entry(request, module_id):
         "assessment_module": assessment_module,
         "assessment": assessment_module.assessment,
         "form": form,
-        "can_unlock": can_unlock,
         "title": f"{assessment_module.module.code} - {assessment_module.module.name} 成绩录入",
         "title_icon": "icon-[tabler--edit-circle]",
     }
@@ -370,11 +374,73 @@ def module_score_entry(request, module_id):
 
 
 @login_required
+@require_POST
+def module_score_lock(request, module_id):
+    assessment_module = get_object_or_404(
+        AssessmentModule.objects.select_related("assessment", "module", "responsible_coach"),
+        pk=module_id,
+    )
+    action = request.POST.get("action")
+
+    if action == "lock":
+        if not _can_lock_assessment_module(request.user, assessment_module):
+            raise PermissionDenied("只有负责该模块的教练或管理员可以锁定成绩")
+        if assessment_module.is_locked:
+            messages.info(request, "该模块成绩已经锁定。")
+        else:
+            _set_score_lock_state(assessment_module, is_locked=True, user=request.user)
+            messages.success(request, f"{assessment_module.module.name} 成绩已锁定。")
+    elif action == "unlock":
+        if not _can_unlock_assessment_module(request.user):
+            raise PermissionDenied("只有管理员可以解锁成绩")
+        if not assessment_module.is_locked:
+            messages.info(request, "该模块成绩当前未锁定。")
+        else:
+            _set_score_lock_state(assessment_module, is_locked=False)
+            messages.success(request, f"{assessment_module.module.name} 成绩已解锁。")
+    else:
+        raise PermissionDenied("无效的成绩锁定操作")
+
+    return redirect("assessment:detail", pk=assessment_module.assessment.pk)
+
+
+@login_required
+@require_POST
+def module_material_lock(request, module_id):
+    assessment_module = get_object_or_404(
+        AssessmentModule.objects.select_related("assessment", "module", "responsible_coach"),
+        pk=module_id,
+    )
+    action = request.POST.get("action")
+
+    if action == "lock":
+        if not _can_lock_assessment_module(request.user, assessment_module):
+            raise PermissionDenied("只有负责该模块的教练或管理员可以锁定资料")
+        if assessment_module.is_material_locked:
+            messages.info(request, "该模块资料已经锁定。")
+        else:
+            _set_material_lock_state(assessment_module, is_locked=True, user=request.user)
+            messages.success(request, f"{assessment_module.module.name} 资料已锁定。")
+    elif action == "unlock":
+        if not _can_unlock_assessment_module(request.user):
+            raise PermissionDenied("只有管理员可以解锁资料")
+        if not assessment_module.is_material_locked:
+            messages.info(request, "该模块资料当前未锁定。")
+        else:
+            _set_material_lock_state(assessment_module, is_locked=False)
+            messages.success(request, f"{assessment_module.module.name} 资料已解锁。")
+    else:
+        raise PermissionDenied("无效的资料锁定操作")
+
+    return redirect("assessment:detail", pk=assessment_module.assessment.pk)
+
+
+@login_required
 def assessment_file_upload(request, module_id):
     """
     考核资料上传页面
     针对特定的考核模块上传各种资料
-    只有负责该模块的教练可以访问
+    只有负责该模块的教练可以访问，资料锁定后仅可只读查看
     """
     assessment_module = get_object_or_404(
         AssessmentModule.objects.select_related(
@@ -385,12 +451,10 @@ def assessment_file_upload(request, module_id):
     if not _can_manage_assessment_module(request.user, assessment_module):
         raise PermissionDenied("只有负责该模块的教练可以上传考核资料")
 
-    today = timezone.now().date()
-    if assessment_module.assessment.end_date < today:
-        messages.warning(request, "该考核已结束，无法上传资料")
-        return redirect("assessment:detail", pk=assessment_module.assessment.pk)
-
     if request.method == "POST":
+        if assessment_module.is_material_locked:
+            raise PermissionDenied("该模块资料已锁定，无法修改")
+
         form = AssessmentFileUploadForm(
             request.POST,
             request.FILES,
@@ -416,6 +480,7 @@ def assessment_file_upload(request, module_id):
     context = {
         "assessment_module": assessment_module,
         "form": form,
+        "can_edit_materials": not assessment_module.is_material_locked,
         "existing_attachments": assessment_module.attachments.all(),
         "title": f"{assessment_module.assessment.name} - {assessment_module.module.name} 资料上传",
         "title_icon": "icon-[tabler--file-upload]",
@@ -434,11 +499,8 @@ def delete_module_file(request, module_id, field_name):
     )
     if not _can_manage_assessment_module(request.user, assessment_module):
         raise PermissionDenied("只有负责该模块的教练可以删除考核资料")
-
-    today = timezone.now().date()
-    if assessment_module.assessment.end_date < today:
-        messages.warning(request, "该考核已结束，无法删除资料")
-        return redirect("assessment:detail", pk=assessment_module.assessment.pk)
+    if assessment_module.is_material_locked:
+        raise PermissionDenied("该模块资料已锁定，无法删除")
 
     field_config = {
         "question_file": {
@@ -509,14 +571,8 @@ def delete_attachment(request, attachment_id):
     )
     if not _can_manage_assessment_module(request.user, attachment.assessment_module):
         raise PermissionDenied("只有负责该模块的教练可以删除附件")
-
-    today = timezone.now().date()
-    if attachment.assessment_module.assessment.end_date < today:
-        messages.warning(request, "该考核已结束，无法删除附件")
-        return redirect(
-            "assessment:detail",
-            pk=attachment.assessment_module.assessment.pk,
-        )
+    if attachment.assessment_module.is_material_locked:
+        raise PermissionDenied("该模块资料已锁定，无法删除附件")
 
     module_id = attachment.assessment_module_id
     attachment.delete()

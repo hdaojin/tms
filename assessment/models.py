@@ -99,7 +99,7 @@ def attachment_upload_path(instance, filename):
     module = assessment_module.module
     start_date = assessment.start_date.strftime('%Y%m%d') if assessment.start_date else '00000000'
     
-    dir_path = f"{start_date}/{assessment.name}/{module.name}"
+    dir_path = f"{start_date}/{assessment.name}/{module.name}/试题附件"
     # 附件保持原文件名
     return str(PurePosixPath(dir_path) / filename)
 
@@ -202,6 +202,24 @@ class AssessmentModule(models.Model):
         blank=True,
         related_name="locked_assessment_modules",
         verbose_name="锁定人",
+    )
+    is_material_locked = models.BooleanField(
+        "资料已锁定",
+        default=False,
+        help_text="锁定后资料不可修改",
+    )
+    material_locked_at = models.DateTimeField(
+        "资料锁定时间",
+        null=True,
+        blank=True,
+    )
+    material_locked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="material_locked_assessment_modules",
+        verbose_name="资料锁定人",
     )
 
     # 考核资料文件字段

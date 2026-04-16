@@ -13,11 +13,19 @@ User = get_user_model()
 
 class AssessmentModuleInline(admin.TabularInline):
     model = AssessmentModule
-    extra = 1
+    extra = 0
     autocomplete_fields = ['module']
     ordering = ('sort_order', 'id')
-    fields = ('sort_order', 'module', 'responsible_coach', 'max_score', 'duration', 'is_locked')
-    readonly_fields = ('is_locked',)
+    fields = (
+        'sort_order',
+        'module',
+        'responsible_coach',
+        'max_score',
+        'duration',
+        'is_locked',
+        'is_material_locked',
+    )
+    readonly_fields = ('is_locked', 'is_material_locked')
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
@@ -63,6 +71,8 @@ class AssessmentAttachmentInline(admin.TabularInline):
     """附件内联编辑"""
     model = AssessmentAttachment
     extra = 1
+    verbose_name = '试题附件'
+    verbose_name_plural = '试题附件'
     fields = ['file', 'description', 'uploaded_at']
     readonly_fields = ['uploaded_at']
 
@@ -108,13 +118,44 @@ class ScoreInline(admin.TabularInline):
 
 @admin.register(AssessmentModule)
 class AssessmentModuleAdmin(admin.ModelAdmin):
-    list_display = ('assessment', 'sort_order', 'module', 'responsible_coach', 'max_score', 'is_locked')
+    list_display = (
+        'assessment',
+        'sort_order',
+        'module',
+        'responsible_coach',
+        'max_score',
+        'is_locked',
+        'is_material_locked',
+    )
     list_display_links = ('assessment', 'module')
     list_editable = ('sort_order',)
-    list_filter = ('assessment', 'responsible_coach', 'is_locked')
+    list_filter = ('assessment', 'responsible_coach', 'is_locked', 'is_material_locked')
     search_fields = ('assessment__name', 'module__name')
-    readonly_fields = ('locked_at', 'locked_by')
-    inlines = [ScoreInline, AssessmentAttachmentInline]
+    readonly_fields = (
+        'locked_at',
+        'locked_by',
+        'material_locked_at',
+        'material_locked_by',
+    )
+    fields = (
+        'assessment',
+        'module',
+        'responsible_coach',
+        'sort_order',
+        'max_score',
+        'duration',
+        'is_locked',
+        'locked_at',
+        'locked_by',
+        'is_material_locked',
+        'material_locked_at',
+        'material_locked_by',
+        'question_file',
+        'scoring_standard_file',
+        'scoring_sheet_file',
+        'scoring_script_file',
+    )
+    inlines = [AssessmentAttachmentInline, ScoreInline]
     ordering = ('assessment', 'sort_order', 'module__code', 'pk')
 
     def get_changeform_initial_data(self, request):
@@ -151,13 +192,5 @@ class AssessmentModuleAdmin(admin.ModelAdmin):
         request._obj_ = obj
         return super().get_form(request, obj, **kwargs)
 
-
-@admin.register(AssessmentAttachment)
-class AssessmentAttachmentAdmin(admin.ModelAdmin):
-    """附件管理"""
-    list_display = ('assessment_module', 'file', 'description', 'uploaded_at')
-    list_filter = ('assessment_module__assessment', 'uploaded_at')
-    search_fields = ('assessment_module__assessment__name', 'assessment_module__module__name', 'description')
-    readonly_fields = ['uploaded_at']
 
 

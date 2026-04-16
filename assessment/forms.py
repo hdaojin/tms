@@ -64,9 +64,9 @@ class AssessmentFileUploadForm(StyledFormMixin, forms.ModelForm):
             "accept": _accept_attr(ASSESSMENT_ATTACHMENT_ALLOWED_EXTENSIONS),
         }),
         required=False,
-        label="附件文件",
+        label="试题附件",
         help_text=(
-            "可上传多个附件文件，支持 "
+            "可上传多个试题附件，支持 "
             f"{', '.join(ASSESSMENT_ATTACHMENT_ALLOWED_EXTENSIONS)}，"
             f"单个文件不超过 {ASSESSMENT_ATTACHMENT_UPLOAD_MAX_SIZE_MB}MB"
         ),
@@ -144,18 +144,21 @@ class ModuleScoreBatchForm(StyledFormMixin, forms.Form):
             "last_name", "first_name", "username"
         )
         existing_scores = {
-            s.user_id: s.score
+            s.user_id: s
             for s in assessment_module.scores.all()
         }
-        for participant in participants:
-            field_name = f"score_{participant.pk}"
-            self.fields[field_name] = forms.DecimalField(
+        self.participants = list(participants)
+        for participant in self.participants:
+            existing_score = existing_scores.get(participant.pk)
+            score_field_name = f"score_{participant.pk}"
+            remarks_field_name = f"remarks_{participant.pk}"
+            self.fields[score_field_name] = forms.DecimalField(
                 label=participant.display_name,
                 max_digits=5,
                 decimal_places=2,
                 min_value=Decimal("0.00"),
                 required=False,
-                initial=existing_scores.get(participant.pk),
+                initial=existing_score.score if existing_score else None,
                 widget=forms.NumberInput(attrs={
                     "step": "0.01",
                     "min": "0",
@@ -164,11 +167,23 @@ class ModuleScoreBatchForm(StyledFormMixin, forms.Form):
                     "class": "input w-full",
                 }),
             )
+            self.fields[remarks_field_name] = forms.CharField(
+                label=f"{participant.display_name}备注",
+                required=False,
+                initial=existing_score.remarks if existing_score else "",
+                widget=forms.TextInput(attrs={
+                    "placeholder": "备注（可选）",
+                    "class": "input w-full",
+                }),
+            )
 
-    def score_fields(self):
-        for name, field in self.fields.items():
-            if name.startswith("score_"):
-                yield self[name]
+    def score_rows(self):
+        for participant in self.participants:
+            yield {
+                "participant": participant,
+                "score": self[f"score_{participant.pk}"],
+                "remarks": self[f"remarks_{participant.pk}"],
+            }
 
     def clean(self):
         cleaned_data = super().clean()
@@ -182,16 +197,26 @@ class ModuleScoreBatchForm(StyledFormMixin, forms.Form):
 
     def save(self):
         saved = []
-        for name, value in self.cleaned_data.items():
-            if not name.startswith("score_"):
+        existing_scores = {
+            score.user_id: score
+            for score in self.assessment_module.scores.all()
+        }
+        for participant in self.participants:
+            user_id = participant.pk
+            score_value = self.cleaned_data.get(f"score_{user_id}")
+            remarks_value = (self.cleaned_data.get(f"remarks_{user_id}") or "").strip()
+            existing_score = existing_scores.get(user_id)
+            if score_value is None and not remarks_value:
                 continue
-            user_id = int(name.split("_", 1)[1])
-            if value is None:
-                continue
+            if score_value is None:
+                score_value = existing_score.score if existing_score else Decimal("0.00")
             obj, _ = Score.objects.update_or_create(
                 assessment_module=self.assessment_module,
                 user_id=user_id,
-                defaults={"score": value},
+                defaults={
+                    "score": score_value,
+                    "remarks": remarks_value,
+                },
             )
             saved.append(obj)
         return saved

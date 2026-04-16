@@ -9,6 +9,7 @@
   - field_name: 字段名称 (用于构建删除 URL)
   - label: 文件标签名称
   - help_text: 帮助文本（可选）
+  - readonly: 只读模式下隐藏删除按钮（可选）
 
 使用示例:
   {% include 'components/file_display.html' with file=object.question_file delete_url_name="assessment:delete_module_file" module_id=object.pk field_name="question_file" label="试题文件" %}
@@ -41,7 +42,7 @@
     
     {# 删除按钮 #}
     <div class="shrink-0">
-      {% if delete_url_name and module_id and field_name %}
+      {% if not readonly and delete_url_name and module_id and field_name %}
         <button type="button" class="btn btn-sm btn-ghost btn-circle text-error hover:bg-error/10" title="删除文件" hx-delete="{% url delete_url_name module_id field_name %}" hx-target="#file-display-{{ field_name }}" hx-swap="outerHTML" hx-confirm="确定要删除这个文件吗？删除后需要重新上传。">
           <span class="icon-[tabler--trash] size-4"></span>
         </button>

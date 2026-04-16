@@ -1,15 +1,17 @@
 from datetime import date
 from decimal import Decimal
 
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
 from competitions.models import CompetitionType, Module, Project
 from core.constants import GROUP_COACH
 
-from .models import Assessment, AssessmentModule, Score
+from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
 
 
 User = get_user_model()
@@ -63,6 +65,11 @@ class AssessmentModuleOrderingTests(TestCase):
 class AssessmentCoachingWorkflowTests(TestCase):
     def setUp(self):
         self.coach_group = Group.objects.create(name=GROUP_COACH)
+        self.admin_user = User.objects.create_superuser(
+            username="admin",
+            password="testpass123",
+            email="admin@example.com",
+        )
 
         self.coach = User.objects.create_user(
             username="coach-a",
@@ -130,14 +137,63 @@ class AssessmentCoachingWorkflowTests(TestCase):
             max_score=Decimal("25.00"),
         )
 
+    def tearDown(self):
+        for assessment_module in AssessmentModule.objects.all():
+            for field_name in (
+                "question_file",
+                "scoring_standard_file",
+                "scoring_sheet_file",
+                "scoring_script_file",
+            ):
+                file_field = getattr(assessment_module, field_name)
+                if file_field:
+                    file_field.delete(save=False)
+
+        for attachment in AssessmentAttachment.objects.all():
+            if attachment.file:
+                attachment.file.delete(save=False)
+
+        super().tearDown()
+
+    def _build_upload_file(self, name="sample.pdf"):
+        return SimpleUploadedFile(name, b"%PDF-1.4\nassessment test", content_type="application/pdf")
+
     def test_responsible_coach_can_view_assessment_detail(self):
         self.client.force_login(self.coach)
 
         response = self.client.get(reverse("assessment:detail", args=[self.assessment.pk]))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "考核资料")
+        self.assertContains(response, "成绩管理")
         self.assertContains(response, "录入成绩")
+        self.assertContains(response, "上传资料")
+        self.assertContains(response, "锁定成绩")
+        self.assertContains(response, "锁定资料")
         self.assertContains(response, self.coach.display_name)
+
+    def test_detail_page_shows_disabled_locked_buttons_without_unlock_actions(self):
+        self.assessment_module.is_locked = True
+        self.assessment_module.locked_by = self.admin_user
+        self.assessment_module.is_material_locked = True
+        self.assessment_module.material_locked_by = self.admin_user
+        self.assessment_module.save(
+            update_fields=[
+                "is_locked",
+                "locked_by",
+                "is_material_locked",
+                "material_locked_by",
+            ]
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(reverse("assessment:detail", args=[self.assessment.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "成绩已锁定")
+        self.assertContains(response, "资料已锁定")
+        self.assertNotContains(response, "解锁成绩")
+        self.assertNotContains(response, "解锁资料")
 
     def test_unassigned_coach_cannot_view_assessment_detail(self):
         self.client.force_login(self.unassigned_coach)
@@ -152,48 +208,39 @@ class AssessmentCoachingWorkflowTests(TestCase):
         url = reverse("assessment:module_score_entry", args=[self.assessment_module.pk])
 
         response = self.client.post(url, {
-            "action": "save",
             f"score_{self.participant_a.pk}": "18.50",
+            f"remarks_{self.participant_a.pk}": "发挥稳定",
             f"score_{self.participant_b.pk}": "20.00",
+            f"remarks_{self.participant_b.pk}": "注意细节",
         })
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            Score.objects.get(
-                assessment_module=self.assessment_module,
-                user=self.participant_a,
-            ).score,
-            Decimal("18.50"),
+        participant_a_score = Score.objects.get(
+            assessment_module=self.assessment_module,
+            user=self.participant_a,
         )
-        self.assertEqual(
-            Score.objects.get(
-                assessment_module=self.assessment_module,
-                user=self.participant_b,
-            ).score,
-            Decimal("20.00"),
+        participant_b_score = Score.objects.get(
+            assessment_module=self.assessment_module,
+            user=self.participant_b,
         )
+        self.assertEqual(participant_a_score.score, Decimal("18.50"))
+        self.assertEqual(participant_a_score.remarks, "发挥稳定")
+        self.assertEqual(participant_b_score.score, Decimal("20.00"))
+        self.assertEqual(participant_b_score.remarks, "注意细节")
 
-    def test_responsible_coach_can_save_and_lock_module(self):
-        """负责教练可以保存并锁定模块成绩"""
+    def test_responsible_coach_can_lock_scores_from_detail_page(self):
+        """负责教练可以在详情页锁定成绩"""
         self.client.force_login(self.coach)
-        url = reverse("assessment:module_score_entry", args=[self.assessment_module.pk])
+        url = reverse("assessment:module_score_lock", args=[self.assessment_module.pk])
 
         response = self.client.post(url, {
             "action": "lock",
-            f"score_{self.participant_a.pk}": "22.00",
         })
 
         self.assessment_module.refresh_from_db()
         self.assertEqual(response.status_code, 302)
         self.assertTrue(self.assessment_module.is_locked)
         self.assertEqual(self.assessment_module.locked_by, self.coach)
-        self.assertTrue(
-            Score.objects.filter(
-                assessment_module=self.assessment_module,
-                user=self.participant_a,
-                score=Decimal("22.00"),
-            ).exists()
-        )
 
     def test_locked_module_rejects_score_submission(self):
         """已锁定模块拒绝成绩提交"""
@@ -212,34 +259,64 @@ class AssessmentCoachingWorkflowTests(TestCase):
             Score.objects.filter(assessment_module=self.assessment_module).exists()
         )
 
-    def test_superuser_can_unlock_locked_module(self):
-        """超管可以解锁已锁定模块"""
-        self.assessment_module.is_locked = True
-        self.assessment_module.save(update_fields=["is_locked"])
-        admin_user = User.objects.create_superuser(
-            username="admin", password="testpass123"
-        )
-        self.client.force_login(admin_user)
-        url = reverse("assessment:module_score_entry", args=[self.assessment_module.pk])
+    def test_superuser_can_lock_and_unlock_scores_from_detail_page(self):
+        """超管可以在详情页锁定并解锁成绩"""
+        self.client.force_login(self.admin_user)
+        url = reverse("assessment:module_score_lock", args=[self.assessment_module.pk])
 
-        response = self.client.post(url, {"action": "unlock"})
+        lock_response = self.client.post(url, {"action": "lock"})
 
         self.assessment_module.refresh_from_db()
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(lock_response.status_code, 302)
+        self.assertTrue(self.assessment_module.is_locked)
+        self.assertEqual(self.assessment_module.locked_by, self.admin_user)
+
+        unlock_response = self.client.post(url, {"action": "unlock"})
+
+        self.assessment_module.refresh_from_db()
+        self.assertEqual(unlock_response.status_code, 302)
         self.assertFalse(self.assessment_module.is_locked)
 
-    def test_coach_cannot_unlock_locked_module(self):
-        """普通教练无法解锁模块"""
+    def test_coach_cannot_unlock_locked_module_from_detail_page(self):
+        """普通教练不能在详情页解锁成绩"""
         self.assessment_module.is_locked = True
         self.assessment_module.save(update_fields=["is_locked"])
         self.client.force_login(self.coach)
-        url = reverse("assessment:module_score_entry", args=[self.assessment_module.pk])
+        url = reverse("assessment:module_score_lock", args=[self.assessment_module.pk])
 
         response = self.client.post(url, {"action": "unlock"})
 
         self.assertEqual(response.status_code, 403)
         self.assessment_module.refresh_from_db()
         self.assertTrue(self.assessment_module.is_locked)
+
+    def test_responsible_coach_can_lock_materials_from_detail_page(self):
+        self.client.force_login(self.coach)
+        url = reverse("assessment:module_material_lock", args=[self.assessment_module.pk])
+
+        response = self.client.post(url, {"action": "lock"})
+
+        self.assessment_module.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(self.assessment_module.is_material_locked)
+        self.assertEqual(self.assessment_module.material_locked_by, self.coach)
+
+    def test_superuser_can_lock_and_unlock_materials_from_detail_page(self):
+        self.client.force_login(self.admin_user)
+        url = reverse("assessment:module_material_lock", args=[self.assessment_module.pk])
+
+        lock_response = self.client.post(url, {"action": "lock"})
+
+        self.assessment_module.refresh_from_db()
+        self.assertEqual(lock_response.status_code, 302)
+        self.assertTrue(self.assessment_module.is_material_locked)
+        self.assertEqual(self.assessment_module.material_locked_by, self.admin_user)
+
+        unlock_response = self.client.post(url, {"action": "unlock"})
+
+        self.assessment_module.refresh_from_db()
+        self.assertEqual(unlock_response.status_code, 302)
+        self.assertFalse(self.assessment_module.is_material_locked)
 
     def test_unassigned_coach_cannot_access_module_score_entry(self):
         """非负责教练无法访问成绩录入页面"""
@@ -260,6 +337,10 @@ class AssessmentCoachingWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.participant_a.display_name)
         self.assertContains(response, self.participant_b.display_name)
+        self.assertContains(response, "备注")
+        self.assertContains(response, "重置")
+        self.assertNotContains(response, "保存并锁定")
+        self.assertNotContains(response, "成绩锁定请返回考核详情页统一操作。")
 
     def test_other_coach_cannot_upload_files_for_unassigned_module(self):
         self.client.force_login(self.other_coach)
@@ -269,6 +350,104 @@ class AssessmentCoachingWorkflowTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 403)
+
+    def test_file_upload_page_is_read_only_when_materials_locked(self):
+        self.assessment_module.is_material_locked = True
+        self.assessment_module.save(update_fields=["is_material_locked"])
+        self.client.force_login(self.coach)
+
+        response = self.client.get(
+            reverse("assessment:file_upload", args=[self.assessment_module.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "只读模式")
+        self.assertNotContains(response, "添加试题附件")
+        self.assertNotContains(response, "提交")
+
+    def test_file_upload_page_places_question_attachments_after_question_file(self):
+        self.client.force_login(self.coach)
+
+        response = self.client.get(
+            reverse("assessment:file_upload", args=[self.assessment_module.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "添加试题附件")
+        content = response.content.decode()
+        self.assertLess(content.index("试题文件"), content.index("添加试题附件"))
+        self.assertLess(content.index("添加试题附件"), content.index("评分标准文件"))
+
+    def test_question_attachment_upload_path_uses_dedicated_subdirectory(self):
+        attachment = AssessmentAttachment.objects.create(
+            assessment_module=self.assessment_module,
+            file=self._build_upload_file("attachment-subdir.pdf"),
+        )
+
+        self.assertIn("/试题附件/", attachment.file.name)
+        self.assertTrue(attachment.file.name.endswith("/试题附件/attachment-subdir.pdf"))
+
+    def test_material_lock_rejects_file_upload(self):
+        self.assessment_module.is_material_locked = True
+        self.assessment_module.save(update_fields=["is_material_locked"])
+        self.client.force_login(self.coach)
+
+        response = self.client.post(
+            reverse("assessment:file_upload", args=[self.assessment_module.pk]),
+            {"question_file": self._build_upload_file("question.pdf")},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assessment_module.refresh_from_db()
+        self.assertFalse(bool(self.assessment_module.question_file))
+
+    def test_past_assessment_still_allows_material_upload_when_unlocked(self):
+        self.assessment.end_date = date(2026, 4, 1)
+        self.assessment.save(update_fields=["end_date"])
+        self.client.force_login(self.coach)
+
+        response = self.client.post(
+            reverse("assessment:file_upload", args=[self.assessment_module.pk]),
+            {"question_file": self._build_upload_file("question.pdf")},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assessment_module.refresh_from_db()
+        self.assertTrue(bool(self.assessment_module.question_file))
+
+    def test_material_lock_rejects_module_file_deletion(self):
+        self.assessment_module.question_file = self._build_upload_file("question.pdf")
+        self.assessment_module.save(update_fields=["question_file"])
+        self.assessment_module.is_material_locked = True
+        self.assessment_module.save(update_fields=["is_material_locked"])
+        self.client.force_login(self.coach)
+
+        response = self.client.delete(
+            reverse(
+                "assessment:delete_module_file",
+                args=[self.assessment_module.pk, "question_file"],
+            )
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assessment_module.refresh_from_db()
+        self.assertTrue(bool(self.assessment_module.question_file))
+
+    def test_material_lock_rejects_attachment_deletion(self):
+        attachment = AssessmentAttachment.objects.create(
+            assessment_module=self.assessment_module,
+            file=self._build_upload_file("attachment.pdf"),
+        )
+        self.assessment_module.is_material_locked = True
+        self.assessment_module.save(update_fields=["is_material_locked"])
+        self.client.force_login(self.coach)
+
+        response = self.client.delete(
+            reverse("assessment:delete_attachment", args=[attachment.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(AssessmentAttachment.objects.filter(pk=attachment.pk).exists())
 
 
 class AssessmentAdminSortOrderTests(TestCase):
@@ -294,12 +473,12 @@ class AssessmentAdminSortOrderTests(TestCase):
         )
         module_a = Module.objects.create(project=project, code="A", name="模块 A")
         module_b = Module.objects.create(project=project, code="B", name="模块 B")
-        AssessmentModule.objects.create(
+        self.assessment_module_a = AssessmentModule.objects.create(
             assessment=self.assessment,
             module=module_a,
             sort_order=0,
         )
-        AssessmentModule.objects.create(
+        self.assessment_module_b = AssessmentModule.objects.create(
             assessment=self.assessment,
             module=module_b,
             sort_order=1,
@@ -323,6 +502,7 @@ class AssessmentAdminSortOrderTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         inline_formset = response.context['inline_admin_formsets'][0].formset
+        self.assertEqual(len(inline_formset.extra_forms), 0)
         self.assertEqual(inline_formset.empty_form.initial['sort_order'], 2)
 
     def test_assessment_module_add_view_prefills_next_sort_order_for_selected_assessment(self):
@@ -336,3 +516,43 @@ class AssessmentAdminSortOrderTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['adminform'].form.initial['assessment'], self.assessment.pk)
         self.assertEqual(response.context['adminform'].form.initial['sort_order'], 2)
+
+    def test_assessment_module_change_view_keeps_file_fields_and_attachment_inline(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(
+            reverse("admin:assessment_assessmentmodule_change", args=[self.assessment_module_a.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context['inline_admin_formsets'][0].opts.model,
+            AssessmentAttachment,
+        )
+        self.assertEqual(response.context['inline_admin_formsets'][1].opts.model, Score)
+        form = response.context['adminform'].form
+        self.assertIn('question_file', form.fields)
+        self.assertIn('scoring_standard_file', form.fields)
+        self.assertIn('scoring_sheet_file', form.fields)
+        self.assertIn('scoring_script_file', form.fields)
+        field_names = list(form.fields)
+        self.assertLess(field_names.index('question_file'), field_names.index('scoring_standard_file'))
+        self.assertLess(field_names.index('question_file'), field_names.index('scoring_sheet_file'))
+        self.assertLess(field_names.index('question_file'), field_names.index('scoring_script_file'))
+
+        attachment_inline = next(
+            (
+                inline_formset
+                for inline_formset in response.context['inline_admin_formsets']
+                if inline_formset.opts.model == AssessmentAttachment
+            ),
+            None,
+        )
+        self.assertIsNotNone(attachment_inline)
+        self.assertEqual(attachment_inline.opts.verbose_name, '试题附件')
+        self.assertEqual(attachment_inline.opts.verbose_name_plural, '试题附件')
+        self.assertIn('file', attachment_inline.formset.empty_form.fields)
+        self.assertIn('description', attachment_inline.formset.empty_form.fields)
+
+    def test_assessment_attachment_is_not_registered_as_standalone_admin_model(self):
+        self.assertNotIn(AssessmentAttachment, admin.site._registry)

@@ -12,7 +12,6 @@
   </div>
 
   {% if assessment_module.is_locked %}
-    {# ---- 锁定后只读模式 ---- #}
     <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 w-full max-w-2xl mx-auto shadow-xl mb-6">
       <legend class="fieldset-legend text-xl font-bold text-center mb-2">
         {{ assessment_module.module.code }} - {{ assessment_module.module.name }}
@@ -31,18 +30,26 @@
           <thead>
             <tr class="bg-base-200">
               <th class="w-12">#</th>
-              <th>选手</th>
+              <th class="text-center">选手</th>
               <th class="text-center">成绩</th>
+              <th class="text-center">备注</th>
             </tr>
           </thead>
           <tbody>
-            {% for field in form.score_fields %}
+            {% for row in form.score_rows %}
               <tr>
                 <td>{{ forloop.counter }}</td>
-                <td>{{ field.label }}</td>
+                <td class="text-center">{{ row.participant.display_name }}</td>
                 <td class="text-center font-mono">
-                  {% if field.value is not None and field.value != "" %}
-                    {{ field.value }}
+                  {% if row.score.value is not None and row.score.value != "" %}
+                    {{ row.score.value }}
+                  {% else %}
+                    <span class="text-base-content/30">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if row.remarks.value %}
+                    {{ row.remarks.value }}
                   {% else %}
                     <span class="text-base-content/30">-</span>
                   {% endif %}
@@ -52,23 +59,9 @@
           </tbody>
         </table>
       </div>
-      {% if can_unlock %}
-        <div class="flex justify-center mt-6">
-          <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="unlock">
-            <button type="submit" class="btn btn-warning gap-1"
-              onclick="return confirm('确定要解锁该模块成绩吗？解锁后负责教练可以修改成绩。')">
-              <span class="icon-[tabler--lock-open] size-5"></span>
-              解锁模块
-            </button>
-          </form>
-        </div>
-      {% endif %}
     </fieldset>
 
   {% else %}
-    {# ---- 可编辑模式 ---- #}
     <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 w-full max-w-2xl mx-auto shadow-xl mb-6">
       <legend class="fieldset-legend text-xl font-bold text-center mb-2">
         {{ assessment_module.module.code }} - {{ assessment_module.module.name }}
@@ -93,38 +86,46 @@
             <thead>
               <tr class="bg-base-200">
                 <th class="w-12">#</th>
-                <th>选手</th>
+                <th class="text-center">选手</th>
                 <th class="w-48 text-center">成绩</th>
+                <th class="w-72 text-center">备注</th>
               </tr>
             </thead>
             <tbody>
-              {% for field in form.score_fields %}
+              {% for row in form.score_rows %}
                 <tr>
                   <td>{{ forloop.counter }}</td>
-                  <td>
-                    <label for="{{ field.id_for_label }}" class="cursor-pointer">{{ field.label }}</label>
-                    {% if field.errors %}
+                  <td class="text-center">
+                    <label for="{{ row.score.id_for_label }}" class="cursor-pointer">{{ row.participant.display_name }}</label>
+                    {% if row.score.errors %}
                       <div class="text-sm text-error mt-1">
-                        {% for error in field.errors %}{{ error }}{% endfor %}
+                        {% for error in row.score.errors %}{{ error }}{% endfor %}
                       </div>
                     {% endif %}
                   </td>
-                  <td class="text-center">{{ field }}</td>
+                  <td class="text-center">{{ row.score }}</td>
+                  <td>
+                    {{ row.remarks }}
+                    {% if row.remarks.errors %}
+                      <div class="text-sm text-error mt-1">
+                        {% for error in row.remarks.errors %}{{ error }}{% endfor %}
+                      </div>
+                    {% endif %}
+                  </td>
                 </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
 
-        <div class="flex flex-wrap justify-center gap-3 mt-6">
-          <button type="submit" name="action" value="save" class="btn btn-primary gap-1">
+        <div class="mt-6 flex flex-col gap-3 pt-2 sm:flex-row sm:justify-center">
+          <button type="reset" class="btn btn-outline w-full gap-1 sm:w-44">
+            <span class="icon-[tabler--refresh] size-5"></span>
+            重置
+          </button>
+          <button type="submit" class="btn btn-primary w-full gap-1 sm:w-44">
             <span class="icon-[tabler--device-floppy] size-5"></span>
             保存
-          </button>
-          <button type="submit" name="action" value="lock" class="btn btn-warning gap-1"
-            onclick="return confirm('锁定后将无法修改成绩，确定要保存并锁定吗？')">
-            <span class="icon-[tabler--lock] size-5"></span>
-            保存并锁定
           </button>
         </div>
       </form>

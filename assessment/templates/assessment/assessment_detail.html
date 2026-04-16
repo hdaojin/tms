@@ -22,7 +22,7 @@
             <th class="text-center">满分</th>
             <th class="text-center">时长</th>
             <th>考核资料</th>
-            <th class="text-center print:hidden">操作</th>
+            <th class="text-center print:hidden">成绩管理</th>
           </tr>
         </thead>
         <tbody>
@@ -50,64 +50,94 @@
                 {% endif %}
               </td>
               <td>
-                <div class="flex flex-wrap gap-1">
-                  {% if am.question_file %}
-                    {% if am.can_manage %}
-                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-success badge-sm cursor-pointer hover:badge-primary" title="点击管理">试题</a>
-                    {% else %}
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="flex flex-wrap gap-1">
+                    {% if am.question_file %}
                       <span class="badge badge-success badge-sm">试题</span>
                     {% endif %}
-                  {% endif %}
-                  {% if am.scoring_standard_file %}
-                    {% if am.can_manage %}
-                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-success badge-sm cursor-pointer hover:badge-primary" title="点击管理">评分标准</a>
-                    {% else %}
+                    {% if am.scoring_standard_file %}
                       <span class="badge badge-success badge-sm">评分标准</span>
                     {% endif %}
-                  {% endif %}
-                  {% if am.scoring_sheet_file %}
-                    {% if am.can_manage %}
-                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-info badge-sm cursor-pointer hover:badge-primary" title="点击管理">评分表</a>
-                    {% else %}
+                    {% if am.scoring_sheet_file %}
                       <span class="badge badge-info badge-sm">评分表</span>
                     {% endif %}
-                  {% endif %}
-                  {% if am.scoring_script_file %}
-                    {% if am.can_manage %}
-                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-info badge-sm cursor-pointer hover:badge-primary" title="点击管理">评分脚本</a>
-                    {% else %}
+                    {% if am.scoring_script_file %}
                       <span class="badge badge-info badge-sm">评分脚本</span>
                     {% endif %}
-                  {% endif %}
-                  {% if am.has_attachments %}
-                    {% if am.can_manage %}
-                      <a href="{% url 'assessment:file_upload' am.pk %}" class="badge badge-accent badge-sm cursor-pointer hover:badge-primary" title="点击管理">附件({{ am.attachment_count }})</a>
-                    {% else %}
+                    {% if am.has_attachments %}
                       <span class="badge badge-accent badge-sm">附件({{ am.attachment_count }})</span>
                     {% endif %}
-                  {% endif %}
-                  {% if not am.has_any_material %}
-                    {% if am.can_manage %}
-                      <a href="{% url 'assessment:file_upload' am.pk %}" class="text-sm text-base-content/50 hover:text-primary hover:underline">未上传，点击上传</a>
-                    {% else %}
+                    {% if not am.has_any_material %}
                       <span class="text-sm text-base-content/50">未上传</span>
                     {% endif %}
+                  </div>
+
+                  {% if am.can_manage_materials and am.has_any_material %}
+                    <a href="{% url 'assessment:file_upload' am.pk %}" class="btn btn-primary btn-xs min-w-20 justify-center gap-1">
+                      <span class="icon-[tabler--settings] size-3"></span>
+                      管理资料
+                    </a>
+                  {% elif am.can_manage_materials and not am.is_material_locked %}
+                    <a href="{% url 'assessment:file_upload' am.pk %}" class="btn btn-primary btn-xs min-w-20 justify-center gap-1">
+                      <span class="icon-[tabler--upload] size-3"></span>
+                      上传资料
+                    </a>
+                  {% endif %}
+
+                  {% if am.is_material_locked %}
+                    <button type="button" class="btn btn-outline btn-xs min-w-20 justify-center gap-1" disabled>
+                      <span class="icon-[tabler--lock] size-3"></span>
+                      资料已锁定
+                    </button>
+                  {% elif am.can_lock_materials %}
+                    <form method="post" action="{% url 'assessment:module_material_lock' am.pk %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="lock">
+                      <button type="submit" class="btn btn-warning btn-xs min-w-20 justify-center gap-1" onclick="return confirm('锁定后将无法继续修改该模块资料，确定要锁定吗？')">
+                        <span class="icon-[tabler--lock] size-3"></span>
+                        锁定资料
+                      </button>
+                    </form>
+                  {% else %}
+                    <button type="button" class="btn btn-ghost btn-xs min-w-20 justify-center gap-1" disabled>
+                      <span class="icon-[tabler--lock-open] size-3"></span>
+                      资料未锁定
+                    </button>
                   {% endif %}
                 </div>
               </td>
-              <td class="text-center print:hidden">
-                {% if am.can_manage %}
-                  {% if am.is_locked %}
-                    <span class="badge badge-error badge-sm gap-1">
-                      <span class="icon-[tabler--lock] size-3"></span>已锁定
-                    </span>
-                  {% else %}
-                    <a href="{% url 'assessment:module_score_entry' am.pk %}" class="btn btn-primary btn-sm gap-1">
+              <td class="print:hidden">
+                <div class="flex flex-wrap items-center justify-center gap-2">
+                  {% if am.can_manage_scores %}
+                    <a href="{% url 'assessment:module_score_entry' am.pk %}" class="btn {% if am.is_locked %}btn-outline{% else %}btn-primary{% endif %} btn-xs min-w-20 justify-center gap-1">
                       <span class="icon-[tabler--edit-circle] size-4"></span>
-                      录入成绩
+                      {% if am.is_locked %}查看成绩{% else %}录入成绩{% endif %}
                     </a>
+                  {% else %}
+                    <span class="text-base-content/50">-</span>
                   {% endif %}
-                {% endif %}
+
+                  {% if am.is_locked %}
+                    <button type="button" class="btn btn-outline btn-xs min-w-20 justify-center gap-1" disabled>
+                      <span class="icon-[tabler--lock] size-3"></span>
+                      成绩已锁定
+                    </button>
+                  {% elif am.can_lock_scores %}
+                    <form method="post" action="{% url 'assessment:module_score_lock' am.pk %}">
+                      {% csrf_token %}
+                      <input type="hidden" name="action" value="lock">
+                      <button type="submit" class="btn btn-warning btn-xs min-w-20 justify-center gap-1" onclick="return confirm('锁定后将无法继续修改该模块成绩，确定要锁定吗？')">
+                        <span class="icon-[tabler--lock] size-3"></span>
+                        锁定成绩
+                      </button>
+                    </form>
+                  {% else %}
+                    <button type="button" class="btn btn-ghost btn-xs min-w-20 justify-center gap-1" disabled>
+                      <span class="icon-[tabler--lock-open] size-3"></span>
+                      成绩未锁定
+                    </button>
+                  {% endif %}
+                </div>
               </td>
             </tr>
           {% endfor %}
