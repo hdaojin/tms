@@ -5,6 +5,24 @@ from core.utils.forms import StyledFormMixin
 from core.constants import TRAININGLOG_ALLOWED_EXTENSIONS
 
 class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
+    def __init__(self, *args, user=None, **kwargs):
+        self.current_user = user
+        super().__init__(*args, **kwargs)
+        if self.current_user and not self.instance.uploaded_by_id:
+            self.instance.uploaded_by = self.current_user
+
+        module_field = self.fields['module']
+        module_field.required = True
+        module_field.empty_label = None
+        module_field.label_from_instance = lambda obj: f"{obj.code} - {obj.name}" #type: ignore
+        # 如果需要，可以在这里添加自定义初始化逻辑
+        # 例如，动态设置某些字段的选项或初始值
+        # 设置默认日期为今天（每次实例化时动态设置）
+        if not self.instance.pk:
+            today = timezone.localdate()
+            self.fields['training_date'].initial = today.strftime('%Y-%m-%d')
+            self.fields['training_date'].widget.attrs['value'] = today.strftime('%Y-%m-%d')
+
     class Meta:
         model = TrainingLog
         fields = ['training_date', 'module', 'task', 'file']
@@ -23,16 +41,3 @@ class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
         #     'file': '日志文件',
         # }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        module_field = self.fields['module']
-        module_field.required = True
-        module_field.empty_label = None
-        module_field.label_from_instance = lambda obj: f"{obj.code} - {obj.name}" #type: ignore
-        # 如果需要，可以在这里添加自定义初始化逻辑
-        # 例如，动态设置某些字段的选项或初始值
-        # 设置默认日期为今天（每次实例化时动态设置）
-        if not self.instance.pk: 
-            today = timezone.localdate()
-            self.fields['training_date'].initial = today.strftime('%Y-%m-%d')
-            self.fields['training_date'].widget.attrs['value'] = today.strftime('%Y-%m-%d')

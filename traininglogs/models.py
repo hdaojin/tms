@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.utils.text import slugify
 from pathlib import Path
@@ -84,11 +85,29 @@ class TrainingLog(models.Model):
         verbose_name = '训练日志'
         verbose_name_plural = '训练日志'
         ordering = ('-training_date', '-uploaded_at')
+        unique_together = [('uploaded_by', 'training_date')]
         permissions = [
             ('view_all_traininglog', '查看所有训练日志'),
             ('view_coach_traininglog', '查看教练训练日志'),
             ('view_competitor_traininglog', '查看选手训练日志'),
         ]
+
+    def clean(self):
+        super().clean()
+        if not self.uploaded_by_id or not self.training_date:
+            return
+
+        duplicate_qs = type(self).objects.filter(
+            uploaded_by_id=self.uploaded_by_id,
+            training_date=self.training_date,
+        )
+        if self.pk:
+            duplicate_qs = duplicate_qs.exclude(pk=self.pk)
+
+        if duplicate_qs.exists():
+            raise ValidationError({
+                'training_date': '同一训练日期只能上传一条训练日志。如需更正，请先删除原日志后再重新上传。'
+            })
 
     def __str__(self):
         m = self.module.name if self.module else "未分配模块"

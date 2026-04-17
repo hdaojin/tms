@@ -81,6 +81,11 @@ class TrainingLogUploadView(TitleMixin, PermissionRequiredMixin, CreateView):
     title = "上传训练日志"
     title_icon = "icon-[tabler--upload]"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
     def form_valid(self, form):
         form.instance.uploaded_by = self.request.user
         messages.success(self.request, "训练日志上传成功！")

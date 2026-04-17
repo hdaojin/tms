@@ -1,11 +1,12 @@
 import shutil
 import tempfile
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.test import override_settings
@@ -48,6 +49,124 @@ class TrainingLogCreateFormTestCase(TestCase):
 		self.assertEqual(
 			[choice.choice_label for choice in form['module']],
 			['A - 网络配置', 'B - 服务部署'],
+		)
+
+
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
+class TrainingLogDuplicateValidationTestCase(TestCase):
+	@classmethod
+	def tearDownClass(cls):
+		super().tearDownClass()
+		shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)
+
+	def setUp(self):
+		competition_type = CompetitionType.objects.create(
+			code='WSC-DUP',
+			name='重复校验赛事',
+		)
+		project = Project.objects.create(
+			competition_type=competition_type,
+			code='ITNSA-DUP',
+			name='重复校验项目',
+		)
+		self.module = Module.objects.create(project=project, code='A', name='网络配置')
+
+		self.user = User.objects.create_user(username='coach-dup', password='testpass123')
+		self.other_user = User.objects.create_user(username='coach-other', password='testpass123')
+		add_permission = Permission.objects.get(codename='add_traininglog')
+		self.user.user_permissions.add(add_permission)
+		self.other_user.user_permissions.add(add_permission)
+
+		today = timezone.localdate()
+		self.training_date = date(today.year, today.month, min(today.day, 28))
+		self.existing_log = TrainingLog.objects.create(
+			module=self.module,
+			task='已有日志',
+			training_date=self.training_date,
+			file=self._build_upload_file('existing.pdf'),
+			uploaded_by=self.user,
+		)
+
+	def _build_upload_file(self, name='sample.pdf'):
+		return SimpleUploadedFile(name, b'%PDF-1.4 training log', content_type='application/pdf')
+
+	def test_form_rejects_duplicate_training_log_for_same_user_and_date(self):
+		form = TrainingLogCreateForm(
+			data={
+				'training_date': self.training_date.isoformat(),
+				'module': self.module.pk,
+				'task': '重复日志',
+			},
+			files={'file': self._build_upload_file('duplicate.pdf')},
+			user=self.user,
+		)
+
+		self.assertFalse(form.is_valid())
+		self.assertIn('training_date', form.errors)
+		self.assertEqual(len(form.errors['training_date']), 1)
+		self.assertIn('同一训练日期只能上传一条训练日志', form.errors['training_date'][0])
+
+	def test_form_allows_same_user_on_different_date(self):
+		other_date = self.training_date - timedelta(days=1)
+		form = TrainingLogCreateForm(
+			data={
+				'training_date': other_date.isoformat(),
+				'module': self.module.pk,
+				'task': '新日期日志',
+			},
+			files={'file': self._build_upload_file('another-day.pdf')},
+			user=self.user,
+		)
+
+		self.assertTrue(form.is_valid(), form.errors)
+
+	def test_model_clean_rejects_duplicate_training_log_for_same_user_and_date(self):
+		duplicate_log = TrainingLog(
+			module=self.module,
+			task='模型重复日志',
+			training_date=self.training_date,
+			file=self._build_upload_file('model-duplicate.pdf'),
+			uploaded_by=self.user,
+		)
+
+		with self.assertRaises(ValidationError) as exc_info:
+			duplicate_log.clean()
+
+		self.assertIn('training_date', exc_info.exception.message_dict)
+
+	def test_same_date_is_allowed_for_different_user(self):
+		other_log = TrainingLog.objects.create(
+			module=self.module,
+			task='其他人的日志',
+			training_date=self.training_date,
+			file=self._build_upload_file('other-user.pdf'),
+			uploaded_by=self.other_user,
+		)
+
+		self.assertIsNotNone(other_log.pk)
+		self.assertEqual(
+			TrainingLog.objects.filter(training_date=self.training_date).count(),
+			2,
+		)
+
+	def test_upload_view_rejects_duplicate_training_log(self):
+		self.client.force_login(self.user)
+
+		response = self.client.post(
+			reverse('traininglogs:traininglog_upload'),
+			{
+				'training_date': self.training_date.isoformat(),
+				'module': self.module.pk,
+				'task': '重复上传',
+				'file': self._build_upload_file('view-duplicate.pdf'),
+			},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '同一训练日期只能上传一条训练日志')
+		self.assertEqual(
+			TrainingLog.objects.filter(uploaded_by=self.user, training_date=self.training_date).count(),
+			1,
 		)
 
 
