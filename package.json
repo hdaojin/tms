@@ -25,7 +25,9 @@
     "tailwindStylesheet": "static/css/main.css",
     "overrides": [
       {
-        "files": ["*.html"],
+        "files": [
+          "*.html"
+        ],
         "options": {
           "parser": "jinja-template"
         }

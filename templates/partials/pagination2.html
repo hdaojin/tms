@@ -5,7 +5,7 @@
     <div class="join">
     {% if table.page.has_previous %}
         <button class="join-item btn previous">
-            <a href="{% querystring table.prefixed_page_field=table.page.previous_page_number %}">
+            <a href="{% querystring_replace table.prefixed_page_field=table.page.previous_page_number %}">
                     {% trans 'previous' %}
             </a>
         </button>
@@ -18,7 +18,7 @@
                 {% if p == '...' %}
                     <a href="#">{{ p }}</a>
                 {% else %}
-                    <a href="{% querystring table.prefixed_page_field=p %}">
+                    <a href="{% querystring_replace table.prefixed_page_field=p %}">
                         {{ p }}
                     </a>
                 {% endif %}
@@ -29,7 +29,7 @@
     {% if table.page.has_next %}
         {% block pagination.next %}
             <button class="join-item btn next">
-                <a href="{% querystring table.prefixed_page_field=table.page.next_page_number %}">
+                <a href="{% querystring_replace table.prefixed_page_field=table.page.next_page_number %}">
                     {% trans 'next' %}
                 </a>
             </button>
