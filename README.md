@@ -26,13 +26,13 @@ TMS（Training Management System）是一个基于 Django 的培训与竞赛管�
 ## 环境要求
 
 - Python 3.13+
-- Node.js 20+
 - uv
-- npm
+- Node.js 20+（仅开发环境或前端资源预构建时需要）
+- npm（仅开发环境或前端资源预构建时需要）
 
 ## 目录说明
 
-- `static/`：项目静态资源源码目录
+- `static/`：项目静态资源目录，包含前端构建产物和随仓库分发的第三方静态文件
 - `staticfiles/`：`collectstatic` 输出目录，供生产环境 Web 服务器直接提供
 - `media/`：公共上传目录，例如训练日志、通知附件等
 - `media-private/`：私有资料目录，例如考核、竞赛、操行、笔记等敏感文件
@@ -130,9 +130,17 @@ npm run watch:css
 npm run build:css
 ```
 
+## 前端静态资源交付规则
+
+- 开发环境使用 npm 安装依赖并构建前端资源；生产服务器不安装 npm。
+- `static/css/output.css`：由 `npm run build:css` 在开发机或 CI 生成，并随代码或发布制品一起部署到服务器。
+- `static/js/alpinejs.min.js`：作为仓库内静态文件维护；升级 Alpine.js 时同步替换该文件。
+- `static/css/prism.css` 与 `static/js/prism.js`：从 Prism 官网直接下载后纳入仓库；升级 Prism 时同步替换这两个文件。
+- HTMX 运行时脚本由 `django-htmx` 模板标签提供，并在 `collectstatic` 时一并收集；生产环境不需要通过 npm 安装或手工复制 HTMX 脚本文件。
+
 ## 生产环境部署（TMS App）
 
-下面给出一套适用于 Linux 服务器的常规部署方案：`Nginx + Gunicorn + Django`。
+下面给出一套适用于 Linux 服务器的常规部署方案：`Nginx + Gunicorn + Django`。该方案默认生产服务器不安装 npm，前端产物需在开发机或 CI 预先准备完成。
 
 ### 推荐部署架构
 
@@ -148,21 +156,25 @@ npm run build:css
 确保服务器已安装：
 
 - Python 3.13+
-- Node.js 20+
 - uv
-- npm
 - Nginx
 - PostgreSQL（推荐） 或 MySQL
 
-### 2. 拉取代码并安装依赖
+### 2. 拉取代码并安装 Python 依赖
 
 ```bash
 git clone git@github.com:hdaojin/tms.git /srv/tms
 cd /srv/tms
 
 uv sync --frozen
-npm ci
 ```
+
+部署到生产服务器前，请先在开发机或 CI 完成前端资源准备，并确保以下文件已经包含在本次部署内容中：
+
+- `static/css/output.css`
+- `static/js/alpinejs.min.js`
+- `static/css/prism.css`
+- `static/js/prism.js`
 
 ### 3. 配置生产环境变量
 
@@ -216,12 +228,19 @@ uv run manage.py createsuperuser
 uv run manage.py migrate
 ```
 
-### 6. 构建前端资源
+### 6. 收集静态资源
+
+生产服务器不在本机安装 npm，也不在本机执行前端构建。确认部署内容已包含最新前端静态资源后，执行：
 
 ```bash
-npm run build:css
 uv run manage.py collectstatic --noinput
 ```
+
+说明：
+
+- `collectstatic` 会收集项目 `static/` 目录中的文件，以及 `django-htmx` 等 Python 依赖自带的静态文件。
+- 如果本次版本更新了 Alpine.js 或 Prism，请在部署前先同步更新仓库中的对应静态文件。
+- 如果本次版本更新了 Tailwind/DaisyUI 样式，请在开发机或 CI 先重新生成 `static/css/output.css`。
 
 ### 7. 执行部署检查
 
@@ -323,14 +342,75 @@ server {
 
 ## 发布更新流程
 
-后续版本更新可按下面顺序执行：
+### 本地升级依赖版本与静态文件同步
+
+如果你要在本地主动升级 Python 或前端依赖版本，而不是单纯拉取最新代码，建议按下面顺序处理：
+
+```bash
+uv sync -U
+npm outdated
+```
+
+Python 依赖如果需要提高 `pyproject.toml` 中声明的版本下限，可按需执行：
+
+```bash
+uv add <package>@latest
+uv sync -U
+```
+
+npm 依赖如果需要升级到新版并同步写回 `package.json` / `package-lock.json`，可按需执行：
+
+```bash
+npm install <package>@latest
+npm run build:css
+```
+
+升级完成后，请同步检查和更新仓库内维护的静态文件：
+
+- 如果升级了 Alpine.js，请将 `node_modules/alpinejs/dist/cdn.min.js` 覆盖到 `static/js/alpinejs.min.js`
+- 如果升级了 Prism，请从 Prism 官网重新下载并覆盖 `static/css/prism.css` 和 `static/js/prism.js`
+- 如果升级了 Tailwind CSS、DaisyUI 或其他会影响样式输出的前端依赖，请重新生成 `static/css/output.css`
+
+```bash
+cp node_modules/alpinejs/dist/cdn.min.js static/js/alpinejs.min.js
+```
+
+
+完成依赖升级和静态文件同步后，建议执行基本验证：
+
+```bash
+uv run manage.py check
+uv run manage.py test <受影响的 app>
+```
+
+提交代码时，通常需要一并提交这些文件中的实际变更：
+
+- `pyproject.toml`
+- `uv.lock`
+- `package.json`
+- `package-lock.json`
+- `static/css/output.css`
+- `static/js/alpinejs.min.js`
+- `static/css/prism.css`
+- `static/js/prism.js`
+
+如果这次升级同时包含项目代码或基础数据调整，再按需执行迁移和数据导入。例如：
+
+```bash
+uv run manage.py migrate
+uv run manage.py loaddata core/default
+```
+
+### 生产环境更新流程
+
+后续版本发布到生产服务器时，可按下面顺序执行：
+
+发布到生产服务器前，请确认本次提交已经包含最新的 `static/css/output.css`，以及需要更新的 Alpine.js / Prism 静态文件。
 
 ```bash
 cd /srv/tms
 git pull
 uv sync --frozen
-npm ci
-npm run build:css
 uv run manage.py migrate
 uv run manage.py collectstatic --noinput
 sudo systemctl restart tms
@@ -348,6 +428,7 @@ uv run manage.py loaddata core/default
 - 本项目默认语言为 `zh-hans`
 - 考核、竞赛、操行、笔记等敏感文件位于 `media-private/`
 - 训练日志、通知等公共上传文件位于 `media/`
+- 生产服务器默认不安装 npm；前端资源由开发机或 CI 预先构建或同步后随版本发布
 
 
 
