@@ -42,6 +42,7 @@ DEBUG = env.bool('DEBUG', default=True) # type: ignore
 # ALLOWED_HOSTS = []
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1']) # type: ignore
 
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[]) # type: ignore
 
 # Application definition
 
