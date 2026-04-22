@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from competitions.models import CompetitionType, Module, ModuleSet, Project
+from competitions.models import CompetitionType, Project, StandardModule, StandardModuleSet
 from core.constants import GROUP_COACH
 
 from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
@@ -24,7 +24,6 @@ class AssessmentModuleOrderingTests(TestCase):
             name="世界技能大赛",
         )
         project = Project.objects.create(
-            competition_type=competition_type,
             code="ITNSA",
             name="信息网络布线",
         )
@@ -34,9 +33,9 @@ class AssessmentModuleOrderingTests(TestCase):
             end_date=date(2026, 4, 2),
         )
 
-        module_b = Module.objects.create(project=project, code="B", name="模块 B")
-        module_a = Module.objects.create(project=project, code="A", name="模块 A")
-        module_c = Module.objects.create(project=project, code="C", name="模块 C")
+        module_b = StandardModule.objects.create(project=project, code="B", name="模块 B")
+        module_a = StandardModule.objects.create(project=project, code="A", name="模块 A")
+        module_c = StandardModule.objects.create(project=project, code="C", name="模块 C")
 
         AssessmentModule.objects.create(
             assessment=self.assessment,
@@ -69,22 +68,21 @@ class AssessmentModuleAdminModuleQuerysetTests(TestCase):
             name="后台测试赛事",
         )
         self.project = Project.objects.create(
-            competition_type=competition_type,
             code="ITNSA-ADMIN",
             name="后台测试项目",
         )
-        self.current_module = Module.objects.create(
+        self.current_module = StandardModule.objects.create(
             project=self.project,
             code="A",
             name="当前模块",
         )
-        historical_module_set = ModuleSet.objects.create(
+        historical_module_set = StandardModuleSet.objects.create(
             project=self.project,
             code="2024",
             name="2024 版标准模块",
             is_current=False,
         )
-        self.historical_module = Module.objects.create(
+        self.historical_module = StandardModule.objects.create(
             project=self.project,
             module_set=historical_module_set,
             code="B",
@@ -147,12 +145,11 @@ class AssessmentCoachingWorkflowTests(TestCase):
             name="世界技能大赛",
         )
         project = Project.objects.create(
-            competition_type=competition_type,
             code="ITSA",
             name="信息网络综合布线",
         )
-        module_a = Module.objects.create(project=project, code="A", name="模块 A")
-        module_b = Module.objects.create(project=project, code="B", name="模块 B")
+        module_a = StandardModule.objects.create(project=project, code="A", name="模块 A")
+        module_b = StandardModule.objects.create(project=project, code="B", name="模块 B")
 
         self.assessment = Assessment.objects.create(
             name="2026 夏季考核",
@@ -501,7 +498,6 @@ class AssessmentAdminSortOrderTests(TestCase):
             name="世界技能大赛",
         )
         project = Project.objects.create(
-            competition_type=competition_type,
             code="ITSA",
             name="信息网络综合布线",
         )
@@ -510,8 +506,8 @@ class AssessmentAdminSortOrderTests(TestCase):
             start_date=date(2026, 9, 1),
             end_date=date(2026, 9, 2),
         )
-        module_a = Module.objects.create(project=project, code="A", name="模块 A")
-        module_b = Module.objects.create(project=project, code="B", name="模块 B")
+        module_a = StandardModule.objects.create(project=project, code="A", name="模块 A")
+        module_b = StandardModule.objects.create(project=project, code="B", name="模块 B")
         self.assessment_module_a = AssessmentModule.objects.create(
             assessment=self.assessment,
             module=module_a,

@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
-from competitions.models import CompetitionType, Module, ModuleSet, Project
+from competitions.models import CompetitionType, Project, StandardModule, StandardModuleSet
 
 from .forms import TrainingLogCreateForm
 from .models import TrainingLog
@@ -31,12 +31,11 @@ class TrainingLogCreateFormTestCase(TestCase):
 			name='世界技能大赛',
 		)
 		self.project = Project.objects.create(
-			competition_type=competition_type,
 			code='ITNSA',
 			name='网络系统管理',
 		)
-		Module.objects.create(project=self.project, code='A', name='网络配置')
-		Module.objects.create(project=self.project, code='B', name='服务部署')
+		StandardModule.objects.create(project=self.project, code='A', name='网络配置')
+		StandardModule.objects.create(project=self.project, code='B', name='服务部署')
 
 	def test_module_field_uses_radio_select_widget(self):
 		form = TrainingLogCreateForm()
@@ -51,15 +50,15 @@ class TrainingLogCreateFormTestCase(TestCase):
 			['A - 网络配置', 'B - 服务部署'],
 		)
 
-	def test_module_field_only_lists_current_module_set_modules(self):
-		current_module_set = self.project.current_module_set
-		historical_module_set = ModuleSet.objects.create(
+	def test_module_field_only_lists_current_standard_module_set_modules(self):
+		current_standard_module_set = self.project.current_standard_module_set
+		historical_module_set = StandardModuleSet.objects.create(
 			project=self.project,
 			code='2024',
 			name='2024 版标准模块',
 			is_current=False,
 		)
-		Module.objects.create(
+		StandardModule.objects.create(
 			project=self.project,
 			module_set=historical_module_set,
 			code='C',
@@ -68,7 +67,7 @@ class TrainingLogCreateFormTestCase(TestCase):
 
 		form = TrainingLogCreateForm()
 
-		self.assertIsNotNone(current_module_set)
+		self.assertIsNotNone(current_standard_module_set)
 		self.assertEqual(
 			[choice.choice_label for choice in form['module']],
 			['A - 网络配置', 'B - 服务部署'],
@@ -88,11 +87,10 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 			name='重复校验赛事',
 		)
 		project = Project.objects.create(
-			competition_type=competition_type,
 			code='ITNSA-DUP',
 			name='重复校验项目',
 		)
-		self.module = Module.objects.create(project=project, code='A', name='网络配置')
+		self.module = StandardModule.objects.create(project=project, code='A', name='网络配置')
 
 		self.user = User.objects.create_user(username='coach-dup', password='testpass123')
 		self.other_user = User.objects.create_user(username='coach-other', password='testpass123')
@@ -206,11 +204,10 @@ class TrainingLogListViewTestCase(TestCase):
 			name='列表测试赛事',
 		)
 		project = Project.objects.create(
-			competition_type=competition_type,
 			code='ITNSA-LIST',
 			name='列表测试项目',
 		)
-		self.module = Module.objects.create(project=project, code='M1', name='模块一')
+		self.module = StandardModule.objects.create(project=project, code='M1', name='模块一')
 
 		self.superuser = User.objects.create_superuser(
 			username='admin',

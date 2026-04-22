@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="flex flex-col gap-6">
+    <div class="card bg-base-100 border-base-300 border shadow-sm">
+      <div class="card-body">
+        <div class="flex flex-wrap items-start justify-between gap-4">
+          <div class="space-y-1">
+            <h2 class="card-title text-2xl">{{ competition.name }}</h2>
+            <p class="text-sm text-base-content/70">{{ competition.competition_type.name }} · {{ competition.competition_type.get_level_display }}</p>
+            <p class="text-sm text-base-content/70">赛事编号：{{ competition.code }}</p>
+            {% if competition.location %}
+              <p class="text-sm text-base-content/70">举办地点：{{ competition.location }}</p>
+            {% endif %}
+          </div>
+          <a href="{% url 'competitions:competition_list' %}" class="btn btn-ghost btn-sm">
+            <span class="icon-[tabler--arrow-left] size-4"></span>
+            返回竞赛列表
+          </a>
+        </div>
+        {% if competition.description %}
+          <p class="text-sm text-base-content/80">{{ competition.description }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card bg-base-100 border-base-300 border shadow-sm">
+      <div class="card-body">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="card-title text-lg">具体赛事项目</h2>
+          <span class="text-sm text-base-content/60">共 {{ competition_projects|length }} 项</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-zebra">
+            <thead>
+              <tr class="bg-base-200">
+                <th>项目</th>
+                <th class="text-center">官方模块</th>
+                <th class="text-center">选手</th>
+                <th class="text-center">专家</th>
+                <th class="text-center">成绩</th>
+                <th class="text-center">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in competition_projects %}
+                <tr>
+                  <td>
+                    <div class="font-semibold">{{ item.project.name }}</div>
+                    <div class="text-xs text-base-content/60">{{ item.project.code }}</div>
+                  </td>
+                  <td class="text-center">{{ item.official_module_total }}</td>
+                  <td class="text-center">{{ item.competitor_total }}</td>
+                  <td class="text-center">{{ item.expert_total }}</td>
+                  <td class="text-center">{{ item.result_total }}</td>
+                  <td class="text-center">
+                    <a href="{% url 'competitions:competitionproject_detail' item.pk %}" class="btn btn-soft btn-primary btn-sm">查看详情</a>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="6" class="text-center text-base-content/60">当前赛事还没有配置具体赛项。</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

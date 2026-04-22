@@ -52,7 +52,7 @@ def traininglog_upload_to(instance: "TrainingLog", filename: str) -> str:
 
 class TrainingLog(models.Model):
     module = models.ForeignKey(
-        'competitions.Module', on_delete=models.SET_NULL,
+        'competitions.StandardModule', on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='training_logs', verbose_name='训练模块'
     )

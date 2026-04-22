@@ -115,7 +115,7 @@ class Assessment(models.Model):
     end_date = models.DateField("结束日期", help_text="考核结束的日期")
     description = models.TextField("描述", blank=True)
     modules = models.ManyToManyField(
-        'competitions.Module',
+        'competitions.StandardModule',
         through='AssessmentModule',
         verbose_name="考核模块",
         related_name="assessments",
@@ -150,7 +150,7 @@ class AssessmentModule(models.Model):
         verbose_name="考核"
     )
     module = models.ForeignKey(
-        'competitions.Module',
+        'competitions.StandardModule',
         on_delete=models.PROTECT,
         verbose_name="模块"
     )

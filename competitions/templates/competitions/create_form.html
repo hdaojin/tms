@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="mx-auto flex w-full max-w-2xl flex-col gap-4">
+    {% if page_note %}
+      <div class="alert alert-info items-start">
+        <span class="icon-[tabler--info-circle] mt-1 size-5"></span>
+        <span>{{ page_note }}</span>
+      </div>
+    {% endif %}
+
+    <fieldset class="fieldset bg-base-100 border-base-300 rounded-box w-full border p-6 shadow-xl mb-6">
+      <legend class="fieldset-legend mb-4 text-center text-2xl font-bold">{{ title }}</legend>
+      <form action="{{ request.path }}" method="post" {% if form.is_multipart %}enctype="multipart/form-data"{% endif %}>
+        {% csrf_token %}
+        {% if next_url %}
+          <input type="hidden" name="next" value="{{ next_url }}">
+        {% endif %}
+        {% for hidden in form.hidden_fields %}
+          {{ hidden }}
+        {% endfor %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-error mb-4">
+            <ul class="list-disc list-inside">
+              {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        {% for field in form.visible_fields %}
+          {% include 'components/field.html' with field=field %}
+        {% endfor %}
+
+        <div class="mt-6 flex flex-wrap justify-center gap-4">
+          <a href="{{ back_url }}" class="btn btn-ghost">
+            <span class="icon-[tabler--arrow-left] size-5"></span>
+            返回
+          </a>
+          <button type="reset" class="btn btn-outline btn-wide">
+            <span class="icon-[tabler--refresh] size-5"></span>
+            重置
+          </button>
+          <button type="submit" class="btn btn-primary btn-wide">
+            <span class="icon-[tabler--send] size-5"></span>
+            {{ submit_label }}
+          </button>
+        </div>
+      </form>
+    </fieldset>
+  </div>
+{% endblock %}

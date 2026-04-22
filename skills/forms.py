@@ -4,7 +4,7 @@ from django import forms
 from django.db import transaction
 from django.urls import reverse
 
-from competitions.models import CompetitionProject, Module
+from competitions.models import CompetitionProject, StandardModule
 from core.utils.forms import StyledFormMixin
 from .models import ExamPoint, ExamPointSkill, Skill, Topic
 
@@ -19,9 +19,9 @@ TOPIC_MODE_CHOICES = (
 
 def get_competition_project_modules_queryset(competition_project):
     if competition_project is None:
-        return Module.objects.none()
+        return StandardModule.objects.none()
     return (
-        Module.objects.current().filter(
+        StandardModule.objects.current().filter(
             competition_module_mappings__competition_module__competition_project=competition_project,
         )
         .select_related('project', 'module_set')
@@ -33,7 +33,7 @@ def get_competition_project_modules_queryset(competition_project):
 class SkillFilterForm(StyledFormMixin, forms.Form):
     module = forms.ModelChoiceField(
         label="竞赛模块",
-        queryset=Module.objects.none(),
+        queryset=StandardModule.objects.none(),
         required=False,
         empty_label="全部模块",
     )
@@ -46,7 +46,7 @@ class SkillFilterForm(StyledFormMixin, forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['module'].queryset = Module.objects.current().select_related('project', 'module_set').order_by(
+        self.fields['module'].queryset = StandardModule.objects.current().select_related('project', 'module_set').order_by(
             'project__name', 'module_set__sort_order', 'sort_order', 'code', 'name'
         )
         self.fields['keyword'].widget.attrs.setdefault('placeholder', '输入专题或技能点关键字')
@@ -60,7 +60,7 @@ class ExamPointEntryForm(StyledFormMixin, forms.Form):
     )
     module = forms.ModelChoiceField(
         label='竞赛模块',
-        queryset=Module.objects.none(),
+        queryset=StandardModule.objects.none(),
         help_text='模块来自当前具体赛项的官方模块映射到当前标准模块集后的结果。',
     )
     topic_mode = forms.ChoiceField(

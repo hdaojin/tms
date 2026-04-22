@@ -26,7 +26,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.utils import timezone
 
-from competitions.models import Module
+from competitions.models import StandardModule
 from traininglogs.models import TrainingLog
 
 
@@ -134,7 +134,7 @@ def build_uploaded_by_plan(users: list[object], count: int, rng: random.Random) 
     return planned_users[:target_count]
 
 
-def build_task(module: Module | None, rng: random.Random) -> str:
+def build_task(module: StandardModule | None, rng: random.Random) -> str:
     topic = rng.choice(TASK_TOPICS)
     if module is None:
         return topic[:100]
@@ -157,7 +157,7 @@ def create_traininglogs(count: int, days_back: int, seed: int | None) -> int:
 
     user_model = get_user_model()
     users = [user for user in user_model.objects.order_by("id") if hasattr(user, "display_name")]
-    modules = list(Module.objects.order_by("id"))
+    modules = list(StandardModule.objects.order_by("id"))
     uploaded_by_plan = build_uploaded_by_plan(users, count, rng)
 
     if not users:

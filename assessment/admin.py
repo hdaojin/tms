@@ -3,7 +3,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.db.models import Max
 
-from competitions.models import Module
+from competitions.models import StandardModule
 from core.constants import GROUP_COACH
 
 from .models import Assessment, Score, AssessmentModule, AssessmentAttachment
@@ -13,7 +13,7 @@ User = get_user_model()
 
 
 def get_current_module_queryset():
-    return Module.objects.current().select_related('project', 'module_set').order_by(
+    return StandardModule.objects.current().select_related('project', 'module_set').order_by(
         'project__name',
         'module_set__sort_order',
         'sort_order',

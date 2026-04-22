@@ -41,13 +41,14 @@ sections:
       - "skills"
 
   - section: "assessment"
-    label: "考核"
-    description: "考核与成绩管理"
+    label: "竞赛"
+    description: "竞赛、考核与成绩管理"
     icon: 
-      pic: "icon-[tabler--wallpaper]"
+      pic: "icon-[tabler--trophy]"
       size: 8
-      color: "error"
+      color: "warning"
     include:
+      - "competitions"
       - "assessment"
 
   - section: "meeting"

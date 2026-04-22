@@ -1,7 +1,7 @@
 from django import forms
 from django.utils import timezone
 
-from competitions.models import Module
+from competitions.models import StandardModule
 
 from .models import TrainingLog
 from core.utils.forms import StyledFormMixin
@@ -15,7 +15,7 @@ class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
             self.instance.uploaded_by = self.current_user
 
         module_field = self.fields['module']
-        module_field.queryset = Module.objects.current().select_related('project', 'module_set').order_by(
+        module_field.queryset = StandardModule.objects.current().select_related('project', 'module_set').order_by(
             'project__name',
             'module_set__sort_order',
             'sort_order',

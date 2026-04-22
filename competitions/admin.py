@@ -3,11 +3,16 @@ from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.db.models import Count
 from django.forms.models import BaseInlineFormSet
+from django.urls import reverse
+from django.utils.html import format_html
+from urllib.parse import urlencode
 
 from .models import (
     Competition,
+    CompetitionModuleAxisMap,
     CompetitionModule,
-    CompetitionModuleMapping,
+    CompetitionModuleStandardModuleMap,
+    CompetitionPerson,
     CompetitionProject,
     CompetitionResult,
     CompetitionType,
@@ -15,9 +20,11 @@ from .models import (
     CompetitorUser,
     Expert,
     Member,
-    Module,
-    ModuleSet,
+    ModuleAxis,
     Project,
+    StandardModule,
+    StandardModuleAxisMap,
+    StandardModuleSet,
     SkillPosition,
 )
 
@@ -26,14 +33,27 @@ def format_standard_module_label(module):
     return f'{module.code} - {module.name} [{module.module_set.name}]'
 
 
+def format_module_axis_label(module_axis):
+    return f'{module_axis.code} - {module_axis.name}'
+
+
 def format_member_label(member):
     return f'{member.name} [{member.get_level_display()}]'
 
 
+def format_competition_person_label(person):
+    parts = [person.name]
+    if person.organization:
+        parts.append(person.organization)
+    if person.user_id:
+        parts.append(person.user.display_name)
+    return ' / '.join(parts)
+
+
 def get_project_module_queryset(project):
     if project is None:
-        return Module.objects.none()
-    return Module.objects.filter(project=project).select_related('project', 'module_set').order_by(
+        return StandardModule.objects.none()
+    return StandardModule.objects.filter(project=project).select_related('project', 'module_set').order_by(
         '-module_set__is_current',
         'module_set__sort_order',
         'sort_order',
@@ -42,11 +62,45 @@ def get_project_module_queryset(project):
     )
 
 
+def get_project_module_axis_queryset(project):
+    if project is None:
+        return ModuleAxis.objects.none()
+    return ModuleAxis.objects.filter(project=project).order_by('sort_order', 'code', 'name')
+
+
 def get_member_queryset_for_competition_project(competition_project):
     queryset = Member.objects.order_by('level', 'name')
     if competition_project is None:
-        return queryset
-    return queryset.filter(level=competition_project.required_member_level)
+        return queryset.none()
+
+    required_level = competition_project.required_member_level
+    if required_level is None:
+        return queryset.none()
+    return queryset.filter(level=required_level)
+
+
+def get_competition_person_queryset():
+    return CompetitionPerson.objects.select_related('user').order_by('name', 'organization', 'pk')
+
+
+def format_competition_module_mappings(competition_module):
+    labels = []
+    for mapping in competition_module.module_mappings.all():
+        label = format_standard_module_label(mapping.module)
+        if mapping.is_primary:
+            label = f'★ {label}'
+        labels.append(label)
+    return '，'.join(labels) or '-'
+
+
+def format_competition_module_axis_mappings(competition_module):
+    labels = []
+    for mapping in competition_module.axis_mappings.all():
+        label = format_module_axis_label(mapping.module_axis)
+        if mapping.is_primary:
+            label = f'★ {label}'
+        labels.append(label)
+    return '，'.join(labels) or '-'
 
 
 class HiddenFromAdminIndexMixin:
@@ -54,25 +108,25 @@ class HiddenFromAdminIndexMixin:
         return {}
 
 
-class CompetitionModuleMappingAdminForm(forms.ModelForm):
+class CompetitionModuleStandardModuleMapAdminForm(forms.ModelForm):
     class Meta:
-        model = CompetitionModuleMapping
+        model = CompetitionModuleStandardModuleMap
         fields = '__all__'
 
     def __init__(self, *args, competition_module=None, **kwargs):
         super().__init__(*args, **kwargs)
         competition_module = competition_module or getattr(self.instance, 'competition_module', None)
-        queryset = Module.objects.none()
+        queryset = StandardModule.objects.none()
         if competition_module is not None and competition_module.pk:
             queryset = get_project_module_queryset(competition_module.project)
         elif self.instance.pk and self.instance.module_id:
-            queryset = Module.objects.filter(pk=self.instance.module_id).select_related('project', 'module_set')
+            queryset = StandardModule.objects.filter(pk=self.instance.module_id).select_related('project', 'module_set')
 
         self.fields['module'].queryset = queryset
         self.fields['module'].label_from_instance = format_standard_module_label
 
 
-class CompetitionModuleMappingInlineFormSet(BaseInlineFormSet):
+class CompetitionModuleStandardModuleMapInlineFormSet(BaseInlineFormSet):
     def get_form_kwargs(self, index):
         kwargs = super().get_form_kwargs(index)
         kwargs['competition_module'] = self.instance
@@ -98,10 +152,102 @@ class CompetitionModuleMappingInlineFormSet(BaseInlineFormSet):
             raise ValidationError('请至少选择一条主映射。')
 
 
+class StandardModuleAxisMapAdminForm(forms.ModelForm):
+    class Meta:
+        model = StandardModuleAxisMap
+        fields = '__all__'
+
+    def __init__(self, *args, module=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        module = module or getattr(self.instance, 'module', None)
+        queryset = ModuleAxis.objects.none()
+        if module is not None and module.pk:
+            queryset = get_project_module_axis_queryset(module.project)
+        elif self.instance.pk and self.instance.module_axis_id:
+            queryset = ModuleAxis.objects.filter(pk=self.instance.module_axis_id).select_related('project')
+
+        self.fields['module_axis'].queryset = queryset
+        self.fields['module_axis'].label_from_instance = format_module_axis_label
+
+
+class StandardModuleAxisMapInlineFormSet(BaseInlineFormSet):
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs['module'] = self.instance
+        return kwargs
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        active_forms = [
+            form
+            for form in self.forms
+            if form.cleaned_data and not form.cleaned_data.get('DELETE', False)
+        ]
+        if not active_forms:
+            return
+
+        primary_forms = [form for form in active_forms if form.cleaned_data.get('is_primary')]
+        if len(primary_forms) > 1:
+            raise ValidationError('同一标准模块只能设置一个主主线映射。')
+        if len(primary_forms) == 0:
+            raise ValidationError('请至少选择一条主主线映射。')
+
+
+class CompetitionModuleAxisMapAdminForm(forms.ModelForm):
+    class Meta:
+        model = CompetitionModuleAxisMap
+        fields = '__all__'
+
+    def __init__(self, *args, competition_module=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        competition_module = competition_module or getattr(self.instance, 'competition_module', None)
+        queryset = ModuleAxis.objects.none()
+        if competition_module is not None and competition_module.pk:
+            queryset = get_project_module_axis_queryset(competition_module.project)
+        elif self.instance.pk and self.instance.module_axis_id:
+            queryset = ModuleAxis.objects.filter(pk=self.instance.module_axis_id).select_related('project')
+
+        self.fields['module_axis'].queryset = queryset
+        self.fields['module_axis'].label_from_instance = format_module_axis_label
+
+
+class CompetitionModuleAxisMapInlineFormSet(BaseInlineFormSet):
+    def get_form_kwargs(self, index):
+        kwargs = super().get_form_kwargs(index)
+        kwargs['competition_module'] = self.instance
+        return kwargs
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        active_forms = [
+            form
+            for form in self.forms
+            if form.cleaned_data and not form.cleaned_data.get('DELETE', False)
+        ]
+        if not active_forms:
+            return
+
+        primary_forms = [form for form in active_forms if form.cleaned_data.get('is_primary')]
+        if len(primary_forms) > 1:
+            raise ValidationError('同一官方模块只能设置一个主主线映射。')
+        if len(primary_forms) == 0:
+            raise ValidationError('请至少选择一条主主线映射。')
+
+
 class CompetitionProjectScopedMemberFormMixin:
     def __init__(self, *args, competition_project=None, **kwargs):
         self._competition_project = competition_project
         super().__init__(*args, **kwargs)
+
+        if 'person' in self.fields:
+            self.fields['person'].queryset = get_competition_person_queryset()
+            self.fields['person'].label_from_instance = format_competition_person_label
 
         if 'member' not in self.fields:
             return
@@ -109,7 +255,7 @@ class CompetitionProjectScopedMemberFormMixin:
         competition_project = self.get_competition_project()
         self.fields['member'].queryset = get_member_queryset_for_competition_project(competition_project)
         self.fields['member'].label_from_instance = format_member_label
-        if competition_project is None:
+        if competition_project is None or competition_project.required_member_level is None:
             self.fields['member'].help_text = '请先选择具体赛项，再选择匹配层级的代表队。'
         else:
             self.fields['member'].help_text = (
@@ -141,6 +287,18 @@ class ExpertAdminForm(CompetitionProjectScopedMemberFormMixin, forms.ModelForm):
     class Meta:
         model = Expert
         fields = '__all__'
+
+
+class SkillPositionAdminForm(forms.ModelForm):
+    class Meta:
+        model = SkillPosition
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'person' in self.fields:
+            self.fields['person'].queryset = get_competition_person_queryset()
+            self.fields['person'].label_from_instance = format_competition_person_label
 
 
 class CompetitionProjectScopedMemberInlineFormSet(BaseInlineFormSet):
@@ -178,8 +336,8 @@ class CompetitionAdmin(admin.ModelAdmin):
         return obj.competition_project_total
 
 
-class ModuleSetInline(admin.TabularInline):
-    model = ModuleSet
+class StandardModuleSetInline(admin.TabularInline):
+    model = StandardModuleSet
     extra = 0
     fields = ('code', 'name', 'sort_order', 'is_current')
     show_change_link = True
@@ -188,27 +346,55 @@ class ModuleSetInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('name', 'code', 'competition_type', 'current_module_set_display', 'created_at')
-    list_filter = ('competition_type',)
-    search_fields = ('name', 'code', 'competition_type__name')
-    autocomplete_fields = ['competition_type']
-    list_select_related = ('competition_type',)
-    ordering = ('name',)
-    inlines = [ModuleSetInline]
+    list_display = ('name', 'code', 'current_standard_module_set_display', 'created_at')
+    search_fields = ('name', 'code')
+    ordering = ('name', 'code')
+    inlines = [StandardModuleSetInline]
 
-    @admin.display(description='当前模块集')
-    def current_module_set_display(self, obj):
-        return obj.current_module_set or '-'
+    @admin.display(description='当前标准模块集')
+    def current_standard_module_set_display(self, obj):
+        return obj.current_standard_module_set or '-'
+
+
+@admin.register(ModuleAxis)
+class ModuleAxisAdmin(admin.ModelAdmin):
+    list_display = ('name', 'code', 'project', 'is_active', 'sort_order')
+    list_filter = ('project', 'is_active')
+    search_fields = ('name', 'code', 'project__name')
+    autocomplete_fields = ['project']
+    list_select_related = ('project',)
+    ordering = ('project__name', 'sort_order', 'code', 'name')
+
+
+@admin.register(CompetitionPerson)
+class CompetitionPersonAdmin(admin.ModelAdmin):
+    list_display = ('name', 'organization', 'user', 'created_at')
+    search_fields = ('name', 'organization', 'user__username', 'user__first_name', 'user__last_name')
+    autocomplete_fields = ['user']
+    ordering = ('name', 'organization', 'pk')
 
 
 class CompetitionModuleInline(admin.TabularInline):
     model = CompetitionModule
     extra = 0
-    fields = ('sort_order', 'code', 'name')
+    fields = ('sort_order', 'code', 'name', 'mapped_modules_summary', 'mapped_axes_summary')
+    readonly_fields = ('mapped_modules_summary', 'mapped_axes_summary')
     ordering = ('sort_order', 'code', 'pk')
     show_change_link = True
     verbose_name = '官方模块'
-    verbose_name_plural = '本届官方模块（保存后进入详情页维护标准模块映射）'
+    verbose_name_plural = '本届官方模块（可在下方快捷入口或独立“具体赛项模块”后台中集中维护）'
+
+    @admin.display(description='映射关系')
+    def mapped_modules_summary(self, obj):
+        if obj is None or not obj.pk:
+            return '-'
+        return format_competition_module_mappings(obj)
+
+    @admin.display(description='主线关系')
+    def mapped_axes_summary(self, obj):
+        if obj is None or not obj.pk:
+            return '-'
+        return format_competition_module_axis_mappings(obj)
 
 
 class CompetitorInline(admin.TabularInline):
@@ -216,9 +402,9 @@ class CompetitorInline(admin.TabularInline):
     form = CompetitorAdminForm
     formset = CompetitionProjectScopedMemberInlineFormSet
     extra = 0
-    fields = ('name', 'member', 'organization', 'gender', 'user')
-    autocomplete_fields = ['user']
-    ordering = ('name',)
+    fields = ('person', 'member', 'gender')
+    autocomplete_fields = ['person']
+    ordering = ('person__name',)
     show_change_link = True
     verbose_name = '选手'
     verbose_name_plural = '选手'
@@ -229,9 +415,9 @@ class ExpertInline(admin.TabularInline):
     form = ExpertAdminForm
     formset = CompetitionProjectScopedMemberInlineFormSet
     extra = 0
-    fields = ('name', 'member', 'organization', 'user')
-    autocomplete_fields = ['user']
-    ordering = ('name',)
+    fields = ('person', 'member')
+    autocomplete_fields = ['person']
+    ordering = ('person__name',)
     show_change_link = True
     verbose_name = '专家'
     verbose_name_plural = '专家'
@@ -239,10 +425,11 @@ class ExpertInline(admin.TabularInline):
 
 class SkillPositionInline(admin.TabularInline):
     model = SkillPosition
+    form = SkillPositionAdminForm
     extra = 0
-    fields = ('name', 'position_name', 'organization', 'user')
-    autocomplete_fields = ['user']
-    ordering = ('position_name', 'name')
+    fields = ('person', 'position_name', 'remarks')
+    autocomplete_fields = ['person']
+    ordering = ('position_name', 'person__name')
     show_change_link = True
     verbose_name = '岗位人员'
     verbose_name_plural = '岗位人员'
@@ -255,6 +442,7 @@ class CompetitionProjectAdmin(admin.ModelAdmin):
         'project',
         'member_scope_display',
         'official_module_total',
+        'module_entry_link',
         'competitor_total',
         'result_total',
     )
@@ -265,6 +453,18 @@ class CompetitionProjectAdmin(admin.ModelAdmin):
     ordering = ('-competition__start_date', 'competition__name', 'project__name')
     fields = ('competition', 'project', 'document', 'description')
     inlines = [CompetitionModuleInline, CompetitorInline, ExpertInline, SkillPositionInline]
+
+    def get_fields(self, request, obj=None):
+        fields = list(super().get_fields(request, obj))
+        if obj is not None:
+            fields.insert(2, 'module_entry_link')
+        return fields
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(super().get_readonly_fields(request, obj))
+        if obj is not None:
+            readonly_fields.append('module_entry_link')
+        return readonly_fields
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('competition__competition_type', 'project').annotate(
@@ -280,6 +480,19 @@ class CompetitionProjectAdmin(admin.ModelAdmin):
     @admin.display(description='官方模块数', ordering='official_module_total')
     def official_module_total(self, obj):
         return obj.official_module_total
+
+    @admin.display(description='模块入口')
+    def module_entry_link(self, obj):
+        module_total = getattr(obj, 'official_module_total', obj.competition_modules.count())
+        url = '{}?{}'.format(
+            reverse('admin:competitions_competitionmodule_changelist'),
+            urlencode({'competition_project__id__exact': obj.pk}),
+        )
+        return format_html(
+            '<a href="{}">进入具体赛项模块（{}）</a>',
+            url,
+            module_total,
+        )
 
     @admin.display(description='选手数', ordering='competitor_total')
     def competitor_total(self, obj):
@@ -314,13 +527,13 @@ class CompetitionResultAdmin(admin.ModelAdmin):
         'competitor__competition_project__project',
         'competitor__member',
     )
-    search_fields = ('competitor__name', 'competitor__organization', 'competitor__user__username')
+    search_fields = ('competitor__person__name', 'competitor__person__organization', 'competitor__person__user__username')
     autocomplete_fields = ['competitor']
     list_select_related = (
         'competitor__competition_project__competition',
         'competitor__competition_project__project',
         'competitor__member',
-        'competitor__user',
+        'competitor__person__user',
     )
     ordering = (
         'competitor__competition_project__competition__name',
@@ -335,7 +548,7 @@ class CompetitionResultAdmin(admin.ModelAdmin):
             'competitor__competition_project__competition',
             'competitor__competition_project__project',
             'competitor__member',
-            'competitor__user',
+            'competitor__person__user',
         )
 
     @admin.display(description='具体赛项')
@@ -347,8 +560,8 @@ class CompetitionResultAdmin(admin.ModelAdmin):
         return obj.competitor.member
 
 
-@admin.register(ModuleSet)
-class ModuleSetAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
+@admin.register(StandardModuleSet)
+class StandardModuleSetAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
     search_fields = ('name', 'code', 'project__name')
     list_display = ('name', 'code', 'project', 'is_current', 'sort_order')
     list_filter = ('project', 'is_current')
@@ -357,79 +570,123 @@ class ModuleSetAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
     ordering = ('project__name', '-is_current', 'sort_order', 'name')
 
 
-@admin.register(Module)
-class ModuleAdmin(admin.ModelAdmin):
+class StandardModuleAxisMapInline(admin.TabularInline):
+    model = StandardModuleAxisMap
+    form = StandardModuleAxisMapAdminForm
+    formset = StandardModuleAxisMapInlineFormSet
+    extra = 1
+    fields = ('module_axis', 'is_primary', 'weight', 'note')
+    verbose_name = '模块主线映射'
+    verbose_name_plural = '模块主线映射（若已配置，需确保一条且仅一条主映射）'
+
+
+@admin.register(StandardModule)
+class StandardModuleAdmin(admin.ModelAdmin):
     search_fields = ('name', 'code', 'project__name', 'module_set__name')
     list_display = ('name', 'code', 'project', 'module_set', 'sort_order', 'is_current_module')
     list_filter = ('project', 'module_set', 'module_set__is_current')
     autocomplete_fields = ['project', 'module_set']
     list_select_related = ('project', 'module_set')
     ordering = ('project__name', '-module_set__is_current', 'module_set__sort_order', 'sort_order', 'code', 'name')
+    inlines = [StandardModuleAxisMapInline]
 
     @admin.display(description='当前模块')
     def is_current_module(self, obj):
         return obj.is_current
 
 
-class CompetitionModuleMappingInline(admin.TabularInline):
-    model = CompetitionModuleMapping
-    form = CompetitionModuleMappingAdminForm
-    formset = CompetitionModuleMappingInlineFormSet
+class CompetitionModuleStandardModuleMapInline(admin.TabularInline):
+    model = CompetitionModuleStandardModuleMap
+    form = CompetitionModuleStandardModuleMapAdminForm
+    formset = CompetitionModuleStandardModuleMapInlineFormSet
     extra = 1
     fields = ('module', 'is_primary', 'weight', 'note')
     verbose_name = '标准模块映射'
     verbose_name_plural = '标准模块映射（请确保一条且仅一条主映射）'
 
 
+class CompetitionModuleAxisMapInline(admin.TabularInline):
+    model = CompetitionModuleAxisMap
+    form = CompetitionModuleAxisMapAdminForm
+    formset = CompetitionModuleAxisMapInlineFormSet
+    extra = 1
+    fields = ('module_axis', 'is_primary', 'weight', 'note')
+    verbose_name = '模块主线映射'
+    verbose_name_plural = '模块主线映射（可为空；若配置则需确保一条且仅一条主映射）'
+
+
 @admin.register(CompetitionModule)
-class CompetitionModuleAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
+class CompetitionModuleAdmin(admin.ModelAdmin):
     search_fields = (
         'code',
         'name',
         'competition_project__competition__name',
+        'competition_project__competition__code',
         'competition_project__project__name',
+        'competition_project__project__code',
         'module_mappings__module__name',
         'module_mappings__module__code',
     )
-    list_display = ('code', 'name', 'competition_project', 'primary_module_display', 'mapped_modules_display', 'sort_order')
-    list_filter = ('competition_project__competition', 'competition_project__project')
+    list_display = (
+        'competition_display',
+        'competition_project',
+        'code',
+        'name',
+        'primary_standard_module_display',
+        'primary_axis_display',
+        'mapped_modules_display',
+        'mapped_axes_display',
+        'sort_order',
+    )
+    list_display_links = ('code', 'name')
+    list_filter = ('competition_project__competition', 'competition_project__project', 'competition_project')
     autocomplete_fields = ['competition_project']
     list_select_related = ('competition_project__competition', 'competition_project__project')
     ordering = (
+        '-competition_project__competition__start_date',
         'competition_project__competition__name',
         'competition_project__project__name',
         'sort_order',
         'code',
     )
     fields = ('competition_project', 'sort_order', 'code', 'name', 'description')
-    inlines = [CompetitionModuleMappingInline]
+    inlines = [CompetitionModuleStandardModuleMapInline, CompetitionModuleAxisMapInline]
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
             'competition_project__competition',
             'competition_project__project',
-        ).prefetch_related('module_mappings__module__module_set')
+        ).prefetch_related('module_mappings__module__module_set', 'axis_mappings__module_axis')
+
+    @admin.display(description='赛事', ordering='competition_project__competition__name')
+    def competition_display(self, obj):
+        return obj.competition_project.competition
 
     @admin.display(description='主映射标准模块')
-    def primary_module_display(self, obj):
-        primary_module = obj.primary_module
-        if primary_module is None:
+    def primary_standard_module_display(self, obj):
+        primary_standard_module = obj.primary_standard_module
+        if primary_standard_module is None:
             return '-'
-        return format_standard_module_label(primary_module)
+        return format_standard_module_label(primary_standard_module)
+
+    @admin.display(description='主映射主线')
+    def primary_axis_display(self, obj):
+        primary_axis = obj.primary_axis
+        if primary_axis is None:
+            return '-'
+        return format_module_axis_label(primary_axis)
 
     @admin.display(description='全部映射')
     def mapped_modules_display(self, obj):
-        labels = []
-        for mapping in obj.module_mappings.all():
-            label = format_standard_module_label(mapping.module)
-            if mapping.is_primary:
-                label = f'★ {label}'
-            labels.append(label)
-        return '，'.join(labels) or '-'
+        return format_competition_module_mappings(obj)
+
+    @admin.display(description='全部主线')
+    def mapped_axes_display(self, obj):
+        return format_competition_module_axis_mappings(obj)
 
 
-@admin.register(CompetitionModuleMapping)
-class CompetitionModuleMappingAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
+@admin.register(CompetitionModuleStandardModuleMap)
+class CompetitionModuleStandardModuleMapAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
     search_fields = (
         'competition_module__code',
         'competition_module__name',
@@ -439,6 +696,27 @@ class CompetitionModuleMappingAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin)
     list_display = ('competition_module', 'module', 'is_primary', 'weight')
     list_filter = ('is_primary', 'module__project', 'module__module_set')
     autocomplete_fields = ['competition_module']
+
+
+@admin.register(StandardModuleAxisMap)
+class StandardModuleAxisMapAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
+    search_fields = ('module__code', 'module__name', 'module_axis__code', 'module_axis__name')
+    list_display = ('module', 'module_axis', 'is_primary', 'weight')
+    list_filter = ('is_primary', 'module__project', 'module_axis')
+    autocomplete_fields = ['module', 'module_axis']
+
+
+@admin.register(CompetitionModuleAxisMap)
+class CompetitionModuleAxisMapAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
+    search_fields = (
+        'competition_module__code',
+        'competition_module__name',
+        'module_axis__code',
+        'module_axis__name',
+    )
+    list_display = ('competition_module', 'module_axis', 'is_primary', 'weight')
+    list_filter = ('is_primary', 'module_axis__project', 'module_axis')
+    autocomplete_fields = ['competition_module', 'module_axis']
 
 
 @admin.register(CompetitorUser)
@@ -452,18 +730,19 @@ class CompetitorAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
     form = CompetitorAdminForm
     list_display = ('name', 'gender', 'member', 'organization', 'competition_project', 'user', 'created_at')
     list_filter = ('member', 'gender', 'competition_project__competition')
-    search_fields = ('name', 'member__name', 'user__username', 'competition_project__project__name', 'organization')
-    autocomplete_fields = ['user', 'competition_project']
-    list_select_related = ('member', 'competition_project__competition', 'competition_project__project', 'user')
+    search_fields = ('person__name', 'member__name', 'person__user__username', 'competition_project__project__name', 'person__organization')
+    autocomplete_fields = ['person', 'competition_project']
+    list_select_related = ('member', 'competition_project__competition', 'competition_project__project', 'person__user')
 
 
 @admin.register(SkillPosition)
 class SkillPositionAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
+    form = SkillPositionAdminForm
     list_display = ('name', 'position_name', 'competition_project', 'organization', 'user')
     list_filter = ('competition_project', 'position_name')
-    search_fields = ('name', 'position_name', 'user__username', 'organization')
-    autocomplete_fields = ['user', 'competition_project']
-    list_select_related = ('competition_project__competition', 'competition_project__project', 'user')
+    search_fields = ('person__name', 'position_name', 'person__user__username', 'person__organization')
+    autocomplete_fields = ['person', 'competition_project']
+    list_select_related = ('competition_project__competition', 'competition_project__project', 'person__user')
 
 
 @admin.register(Expert)
@@ -471,7 +750,7 @@ class ExpertAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
     form = ExpertAdminForm
     list_display = ('name', 'user', 'member', 'competition_project', 'organization')
     list_filter = ('member', 'competition_project')
-    search_fields = ('name', 'user__username', 'member__name', 'organization')
-    autocomplete_fields = ['user', 'competition_project']
-    list_select_related = ('member', 'competition_project__competition', 'competition_project__project', 'user')
+    search_fields = ('person__name', 'person__user__username', 'member__name', 'person__organization')
+    autocomplete_fields = ['person', 'competition_project']
+    list_select_related = ('member', 'competition_project__competition', 'competition_project__project', 'person__user')
 

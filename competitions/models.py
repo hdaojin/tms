@@ -16,12 +16,12 @@ DEFAULT_MODULE_SET_CODE = 'default'
 DEFAULT_MODULE_SET_NAME = '默认标准模块集'
 
 
-class ModuleSetQuerySet(models.QuerySet):
+class StandardModuleSetQuerySet(models.QuerySet):
     def current(self):
         return self.filter(is_current=True)
 
 
-class ModuleQuerySet(models.QuerySet):
+class StandardModuleQuerySet(models.QuerySet):
     def current(self):
         return self.filter(module_set__is_current=True)
 
@@ -62,6 +62,8 @@ def validate_member_level(member, competition_project):
         return
 
     required_level = competition_project.required_member_level
+    if required_level is None:
+        return
     if member.level != required_level:
         raise ValidationError(
             {
@@ -111,7 +113,7 @@ class Competition(models.Model):
         related_name='competitions'
     )
     name = models.CharField("赛事名称", max_length=100, help_text="具体赛事名称，如：第47届世界技能大赛")
-    code = models.CharField("赛事编号", max_length=50, unique=True, help_text="具体赛事唯一编号，如：WSC2024")
+    code = models.CharField("赛事编号", max_length=50, unique=True, help_text="具体赛事唯一编号，如：47WSC2024")
     start_date = models.DateField("开始日期", null=True, blank=True)
     end_date = models.DateField("结束日期", null=True, blank=True)
     location = models.CharField("举办地点", max_length=100, blank=True)
@@ -131,14 +133,8 @@ class Competition(models.Model):
 
 class Project(models.Model):
     """标准项目库 (Skill)"""
-    competition_type = models.ForeignKey(
-        CompetitionType,
-        verbose_name="所属赛事类型",
-        on_delete=models.CASCADE,
-        related_name='projects',
-    )
     code = models.CharField("项目代码", max_length=50, unique=True, help_text="用于标识竞赛项目的唯一代码，如ITNSA")
-    name = models.CharField("项目名称", max_length=100, unique=True)
+    name = models.CharField("项目名称", max_length=100)
     description = models.TextField("描述", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
@@ -146,19 +142,27 @@ class Project(models.Model):
     class Meta:
         verbose_name = '竞赛项目'
         verbose_name_plural = '竞赛项目'
-        ordering = ['name']
+        ordering = ['name', 'code']
     
     def __str__(self):
-        return f"{self.name} ({self.competition_type})"
+        return f"{self.name} ({self.code})"
 
     @property
-    def current_module_set(self):
+    def standard_module_sets(self):
+        return self.module_sets
+
+    @property
+    def standard_modules(self):
+        return self.modules
+
+    @property
+    def current_standard_module_set(self):
         return self.module_sets.current().order_by('sort_order', 'pk').first()
 
-    def get_or_create_default_module_set(self):
-        current_module_set = self.current_module_set
-        if current_module_set is not None:
-            return current_module_set
+    def get_or_create_default_standard_module_set(self):
+        current_standard_module_set = self.current_standard_module_set
+        if current_standard_module_set is not None:
+            return current_standard_module_set
 
         module_set, created = self.module_sets.get_or_create(
             code=DEFAULT_MODULE_SET_CODE,
@@ -175,14 +179,14 @@ class Project(models.Model):
             module_set.save(update_fields=['is_current', 'updated_at'])
         return module_set
 
-    def get_current_modules_queryset(self):
-        current_module_set = self.current_module_set
-        if current_module_set is None:
+    def get_current_standard_modules_queryset(self):
+        current_standard_module_set = self.current_standard_module_set
+        if current_standard_module_set is None:
             return self.modules.none()
-        return current_module_set.modules.all()
+        return current_standard_module_set.modules.all()
 
 
-class ModuleSet(models.Model):
+class StandardModuleSet(models.Model):
     project = models.ForeignKey(
         Project,
         verbose_name="所属竞赛项目",
@@ -197,7 +201,7 @@ class ModuleSet(models.Model):
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
-    objects = ModuleSetQuerySet.as_manager()
+    objects = StandardModuleSetQuerySet.as_manager()
 
     class Meta:
         verbose_name = '标准模块集'
@@ -220,6 +224,33 @@ class ModuleSet(models.Model):
     def __str__(self):
         suffix = '（当前）' if self.is_current else ''
         return f"{self.project.name} / {self.name}{suffix}"
+
+
+class ModuleAxis(models.Model):
+    project = models.ForeignKey(
+        Project,
+        verbose_name='所属竞赛项目',
+        on_delete=models.CASCADE,
+        related_name='module_axes',
+    )
+    code = models.CharField('主线代码', max_length=50, help_text='同一项目下唯一，用于标识能力主线。')
+    name = models.CharField('主线名称', max_length=100)
+    description = models.TextField('描述', blank=True)
+    sort_order = models.PositiveIntegerField('显示顺序', default=0, help_text='数值越小越靠前显示。')
+    is_active = models.BooleanField('启用', default=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('最后更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '模块主线'
+        verbose_name_plural = '模块主线'
+        ordering = ['project', 'sort_order', 'code', 'name']
+        constraints = [
+            models.UniqueConstraint(fields=['project', 'code'], name='unique_module_axis_code_within_project'),
+        ]
+
+    def __str__(self):
+        return f"{self.project.name} / {self.code} - {self.name}"
 
 
 class CompetitionProject(models.Model):
@@ -264,15 +295,20 @@ class CompetitionProject(models.Model):
 
     @property
     def required_member_level(self):
+        if not self.competition_id:
+            return None
         return self.competition.competition_type.level
 
     @property
     def required_member_level_label(self):
-        return get_member_scope_label(self.required_member_level)
+        required_level = self.required_member_level
+        if required_level is None:
+            return None
+        return get_member_scope_label(required_level)
 
 
-class Module(models.Model):
-    """项目模块 (隶属于标准项目 Project)"""
+class StandardModule(models.Model):
+    """标准模块（隶属于标准项目 Project）"""
     project = models.ForeignKey(
         Project,
         verbose_name="所属竞赛项目",
@@ -280,7 +316,7 @@ class Module(models.Model):
         related_name='modules',
     )
     module_set = models.ForeignKey(
-        ModuleSet,
+        StandardModuleSet,
         verbose_name="所属标准模块集",
         on_delete=models.PROTECT,
         related_name='modules',
@@ -292,11 +328,11 @@ class Module(models.Model):
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
-    objects = ModuleQuerySet.as_manager()
+    objects = StandardModuleQuerySet.as_manager()
     
     class Meta:
-        verbose_name = '竞赛模块'
-        verbose_name_plural = '竞赛模块'
+        verbose_name = '标准模块'
+        verbose_name_plural = '标准模块'
         ordering = ['project', 'module_set__sort_order', 'sort_order', 'code', 'name']
         unique_together = ['module_set', 'code']
 
@@ -306,7 +342,7 @@ class Module(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.module_set_id and self.project_id:
-            self.module_set = self.project.get_or_create_default_module_set()
+            self.module_set = self.project.get_or_create_default_standard_module_set()
         if self.module_set_id and self.project_id and self.module_set.project_id != self.project_id:
             raise ValidationError({'module_set': '所选标准模块集不属于当前竞赛项目。'})
         super().save(*args, **kwargs)
@@ -317,6 +353,72 @@ class Module(models.Model):
     
     def __str__(self):
         return f"{self.code} - {self.name}"
+
+    @property
+    def standard_module_set(self):
+        return self.module_set
+
+    @property
+    def primary_axis(self):
+        primary_mapping = self.axis_mappings.filter(is_primary=True).select_related('module_axis').first()
+        if primary_mapping is not None:
+            return primary_mapping.module_axis
+        first_mapping = self.axis_mappings.select_related('module_axis').first()
+        return first_mapping.module_axis if first_mapping is not None else None
+
+
+class StandardModuleAxisMap(models.Model):
+    module = models.ForeignKey(
+        StandardModule,
+        on_delete=models.CASCADE,
+        related_name='axis_mappings',
+        verbose_name='标准模块',
+    )
+    module_axis = models.ForeignKey(
+        ModuleAxis,
+        on_delete=models.PROTECT,
+        related_name='standard_module_mappings',
+        verbose_name='模块主线',
+    )
+    is_primary = models.BooleanField('主映射', default=False, help_text='用于标识该标准模块当前主要归属的模块主线。')
+    weight = models.DecimalField(
+        '权重',
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('1.00'),
+        validators=[MinValueValidator(Decimal('0.01'))],
+        help_text='用于表示该标准模块映射到该模块主线时的相对权重。',
+    )
+    note = models.TextField('备注', blank=True)
+
+    class Meta:
+        verbose_name = '标准模块主线映射'
+        verbose_name_plural = '标准模块主线映射'
+        unique_together = ['module', 'module_axis']
+        ordering = ['module', '-is_primary', 'module_axis__sort_order', 'module_axis__code', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['module'],
+                condition=models.Q(is_primary=True),
+                name='unique_primary_axis_mapping_per_standard_module',
+            ),
+        ]
+
+    def clean(self):
+        if self.module_id and self.module_axis_id and self.module.project_id != self.module_axis.project_id:
+            raise ValidationError({'module_axis': '模块主线必须属于当前标准模块对应的竞赛项目。'})
+        if self.is_primary and self.module_id:
+            existing_primary = type(self).objects.filter(module_id=self.module_id, is_primary=True).exclude(pk=self.pk)
+            if existing_primary.exists():
+                raise ValidationError({'is_primary': '同一标准模块只能设置一个主映射。'})
+
+    def save(self, *args, **kwargs):
+        if self.module_id and self.module_axis_id and self.module.project_id != self.module_axis.project_id:
+            raise ValidationError({'module_axis': '模块主线必须属于当前标准模块对应的竞赛项目。'})
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.module} -> {self.module_axis}"
 
 
 class CompetitionModule(models.Model):
@@ -343,18 +445,31 @@ class CompetitionModule(models.Model):
         return self.competition_project.project
 
     @property
-    def primary_module(self):
+    def primary_standard_module(self):
         primary_mapping = self.module_mappings.filter(is_primary=True).select_related('module').first()
         if primary_mapping is not None:
             return primary_mapping.module
         first_mapping = self.module_mappings.select_related('module').first()
         return first_mapping.module if first_mapping is not None else None
 
+    @property
+    def primary_axis(self):
+        primary_mapping = self.axis_mappings.filter(is_primary=True).select_related('module_axis').first()
+        if primary_mapping is not None:
+            return primary_mapping.module_axis
+        first_mapping = self.axis_mappings.select_related('module_axis').first()
+        if first_mapping is not None:
+            return first_mapping.module_axis
+        primary_standard_module = self.primary_standard_module
+        if primary_standard_module is None:
+            return None
+        return primary_standard_module.primary_axis
+
     def __str__(self):
         return f"{self.competition_project} - {self.code} - {self.name}"
 
 
-class CompetitionModuleMapping(models.Model):
+class CompetitionModuleStandardModuleMap(models.Model):
     competition_module = models.ForeignKey(
         CompetitionModule,
         on_delete=models.CASCADE,
@@ -362,7 +477,7 @@ class CompetitionModuleMapping(models.Model):
         verbose_name='具体赛项模块',
     )
     module = models.ForeignKey(
-        Module,
+        StandardModule,
         on_delete=models.PROTECT,
         related_name='competition_module_mappings',
         verbose_name='标准模块',
@@ -379,8 +494,8 @@ class CompetitionModuleMapping(models.Model):
     note = models.TextField('备注', blank=True)
 
     class Meta:
-        verbose_name = '赛项模块映射'
-        verbose_name_plural = '赛项模块映射'
+        verbose_name = '官方模块标准映射'
+        verbose_name_plural = '官方模块标准映射'
         unique_together = ['competition_module', 'module']
         ordering = ['competition_module', '-is_primary', 'module__sort_order', 'module__code', 'pk']
         constraints = [
@@ -409,6 +524,71 @@ class CompetitionModuleMapping(models.Model):
 
     def __str__(self):
         return f"{self.competition_module} -> {self.module}"
+
+
+class CompetitionModuleAxisMap(models.Model):
+    competition_module = models.ForeignKey(
+        CompetitionModule,
+        on_delete=models.CASCADE,
+        related_name='axis_mappings',
+        verbose_name='具体赛项模块',
+    )
+    module_axis = models.ForeignKey(
+        ModuleAxis,
+        on_delete=models.PROTECT,
+        related_name='competition_module_mappings',
+        verbose_name='模块主线',
+    )
+    is_primary = models.BooleanField('主映射', default=False, help_text='用于标识该官方模块当前主要归属的模块主线。')
+    weight = models.DecimalField(
+        '权重',
+        max_digits=5,
+        decimal_places=2,
+        default=Decimal('1.00'),
+        validators=[MinValueValidator(Decimal('0.01'))],
+        help_text='用于表示该官方模块映射到该模块主线时的相对权重。',
+    )
+    note = models.TextField('备注', blank=True)
+
+    class Meta:
+        verbose_name = '官方模块主线映射'
+        verbose_name_plural = '官方模块主线映射'
+        unique_together = ['competition_module', 'module_axis']
+        ordering = ['competition_module', '-is_primary', 'module_axis__sort_order', 'module_axis__code', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['competition_module'],
+                condition=models.Q(is_primary=True),
+                name='unique_primary_axis_mapping_per_competition_module',
+            ),
+        ]
+
+    def clean(self):
+        if (
+            self.competition_module_id
+            and self.module_axis_id
+            and self.competition_module.competition_project.project_id != self.module_axis.project_id
+        ):
+            raise ValidationError({'module_axis': '模块主线必须属于当前具体赛项对应的竞赛项目。'})
+        if self.is_primary and self.competition_module_id:
+            existing_primary = type(self).objects.filter(
+                competition_module_id=self.competition_module_id,
+                is_primary=True,
+            ).exclude(pk=self.pk)
+            if existing_primary.exists():
+                raise ValidationError({'is_primary': '同一官方模块只能设置一个主主线映射。'})
+
+    def save(self, *args, **kwargs):
+        if (
+            self.competition_module_id
+            and self.module_axis_id
+            and self.competition_module.competition_project.project_id != self.module_axis.project_id
+        ):
+            raise ValidationError({'module_axis': '模块主线必须属于当前具体赛项对应的竞赛项目。'})
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.competition_module} -> {self.module_axis}"
 
 
 class Member(models.Model):
@@ -447,14 +627,11 @@ class CompetitorUser(User):
 
 class Competitor(models.Model):
     """参赛选手 (关联到具体赛项)"""
-    user = models.ForeignKey(
-        CompetitorUser, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        verbose_name="关联用户",
-        related_name="competitor_profiles",
-        help_text="如果是校内选手，请关联用户账号；如果是外部选手，留空即可。"
+    person = models.ForeignKey(
+        'CompetitionPerson',
+        on_delete=models.PROTECT,
+        verbose_name="选手人员",
+        related_name="competitor_assignments",
     )
     competition_project = models.ForeignKey(
         CompetitionProject,
@@ -462,9 +639,7 @@ class Competitor(models.Model):
         verbose_name="参赛项目",
         related_name="competitors",
     )
-    name = models.CharField("姓名", max_length=100, help_text="选手姓名")
     gender = models.CharField("性别", max_length=1, choices=[('M', '男'), ('F', '女')], blank=True, null=True)
-    organization = models.CharField("所属单位", max_length=100, blank=True, help_text="具体所属学校或单位，区别于代表队")
     member = models.ForeignKey(
         Member, 
         on_delete=models.PROTECT, 
@@ -478,7 +653,19 @@ class Competitor(models.Model):
     class Meta:
         verbose_name = '参赛选手'
         verbose_name_plural = '参赛选手'
-        ordering = ['competition_project', 'name']
+        ordering = ['competition_project', 'person__name', 'pk']
+
+    @property
+    def name(self):
+        return self.person.name
+
+    @property
+    def user(self):
+        return self.person.user
+
+    @property
+    def organization(self):
+        return self.person.organization
 
     def clean(self):
         member = self.member if self.member_id else None
@@ -492,20 +679,45 @@ class Competitor(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        if self.user:
-            return f"{self.name} (User: {self.user.username})"
+        if self.person.user:
+            return f"{self.person.name} (User: {self.person.user.username})"
+        return self.person.name
+
+
+class CompetitionPerson(models.Model):
+    """可在不同赛事中复用的竞赛人员主档。"""
+    user = models.ForeignKey(
+        CompetitorUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="关联用户",
+        related_name="competition_people",
+        help_text="如果是校内人员，可关联用户账号；外部人员可留空。",
+    )
+    name = models.CharField("姓名", max_length=100)
+    organization = models.CharField("所属单位", max_length=100, blank=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = '竞赛人员'
+        verbose_name_plural = '竞赛人员'
+        ordering = ['name', 'organization', 'pk']
+
+    def __str__(self):
+        if self.organization:
+            return f"{self.name} - {self.organization}"
         return self.name
 
 
 class Expert(models.Model):
     """专家 (关联到具体赛项)"""
-    user = models.ForeignKey(
-        CompetitorUser, # 复用之前定义的代理用户
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        verbose_name="关联用户",
-        related_name="expert_profiles"
+    person = models.ForeignKey(
+        CompetitionPerson,
+        on_delete=models.PROTECT,
+        verbose_name="专家人员",
+        related_name="expert_assignments",
     )
     competition_project = models.ForeignKey(
         CompetitionProject,
@@ -513,14 +725,12 @@ class Expert(models.Model):
         verbose_name="所属赛项",
         related_name="experts"
     )
-    name = models.CharField("姓名", max_length=100)
     member = models.ForeignKey(
         Member, 
         on_delete=models.PROTECT, 
         verbose_name="代表队",
         related_name="experts"
     )
-    organization = models.CharField("所属单位", max_length=100, blank=True)
     
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
@@ -528,7 +738,25 @@ class Expert(models.Model):
     class Meta:
         verbose_name = '参赛专家(裁判)'
         verbose_name_plural = '参赛专家(裁判)'
-        ordering = ['competition_project', 'name']
+        ordering = ['competition_project', 'person__name', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['competition_project', 'person'],
+                name='unique_expert_per_competition_project',
+            ),
+        ]
+
+    @property
+    def name(self):
+        return self.person.name
+
+    @property
+    def user(self):
+        return self.person.user
+
+    @property
+    def organization(self):
+        return self.person.organization
 
     def clean(self):
         member = self.member if self.member_id else None
@@ -542,18 +770,16 @@ class Expert(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.name} - {self.member.name if self.member else ''}"
+        return f"{self.person.name} - {self.member.name if self.member else ''}"
 
 
 class SkillPosition(models.Model):
     """技能岗位人员 (如场地经理、翻译等, 关联到具体赛项)"""
-    user = models.ForeignKey(
-        CompetitorUser, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        verbose_name="关联用户",
-        related_name="skill_positions"
+    person = models.ForeignKey(
+        CompetitionPerson,
+        on_delete=models.PROTECT,
+        verbose_name="岗位人员",
+        related_name="skill_position_assignments",
     )
     competition_project = models.ForeignKey(
         CompetitionProject,
@@ -561,9 +787,7 @@ class SkillPosition(models.Model):
         verbose_name="所属赛项",
         related_name="skill_positions"
     )
-    name = models.CharField("姓名", max_length=100)
     position_name = models.CharField("岗位名称", max_length=100, help_text="如：技能竞赛经理(Skill Competition Manager)、首席专家(Chief Expert)、场地经理(Workshop Manager)")
-    organization = models.CharField("所属单位", max_length=100, blank=True)
     remarks = models.TextField("备注", blank=True)
 
     
@@ -573,10 +797,28 @@ class SkillPosition(models.Model):
     class Meta:
         verbose_name = '具体赛事技能岗位人员'
         verbose_name_plural = '具体赛事技能岗位人员'
-        ordering = ['competition_project', 'position_name', 'name']
+        ordering = ['competition_project', 'position_name', 'person__name', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['competition_project', 'person', 'position_name'],
+                name='unique_skill_position_per_person_in_competition_project',
+            ),
+        ]
+
+    @property
+    def name(self):
+        return self.person.name
+
+    @property
+    def user(self):
+        return self.person.user
+
+    @property
+    def organization(self):
+        return self.person.organization
 
     def __str__(self):
-        return f"{self.name} - {self.position_name}"
+        return f"{self.person.name} - {self.position_name}"
 
 
 class CompetitionResult(models.Model):

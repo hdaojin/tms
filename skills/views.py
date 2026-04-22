@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.views.generic import FormView
 from django_tables2 import SingleTableView
 
-from competitions.models import CompetitionProject, Module
+from competitions.models import CompetitionProject, StandardModule
 from core.utils.mixins import TitleMixin
 from .forms import ExamPointEntryForm, SkillFilterForm
 from .models import ExamPoint, Skill, Topic
@@ -148,7 +148,7 @@ def exam_point_dependency_fields(request):
 @login_required
 def exam_point_topic_suggestions(request):
 	query = (request.GET.get('new_topic_name') or '').strip()
-	module = Module.objects.current().filter(pk=request.GET.get('module')).select_related('project', 'module_set').first()
+	module = StandardModule.objects.current().filter(pk=request.GET.get('module')).select_related('project', 'module_set').first()
 	suggestions = Topic.objects.none()
 	if module is not None and query:
 		suggestions = Topic.objects.filter(module=module, name__icontains=query).order_by('name')[:6]

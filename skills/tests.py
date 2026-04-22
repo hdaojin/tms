@@ -6,12 +6,12 @@ from django.urls import reverse
 from competitions.models import (
 	Competition,
 	CompetitionModule,
-	CompetitionModuleMapping,
+	CompetitionModuleStandardModuleMap,
 	CompetitionProject,
 	CompetitionType,
-	Module,
-	ModuleSet,
 	Project,
+	StandardModule,
+	StandardModuleSet,
 )
 from skills.models import ExamPoint, ExamPointSkill, Skill, Tag, TagGroup, Topic
 
@@ -26,12 +26,10 @@ class ExamPointModelTests(TestCase):
 			name='世界技能大赛',
 		)
 		self.project = Project.objects.create(
-			competition_type=self.competition_type,
 			code='ITNSA',
 			name='信息网络布线',
 		)
 		self.second_project = Project.objects.create(
-			competition_type=self.competition_type,
 			code='CLD',
 			name='云计算',
 		)
@@ -48,7 +46,7 @@ class ExamPointModelTests(TestCase):
 			competition=self.competition,
 			project=self.second_project,
 		)
-		self.module = Module.objects.create(
+		self.module = StandardModule.objects.create(
 			project=self.project,
 			code='M1',
 			name='网络模块',
@@ -167,17 +165,15 @@ class SkillListViewTests(TestCase):
 			name='世界技能大赛',
 		)
 		project = Project.objects.create(
-			competition_type=competition_type,
 			code='ITNSA',
 			name='信息网络布线',
 		)
 		other_project = Project.objects.create(
-			competition_type=competition_type,
 			code='CLD',
 			name='云计算',
 		)
-		self.module_a = Module.objects.create(project=project, code='M1', name='网络模块')
-		self.module_b = Module.objects.create(project=other_project, code='M2', name='云平台模块')
+		self.module_a = StandardModule.objects.create(project=project, code='M1', name='网络模块')
+		self.module_b = StandardModule.objects.create(project=other_project, code='M2', name='云平台模块')
 		topic_a = Topic.objects.create(module=self.module_a, name='网络基础')
 		topic_b = Topic.objects.create(module=self.module_b, name='系统部署')
 		self.skill_a = Skill.objects.create(topic=topic_a, name='交换与路由', description='网络配置技能')
@@ -231,17 +227,14 @@ class ExamPointCreateViewTests(TestCase):
 			code='WSC2026',
 		)
 		self.project = Project.objects.create(
-			competition_type=self.competition_type,
 			code='ITNSA',
 			name='信息网络布线',
 		)
 		self.second_project = Project.objects.create(
-			competition_type=self.competition_type,
 			code='NSAUX',
 			name='网络系统辅助项目',
 		)
 		self.other_project = Project.objects.create(
-			competition_type=self.competition_type,
 			code='CLD',
 			name='云计算',
 		)
@@ -257,20 +250,20 @@ class ExamPointCreateViewTests(TestCase):
 			competition=self.other_competition,
 			project=self.other_project,
 		)
-		self.module = Module.objects.create(project=self.project, code='M1', name='网络模块')
-		self.second_module = Module.objects.create(project=self.project, code='M2', name='服务模块')
-		self.same_competition_other_project_module = Module.objects.create(
+		self.module = StandardModule.objects.create(project=self.project, code='M1', name='网络模块')
+		self.second_module = StandardModule.objects.create(project=self.project, code='M2', name='服务模块')
+		self.same_competition_other_project_module = StandardModule.objects.create(
 			project=self.second_project,
 			code='M9',
 			name='辅助模块',
 		)
-		self.other_module = Module.objects.create(project=self.other_project, code='M3', name='离线模块')
+		self.other_module = StandardModule.objects.create(project=self.other_project, code='M3', name='离线模块')
 		self.official_module = CompetitionModule.objects.create(
 			competition_project=self.competition_project,
 			code=self.module.code,
 			name=self.module.name,
 		)
-		CompetitionModuleMapping.objects.create(
+		CompetitionModuleStandardModuleMap.objects.create(
 			competition_module=self.official_module,
 			module=self.module,
 			is_primary=True,
@@ -280,7 +273,7 @@ class ExamPointCreateViewTests(TestCase):
 			code=self.second_module.code,
 			name=self.second_module.name,
 		)
-		CompetitionModuleMapping.objects.create(
+		CompetitionModuleStandardModuleMap.objects.create(
 			competition_module=self.second_official_module,
 			module=self.second_module,
 			is_primary=True,
@@ -290,7 +283,7 @@ class ExamPointCreateViewTests(TestCase):
 			code=self.same_competition_other_project_module.code,
 			name=self.same_competition_other_project_module.name,
 		)
-		CompetitionModuleMapping.objects.create(
+		CompetitionModuleStandardModuleMap.objects.create(
 			competition_module=self.secondary_project_official_module,
 			module=self.same_competition_other_project_module,
 			is_primary=True,
@@ -300,7 +293,7 @@ class ExamPointCreateViewTests(TestCase):
 			code=self.other_module.code,
 			name=self.other_module.name,
 		)
-		CompetitionModuleMapping.objects.create(
+		CompetitionModuleStandardModuleMap.objects.create(
 			competition_module=self.other_official_module,
 			module=self.other_module,
 			is_primary=True,
@@ -360,19 +353,19 @@ class ExamPointCreateViewTests(TestCase):
 	def test_dependency_endpoint_uses_current_module_mappings_only(self):
 		self.login()
 		self.official_module.module_mappings.filter(module=self.module).update(is_primary=False)
-		new_module_set = ModuleSet.objects.create(
+		new_module_set = StandardModuleSet.objects.create(
 			project=self.project,
 			code='2026',
 			name='2026 版标准模块',
 			is_current=True,
 		)
-		replacement_module = Module.objects.create(
+		replacement_module = StandardModule.objects.create(
 			project=self.project,
 			module_set=new_module_set,
 			code='NM1',
 			name='新网络模块',
 		)
-		CompetitionModuleMapping.objects.create(
+		CompetitionModuleStandardModuleMap.objects.create(
 			competition_module=self.official_module,
 			module=replacement_module,
 			is_primary=True,
