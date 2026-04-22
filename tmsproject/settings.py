@@ -68,7 +68,7 @@ INSTALLED_APPS = [
     'competitions',
     'assessment',
     'notes',
-    # 'skills',
+    'skills',
     'traininglogs',
     'meeting',
     'notices',

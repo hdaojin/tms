@@ -1,0 +1,15 @@
+---
+- name: 技能点管理
+  icon: icon-[tabler--hierarchy-3]
+  is_group_header: true
+  children:
+      - name: 技能点列表
+        named_url: skills:skill_list
+        icon: icon-[tabler--list-search]
+        is_visible: true
+        login_required: true
+      - name: 录入考点
+        named_url: skills:exam_point_create
+        icon: icon-[tabler--plus]
+        is_visible: true
+        login_required: true

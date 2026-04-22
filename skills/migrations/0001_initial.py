@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('competitions', '0012_skill'),
+        ('competitions', '0012_alter_competitionproject_document'),
     ]
 
     operations = [

@@ -3,12 +3,23 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.db.models import Max
 
+from competitions.models import Module
 from core.constants import GROUP_COACH
 
 from .models import Assessment, Score, AssessmentModule, AssessmentAttachment
 
 
 User = get_user_model()
+
+
+def get_current_module_queryset():
+    return Module.objects.current().select_related('project', 'module_set').order_by(
+        'project__name',
+        'module_set__sort_order',
+        'sort_order',
+        'code',
+        'name',
+    )
 
 
 class AssessmentModuleInline(admin.TabularInline):
@@ -61,6 +72,8 @@ class AssessmentModuleInline(admin.TabularInline):
             kwargs["queryset"] = User.objects.filter(groups__name=GROUP_COACH).order_by(
                 "last_name", "first_name", "username"
             )
+        elif db_field.name == "module":
+            kwargs["queryset"] = get_current_module_queryset()
 
         form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
         if form_field and db_field.name == "responsible_coach":
@@ -181,6 +194,8 @@ class AssessmentModuleAdmin(admin.ModelAdmin):
             kwargs["queryset"] = User.objects.filter(groups__name=GROUP_COACH).order_by(
                 "last_name", "first_name", "username"
             )
+        elif db_field.name == "module":
+            kwargs["queryset"] = get_current_module_queryset()
 
         form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
         if form_field and db_field.name == "responsible_coach":

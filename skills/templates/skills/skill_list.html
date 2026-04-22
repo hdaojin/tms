@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="flex flex-col gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <div class="text-sm text-base-content/70">
+        按竞赛模块查看技能点与关联专题。
+      </div>
+      <a href="{% url 'skills:exam_point_create' %}" class="btn btn-primary">
+        <span class="icon-[tabler--plus] size-5"></span>
+        录入考点
+      </a>
+    </div>
+
+    <div class="card bg-base-200 shadow-sm">
+      <div class="card-body">
+        <form method="get">
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {% include 'components/field.html' with field=filter_form.module %}
+            {% include 'components/field.html' with field=filter_form.keyword %}
+          </div>
+          <div class="mt-4 flex flex-wrap justify-center gap-4">
+            <a href="{% url 'skills:skill_list' %}" class="btn btn-outline btn-wide">清空筛选</a>
+            <button type="submit" class="btn btn-primary btn-wide">筛选</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-between text-sm text-base-content/70">
+      <span>可先筛选已有技能点，再进入考点录入页复用专题与技能。</span>
+      {% if table.page %}
+        <span>共 {{ table.page.paginator.count }} 条记录</span>
+      {% endif %}
+    </div>
+
+    {% include 'components/table_block.html' %}
+  </div>
+{% endblock %}

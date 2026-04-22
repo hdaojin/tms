@@ -1,5 +1,8 @@
 from django import forms
 from django.utils import timezone
+
+from competitions.models import Module
+
 from .models import TrainingLog
 from core.utils.forms import StyledFormMixin
 from core.constants import TRAININGLOG_ALLOWED_EXTENSIONS
@@ -12,6 +15,13 @@ class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
             self.instance.uploaded_by = self.current_user
 
         module_field = self.fields['module']
+        module_field.queryset = Module.objects.current().select_related('project', 'module_set').order_by(
+            'project__name',
+            'module_set__sort_order',
+            'sort_order',
+            'code',
+            'name',
+        )
         module_field.required = True
         module_field.empty_label = None
         module_field.label_from_instance = lambda obj: f"{obj.code} - {obj.name}" #type: ignore

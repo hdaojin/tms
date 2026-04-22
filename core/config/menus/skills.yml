@@ -1,0 +1,24 @@
+---
+menu_slug: "skills"
+app_name: "skills"
+items:
+  - name: "技能点管理"
+    icon:
+      pic: "icon-[tabler--hierarchy-3]"
+      size: 4
+    is_group_header: true
+    children:
+      - name: "技能点列表"
+        named_url: "skills:skill_list"
+        icon:
+          pic: "icon-[tabler--list-search]"
+          size: 4
+        is_visible: true
+        login_required: true
+      - name: "录入考点"
+        named_url: "skills:exam_point_create"
+        icon:
+          pic: "icon-[tabler--plus]"
+          size: 4
+        is_visible: true
+        login_required: true

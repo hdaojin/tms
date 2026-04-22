@@ -38,6 +38,7 @@ sections:
       color: "success"
     include:
       - "traininglogs"
+      - "skills"
 
   - section: "assessment"
     label: "考核"

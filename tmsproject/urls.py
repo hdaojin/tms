@@ -52,6 +52,7 @@ urlpatterns = [
     path("notes/", include("notes.urls", namespace="notes")),
     path("assessment/", include("assessment.urls", namespace="assessment")),
     path("conduct/", include("conduct.urls", namespace="conduct")),
+    path("skills/", include("skills.urls", namespace="skills")),
     path("notes-files/<str:repo>/<path:asset_path>", note_asset_view, name="note_asset"),
     # path("competitions/", include("competitions.urls", namespace="competitions")),
     path("", login_not_required(HomeView.as_view()), name="home"),

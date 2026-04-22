@@ -5,10 +5,10 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from competitions.models import CompetitionType, Module, Project
+from competitions.models import CompetitionType, Module, ModuleSet, Project
 from core.constants import GROUP_COACH
 
 from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
@@ -60,6 +60,45 @@ class AssessmentModuleOrderingTests(TestCase):
         )
 
         self.assertEqual(module_codes, ["C", "A", "B"])
+
+
+class AssessmentModuleAdminModuleQuerysetTests(TestCase):
+    def setUp(self):
+        competition_type = CompetitionType.objects.create(
+            code="WSC-ADMIN",
+            name="后台测试赛事",
+        )
+        self.project = Project.objects.create(
+            competition_type=competition_type,
+            code="ITNSA-ADMIN",
+            name="后台测试项目",
+        )
+        self.current_module = Module.objects.create(
+            project=self.project,
+            code="A",
+            name="当前模块",
+        )
+        historical_module_set = ModuleSet.objects.create(
+            project=self.project,
+            code="2024",
+            name="2024 版标准模块",
+            is_current=False,
+        )
+        self.historical_module = Module.objects.create(
+            project=self.project,
+            module_set=historical_module_set,
+            code="B",
+            name="历史模块",
+        )
+        self.request = RequestFactory().get("/admin/assessment/assessmentmodule/add/")
+        self.admin = admin.site._registry[AssessmentModule]
+
+    def test_admin_module_field_only_shows_current_modules(self):
+        field = AssessmentModule._meta.get_field("module")
+
+        form_field = self.admin.formfield_for_foreignkey(field, self.request)
+
+        self.assertEqual(list(form_field.queryset), [self.current_module])
 
 
 class AssessmentCoachingWorkflowTests(TestCase):

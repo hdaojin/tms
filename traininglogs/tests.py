@@ -14,7 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
-from competitions.models import CompetitionType, Module, Project
+from competitions.models import CompetitionType, Module, ModuleSet, Project
 
 from .forms import TrainingLogCreateForm
 from .models import TrainingLog
@@ -30,13 +30,13 @@ class TrainingLogCreateFormTestCase(TestCase):
 			code='WSC',
 			name='世界技能大赛',
 		)
-		project = Project.objects.create(
+		self.project = Project.objects.create(
 			competition_type=competition_type,
 			code='ITNSA',
 			name='网络系统管理',
 		)
-		Module.objects.create(project=project, code='A', name='网络配置')
-		Module.objects.create(project=project, code='B', name='服务部署')
+		Module.objects.create(project=self.project, code='A', name='网络配置')
+		Module.objects.create(project=self.project, code='B', name='服务部署')
 
 	def test_module_field_uses_radio_select_widget(self):
 		form = TrainingLogCreateForm()
@@ -46,6 +46,29 @@ class TrainingLogCreateFormTestCase(TestCase):
 		self.assertTrue(module_field.required)
 		self.assertIsNone(module_field.empty_label)
 		self.assertEqual(module_field.widget.attrs['class'], 'radio radio-primary')
+		self.assertEqual(
+			[choice.choice_label for choice in form['module']],
+			['A - 网络配置', 'B - 服务部署'],
+		)
+
+	def test_module_field_only_lists_current_module_set_modules(self):
+		current_module_set = self.project.current_module_set
+		historical_module_set = ModuleSet.objects.create(
+			project=self.project,
+			code='2024',
+			name='2024 版标准模块',
+			is_current=False,
+		)
+		Module.objects.create(
+			project=self.project,
+			module_set=historical_module_set,
+			code='C',
+			name='历史模块',
+		)
+
+		form = TrainingLogCreateForm()
+
+		self.assertIsNotNone(current_module_set)
 		self.assertEqual(
 			[choice.choice_label for choice in form['module']],
 			['A - 网络配置', 'B - 服务部署'],

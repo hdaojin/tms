@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="flex flex-col gap-4">
+    <div class="alert alert-info items-start">
+      <span class="icon-[tabler--info-circle] mt-1 size-6"></span>
+      <div class="space-y-2">
+        <p class="font-semibold">关系说明</p>
+        <ul class="list-disc space-y-1 pl-5 text-sm">
+          <li>具体赛项决定考点的唯一性范围，考点名称在同一具体赛项下不能重复。</li>
+          <li>模块来自当前具体赛项的官方模块映射到当前标准模块集的结果，不直接手工新建。</li>
+          <li>专题隶属于模块，技能点隶属于专题；录入时可跨同一模块下多个专题复用已有技能点。</li>
+          <li>如果需要补录新技能点，再为它指定一个已有专题或新建专题。</li>
+        </ul>
+      </div>
+    </div>
+
+    <fieldset class="fieldset bg-base-100 border-base-300 rounded-box w-full border p-6 shadow-xl">
+      <legend class="fieldset-legend text-2xl font-bold">{{ title }}</legend>
+
+      <form
+        id="exam-point-entry-form"
+        method="post"
+        x-data='{
+          topicMode: "{{ form.topic_mode.value|default:"existing" }}",
+          newSkills: JSON.parse("{{ new_skill_rows_json|escapejs }}"),
+          addSkill() { this.newSkills.push(""); },
+          removeSkill(index) {
+            if (this.newSkills.length > 1) {
+              this.newSkills.splice(index, 1);
+              return;
+            }
+            this.newSkills = [""];
+          }
+        }'
+      >
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-error mb-4">
+            <ul class="list-disc list-inside">
+              {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {% include 'components/field.html' with field=form.competition_project %}
+        </div>
+
+        <div id="entry-dependencies">
+          {% include 'skills/partials/exam_point_dependency_fields.html' with form=form %}
+        </div>
+
+        <div class="card bg-base-100 border-base-300 border shadow-sm">
+          <div class="card-body">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="card-title text-lg">3. 考点基础信息</h2>
+              <span class="text-sm text-base-content/60">同一具体赛项下名称唯一</span>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {% include 'components/field.html' with field=form.name wrapper_class='md:col-span-2' %}
+              {% include 'components/field.html' with field=form.detail_content wrapper_class='md:col-span-2' %}
+              {% include 'components/field.html' with field=form.difficulty %}
+              {% include 'components/field.html' with field=form.score %}
+            </div>
+
+            <div id="exam-point-suggestions" class="mt-2">
+              {% include 'skills/partials/exam_point_suggestions.html' with competition_project=None query='' suggestions=None %}
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-wrap justify-center gap-4">
+          <a href="{% url 'skills:skill_list' %}" class="btn btn-ghost">
+            <span class="icon-[tabler--arrow-left] size-5"></span>
+            返回列表
+          </a>
+          <button type="reset" class="btn btn-outline btn-wide">
+            <span class="icon-[tabler--refresh] size-5"></span>
+            重置
+          </button>
+          <button type="submit" class="btn btn-primary btn-wide">
+            <span class="icon-[tabler--send] size-5"></span>
+            保存考点
+          </button>
+        </div>
+      </form>
+    </fieldset>
+  </div>
+{% endblock %}
