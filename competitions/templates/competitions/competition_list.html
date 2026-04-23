@@ -7,29 +7,8 @@
       <span class="icon-[tabler--info-circle] mt-1 size-5"></span>
       <div class="space-y-1 text-sm">
         <p class="font-semibold">维护边界</p>
-        <p>竞赛类型、竞赛项目、竞赛模块、具体赛事、具体赛事项目与本届官方模块由管理员在后台维护。</p>
-        <p>前台只开放代表队、选手、专家、岗位人员和最终竞赛总成绩的新增入口。</p>
-      </div>
-    </div>
-
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <p class="text-sm text-base-content/70">登录后可查看全部竞赛与具体赛项详情。</p>
-      <div class="flex flex-wrap gap-2">
-        {% if perms.competitions.add_member %}
-          <a href="{% url 'competitions:member_create' %}" class="btn btn-outline btn-sm">新增代表队</a>
-        {% endif %}
-        {% if perms.competitions.add_competitor %}
-          <a href="{% url 'competitions:competitor_create' %}" class="btn btn-outline btn-sm">新增选手</a>
-        {% endif %}
-        {% if perms.competitions.add_expert %}
-          <a href="{% url 'competitions:expert_create' %}" class="btn btn-outline btn-sm">新增专家</a>
-        {% endif %}
-        {% if perms.competitions.add_skillposition %}
-          <a href="{% url 'competitions:skillposition_create' %}" class="btn btn-outline btn-sm">新增岗位人员</a>
-        {% endif %}
-        {% if perms.competitions.add_competitionresult %}
-          <a href="{% url 'competitions:competitionresult_create' %}" class="btn btn-primary btn-sm">录入总成绩</a>
-        {% endif %}
+        <p>竞赛类型、竞赛项目、竞赛模块、具体赛事、具体赛事项目与每届官方比赛模块由管理员在后台维护。</p>
+        <p>前台只开放代表队、选手、专家、岗位人员和最终竞赛总成绩的录入入口。</p>
       </div>
     </div>
 

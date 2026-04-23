@@ -30,7 +30,7 @@ def competition_document_path(instance, filename):
     return f"competition_projects/{competition_path}/{filename}"
 
 class Level(models.TextChoices):
-    INTERNATIONAL = 'international', '国际级'
+    INTERNATIONAL = 'international', '世界级'
     NATIONAL = 'national', '国家级'
     PROVINCIAL = 'provincial', '省级'
     MUNICIPAL = 'municipal', '市级'
