@@ -126,7 +126,10 @@ class Command(BaseCommand):
             old_exists = plan.old_name in existing_tables
             new_exists = plan.new_name in existing_tables
             if old_exists and new_exists:
-                if self._table_has_rows(connection, plan.new_name):
+                if self._table_has_rows(connection, plan.new_name) and not self._can_replace_non_empty_new_table(
+                    connection,
+                    plan,
+                ):
                     raise CommandError(
                         f"检测到旧表和新表同时存在，且新表 {plan.new_name} 已有数据。当前状态不完整，请先人工确认。"
                     )
@@ -141,6 +144,29 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             cursor.execute(f"SELECT 1 FROM {quoted_name} LIMIT 1")
             return cursor.fetchone() is not None
+
+    def _can_replace_non_empty_new_table(self, connection, plan):
+        if plan.new_name != ConductSeverityRule._meta.db_table:
+            return False
+
+        old_table = connection.ops.quote_name(plan.old_name)
+        new_table = connection.ops.quote_name(plan.new_name)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT COUNT(*)
+                FROM {new_table} AS new_rule
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM {old_table} AS old_rule
+                    WHERE old_rule.nature = new_rule.nature
+                      AND old_rule.severity = new_rule.severity
+                )
+                """
+            )
+            unmatched_count = cursor.fetchone()[0]
+
+        return unmatched_count == 0
 
     def _collect_metadata_action(self, connection, table_name, column_name):
         with connection.cursor() as cursor:

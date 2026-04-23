@@ -739,3 +739,47 @@ class ConductCutoverRecoveryTests(TransactionTestCase):
                 content_type__app_label='behaviors',
             ).exists()
         )
+
+    def test_cutover_command_recovers_when_new_severity_rule_table_only_has_seed_rows(self):
+        old_rule = ConductSeverityRule.objects.create(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=CONDUCT_SEVERITY_MODERATE,
+            multiplier=Decimal('9.00'),
+            order=20,
+        )
+
+        self.addCleanup(
+            lambda: connection.cursor().execute('DROP TABLE IF EXISTS conduct_conductseverityrule')
+        )
+        self.addCleanup(
+            lambda: connection.cursor().execute('DROP TABLE IF EXISTS behaviors_conductseverityrule_empty_backup')
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = %s",
+                ['behaviors_conductseverityrule'],
+            )
+            create_sql = cursor.fetchone()[0].replace(
+                '"behaviors_conductseverityrule"',
+                '"conduct_conductseverityrule"',
+                1,
+            )
+            cursor.execute(create_sql)
+            cursor.execute(
+                'INSERT INTO conduct_conductseverityrule SELECT * FROM behaviors_conductseverityrule'
+            )
+            cursor.execute('DELETE FROM behaviors_conductseverityrule')
+            cursor.execute(
+                """
+                INSERT INTO behaviors_conductseverityrule (id, nature, severity, multiplier, "order", created_at, updated_at, created_by_id, updated_by_id)
+                VALUES (999, 'REWARD', 'MODERATE', 1.00, 20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL)
+                """
+            )
+
+        stdout = StringIO()
+        call_command('cutover_conduct_to_behaviors', '--execute', stdout=stdout)
+
+        self.assertIn('conduct 已切换为 behaviors', stdout.getvalue())
+        self.assertEqual(ConductSeverityRule.objects.count(), 1)
+        self.assertEqual(ConductSeverityRule.objects.get().pk, old_rule.pk)
+        self.assertEqual(ConductSeverityRule.objects.get().multiplier, Decimal('9.00'))
