@@ -13,24 +13,18 @@
       login_required: true
 
     - name: 教练训练日志
-      # visible_for_groups: ["选手"]
       named_url: "traininglogs:traininglog_coach_list"
       icon: icon-[tabler--file-search]
       is_visible: true
       login_required: true
-      perm_match_all: true
-      required_perms: 
-        - traininglogs.view_coach_traininglog
+      visible_for_groups: ["选手"]
 
     - name: 选手训练日志
-      # visible_for_groups: ["教练"]
       named_url: "traininglogs:traininglog_competitor_list"
       icon: icon-[tabler--file-search]
       is_visible: true
       login_required: true
-      perm_match_all: true
-      required_perms: 
-        - traininglogs.view_competitor_traininglog
+      visible_for_groups: ["教练"]
 
     - name: 上传训练日志
       named_url: "traininglogs:traininglog_upload"

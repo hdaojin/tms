@@ -17,6 +17,7 @@
 - [competitions/admin-guide.md](competitions/admin-guide.md): competitions 后台管理员操作手册。
 - [competitions/frontend-guide.md](competitions/frontend-guide.md): competitions 前台业务录入手册。
 - [meetings/overview.md](meetings/overview.md): meetings APP 总览与常见任务。
+- [traininglogs/overview.md](traininglogs/overview.md): traininglogs APP 总览与跨角色查看规则。
 
 
 ## 编写约定

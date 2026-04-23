@@ -5,6 +5,7 @@ from datetime import date, timedelta
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
     PermissionRequiredMixin,
+    UserPassesTestMixin,
 )
 from django.views.generic import CreateView, DetailView, DeleteView
 from django.urls import reverse_lazy, reverse
@@ -176,11 +177,25 @@ class TrainingLogDeleteView(OwnerRequiredMixin, LoginRequiredMixin, DeleteView):
     owner_field = "uploaded_by"
 
 
+class CrossGroupTraininglogListAccessMixin(UserPassesTestMixin):
+    raise_exception = True
+    allowed_viewer_groups: tuple[str, ...] = ()
+
+    def test_func(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return False
+        if getattr(user, "is_superuser", False):
+            return True
+        user_groups = set(user.groups.values_list("name", flat=True))
+        return bool(user_groups.intersection(self.allowed_viewer_groups))
+
+
 class CoachTraininglogListView(
     TraininglogMonthFilterMixin,
     TitleMixin,
     LoginRequiredMixin,
-    PermissionRequiredMixin,
+    CrossGroupTraininglogListAccessMixin,
     SingleTableView,
 ):
     """教练训练日志：展示所有“教练”上传的日志。"""
@@ -188,8 +203,8 @@ class CoachTraininglogListView(
     model = TrainingLog
     table_class = TrainingLogOthersTable
     template_name = "traininglogs/traininglog_list.html"
-    permission_required = "traininglogs.view_coach_traininglog"
     raise_exception = True
+    allowed_viewer_groups = (GROUP_COMPETITOR,)
     paginate_by = pagination_per_page
     title = "教练训练日志"
     title_icon = "icon-[tabler--file-search]"
@@ -209,7 +224,7 @@ class CompetitorTraininglogListView(
     TraininglogMonthFilterMixin,
     TitleMixin,
     LoginRequiredMixin,
-    PermissionRequiredMixin,
+    CrossGroupTraininglogListAccessMixin,
     SingleTableView,
 ):
     """选手训练日志：展示所有“选手”上传的日志。"""
@@ -217,8 +232,8 @@ class CompetitorTraininglogListView(
     model = TrainingLog
     table_class = TrainingLogOthersTable
     template_name = "traininglogs/traininglog_list.html"
-    permission_required = "traininglogs.view_competitor_traininglog"
     raise_exception = True
+    allowed_viewer_groups = (GROUP_COACH,)
     paginate_by = pagination_per_page
     title = "选手训练日志"
     title_icon = "icon-[tabler--file-search]"

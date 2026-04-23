@@ -294,6 +294,34 @@ class TrainingLogListViewTestCase(TestCase):
 		self.assertEqual(list(response.context['object_list']), [self.current_competitor_log])
 		self.assertNotContains(response, self.current_coach_log.task)
 
+	def test_competitor_can_view_coach_traininglogs(self):
+		self.client.force_login(self.competitor_user)
+		response = self.client.get(reverse('traininglogs:traininglog_coach_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(list(response.context['object_list']), [self.current_coach_log])
+		self.assertNotContains(response, self.current_competitor_log.task)
+
+	def test_coach_can_view_competitor_traininglogs(self):
+		self.client.force_login(self.coach_user)
+		response = self.client.get(reverse('traininglogs:traininglog_competitor_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(list(response.context['object_list']), [self.current_competitor_log])
+		self.assertNotContains(response, self.current_coach_log.task)
+
+	def test_coach_cannot_view_peer_coach_traininglog_list(self):
+		self.client.force_login(self.coach_user)
+		response = self.client.get(reverse('traininglogs:traininglog_coach_list'))
+
+		self.assertEqual(response.status_code, 403)
+
+	def test_competitor_cannot_view_peer_competitor_traininglog_list(self):
+		self.client.force_login(self.competitor_user)
+		response = self.client.get(reverse('traininglogs:traininglog_competitor_list'))
+
+		self.assertEqual(response.status_code, 403)
+
 	def test_my_list_defaults_to_current_month_for_current_user(self):
 		self.client.force_login(self.coach_user)
 		response = self.client.get(reverse('traininglogs:traininglog_list'))
@@ -320,3 +348,17 @@ class TrainingLogListViewTestCase(TestCase):
 
 	def test_my_list_route_is_mounted_at_app_root(self):
 		self.assertEqual(reverse('traininglogs:traininglog_list'), '/traininglogs/')
+
+	def test_competitor_can_view_coach_traininglog_detail(self):
+		self.client.force_login(self.competitor_user)
+		response = self.client.get(reverse('traininglogs:traininglog_detail', args=[self.current_coach_log.pk]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['traininglog'], self.current_coach_log)
+
+	def test_coach_can_view_competitor_traininglog_detail(self):
+		self.client.force_login(self.coach_user)
+		response = self.client.get(reverse('traininglogs:traininglog_detail', args=[self.current_competitor_log.pk]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.context['traininglog'], self.current_competitor_log)
