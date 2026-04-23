@@ -135,19 +135,19 @@ CONDUCT_UPLOAD_MAX_SIZE_MB = 50
 NOTES_ROOT = PRIVATE_MEDIA_ROOT / "notes"
 
 # 考核文件上传目录（私有，完整路径）
-ASSESSMENT_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "assessment"
+ASSESSMENT_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "assessments"
 
 # 竞赛文件上传目录（私有，完整路径）
 COMPETITION_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "competitions"
 
-# conduct 操行记录附件上传目录（私有，完整路径）
-CONDUCT_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "conduct"
+# 奖惩记录附件上传目录（公共，相对于 MEDIA_ROOT）
+BEHAVIORS_UPLOAD_DIR = Path("behaviors")
 
 # 训练日志上传目录（公共，相对于 MEDIA_ROOT）
 TRAININGLOG_UPLOAD_DIR = "traininglogs"
 
 # 会议记录上传目录（公共，相对于 MEDIA_ROOT）
-MEETING_UPLOAD_DIR = "meetings"
+MEETINGS_UPLOAD_DIR = "meetings"
 
 # 通知附件上传目录（公共，相对于 MEDIA_ROOT）
 NOTICE_UPLOAD_DIR = "notices"

@@ -6,7 +6,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from accounts.models import UserProfile
-from conduct.models import ConductSummary
+from behaviors.models import ConductSummary
 from core.constants import GROUP_COMPETITOR
 
 User = get_user_model()
@@ -26,7 +26,7 @@ class AccountHomeTestCase(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '奖惩')
 
-	def test_conduct_root_is_not_accessible(self):
+	def test_legacy_conduct_root_is_not_accessible(self):
 		response = self.client.get('/conduct/')
 
 		self.assertEqual(response.status_code, 404)

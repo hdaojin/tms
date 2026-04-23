@@ -81,10 +81,33 @@ Copy-Item .env.example .env
 uv run manage.py migrate
 ```
 
+如果当前环境是从旧的内部标识升级到新的 `assessments`、`behaviors` 或 `meetings`，请先执行对应切换命令，再继续 migrate。
+
+仅适用于已有旧数据的环境：
+
+```bash
+uv run manage.py cutover_assessment_to_assessments
+uv run manage.py cutover_assessment_to_assessments --execute
+uv run manage.py cutover_conduct_to_behaviors
+uv run manage.py cutover_conduct_to_behaviors --execute
+uv run manage.py cutover_meeting_to_meetings
+uv run manage.py cutover_meeting_to_meetings --execute
+uv run manage.py migrate
+```
+
+说明：
+
+- 全新初始化数据库时，不需要执行 `cutover_assessment_to_assessments`。
+- 全新初始化数据库时，不需要执行 `cutover_conduct_to_behaviors` 或 `cutover_meeting_to_meetings`。
+- 执行 `--execute` 前，先备份数据库，以及命令涉及的旧上传目录。
+- 该命令会重命名旧的 `assessment_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识，并把私有资料目录迁到 `media-private/assessments/`。
+- `cutover_conduct_to_behaviors` 会重命名旧的 `conduct_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识，并在存在旧目录时把公共附件目录从 `media/conduct/` 迁到 `media/behaviors/`。
+- `cutover_meeting_to_meetings` 会重命名旧的 `meeting_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识；如存在遗留 `media/meeting/`，也会一并迁到 `media/meetings/`。
+
 ### 5. 导入基础数据
 
 ```bash
-uv run manage.py loaddata core/default accounts/default competitions/default conduct/default
+uv run manage.py loaddata core/default accounts/default competitions/default behaviors/default
 ```
 
 ### 6. 创建超级管理员
@@ -122,7 +145,10 @@ http://127.0.0.1:8000/
 ## 常用开发命令
 
 ```bash
-uv run manage.py test assessment
+uv run manage.py test assessments
+uv run manage.py cutover_assessment_to_assessments
+uv run manage.py cutover_conduct_to_behaviors
+uv run manage.py cutover_meeting_to_meetings
 uv run manage.py check
 uv run manage.py makemigrations
 uv run manage.py migrate
@@ -218,7 +244,7 @@ mkdir -p /srv/tms/media-private
 
 ```bash
 uv run manage.py migrate
-uv run manage.py loaddata core/default accounts/default competitions/default conduct/default
+uv run manage.py loaddata core/default accounts/default competitions/default behaviors/default
 uv run manage.py createsuperuser
 ```
 

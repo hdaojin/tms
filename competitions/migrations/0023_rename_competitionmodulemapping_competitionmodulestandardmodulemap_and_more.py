@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('assessment', '0023_assessmentmodule_material_lock_fields'),
+        ('assessments', '0023_assessmentmodule_material_lock_fields'),
         ('competitions', '0022_competitor_person_refactor'),
         ('skills', '0006_finalize_exam_point_scope_and_skills'),
         ('traininglogs', '0004_traininglog_unique_uploaded_by_training_date'),

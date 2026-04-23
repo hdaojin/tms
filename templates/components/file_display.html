@@ -12,7 +12,7 @@
   - readonly: 只读模式下隐藏删除按钮（可选）
 
 使用示例:
-  {% include 'components/file_display.html' with file=object.question_file delete_url_name="assessment:delete_module_file" module_id=object.pk field_name="question_file" label="试题文件" %}
+  {% include 'components/file_display.html' with file=object.question_file delete_url_name="assessments:delete_module_file" module_id=object.pk field_name="question_file" label="试题文件" %}
 {% endcomment %}
 {% load form_extras %}
 

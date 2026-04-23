@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from core.constants import (
@@ -563,6 +564,11 @@ class ConductRecordAdminTestCase(TestCase):
                 self.record,
             )
         )
+
+
+class ConductUrlTests(TestCase):
+    def test_conduct_record_list_is_mounted_at_app_root(self):
+        self.assertEqual(reverse('conduct:conductrecord_list'), '/conduct/')
 
 
 class ConductAuditAdminTestCase(TestCase):

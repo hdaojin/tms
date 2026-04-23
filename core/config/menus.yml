@@ -5,16 +5,16 @@ layouts:
     - home
     - notice
     - training
-    - assessment
-    - meeting
+    - assessments
+    - meetings
     - about
   dashboard_home:
     - "notice"
-    - "meeting"
+    - "meetings"
     - "training"
     - "notes"
-    - "assessment"
-    - "conduct"
+    - "assessments"
+    - "behaviors"
   # - resource
   # - asset
   # - article
@@ -40,7 +40,7 @@ sections:
       - "traininglogs"
       - "skills"
 
-  - section: "assessment"
+  - section: "assessments"
     label: "竞赛"
     description: "竞赛、考核与成绩管理"
     icon: 
@@ -49,9 +49,9 @@ sections:
       color: "warning"
     include:
       - "competitions"
-      - "assessment"
+      - "assessments"
 
-  - section: "meeting"
+  - section: "meetings"
     label: "会议"
     description: "会议记录"
     icon: 
@@ -59,7 +59,7 @@ sections:
       size: 8
       color: "primary"
     include:
-      - "meeting"
+      - "meetings"
 
   - section: "account"
     label: "账户"
@@ -97,7 +97,7 @@ sections:
     include:
       - "notes"
 
-  - section: "conduct"
+  - section: "behaviors"
     label: "奖惩"
     description: "学生奖惩管理"
     icon: 
@@ -105,6 +105,6 @@ sections:
       size: 8
       color: "secondary"
     include:
-      - "conduct"
+      - "behaviors"
 
 

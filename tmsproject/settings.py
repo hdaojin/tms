@@ -66,13 +66,13 @@ INSTALLED_APPS = [
     'samba',
     'articles',
     'competitions',
-    'assessment',
+    'assessments.apps.AssessmentsConfig',
     'notes',
     'skills',
     'traininglogs',
-    'meeting',
+    'meetings.apps.MeetingsConfig',
     'notices',
-    'conduct',
+    'behaviors.apps.BehaviorsConfig',
 ]
 
 # 开发模式下添加 demo 应用

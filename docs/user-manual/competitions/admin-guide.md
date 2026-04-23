@@ -129,7 +129,7 @@
 结果确认：
 
 - 模块出现在对应项目的当前模块集中。
-- traininglogs、skills、assessment 等 APP 的新录入入口可基于当前模块集使用这些模块。
+- traininglogs、skills、assessments 等 APP 的新录入入口可基于当前模块集使用这些模块。
 
 ### 4.5 创建模块主线
 

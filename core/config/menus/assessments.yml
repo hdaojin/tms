@@ -1,0 +1,19 @@
+---
+# 定义考核应用的菜单项
+
+menu_slug: "assessments"
+app_name: "assessments"
+items:
+  - name: "考核管理"
+    icon: 
+      pic: "icon-[tabler--wallpaper]"
+      size: 4
+    is_group_header: true
+    children:
+        - name: "考核列表"
+          named_url: "assessments:list"
+          icon: 
+            pic: "icon-[tabler--list-check]"
+            size: 4
+          is_visible: true
+          login_required: true

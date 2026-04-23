@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin, GroupAdmin as DefaultGroupAdmin
 
-from conduct.models import ConductSummary
+from behaviors.models import ConductSummary
 from .models import UserProfile, GroupProfile
 
 class UserProfileInline(admin.StackedInline):

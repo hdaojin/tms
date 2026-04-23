@@ -52,7 +52,7 @@
 
 标准模块是系统内部长期复用的模块对象。
 
-traininglogs、skills、assessment 等其他 APP 引用的，是标准模块，不是某一届赛事的官方模块。
+traininglogs、skills、assessments 等其他 APP 引用的，是标准模块，不是某一届赛事的官方模块。
 
 关键点：
 
@@ -157,7 +157,7 @@ traininglogs、skills、assessment 等其他 APP 引用的，是标准模块，�
 关键点：
 
 - 这里记录的是最终成绩、排名和奖项。
-- 模块级成绩不在 competitions 前台录入，而由 assessment APP 管理。
+- 模块级成绩不在 competitions 前台录入，而由 assessments APP 管理。
 
 ## 18. 最容易混淆的几组概念
 

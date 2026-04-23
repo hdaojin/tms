@@ -237,6 +237,18 @@ def _mark_active(items: List[MenuItem], request) -> None:
     """根据当前请求标记 active/expanded，用于侧边栏展开。"""
     path = getattr(request, "path", "")
     view_name = getattr(getattr(request, "resolver_match", None), "view_name", None)
+    has_exact_view_match = False
+
+    def _has_named_url_match(nodes: List[MenuItem]) -> bool:
+        for node in nodes:
+            if node.named_url and view_name and node.named_url == view_name:
+                return True
+            if node.children and _has_named_url_match(node.children):
+                return True
+        return False
+
+    if view_name:
+        has_exact_view_match = _has_named_url_match(items)
 
     def _path_matches(node_url: str) -> bool:
         if not node_url or node_url == "#":
@@ -253,7 +265,7 @@ def _mark_active(items: List[MenuItem], request) -> None:
         matched = False
         if node.named_url and view_name and node.named_url == view_name:
             matched = True
-        if _path_matches(node.resolved_url):
+        if not has_exact_view_match and _path_matches(node.resolved_url):
             matched = True
         child_active = False
         for child in node.children:

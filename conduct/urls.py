@@ -11,7 +11,7 @@ from .views import (
 app_name = 'conduct'
 
 urlpatterns = [
-    path('list/', ConductRecordListView.as_view(), name='conductrecord_list'),
+    path('', ConductRecordListView.as_view(), name='conductrecord_list'),
     path('summary/', ConductSummaryListView.as_view(), name='conductsummary_list'),
     path('create/', ConductRecordCreateView.as_view(), name='conductrecord_create'),
     path('item-choices/', item_choices_view, name='item_choices'),

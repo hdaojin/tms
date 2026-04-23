@@ -3,6 +3,7 @@ import tempfile
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from django.urls import reverse
 
 from .models import Notice, NoticeAttachment
 
@@ -69,3 +70,8 @@ class NoticeAttachmentCleanupTests(TestCase):
 
 		self.assertFalse(old_path.exists())
 		self.assertTrue(new_path.exists())
+
+
+class NoticeUrlTests(TestCase):
+	def test_notice_list_is_mounted_at_app_root(self):
+		self.assertEqual(reverse('notices:notice_list'), '/notices/')

@@ -27,7 +27,7 @@ def convert_fixture(yaml_file, json_file, add_timestamps=True):
     print(f"✓ Converted {yaml_file} → {json_file}")
 
 if __name__ == '__main__':
-    fixtures_dir = Path('conduct/fixtures')
+    fixtures_dir = Path('behaviors/fixtures')
     
     # Convert categories.yaml
     convert_fixture(

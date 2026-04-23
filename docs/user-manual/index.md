@@ -1,6 +1,6 @@
 # TMS 用户手册
 
-本目录用于存放 TMS 系统的用户操作手册。首批内容先从 competitions APP 开始，后续再逐步扩展到 traininglogs、assessment、skills、meeting 等模块。
+本目录用于存放 TMS 系统的用户操作手册，当前已覆盖 assessments、behaviors、competitions、meetings 等模块，后续再逐步扩展到 traininglogs、skills 等模块。
 
 ## 使用说明
 
@@ -10,10 +10,14 @@
 
 ## 当前目录
 
+- [assessments/overview.md](assessments/overview.md): assessments APP 总览与角色边界。
+- [behaviors/overview.md](behaviors/overview.md): behaviors APP 总览与角色边界。
 - [competitions/overview.md](competitions/overview.md): competitions APP 总览与关键概念。
 - [competitions/glossary.md](competitions/glossary.md): competitions APP 术语表与易混概念说明。
 - [competitions/admin-guide.md](competitions/admin-guide.md): competitions 后台管理员操作手册。
 - [competitions/frontend-guide.md](competitions/frontend-guide.md): competitions 前台业务录入手册。
+- [meetings/overview.md](meetings/overview.md): meetings APP 总览与常见任务。
+
 
 ## 编写约定
 

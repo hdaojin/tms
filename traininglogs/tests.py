@@ -317,3 +317,6 @@ class TrainingLogListViewTestCase(TestCase):
 		self.assertEqual(list(response.context['object_list']), [self.previous_coach_log])
 		self.assertEqual(response.context['selected_year'], self.previous_month_date.year)
 		self.assertEqual(response.context['selected_month'], self.previous_month_date.month)
+
+	def test_my_list_route_is_mounted_at_app_root(self):
+		self.assertEqual(reverse('traininglogs:traininglog_list'), '/traininglogs/')

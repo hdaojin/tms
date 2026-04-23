@@ -1,0 +1,98 @@
+- model: behaviors.conductcategory
+  pk: 1
+  fields:
+    nature: "PENALTY"
+    name: "考勤"
+    description: "考勤类惩罚事项"
+    order: 10
+    is_active: true
+    created_at: "2026-04-08T00:00:00Z"
+    updated_at: "2026-04-08T00:00:00Z"
+
+- model: behaviors.conductcategory
+  pk: 2
+  fields:
+    nature: "REWARD"
+    name: "竞赛获奖"
+    description: "竞赛获奖类奖励事项"
+    order: 10
+    is_active: true
+    created_at: "2026-04-08T00:00:00Z"
+    updated_at: "2026-04-08T00:00:00Z"
+
+- model: behaviors.conductitem
+  pk: 1
+  fields:
+    category: 1
+    name: "迟到"
+    default_score: "-1.00"
+    description: "考勤类惩罚事项：迟到。"
+    is_active: true
+    created_at: "2026-04-08T00:00:00Z"
+    updated_at: "2026-04-08T00:00:00Z"
+
+- model: behaviors.conductitem
+  pk: 2
+  fields:
+    category: 1
+    name: "早退"
+    default_score: "-1.00"
+    description: "考勤类惩罚事项：早退。"
+    is_active: true
+    created_at: "2026-04-08T00:00:00Z"
+    updated_at: "2026-04-08T00:00:00Z"
+
+- model: behaviors.conductitem
+  pk: 3
+  fields:
+    category: 1
+    name: "旷课"
+    default_score: "-5.00"
+    description: "考勤类惩罚事项：旷课。"
+    is_active: true
+    created_at: "2026-04-08T00:00:00Z"
+    updated_at: "2026-04-08T00:00:00Z"
+
+- model: behaviors.conductitem
+  pk: 4
+  fields:
+    category: 2
+    name: "市级"
+    default_score: "1.00"
+    description: "竞赛获奖类奖励事项：市级。"
+    is_active: true
+    created_at: "2026-04-08T00:00:00Z"
+    updated_at: "2026-04-08T00:00:00Z"
+
+- model: behaviors.conductitem
+  pk: 5
+  fields:
+    category: 2
+    name: "省级"
+    default_score: "5.00"
+    description: "竞赛获奖类奖励事项：省级。"
+    is_active: true
+    created_at: "2026-04-08T00:00:00Z"
+    updated_at: "2026-04-08T00:00:00Z"
+
+- model: behaviors.conductitem
+  pk: 6
+  fields:
+    category: 2
+    name: "国家级"
+    default_score: "10.00"
+    description: "竞赛获奖类奖励事项：国家级。"
+    is_active: true
+    created_at: "2026-04-08T00:00:00Z"
+    updated_at: "2026-04-08T00:00:00Z"
+
+- model: behaviors.conductitem
+  pk: 7
+  fields:
+    category: 2
+    name: "世界级"
+    default_score: "20.00"
+    description: "竞赛获奖类奖励事项：世界级。"
+    is_active: true
+    created_at: "2026-04-08T00:00:00Z"
+    updated_at: "2026-04-08T00:00:00Z"

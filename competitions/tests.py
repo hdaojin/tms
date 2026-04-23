@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from django.db.models.deletion import ProtectedError
 from django.test import RequestFactory, TestCase
-from django.urls import reverse
+from django.urls import resolve, reverse
 
 from .admin import CompetitorAdminForm, ExpertAdminForm
 from core.utils.menus import get_layout_sections, get_section_menu, get_sections
@@ -962,7 +962,7 @@ class CompetitionMenuConfigTests(TestCase):
 	def test_assessment_section_is_renamed_and_includes_competitions(self):
 		cache.clear()
 		assessment_section = next(
-			section for section in get_sections() if section.get('section') == 'assessment'
+			section for section in get_sections() if section.get('section') == 'assessments'
 		)
 
 		self.assertEqual(assessment_section['label'], '竞赛')
@@ -974,8 +974,43 @@ class CompetitionMenuConfigTests(TestCase):
 		cache.clear()
 		user = User.objects.create_user(username='menu-user', password='testpass123')
 
-		menu_items = get_section_menu('assessment', user)
+		menu_items = get_section_menu('assessments', user)
 		group_names = [item.name for item in menu_items]
 
 		self.assertIn('竞赛信息', group_names)
 		self.assertEqual(group_names[0], '竞赛信息')
+
+	def test_skillposition_create_only_highlights_its_own_menu_item(self):
+		cache.clear()
+		user = User.objects.create_user(username='menu-editor', password='testpass123')
+		permission = Permission.objects.get(codename='add_skillposition')
+		user.user_permissions.add(permission)
+
+		request = RequestFactory().get(reverse('competitions:skillposition_create'))
+		request.user = user
+		request.resolver_match = resolve(request.path)
+
+		menu_items = get_section_menu('assessments', user, request=request)
+		competition_group = next(item for item in menu_items if item.name == '竞赛信息')
+		child_states = {item.name: item.active for item in competition_group.children}
+
+		self.assertTrue(competition_group.active)
+		self.assertTrue(competition_group.expanded)
+		self.assertFalse(child_states['竞赛列表'])
+		self.assertTrue(child_states['新增岗位人员'])
+
+	def test_competition_detail_keeps_list_menu_highlighted(self):
+		cache.clear()
+		user = User.objects.create_user(username='menu-viewer', password='testpass123')
+
+		request = RequestFactory().get('/competitions/123/')
+		request.user = user
+		request.resolver_match = resolve(request.path)
+
+		menu_items = get_section_menu('assessments', user, request=request)
+		competition_group = next(item for item in menu_items if item.name == '竞赛信息')
+		child_states = {item.name: item.active for item in competition_group.children}
+
+		self.assertTrue(competition_group.active)
+		self.assertTrue(competition_group.expanded)
+		self.assertTrue(child_states['竞赛列表'])
