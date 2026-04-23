@@ -7,10 +7,13 @@ from unittest.mock import patch
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import RequestFactory, TestCase
+from django.db import connection
+from django.db.migrations.recorder import MigrationRecorder
+from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.urls import reverse
 
 from competitions.models import CompetitionType, Project, StandardModule, StandardModuleSet
@@ -628,3 +631,54 @@ class AssessmentCutoverCommandTests(TestCase):
                 call_command("cutover_assessment_to_assessments", stdout=output)
 
         self.assertIn("无需切换", output.getvalue())
+
+
+class AssessmentCutoverRecoveryTests(TransactionTestCase):
+    def test_cutover_command_recovers_dual_table_state_when_new_table_is_empty(self):
+        assessment = Assessment.objects.create(
+            name="2026 夏季考核",
+            start_date=date(2026, 7, 1),
+            end_date=date(2026, 7, 2),
+        )
+        MigrationRecorder.Migration.objects.create(app="assessment", name="0001_initial")
+        old_content_type = ContentType.objects.create(app_label="assessment", model="assessment")
+        Permission.objects.create(
+            name="旧考核查看权限",
+            codename="view_assessment_legacy",
+            content_type=old_content_type,
+        )
+
+        self.addCleanup(
+            lambda: connection.cursor().execute("DROP TABLE IF EXISTS assessment_assessment")
+        )
+        self.addCleanup(
+            lambda: connection.cursor().execute("DROP TABLE IF EXISTS assessments_assessment_empty_backup")
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = %s",
+                ["assessments_assessment"],
+            )
+            create_sql = cursor.fetchone()[0].replace(
+                '"assessments_assessment"',
+                '"assessment_assessment"',
+                1,
+            )
+            cursor.execute(create_sql)
+            cursor.execute("INSERT INTO assessment_assessment SELECT * FROM assessments_assessment")
+            cursor.execute("DELETE FROM assessments_assessment")
+
+        output = StringIO()
+        call_command("cutover_assessment_to_assessments", "--execute", stdout=output)
+
+        self.assertIn("assessment 已切换为 assessments", output.getvalue())
+        self.assertEqual(Assessment.objects.count(), 1)
+        self.assertEqual(Assessment.objects.get().pk, assessment.pk)
+        self.assertFalse(MigrationRecorder.Migration.objects.filter(app="assessment").exists())
+        self.assertFalse(ContentType.objects.filter(app_label="assessment", model="assessment").exists())
+        self.assertTrue(
+            Permission.objects.filter(
+                codename="view_assessment_legacy",
+                content_type__app_label="assessments",
+            ).exists()
+        )

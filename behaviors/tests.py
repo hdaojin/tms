@@ -6,10 +6,13 @@ from pathlib import Path
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import RequestFactory, TestCase
+from django.db import connection
+from django.db.migrations.recorder import MigrationRecorder
+from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -686,3 +689,53 @@ class ConductCutoverCommandTests(TestCase):
         call_command('cutover_conduct_to_behaviors', stdout=stdout)
 
         self.assertIn('当前数据库与文件目录已经使用 behaviors，无需切换。', stdout.getvalue())
+
+
+class ConductCutoverRecoveryTests(TransactionTestCase):
+    def test_cutover_command_recovers_dual_table_state_when_new_table_is_empty(self):
+        category = ConductCategory.objects.create(
+            nature=CONDUCT_NATURE_REWARD,
+            name='恢复奖励分类',
+        )
+        MigrationRecorder.Migration.objects.create(app='conduct', name='0001_initial')
+        old_content_type = ContentType.objects.create(app_label='conduct', model='conductcategory')
+        Permission.objects.create(
+            name='旧奖惩查看权限',
+            codename='view_conductcategory_legacy',
+            content_type=old_content_type,
+        )
+
+        self.addCleanup(
+            lambda: connection.cursor().execute('DROP TABLE IF EXISTS conduct_conductcategory')
+        )
+        self.addCleanup(
+            lambda: connection.cursor().execute('DROP TABLE IF EXISTS behaviors_conductcategory_empty_backup')
+        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = %s",
+                ['behaviors_conductcategory'],
+            )
+            create_sql = cursor.fetchone()[0].replace(
+                '"behaviors_conductcategory"',
+                '"conduct_conductcategory"',
+                1,
+            )
+            cursor.execute(create_sql)
+            cursor.execute('INSERT INTO conduct_conductcategory SELECT * FROM behaviors_conductcategory')
+            cursor.execute('DELETE FROM behaviors_conductcategory')
+
+        stdout = StringIO()
+        call_command('cutover_conduct_to_behaviors', '--execute', stdout=stdout)
+
+        self.assertIn('conduct 已切换为 behaviors', stdout.getvalue())
+        self.assertEqual(ConductCategory.objects.count(), 1)
+        self.assertEqual(ConductCategory.objects.get().pk, category.pk)
+        self.assertFalse(MigrationRecorder.Migration.objects.filter(app='conduct').exists())
+        self.assertFalse(ContentType.objects.filter(app_label='conduct', model='conductcategory').exists())
+        self.assertTrue(
+            Permission.objects.filter(
+                codename='view_conductcategory_legacy',
+                content_type__app_label='behaviors',
+            ).exists()
+        )

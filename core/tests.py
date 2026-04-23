@@ -1,3 +1,6 @@
+from io import StringIO
+
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
@@ -27,3 +30,17 @@ class SiteRobotsDirectiveTests(TestCase):
             '<meta name="googlebot" content="noindex, nofollow" />',
             html=True,
         )
+
+
+class InternalCutoverOrchestratorCommandTests(TestCase):
+    def test_reconcile_internal_app_cutovers_is_noop_for_current_state(self):
+        output = StringIO()
+
+        call_command("reconcile_internal_app_cutovers", stdout=output)
+
+        value = output.getvalue()
+        self.assertIn("cutover_assessment_to_assessments", value)
+        self.assertIn("当前数据库与文件目录已经使用 assessments，无需切换。", value)
+        self.assertIn("当前数据库与文件目录已经使用 behaviors，无需切换。", value)
+        self.assertIn("当前数据库与文件目录已经使用 meetings，无需切换。", value)
+        self.assertIn("以上为统一预检查结果。确认无误后，请追加 --execute 执行实际收尾。", value)

@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.admin.models import LogEntry
+from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections, transaction
@@ -21,6 +23,12 @@ class TableRename:
     old_name: str
     new_name: str
     model: object
+
+
+@dataclass(frozen=True)
+class TableAction:
+    plan: TableRename
+    mode: str
 
 
 class Command(BaseCommand):
@@ -45,7 +53,7 @@ class Command(BaseCommand):
 
         table_plan = self._get_table_plan()
         existing_tables = set(connection.introspection.table_names())
-        table_actions = self._collect_table_actions(table_plan, existing_tables)
+        table_actions = self._collect_table_actions(connection, table_plan, existing_tables)
         migration_action = self._collect_metadata_action(connection, "django_migrations", "app")
         content_type_action = self._collect_content_type_action(database)
         media_action = self._collect_media_action()
@@ -77,49 +85,68 @@ class Command(BaseCommand):
             TableRename("Meeting", "meeting_meeting", Meeting._meta.db_table, Meeting),
         ]
 
-    def _collect_table_actions(self, table_plan, existing_tables):
+    def _collect_table_actions(self, connection, table_plan, existing_tables):
         actions = []
         for plan in table_plan:
             old_exists = plan.old_name in existing_tables
             new_exists = plan.new_name in existing_tables
             if old_exists and new_exists:
-                raise CommandError(
-                    f"检测到旧表和新表同时存在：{plan.old_name} / {plan.new_name}。当前状态不完整，请先人工确认。"
-                )
+                if self._table_has_rows(connection, plan.new_name):
+                    raise CommandError(
+                        f"检测到旧表和新表同时存在，且新表 {plan.new_name} 已有数据。当前状态不完整，请先人工确认。"
+                    )
+                actions.append(TableAction(plan=plan, mode="recover-dual-table"))
+                continue
             if old_exists:
-                actions.append(plan)
+                actions.append(TableAction(plan=plan, mode="rename-old-table"))
         return actions
+
+    def _table_has_rows(self, connection, table_name):
+        quoted_name = connection.ops.quote_name(table_name)
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT 1 FROM {quoted_name} LIMIT 1")
+            return cursor.fetchone() is not None
 
     def _collect_metadata_action(self, connection, table_name, column_name):
         with connection.cursor() as cursor:
             cursor.execute(
-                f"SELECT COUNT(*) FROM {table_name} WHERE {column_name} = %s",
+                f"SELECT name FROM {table_name} WHERE {column_name} = %s",
                 [OLD_APP_LABEL],
             )
-            old_count = cursor.fetchone()[0]
+            old_names = {row[0] for row in cursor.fetchall()}
             cursor.execute(
-                f"SELECT COUNT(*) FROM {table_name} WHERE {column_name} = %s",
+                f"SELECT name FROM {table_name} WHERE {column_name} = %s",
                 [NEW_APP_LABEL],
             )
-            new_count = cursor.fetchone()[0]
+            new_names = {row[0] for row in cursor.fetchall()}
 
-        if old_count and new_count:
-            raise CommandError(
-                f"检测到 {table_name}.{column_name} 同时存在 {OLD_APP_LABEL} 和 {NEW_APP_LABEL}，当前状态不完整，请先人工确认。"
-            )
-        if old_count:
-            return {"table": table_name, "column": column_name, "count": old_count}
+        duplicate_names = sorted(old_names & new_names)
+        rename_names = sorted(old_names - new_names)
+        if duplicate_names or rename_names:
+            return {
+                "table": table_name,
+                "column": column_name,
+                "duplicate_names": duplicate_names,
+                "rename_names": rename_names,
+            }
         return None
 
     def _collect_content_type_action(self, database):
-        old_count = ContentType.objects.using(database).filter(app_label=OLD_APP_LABEL).count()
-        new_count = ContentType.objects.using(database).filter(app_label=NEW_APP_LABEL).count()
-        if old_count and new_count:
-            raise CommandError(
-                f"检测到 django_content_type 同时存在 {OLD_APP_LABEL} 和 {NEW_APP_LABEL}。当前状态不完整，请先人工确认。"
-            )
-        if old_count:
-            return {"count": old_count}
+        old_models = set(
+            ContentType.objects.using(database)
+            .filter(app_label=OLD_APP_LABEL)
+            .values_list("model", flat=True)
+        )
+        new_models = set(
+            ContentType.objects.using(database)
+            .filter(app_label=NEW_APP_LABEL)
+            .values_list("model", flat=True)
+        )
+        if old_models:
+            return {
+                "duplicate_models": sorted(old_models & new_models),
+                "rename_models": sorted(old_models - new_models),
+            }
         return None
 
     def _collect_media_action(self):
@@ -148,14 +175,23 @@ class Command(BaseCommand):
     def _print_plan(self, database, table_actions, migration_action, content_type_action, media_action):
         self.stdout.write(f"数据库: {database}")
         for action in table_actions:
-            self.stdout.write(f"- 重命名数据表: {action.old_name} -> {action.new_name}")
+            if action.mode == "recover-dual-table":
+                self.stdout.write(
+                    f"- 恢复半切换数据表: {action.plan.old_name} -> {action.plan.new_name}（当前新表为空）"
+                )
+            else:
+                self.stdout.write(f"- 重命名数据表: {action.plan.old_name} -> {action.plan.new_name}")
         if migration_action:
+            duplicate_count = len(migration_action["duplicate_names"])
+            rename_count = len(migration_action["rename_names"])
             self.stdout.write(
-                f"- 更新 django_migrations: {migration_action['count']} 条 {OLD_APP_LABEL} -> {NEW_APP_LABEL}"
+                f"- 收敛 django_migrations: 删除重复 {duplicate_count} 条，迁移旧记录 {rename_count} 条"
             )
         if content_type_action:
+            duplicate_count = len(content_type_action["duplicate_models"])
+            rename_count = len(content_type_action["rename_models"])
             self.stdout.write(
-                f"- 更新 django_content_type: {content_type_action['count']} 条 {OLD_APP_LABEL} -> {NEW_APP_LABEL}"
+                f"- 收敛 django_content_type: 合并重复模型 {duplicate_count} 个，迁移旧模型 {rename_count} 个"
             )
         if media_action:
             self.stdout.write(
@@ -188,30 +224,106 @@ class Command(BaseCommand):
             if connection.vendor == "sqlite":
                 with connection.constraint_checks_disabled():
                     with connection.schema_editor(atomic=False) as schema_editor:
-                        for action in table_actions:
-                            schema_editor.alter_db_table(action.model, action.old_name, action.new_name)
+                        self._apply_table_actions(connection, schema_editor, table_actions)
                     self._update_metadata(database, connection, migration_action, content_type_action)
                 connection.check_constraints()
             else:
                 with transaction.atomic(using=database):
                     with connection.schema_editor() as schema_editor:
-                        for action in table_actions:
-                            schema_editor.alter_db_table(action.model, action.old_name, action.new_name)
+                        self._apply_table_actions(connection, schema_editor, table_actions)
                     self._update_metadata(database, connection, migration_action, content_type_action)
         except Exception as exc:
             if moved_media and new_dir and legacy_dir and new_dir.exists() and not legacy_dir.exists():
                 shutil.move(str(new_dir), str(legacy_dir))
             raise CommandError(f"执行切换失败：{exc}") from exc
 
+    def _apply_table_actions(self, connection, schema_editor, table_actions):
+        for action in table_actions:
+            if action.mode == "rename-old-table":
+                schema_editor.alter_db_table(
+                    action.plan.model,
+                    action.plan.old_name,
+                    action.plan.new_name,
+                )
+                continue
+
+            if connection.vendor == "sqlite":
+                schema_editor.delete_model(action.plan.model)
+                schema_editor.alter_db_table(
+                    action.plan.model,
+                    action.plan.old_name,
+                    action.plan.new_name,
+                )
+                continue
+
+            backup_name = self._build_backup_table_name(connection, action.plan.new_name)
+            schema_editor.alter_db_table(
+                action.plan.model,
+                action.plan.new_name,
+                backup_name,
+            )
+            schema_editor.alter_db_table(
+                action.plan.model,
+                action.plan.old_name,
+                action.plan.new_name,
+            )
+            schema_editor.execute(f"DROP TABLE {connection.ops.quote_name(backup_name)}")
+
+    def _build_backup_table_name(self, connection, table_name):
+        existing_tables = set(connection.introspection.table_names())
+        candidate = f"{table_name}_empty_backup"
+        suffix = 2
+        while candidate in existing_tables:
+            candidate = f"{table_name}_empty_backup_{suffix}"
+            suffix += 1
+        return candidate
+
     def _update_metadata(self, database, connection, migration_action, content_type_action):
         if migration_action:
             with connection.cursor() as cursor:
-                cursor.execute(
-                    "UPDATE django_migrations SET app = %s WHERE app = %s",
-                    [NEW_APP_LABEL, OLD_APP_LABEL],
-                )
+                for name in migration_action["duplicate_names"]:
+                    cursor.execute(
+                        "DELETE FROM django_migrations WHERE app = %s AND name = %s",
+                        [OLD_APP_LABEL, name],
+                    )
+                for name in migration_action["rename_names"]:
+                    cursor.execute(
+                        "UPDATE django_migrations SET app = %s WHERE app = %s AND name = %s",
+                        [NEW_APP_LABEL, OLD_APP_LABEL, name],
+                    )
 
         if content_type_action:
-            ContentType.objects.using(database).filter(app_label=OLD_APP_LABEL).update(
-                app_label=NEW_APP_LABEL
+            old_content_types = list(
+                ContentType.objects.using(database).filter(app_label=OLD_APP_LABEL).order_by("id")
             )
+            new_content_types = {
+                content_type.model: content_type
+                for content_type in ContentType.objects.using(database).filter(app_label=NEW_APP_LABEL)
+            }
+            for old_content_type in old_content_types:
+                new_content_type = new_content_types.get(old_content_type.model)
+                if new_content_type is None:
+                    old_content_type.app_label = NEW_APP_LABEL
+                    old_content_type.save(using=database, update_fields=["app_label"])
+                    new_content_types[old_content_type.model] = old_content_type
+                    continue
+
+                self._merge_permissions(database, old_content_type, new_content_type)
+                LogEntry.objects.using(database).filter(content_type_id=old_content_type.pk).update(
+                    content_type_id=new_content_type.pk
+                )
+                old_content_type.delete(using=database)
+
+    def _merge_permissions(self, database, old_content_type, new_content_type):
+        old_permissions = Permission.objects.using(database).filter(content_type=old_content_type)
+        for permission in old_permissions:
+            duplicate = Permission.objects.using(database).filter(
+                content_type=new_content_type,
+                codename=permission.codename,
+            ).exists()
+            if duplicate:
+                permission.delete(using=database)
+                continue
+
+            permission.content_type = new_content_type
+            permission.save(using=database, update_fields=["content_type"])
