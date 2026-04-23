@@ -255,6 +255,8 @@ class Command(BaseCommand):
             raise CommandError(f"执行切换失败：{exc}") from exc
 
     def _apply_table_actions(self, connection, schema_editor, table_actions):
+        backup_actions = []
+
         for action in table_actions:
             if action.mode == "rename-old-table":
                 schema_editor.alter_db_table(
@@ -279,11 +281,16 @@ class Command(BaseCommand):
                 action.plan.new_name,
                 backup_name,
             )
+            backup_actions.append((action, backup_name))
+
+        for action, backup_name in backup_actions:
             schema_editor.alter_db_table(
                 action.plan.model,
                 action.plan.old_name,
                 action.plan.new_name,
             )
+
+        for action, backup_name in reversed(backup_actions):
             schema_editor.execute(f"DROP TABLE {connection.ops.quote_name(backup_name)}")
 
     def _build_backup_table_name(self, connection, table_name):
