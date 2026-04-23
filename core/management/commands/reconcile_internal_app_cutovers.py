@@ -1,5 +1,9 @@
+import subprocess
+import sys
+
+from django.conf import settings
 from django.core.management import call_command
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 
 CUTOVER_COMMANDS = [
@@ -11,6 +15,27 @@ CUTOVER_COMMANDS = [
 
 class Command(BaseCommand):
     help = "统一预检查或执行 assessments、behaviors、meetings 的内部标识切换收尾，并在执行模式下自动运行 migrate。"
+
+    def _run_migrate_in_fresh_process(self, database):
+        command = [
+            sys.executable,
+            "manage.py",
+            "migrate",
+            f"--database={database}",
+        ]
+        result = subprocess.run(
+            command,
+            cwd=settings.BASE_DIR,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.stdout:
+            self.stdout.write(result.stdout, ending="")
+        if result.stderr:
+            self.stderr.write(result.stderr, ending="")
+        if result.returncode != 0:
+            raise CommandError("统一执行 migrate 失败，请检查上面的输出。")
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -46,7 +71,7 @@ class Command(BaseCommand):
 
         if execute and not skip_migrate:
             self.stdout.write("==> migrate")
-            call_command("migrate", database=database, stdout=self.stdout)
+            self._run_migrate_in_fresh_process(database)
 
         if execute:
             if skip_migrate:
