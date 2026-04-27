@@ -117,6 +117,7 @@ class Competition(models.Model):
     start_date = models.DateField("开始日期", null=True, blank=True)
     end_date = models.DateField("结束日期", null=True, blank=True)
     location = models.CharField("举办地点", max_length=100, blank=True)
+    description = models.TextField("描述", blank=True)
     
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
@@ -612,6 +613,48 @@ class Member(models.Model):
         return self.name
 
 
+class CompetitionProjectMember(models.Model):
+    competition_project = models.ForeignKey(
+        CompetitionProject,
+        on_delete=models.CASCADE,
+        related_name='member_links',
+        verbose_name='具体赛项',
+    )
+    member = models.ForeignKey(
+        Member,
+        on_delete=models.PROTECT,
+        related_name='competition_project_links',
+        verbose_name='代表队',
+    )
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('最后更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '赛项代表队关联'
+        verbose_name_plural = '赛项代表队关联'
+        ordering = ['competition_project', 'member__level', 'member__name', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['competition_project', 'member'],
+                name='unique_member_per_competition_project',
+            ),
+        ]
+
+    def clean(self):
+        competition_project = self.competition_project if self.competition_project_id else None
+        member = self.member if self.member_id else None
+        validate_member_level(member, competition_project)
+
+    def save(self, *args, **kwargs):
+        competition_project = self.competition_project if self.competition_project_id else None
+        member = self.member if self.member_id else None
+        validate_member_level(member, competition_project)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.competition_project} / {self.member.name}'
+
+
 class CompetitorUser(User):
     class Meta:
         proxy = True
@@ -654,6 +697,12 @@ class Competitor(models.Model):
         verbose_name = '参赛选手'
         verbose_name_plural = '参赛选手'
         ordering = ['competition_project', 'person__name', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['competition_project', 'person'],
+                name='unique_competitor_per_competition_project',
+            ),
+        ]
 
     @property
     def name(self):
@@ -671,12 +720,29 @@ class Competitor(models.Model):
         member = self.member if self.member_id else None
         competition_project = self.competition_project if self.competition_project_id else None
         validate_member_level(member, competition_project)
+        if self.pk is None and self.person_id and self.competition_project_id:
+            if Competitor.objects.filter(
+                competition_project_id=self.competition_project_id,
+                person_id=self.person_id,
+            ).exists():
+                raise ValidationError({'person': '该选手已存在于当前赛项中，请勿重复新增。'})
 
     def save(self, *args, **kwargs):
         member = self.member if self.member_id else None
         competition_project = self.competition_project if self.competition_project_id else None
         validate_member_level(member, competition_project)
+        if self._state.adding and self.person_id and self.competition_project_id:
+            if Competitor.objects.filter(
+                competition_project_id=self.competition_project_id,
+                person_id=self.person_id,
+            ).exists():
+                raise ValidationError({'person': '该选手已存在于当前赛项中，请勿重复新增。'})
         super().save(*args, **kwargs)
+        if member is not None and competition_project is not None:
+            CompetitionProjectMember.objects.get_or_create(
+                competition_project=competition_project,
+                member=member,
+            )
 
     def __str__(self):
         if self.person.user:
@@ -768,6 +834,11 @@ class Expert(models.Model):
         competition_project = self.competition_project if self.competition_project_id else None
         validate_member_level(member, competition_project)
         super().save(*args, **kwargs)
+        if member is not None and competition_project is not None:
+            CompetitionProjectMember.objects.get_or_create(
+                competition_project=competition_project,
+                member=member,
+            )
 
     def __str__(self):
         return f"{self.person.name} - {self.member.name if self.member else ''}"

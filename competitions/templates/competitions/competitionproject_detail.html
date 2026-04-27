@@ -5,28 +5,40 @@
   <div class="flex flex-col gap-6">
     <div class="card bg-base-100 border-base-300 border shadow-sm">
       <div class="card-body">
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div class="space-y-1">
-            <h2 class="card-title text-2xl">{{ competition_project.competition.name }} / {{ competition_project.project.name }}</h2>
-            <p class="text-sm text-base-content/70">赛事类型：{{ competition_project.competition.competition_type.name }} · {{ competition_project.competition.competition_type.get_level_display }}</p>
-            <p class="text-sm text-base-content/70">当前要求代表队层级：{{ competition_project.required_member_level_label|default:'未设置' }}</p>
+        <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div class="rounded-box bg-base-200/60 px-4 py-3">
+            <div class="text-xs text-base-content/60">赛事名称</div>
+            <div class="mt-1 font-medium">{{ competition_project.competition.name }}</div>
           </div>
-          <div class="flex flex-wrap gap-2">
-            <a href="{% url 'competitions:competition_detail' competition_project.competition.pk %}" class="btn btn-ghost btn-sm">返回赛事详情</a>
-            {% if perms.competitions.add_member %}
-              <a href="{{ member_create_url }}" class="btn btn-outline btn-sm">新增代表队</a>
-            {% endif %}
-            {% if perms.competitions.add_competitionresult %}
-              <a href="{{ competitionresult_create_url }}" class="btn btn-primary btn-sm">录入总成绩</a>
-            {% endif %}
+          <div class="rounded-box bg-base-200/60 px-4 py-3">
+            <div class="text-xs text-base-content/60">赛项名称</div>
+            <div class="mt-1 font-medium">{{ competition_project.project.name }}</div>
+          </div>
+          <div class="rounded-box bg-base-200/60 px-4 py-3">
+            <div class="text-xs text-base-content/60">赛事类型</div>
+            <div class="mt-1 font-medium">{{ competition_project.competition.competition_type.name }}</div>
+          </div>
+          <div class="rounded-box bg-base-200/60 px-4 py-3">
+            <div class="text-xs text-base-content/60">赛事级别</div>
+            <div class="mt-1 font-medium">{{ competition_project.competition.competition_type.get_level_display }}</div>
+          </div>
+          <div class="rounded-box bg-base-200/60 px-4 py-3">
+            <div class="text-xs text-base-content/60">代表队层级要求</div>
+            <div class="mt-1 font-medium">{{ competition_project.required_member_level_label|default:'未设置' }}</div>
           </div>
         </div>
+
         {% if competition_project.description %}
-          <p class="text-sm text-base-content/80">{{ competition_project.description }}</p>
+          <div class="rounded-box border border-base-300 bg-base-100 px-4 py-3 text-sm text-base-content/80">
+            {{ competition_project.description }}
+          </div>
         {% endif %}
-        {% if competition_project.document %}
-          <p class="text-sm"><a class="link link-primary" href="{{ competition_project.document.url }}">下载赛项文件</a></p>
-        {% endif %}
+
+        <div class="flex flex-wrap gap-2">
+          {% if competition_project.document %}
+            <a href="{{ competition_project.document.url }}" class="btn btn-soft btn-sm">下载赛项文件</a>
+          {% endif %}
+        </div>
       </div>
     </div>
 
@@ -75,7 +87,7 @@
           <div class="flex items-center justify-between gap-3">
             <h2 class="card-title text-lg">代表队</h2>
             {% if perms.competitions.add_member %}
-              <a href="{{ member_create_url }}" class="btn btn-outline btn-sm">新增代表队</a>
+              <a href="{{ member_link_url }}" class="btn btn-outline btn-sm">新增代表队</a>
             {% endif %}
           </div>
           <div class="overflow-x-auto">
@@ -96,7 +108,7 @@
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="3" class="text-center text-base-content/60">当前赛项下暂无已使用的代表队。</td>
+                    <td colspan="3" class="text-center text-base-content/60">当前赛项下暂无已关联的代表队。</td>
                   </tr>
                 {% endfor %}
               </tbody>

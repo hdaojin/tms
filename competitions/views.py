@@ -3,18 +3,19 @@ from urllib.parse import urlencode
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count, Q
-from django.urls import reverse, reverse_lazy
+from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.generic import CreateView, DetailView
+from django.views.generic import CreateView, DetailView, FormView
 from django_tables2 import SingleTableView
 
 from core.utils.mixins import TitleMixin
 
 from .forms import (
+	CompetitionProjectMemberLinkForm,
 	CompetitionResultCreateForm,
 	CompetitorCreateForm,
 	ExpertCreateForm,
-	MemberCreateForm,
 	SkillPositionCreateForm,
 )
 from .models import Competition, CompetitionProject, CompetitionResult, Competitor, Expert, Member, SkillPosition
@@ -78,6 +79,7 @@ class CompetitionProjectDetailView(TitleMixin, LoginRequiredMixin, DetailView):
 			'project',
 		).prefetch_related(
 			'competition_modules__module_mappings__module__module_set',
+			'member_links__member',
 			'competitors__member',
 			'competitors__person__user',
 			'experts__member',
@@ -101,15 +103,10 @@ class CompetitionProjectDetailView(TitleMixin, LoginRequiredMixin, DetailView):
 			'competitor__person__user',
 		).order_by('rank', '-score_700', 'competitor__person__name')
 		context['members'] = Member.objects.filter(
-			Q(competitors__competition_project=competition_project)
-			| Q(experts__competition_project=competition_project)
+			competition_project_links__competition_project=competition_project,
 		).distinct().order_by('level', 'name')
-		context['member_create_url'] = f"{reverse('competitions:member_create')}?{urlencode({'next': detail_url})}"
-		context['competitor_create_url'] = build_competition_project_url(
-			'competitions:competitor_create',
-			competition_project.pk,
-			detail_url,
-		)
+		context['member_link_url'] = reverse('competitions:competitionproject_member_create', args=[competition_project.pk])
+		context['competitor_create_url'] = reverse('competitions:competitor_create', args=[competition_project.pk])
 		context['expert_create_url'] = build_competition_project_url(
 			'competitions:expert_create',
 			competition_project.pk,
@@ -175,18 +172,56 @@ class CompetitionCreateViewMixin(TitleMixin, LoginRequiredMixin, PermissionRequi
 		return response
 
 
-class MemberCreateView(CompetitionCreateViewMixin):
-	model = Member
-	form_class = MemberCreateForm
+class CompetitionProjectMemberCreateView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, FormView):
+	raise_exception = True
+	template_name = 'competitions/create_form.html'
+	form_class = CompetitionProjectMemberLinkForm
 	permission_required = 'competitions.add_member'
-	title = '新增代表队'
-	title_icon = 'icon-[tabler--flag]' 
-	submit_label = '保存代表队'
-	success_message = '代表队已保存。'
-	page_note = '竞赛主干信息由管理员在后台维护；前台只负责补录代表队及人员、成绩等业务信息。'
+	title = '关联代表队'
+	title_icon = 'icon-[tabler--flag]'
+	submit_label = '保存'
 
-	def get_default_success_url(self):
-		return reverse_lazy('competitions:member_create')
+	def get_competition_project(self):
+		if not hasattr(self, '_competition_project'):
+			self._competition_project = get_object_or_404(
+				CompetitionProject.objects.select_related('competition__competition_type', 'project'),
+				pk=self.kwargs['pk'],
+			)
+		return self._competition_project
+
+	def get_form_kwargs(self):
+		kwargs = super().get_form_kwargs()
+		kwargs['competition_project'] = self.get_competition_project()
+		return kwargs
+
+	def get_back_url(self):
+		return reverse('competitions:competitionproject_detail', args=[self.get_competition_project().pk])
+
+	def get_success_url(self):
+		return self.get_back_url()
+
+	def get_page_note(self):
+		competition_project = self.get_competition_project()
+		return (
+			f'当前赛项要求选择“{competition_project.required_member_level_label}”代表队。'
+			'优先选择已有代表队并关联到当前赛项；如库中没有，再在下方补录新的代表队。'
+		)
+
+	def get_context_data(self, **kwargs):
+		context = super().get_context_data(**kwargs)
+		context['back_url'] = self.get_back_url()
+		context['next_url'] = None
+		context['submit_label'] = self.submit_label
+		context['page_note'] = self.get_page_note()
+		return context
+
+	def form_valid(self, form):
+		link = form.save()
+		if form.cleaned_data.get('existing_member') is not None:
+			messages.success(self.request, f'代表队“{link.member.name}”已关联到当前赛项。')
+		else:
+			messages.success(self.request, f'代表队“{link.member.name}”已创建并关联到当前赛项。')
+		return super().form_valid(form)
 
 
 class CompetitorCreateView(CompetitionCreateViewMixin):
@@ -195,12 +230,33 @@ class CompetitorCreateView(CompetitionCreateViewMixin):
 	permission_required = 'competitions.add_competitor'
 	title = '新增选手'
 	title_icon = 'icon-[tabler--user-plus]'
-	submit_label = '保存选手'
+	submit_label = '保存'
 	success_message = '选手信息已保存。'
-	page_note = '请先选择具体赛项，系统会自动按赛事级别过滤可选代表队。'
+
+	def get_competition_project(self):
+		if not hasattr(self, '_competition_project'):
+			self._competition_project = get_object_or_404(
+				CompetitionProject.objects.select_related('competition__competition_type', 'project'),
+				pk=self.kwargs['pk'],
+			)
+		return self._competition_project
+
+	def get_form_kwargs(self):
+		kwargs = super().get_form_kwargs()
+		kwargs['competition_project'] = self.get_competition_project()
+		return kwargs
+
+	def get_context_data(self, **kwargs):
+		context = super().get_context_data(**kwargs)
+		competition_project = self.get_competition_project()
+		context['page_note'] = (
+			f'当前正在为“{competition_project.competition.name} / {competition_project.project.name}”新增选手。'
+			'默认直接补录本届选手；如该选手曾参加过往届或已在人员库中，再选择已有选手。'
+		)
+		return context
 
 	def get_default_success_url(self):
-		return reverse('competitions:competitionproject_detail', args=[self.object.competition_project_id])
+		return reverse('competitions:competitionproject_detail', args=[self.get_competition_project().pk])
 
 
 class ExpertCreateView(CompetitionCreateViewMixin):

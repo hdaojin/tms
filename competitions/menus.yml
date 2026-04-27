@@ -8,20 +8,6 @@
       icon: icon-[tabler--list-details]
       is_visible: true
       login_required: true
-    - name: 新增代表队
-      named_url: competitions:member_create
-      icon: icon-[tabler--flag]
-      is_visible: true
-      login_required: true
-      required_perms:
-        - competitions.add_member
-    - name: 新增选手
-      named_url: competitions:competitor_create
-      icon: icon-[tabler--user-plus]
-      is_visible: true
-      login_required: true
-      required_perms:
-        - competitions.add_competitor
     - name: 新增专家
       named_url: competitions:expert_create
       icon: icon-[tabler--user-star]

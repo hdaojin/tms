@@ -1,9 +1,10 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.db.models import Q
 
 from core.utils.forms import StyledFormMixin
 
-from .models import CompetitionPerson, CompetitionProject, CompetitionResult, Competitor, CompetitorUser, Expert, Member, SkillPosition
+from .models import CompetitionPerson, CompetitionProject, CompetitionProjectMember, CompetitionResult, Competitor, CompetitorUser, Expert, Member, SkillPosition
 
 
 def get_competition_project_queryset():
@@ -14,12 +15,22 @@ def get_competition_project_queryset():
 
 
 def get_member_queryset(competition_project):
-    if competition_project is None:
+    if competition_project is None or not getattr(competition_project, 'pk', None):
+        return Member.objects.none()
+    return Member.objects.filter(
+        competition_project_links__competition_project=competition_project,
+    ).distinct().order_by('level', 'name')
+
+
+def get_available_member_queryset(competition_project):
+    if competition_project is None or not getattr(competition_project, 'pk', None):
         return Member.objects.none()
     required_level = competition_project.required_member_level
     if required_level is None:
         return Member.objects.none()
-    return Member.objects.filter(level=required_level).order_by('level', 'name')
+    return Member.objects.filter(level=required_level).exclude(
+        competition_project_links__competition_project=competition_project,
+    ).distinct().order_by('level', 'name')
 
 
 def get_competitor_user_queryset():
@@ -28,6 +39,17 @@ def get_competitor_user_queryset():
 
 def get_competition_person_queryset():
     return CompetitionPerson.objects.select_related('user').order_by('name', 'organization', 'pk')
+
+
+def get_available_competition_person_queryset(competition_project, include_person=None):
+    queryset = get_competition_person_queryset()
+    if competition_project is None or not getattr(competition_project, 'pk', None):
+        return queryset.none()
+
+    queryset = queryset.exclude(competitor_assignments__competition_project=competition_project)
+    if include_person is not None and getattr(include_person, 'pk', None):
+        queryset = (queryset | CompetitionPerson.objects.filter(pk=include_person.pk).select_related('user')).distinct()
+    return queryset.order_by('name', 'organization', 'pk')
 
 
 def format_competition_person_label(person):
@@ -144,10 +166,109 @@ class CompetitionPersonAssignmentFormMixin:
         return instance
 
 
-class MemberCreateForm(StyledFormMixin, forms.ModelForm):
-    class Meta:
-        model = Member
-        fields = ['name', 'code', 'level', 'flag']
+class CompetitionProjectMemberLinkForm(StyledFormMixin, forms.Form):
+    existing_member = forms.ModelChoiceField(
+        label='已有代表队',
+        queryset=Member.objects.none(),
+        required=False,
+    )
+    new_member_name = forms.CharField(label='新增代表队名称', max_length=100, required=False)
+    new_member_code = forms.CharField(label='新增代表队代码', max_length=20, required=False)
+    new_member_flag = forms.ImageField(label='新增代表队旗帜', required=False)
+
+    def __init__(self, *args, competition_project, **kwargs):
+        self.competition_project = competition_project
+        super().__init__(*args, **kwargs)
+        self.fields['existing_member'].queryset = get_available_member_queryset(competition_project)
+        self.fields['existing_member'].label_from_instance = lambda obj: f'{obj.name} [{obj.get_level_display()}]'
+        self.fields['existing_member'].help_text = (
+            f'当前赛项要求选择“{competition_project.required_member_level_label}”代表队。'
+            '如库中已有，可直接选择并关联到当前赛项。'
+        )
+        self.fields['new_member_name'].help_text = '仅在未选择已有代表队时填写。'
+        self.fields['new_member_code'].help_text = '仅在未选择已有代表队时填写，代码需全局唯一。'
+        self.fields['new_member_flag'].help_text = '仅在新增代表队时填写。'
+        self.order_fields([
+            'existing_member',
+            'new_member_name',
+            'new_member_code',
+            'new_member_flag',
+        ])
+
+    def clean(self):
+        cleaned_data = super().clean()
+        existing_member = cleaned_data.get('existing_member')
+        new_member_name = (cleaned_data.get('new_member_name') or '').strip()
+        new_member_code = (cleaned_data.get('new_member_code') or '').strip()
+        new_member_flag = cleaned_data.get('new_member_flag')
+        has_new_member_input = bool(new_member_name or new_member_code or new_member_flag)
+
+        if existing_member and has_new_member_input:
+            raise forms.ValidationError('请选择已有代表队，或填写下方新增代表队信息，两种方式不能同时使用。')
+
+        if existing_member is None and not has_new_member_input:
+            message = '请选择已有代表队，或填写新的代表队名称和代码。'
+            self.add_error('existing_member', message)
+            self.add_error('new_member_name', message)
+            self.add_error('new_member_code', message)
+            return cleaned_data
+
+        if existing_member is not None:
+            return cleaned_data
+
+        if not new_member_name:
+            self.add_error('new_member_name', '请输入新的代表队名称。')
+        if not new_member_code:
+            self.add_error('new_member_code', '请输入新的代表队代码。')
+        if self.errors:
+            return cleaned_data
+
+        member = Member(
+            name=new_member_name,
+            code=new_member_code,
+            level=self.competition_project.required_member_level,
+            flag=new_member_flag,
+        )
+        try:
+            member.full_clean()
+        except ValidationError as exc:
+            field_mapping = {
+                'name': 'new_member_name',
+                'code': 'new_member_code',
+                'flag': 'new_member_flag',
+            }
+            for field_name, messages in exc.message_dict.items():
+                target_field = field_mapping.get(field_name)
+                if target_field:
+                    for message in messages:
+                        self.add_error(target_field, message)
+                else:
+                    for message in messages:
+                        self.add_error(None, message)
+
+        cleaned_data['new_member_name'] = new_member_name
+        cleaned_data['new_member_code'] = new_member_code
+        return cleaned_data
+
+    def save(self):
+        existing_member = self.cleaned_data.get('existing_member')
+        if existing_member is not None:
+            member = existing_member
+        else:
+            member = Member(
+                name=self.cleaned_data['new_member_name'],
+                code=self.cleaned_data['new_member_code'],
+                level=self.competition_project.required_member_level,
+                flag=self.cleaned_data.get('new_member_flag'),
+            )
+            member.full_clean()
+            member.save()
+
+        link, _created = CompetitionProjectMember.objects.get_or_create(
+            competition_project=self.competition_project,
+            member=member,
+        )
+        return link
 
 
 class CompetitorCreateForm(CompetitionPersonAssignmentFormMixin, CompetitionProjectFormMixin, StyledFormMixin, forms.ModelForm):
@@ -162,26 +283,59 @@ class CompetitorCreateForm(CompetitionPersonAssignmentFormMixin, CompetitionProj
         fields = ['competition_project', 'person', 'member', 'gender']
 
     def __init__(self, *args, **kwargs):
+        self.fixed_competition_project = kwargs.pop('competition_project', None)
         super().__init__(*args, **kwargs)
-        self.init_competition_project_field()
+        if self.fixed_competition_project is None:
+            self.init_competition_project_field()
         self.init_person_fields()
-        self.order_fields([
-            'competition_project',
-            'person',
-            'new_person_name',
-            'new_person_organization',
-            'new_person_user',
-            'member',
-            'gender',
-        ])
+        competition_project = self.fixed_competition_project or self.get_selected_competition_project()
 
-        competition_project = self.get_selected_competition_project()
+        if self.fixed_competition_project is not None:
+            self.fields.pop('competition_project', None)
+            self.fields['person'].queryset = get_available_competition_person_queryset(competition_project)
+            self.fields['person'].help_text = '如该选手参加过往届或已在人员库中，可直接选择；通常请直接填写下方新增选手信息。'
+            self.fields['new_person_name'].help_text = '默认直接新增本届选手；仅在上方未选择已有选手时填写。'
+            self.fields['new_person_organization'].help_text = '仅在新增选手时填写。'
+            self.fields['new_person_user'].help_text = '仅在新增选手且需要关联校内账号时填写。'
+            self.order_fields([
+                'new_person_name',
+                'new_person_organization',
+                'new_person_user',
+                'person',
+                'member',
+                'gender',
+            ])
+        else:
+            self.order_fields([
+                'competition_project',
+                'person',
+                'new_person_name',
+                'new_person_organization',
+                'new_person_user',
+                'member',
+                'gender',
+            ])
+
         self.fields['member'].queryset = get_member_queryset(competition_project)
         self.fields['member'].label_from_instance = lambda obj: f'{obj.name} [{obj.get_level_display()}]'
         if competition_project is None:
             self.fields['member'].help_text = '请先选择具体赛项，再选择匹配层级的代表队。'
         else:
-            self.fields['member'].help_text = f'当前赛事级别要求选择“{competition_project.required_member_level_label}”代表队。'
+            self.fields['member'].help_text = (
+                f'当前赛事级别要求选择“{competition_project.required_member_level_label}”代表队。'
+                '这里只显示当前赛项已关联的代表队。'
+            )
+
+    def save(self, commit=True):
+        if self.fixed_competition_project is None:
+            return super().save(commit=commit)
+
+        instance = super().save(commit=False)
+        instance.competition_project = self.fixed_competition_project
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 class ExpertCreateForm(CompetitionPersonAssignmentFormMixin, CompetitionProjectFormMixin, StyledFormMixin, forms.ModelForm):

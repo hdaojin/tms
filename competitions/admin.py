@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.forms.models import BaseInlineFormSet
 from django.urls import reverse
 from django.utils.html import format_html
@@ -14,6 +14,7 @@ from .models import (
     CompetitionModuleStandardModuleMap,
     CompetitionPerson,
     CompetitionProject,
+    CompetitionProjectMember,
     CompetitionResult,
     CompetitionType,
     Competitor,
@@ -68,15 +69,32 @@ def get_project_module_axis_queryset(project):
     return ModuleAxis.objects.filter(project=project).order_by('sort_order', 'code', 'name')
 
 
-def get_member_queryset_for_competition_project(competition_project):
+def get_member_queryset_for_competition_project(competition_project, include_member=None):
     queryset = Member.objects.order_by('level', 'name')
-    if competition_project is None:
+    if competition_project is None or not getattr(competition_project, 'pk', None):
+        return queryset.none()
+
+    filters = Q(competition_project_links__competition_project=competition_project)
+    if include_member is not None and getattr(include_member, 'pk', None):
+        filters |= Q(pk=include_member.pk)
+    return queryset.filter(filters).distinct()
+
+
+def get_available_member_queryset_for_competition_project(competition_project, include_member=None):
+    queryset = Member.objects.order_by('level', 'name')
+    if competition_project is None or not getattr(competition_project, 'pk', None):
         return queryset.none()
 
     required_level = competition_project.required_member_level
     if required_level is None:
         return queryset.none()
-    return queryset.filter(level=required_level)
+
+    filters = Q(level=required_level) & (
+        ~Q(competition_project_links__competition_project=competition_project)
+    )
+    if include_member is not None and getattr(include_member, 'pk', None):
+        filters |= Q(pk=include_member.pk)
+    return queryset.filter(filters).distinct().order_by('level', 'name')
 
 
 def get_competition_person_queryset():
@@ -253,13 +271,18 @@ class CompetitionProjectScopedMemberFormMixin:
             return
 
         competition_project = self.get_competition_project()
-        self.fields['member'].queryset = get_member_queryset_for_competition_project(competition_project)
+        current_member = getattr(self.instance, 'member', None)
+        self.fields['member'].queryset = get_member_queryset_for_competition_project(
+            competition_project,
+            include_member=current_member,
+        )
         self.fields['member'].label_from_instance = format_member_label
         if competition_project is None or competition_project.required_member_level is None:
             self.fields['member'].help_text = '请先选择具体赛项，再选择匹配层级的代表队。'
         else:
             self.fields['member'].help_text = (
                 f'当前赛事级别要求选择“{competition_project.required_member_level_label}”代表队。'
+                '请先在当前赛项中关联代表队，再为选手或专家选择。'
             )
 
     def get_competition_project(self):
@@ -289,6 +312,38 @@ class ExpertAdminForm(CompetitionProjectScopedMemberFormMixin, forms.ModelForm):
         fields = '__all__'
 
 
+class CompetitionProjectMemberAdminForm(forms.ModelForm):
+    class Meta:
+        model = CompetitionProjectMember
+        fields = '__all__'
+
+    def __init__(self, *args, competition_project=None, **kwargs):
+        self._competition_project = competition_project
+        super().__init__(*args, **kwargs)
+        competition_project = self.get_competition_project()
+        current_member = getattr(self.instance, 'member', None)
+        self.fields['member'].queryset = get_available_member_queryset_for_competition_project(
+            competition_project,
+            include_member=current_member,
+        )
+        self.fields['member'].label_from_instance = format_member_label
+        if competition_project is None or competition_project.required_member_level is None:
+            self.fields['member'].help_text = '请先选择具体赛项，再选择匹配层级的代表队。'
+        else:
+            self.fields['member'].help_text = (
+                f'当前赛事级别要求选择“{competition_project.required_member_level_label}”代表队。'
+                '这里仅显示尚未关联到当前赛项的代表队。'
+            )
+
+    def get_competition_project(self):
+        if self._competition_project is not None:
+            return self._competition_project
+
+        if getattr(self.instance, 'competition_project_id', None):
+            return self.instance.competition_project
+        return None
+
+
 class SkillPositionAdminForm(forms.ModelForm):
     class Meta:
         model = SkillPosition
@@ -306,6 +361,18 @@ class CompetitionProjectScopedMemberInlineFormSet(BaseInlineFormSet):
         kwargs = super().get_form_kwargs(index)
         kwargs['competition_project'] = self.instance
         return kwargs
+
+
+class CompetitionProjectMemberInline(admin.TabularInline):
+    model = CompetitionProjectMember
+    form = CompetitionProjectMemberAdminForm
+    formset = CompetitionProjectScopedMemberInlineFormSet
+    extra = 0
+    fields = ('member',)
+    ordering = ('member__level', 'member__name')
+    show_change_link = True
+    verbose_name = '已关联代表队'
+    verbose_name_plural = '已关联代表队'
 
 
 @admin.register(CompetitionType)
@@ -452,7 +519,7 @@ class CompetitionProjectAdmin(admin.ModelAdmin):
     list_select_related = ('competition__competition_type', 'project')
     ordering = ('-competition__start_date', 'competition__name', 'project__name')
     fields = ('competition', 'project', 'document', 'description')
-    inlines = [CompetitionModuleInline, CompetitorInline, ExpertInline, SkillPositionInline]
+    inlines = [CompetitionModuleInline, CompetitionProjectMemberInline, CompetitorInline, ExpertInline, SkillPositionInline]
 
     def get_fields(self, request, obj=None):
         fields = list(super().get_fields(request, obj))

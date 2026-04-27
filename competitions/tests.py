@@ -7,7 +7,7 @@ from django.db.models.deletion import ProtectedError
 from django.test import RequestFactory, TestCase
 from django.urls import resolve, reverse
 
-from .admin import CompetitorAdminForm, ExpertAdminForm
+from .admin import CompetitionProjectMemberAdminForm, CompetitorAdminForm, ExpertAdminForm
 from core.utils.menus import get_layout_sections, get_section_menu, get_sections
 from .models import (
 	Competition,
@@ -16,6 +16,7 @@ from .models import (
 	CompetitionModuleStandardModuleMap,
 	CompetitionPerson,
 	CompetitionProject,
+	CompetitionProjectMember,
 	CompetitionResult,
 	CompetitionType,
 	Competitor,
@@ -447,7 +448,39 @@ class CompetitionMemberLevelTests(TestCase):
 
 		self.assertIn('member', context.exception.message_dict)
 
+	def test_competition_project_member_rejects_member_with_mismatched_level(self):
+		competition_project_member = CompetitionProjectMember(
+			competition_project=self.competition_project,
+			member=self.province_member,
+		)
+
+		with self.assertRaises(ValidationError) as context:
+			competition_project_member.full_clean()
+
+		self.assertIn('member', context.exception.message_dict)
+
+	def test_competitor_rejects_duplicate_person_when_creating_new_record(self):
+		Competitor.objects.create(
+			competition_project=self.competition_project,
+			person=self.competitor_person,
+			member=self.country_member,
+		)
+		duplicate_competitor = Competitor(
+			competition_project=self.competition_project,
+			person=self.competitor_person,
+			member=self.country_member,
+		)
+
+		with self.assertRaises(ValidationError) as context:
+			duplicate_competitor.full_clean()
+
+		self.assertIn('person', context.exception.message_dict)
+
 	def test_member_forms_only_show_matching_level_choices(self):
+		CompetitionProjectMember.objects.create(
+			competition_project=self.competition_project,
+			member=self.country_member,
+		)
 		competitor_form = CompetitorAdminForm(competition_project=self.competition_project)
 		expert_form = ExpertAdminForm(competition_project=self.competition_project)
 
@@ -457,6 +490,31 @@ class CompetitionMemberLevelTests(TestCase):
 		)
 		self.assertEqual(
 			list(expert_form.fields['member'].queryset.values_list('pk', flat=True)),
+			[self.country_member.pk],
+		)
+
+	def test_member_forms_keep_current_member_even_if_not_in_filtered_queryset(self):
+		competitor = Competitor.objects.create(
+			competition_project=self.competition_project,
+			person=self.competitor_person,
+			member=self.country_member,
+		)
+		form = CompetitorAdminForm(instance=competitor, competition_project=self.competition_project)
+
+		self.assertEqual(
+			list(form.fields['member'].queryset.values_list('pk', flat=True)),
+			[self.country_member.pk],
+		)
+
+		unlinked_form = CompetitionProjectMemberAdminForm(
+			competition_project=self.competition_project,
+			instance=CompetitionProjectMember(
+				competition_project=self.competition_project,
+				member=self.country_member,
+			),
+		)
+		self.assertEqual(
+			list(unlinked_form.fields['member'].queryset.values_list('pk', flat=True)),
 			[self.country_member.pk],
 		)
 
@@ -564,7 +622,7 @@ class CompetitionFrontendViewTests(TestCase):
 		self.viewer = User.objects.create_user(username='viewer', password='testpass123')
 		self.editor = User.objects.create_user(username='editor', password='testpass123')
 		permissions = Permission.objects.filter(
-			codename__in=['add_competitor', 'add_competitionresult', 'add_expert', 'add_skillposition'],
+			codename__in=['add_member', 'add_competitor', 'add_competitionresult', 'add_expert', 'add_skillposition'],
 		)
 		self.editor.user_permissions.add(*permissions)
 
@@ -622,6 +680,11 @@ class CompetitionFrontendViewTests(TestCase):
 			code='CN-FRONTEND',
 			level=MemberScope.INTERNATIONAL,
 		)
+		self.extra_country_member = Member.objects.create(
+			name='日本',
+			code='JP-FRONTEND',
+			level=MemberScope.INTERNATIONAL,
+		)
 		self.province_member = Member.objects.create(
 			name='浙江省',
 			code='ZJ-FRONTEND',
@@ -671,16 +734,37 @@ class CompetitionFrontendViewTests(TestCase):
 		self.assertEqual(detail_response.status_code, 200)
 		self.assertContains(detail_response, '前台视图测试项目')
 		self.assertEqual(project_response.status_code, 200)
-		self.assertContains(project_response, '当前要求代表队层级')
+		self.assertContains(project_response, '代表队层级要求')
 		self.assertContains(project_response, '选手甲')
 		self.assertContains(project_response, '专家甲')
+
+	def test_competition_project_detail_displays_linked_member_without_people(self):
+		CompetitionProjectMember.objects.create(
+			competition_project=self.competition_project,
+			member=self.extra_country_member,
+		)
+		self.client.force_login(self.viewer)
+
+		response = self.client.get(reverse('competitions:competitionproject_detail', args=[self.competition_project.pk]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '日本')
+
+	def test_competition_detail_displays_description_when_present(self):
+		self.competition.description = '这是赛事简介，用于前台详情页展示。'
+		self.competition.save(update_fields=['description'])
+		self.client.force_login(self.viewer)
+
+		response = self.client.get(reverse('competitions:competition_detail', args=[self.competition.pk]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '这是赛事简介，用于前台详情页展示。')
 
 	def test_competitor_create_requires_add_permission(self):
 		self.client.force_login(self.viewer)
 
 		response = self.client.get(
-			reverse('competitions:competitor_create'),
-			{'competition_project': self.competition_project.pk},
+			reverse('competitions:competitor_create', args=[self.competition_project.pk]),
 		)
 
 		self.assertEqual(response.status_code, 403)
@@ -689,23 +773,93 @@ class CompetitionFrontendViewTests(TestCase):
 		self.client.force_login(self.editor)
 
 		response = self.client.get(
-			reverse('competitions:competitor_create'),
-			{'competition_project': self.competition_project.pk},
+			reverse('competitions:competitor_create', args=[self.competition_project.pk]),
+		)
+
+		self.assertEqual(response.status_code, 200)
+		form = response.context['form']
+		self.assertNotIn('competition_project', form.fields)
+		self.assertEqual(
+			list(form.fields['member'].queryset.values_list('pk', flat=True)),
+			[self.country_member.pk],
+		)
+		self.assertNotIn(
+			self.extra_country_member.pk,
+			list(form.fields['member'].queryset.values_list('pk', flat=True)),
+		)
+		self.assertNotIn(
+			self.available_competitor_person.pk,
+			list(form.fields['person'].queryset.values_list('pk', flat=True)),
+		)
+		self.assertContains(response, f'当前正在为“{self.competition.name} / {self.project.name}”新增选手。')
+
+	def test_competitionproject_member_create_form_only_shows_unlinked_matching_members(self):
+		self.client.force_login(self.editor)
+
+		response = self.client.get(
+			reverse('competitions:competitionproject_member_create', args=[self.competition_project.pk]),
 		)
 
 		self.assertEqual(response.status_code, 200)
 		form = response.context['form']
 		self.assertEqual(
-			list(form.fields['member'].queryset.values_list('pk', flat=True)),
-			[self.country_member.pk],
+			list(form.fields['existing_member'].queryset.values_list('pk', flat=True)),
+			[self.extra_country_member.pk],
+		)
+
+	def test_competitionproject_member_create_can_reuse_existing_member(self):
+		self.client.force_login(self.editor)
+
+		response = self.client.post(
+			reverse('competitions:competitionproject_member_create', args=[self.competition_project.pk]),
+			{
+				'existing_member': self.extra_country_member.pk,
+				'new_member_name': '',
+				'new_member_code': '',
+			},
+		)
+
+		self.assertRedirects(
+			response,
+			reverse('competitions:competitionproject_detail', args=[self.competition_project.pk]),
+		)
+		self.assertTrue(
+			CompetitionProjectMember.objects.filter(
+				competition_project=self.competition_project,
+				member=self.extra_country_member,
+			).exists()
+		)
+
+	def test_competitionproject_member_create_can_create_new_member_with_required_level(self):
+		self.client.force_login(self.editor)
+
+		response = self.client.post(
+			reverse('competitions:competitionproject_member_create', args=[self.competition_project.pk]),
+			{
+				'existing_member': '',
+				'new_member_name': '韩国',
+				'new_member_code': 'KR-FRONTEND',
+			},
+		)
+
+		self.assertRedirects(
+			response,
+			reverse('competitions:competitionproject_detail', args=[self.competition_project.pk]),
+		)
+		member = Member.objects.get(code='KR-FRONTEND')
+		self.assertEqual(member.level, MemberScope.INTERNATIONAL)
+		self.assertTrue(
+			CompetitionProjectMember.objects.filter(
+				competition_project=self.competition_project,
+				member=member,
+			).exists()
 		)
 
 	def test_competitor_create_page_uses_narrow_form_layout(self):
 		self.client.force_login(self.editor)
 
 		response = self.client.get(
-			reverse('competitions:competitor_create'),
-			{'competition_project': self.competition_project.pk},
+			reverse('competitions:competitor_create', args=[self.competition_project.pk]),
 		)
 
 		self.assertEqual(response.status_code, 200)
@@ -734,9 +888,8 @@ class CompetitionFrontendViewTests(TestCase):
 		)
 
 		response = self.client.post(
-			reverse('competitions:competitor_create'),
+			reverse('competitions:competitor_create', args=[self.competition_project.pk]),
 			{
-				'competition_project': self.competition_project.pk,
 				'person': reusable_person.pk,
 				'member': self.country_member.pk,
 				'gender': 'M',
@@ -760,9 +913,8 @@ class CompetitionFrontendViewTests(TestCase):
 		self.client.force_login(self.editor)
 
 		response = self.client.post(
-			reverse('competitions:competitor_create'),
+			reverse('competitions:competitor_create', args=[self.competition_project.pk]),
 			{
-				'competition_project': self.competition_project.pk,
 				'person': '',
 				'new_person_name': '选手丙',
 				'new_person_organization': '复用单位',
@@ -785,6 +937,27 @@ class CompetitionFrontendViewTests(TestCase):
 				member=self.country_member,
 				gender='F',
 			).exists()
+		)
+
+	def test_competitor_create_rejects_duplicate_person_in_same_project(self):
+		self.client.force_login(self.editor)
+		initial_total = Competitor.objects.filter(competition_project=self.competition_project).count()
+
+		response = self.client.post(
+			reverse('competitions:competitor_create', args=[self.competition_project.pk]),
+			{
+				'person': self.available_competitor_person.pk,
+				'member': self.country_member.pk,
+				'gender': 'M',
+			},
+		)
+
+		self.assertEqual(response.status_code, 200)
+		form = response.context['form']
+		self.assertIn('person', form.errors)
+		self.assertEqual(
+			Competitor.objects.filter(competition_project=self.competition_project).count(),
+			initial_total,
 		)
 
 	def test_expert_create_can_reuse_existing_person(self):

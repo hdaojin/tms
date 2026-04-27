@@ -51,7 +51,6 @@
     --radius-lg: 0.5rem;
     --radius-xl: 0.75rem;
     --ease-out: cubic-bezier(0, 0, 0.2, 1);
-    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
     --animate-pulse: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
     --default-transition-duration: 150ms;
     --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
@@ -1953,15 +1952,6 @@
       &:has(> :checked) {
         outline: 2px solid currentColor;
       }
-    }
-  }
-  .stats {
-    @layer daisyui.l1.l2.l3 {
-      position: relative;
-      display: inline-grid;
-      grid-auto-flow: column;
-      overflow-x: auto;
-      border-radius: var(--radius-box);
     }
   }
   .progress {
@@ -6721,9 +6711,9 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
-  .xl\:grid-cols-4 {
+  .xl\:grid-cols-5 {
     @media (width >= 80rem) {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
     }
   }
   .print\:hidden {
