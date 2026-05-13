@@ -10,14 +10,11 @@ class ConductRecordTable(BaseTable):
         accessor="student.display_name",
     )
     item = tables.Column(verbose_name="奖惩事项", accessor="item.name")
+    reason = tables.Column(verbose_name="具体原因/描述")
     severity_label = tables.Column(verbose_name="程度", orderable=False)
     occurred_date = BaseDateColumn(verbose_name="发生日期")
     score = tables.Column(verbose_name="分值", orderable=False)
     status = tables.Column(verbose_name="状态")
-    recorded_by = tables.Column(
-        verbose_name="记录人",
-        accessor="recorded_by.display_name",
-    )
     recorded_at = BaseDateTimeColumn(verbose_name="记录时间")
 
     def render_score(self, record):
@@ -32,11 +29,11 @@ class ConductRecordTable(BaseTable):
         fields = (
             "student",
             "item",
+            "reason",
             "severity_label",
             "occurred_date",
             "score",
             "status",
-            "recorded_by",
             "recorded_at",
         )
         order_by = ("-occurred_date",)

@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@tailwindcss/cli": "^4.1.12",
+    "@upstash/context7-mcp": "^2.2.1",
     "alpinejs": "^3.15.6",
     "tailwindcss": "^4.1.12"
   },
@@ -33,5 +34,24 @@
         }
       }
     ]
-  }
+  },
+  "name": "tms",
+  "version": "1.0.0",
+  "description": "TMS（Training Management System）是一个基于 Django 的培训与竞赛管理系统，用于统一管理训练过程、考核资料、会议记录、通知公告和用户角色权限。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hdaojin/tms.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/hdaojin/tms/issues"
+  },
+  "homepage": "https://github.com/hdaojin/tms#readme"
 }

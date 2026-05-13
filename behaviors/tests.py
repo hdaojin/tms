@@ -592,6 +592,58 @@ class ConductUrlTests(TestCase):
         self.assertEqual(reverse('behaviors:conductrecord_list'), '/behaviors/')
 
 
+class ConductRecordListViewTests(TestCase):
+    """奖惩记录列表应展示具体原因/描述。"""
+
+    def setUp(self):
+        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        self.student = User.objects.create_user(username='list-student', password='testpass123')
+        self.student.groups.add(competitor_group)
+        self.other_student = User.objects.create_user(username='list-other-student', password='testpass123')
+        self.other_student.groups.add(competitor_group)
+        self.recorder = User.objects.create_user(username='list-recorder', password='testpass123')
+
+        category = ConductCategory.objects.create(
+            nature=CONDUCT_NATURE_REWARD,
+            name='列表测试分类',
+        )
+        ConductSeverityRule.objects.update_or_create(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=CONDUCT_SEVERITY_MODERATE,
+            defaults={'multiplier': Decimal('1.00'), 'order': 20},
+        )
+        item = ConductItem.objects.create(
+            category=category,
+            name='列表测试事项',
+            default_score=Decimal('5.00'),
+        )
+
+        ConductRecord.objects.create(
+            student=self.student,
+            item=item,
+            severity=CONDUCT_SEVERITY_MODERATE,
+            reason='课堂表现积极，主动帮助同学',
+            recorded_by=self.recorder,
+        )
+        ConductRecord.objects.create(
+            student=self.other_student,
+            item=item,
+            severity=CONDUCT_SEVERITY_MODERATE,
+            reason='不应显示的其他学生原因',
+            recorded_by=self.recorder,
+        )
+
+    def test_student_list_shows_reason_column_without_recorder_column(self):
+        self.client.force_login(self.student)
+
+        response = self.client.get(reverse('behaviors:conductrecord_list'))
+
+        self.assertContains(response, '具体原因/描述')
+        self.assertNotContains(response, '记录人')
+        self.assertContains(response, '课堂表现积极，主动帮助同学')
+        self.assertNotContains(response, '不应显示的其他学生原因')
+
+
 class ConductAuditAdminTestCase(TestCase):
     """录入模型应记录创建人与更新人。"""
 
