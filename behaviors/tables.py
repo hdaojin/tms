@@ -9,16 +9,26 @@ class ConductRecordTable(BaseTable):
         verbose_name="学生",
         accessor="student.display_name",
     )
+    nature = tables.Column(
+        verbose_name="奖惩性质",
+        accessor="item.category.nature",
+        order_by=("item__category__nature",),
+    )
     item = tables.Column(verbose_name="奖惩事项", accessor="item.name")
     reason = tables.Column(verbose_name="具体原因/描述")
     severity_label = tables.Column(verbose_name="程度", orderable=False)
     occurred_date = BaseDateColumn(verbose_name="发生日期")
     score = tables.Column(verbose_name="分值", orderable=False)
     status = tables.Column(verbose_name="状态")
-    recorded_at = BaseDateTimeColumn(verbose_name="记录时间")
+
+    def render_nature(self, record):
+        return record.item.category.get_nature_display()
 
     def render_score(self, record):
         score = record.score
+        if score == 0:
+            return '0.0'
+
         return f'{score:+.1f}'
 
     def render_status(self, record):
@@ -28,13 +38,13 @@ class ConductRecordTable(BaseTable):
         model = ConductRecord
         fields = (
             "student",
+            "nature",
             "item",
             "reason",
             "severity_label",
             "occurred_date",
             "score",
             "status",
-            "recorded_at",
         )
         order_by = ("-occurred_date",)
 

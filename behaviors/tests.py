@@ -593,7 +593,7 @@ class ConductUrlTests(TestCase):
 
 
 class ConductRecordListViewTests(TestCase):
-    """奖惩记录列表应展示具体原因/描述。"""
+    """奖惩记录列表应展示核心字段并隐藏录入元数据。"""
 
     def setUp(self):
         competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
@@ -612,6 +612,11 @@ class ConductRecordListViewTests(TestCase):
             severity=CONDUCT_SEVERITY_MODERATE,
             defaults={'multiplier': Decimal('1.00'), 'order': 20},
         )
+        ConductSeverityRule.objects.update_or_create(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=CONDUCT_SEVERITY_MINOR,
+            defaults={'multiplier': Decimal('0.00'), 'order': 10},
+        )
         item = ConductItem.objects.create(
             category=category,
             name='列表测试事项',
@@ -626,6 +631,13 @@ class ConductRecordListViewTests(TestCase):
             recorded_by=self.recorder,
         )
         ConductRecord.objects.create(
+            student=self.student,
+            item=item,
+            severity=CONDUCT_SEVERITY_MINOR,
+            reason='只做提醒，不计分',
+            recorded_by=self.recorder,
+        )
+        ConductRecord.objects.create(
             student=self.other_student,
             item=item,
             severity=CONDUCT_SEVERITY_MODERATE,
@@ -633,15 +645,29 @@ class ConductRecordListViewTests(TestCase):
             recorded_by=self.recorder,
         )
 
-    def test_student_list_shows_reason_column_without_recorder_column(self):
+    def test_student_list_shows_nature_and_reason_without_recorded_metadata(self):
+        self.client.force_login(self.student)
+
+        response = self.client.get(reverse('behaviors:conductrecord_list'))
+        content = response.content.decode()
+
+        self.assertContains(response, '奖惩性质')
+        self.assertContains(response, '具体原因/描述')
+        self.assertNotContains(response, '记录人')
+        self.assertNotContains(response, '记录时间')
+        self.assertLess(content.index('奖惩性质'), content.index('奖惩事项'))
+        self.assertContains(response, '奖励')
+        self.assertContains(response, '课堂表现积极，主动帮助同学')
+        self.assertNotContains(response, '不应显示的其他学生原因')
+
+    def test_zero_score_is_rendered_without_sign(self):
         self.client.force_login(self.student)
 
         response = self.client.get(reverse('behaviors:conductrecord_list'))
 
-        self.assertContains(response, '具体原因/描述')
-        self.assertNotContains(response, '记录人')
-        self.assertContains(response, '课堂表现积极，主动帮助同学')
-        self.assertNotContains(response, '不应显示的其他学生原因')
+        self.assertContains(response, '0.0')
+        self.assertNotContains(response, '+0.0')
+        self.assertNotContains(response, '-0.0')
 
 
 class ConductAuditAdminTestCase(TestCase):

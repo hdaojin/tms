@@ -616,6 +616,22 @@ class CompetitionAdminVisibilityTests(TestCase):
 			('code', 'name'),
 		)
 
+	def test_competition_admin_shows_competition_projects_inline(self):
+		competition_type = CompetitionType.objects.create(
+			code='WSC-ADMIN-CP',
+			name='后台赛事内联测试',
+		)
+		competition = Competition.objects.create(
+			competition_type=competition_type,
+			name='后台赛事内联',
+			code='WSC-ADMIN-CP-1',
+		)
+
+		competition_admin = admin.site._registry[Competition]
+		self.assertTrue(
+			any(getattr(inline, 'model', None) is CompetitionProject for inline in competition_admin.inlines)
+		)
+
 
 class CompetitionFrontendViewTests(TestCase):
 	def setUp(self):

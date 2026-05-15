@@ -375,12 +375,27 @@ class CompetitionProjectMemberInline(admin.TabularInline):
     verbose_name_plural = '已关联代表队'
 
 
+ 
+
+
+
 @admin.register(CompetitionType)
 class CompetitionTypeAdmin(admin.ModelAdmin):
     list_display = ('name', 'code', 'level', 'weight', 'created_at')
     list_filter = ('level',)
     search_fields = ('name', 'code')
     ordering = ('level', 'name')
+
+
+class CompetitionProjectInline(admin.TabularInline):
+    model = CompetitionProject
+    extra = 0
+    fields = ('project', 'document', 'description')
+    autocomplete_fields = ['project']
+    ordering = ('project__name',)
+    show_change_link = True
+    verbose_name = '具体赛项'
+    verbose_name_plural = '具体赛项'
 
 
 @admin.register(Competition)
@@ -392,6 +407,7 @@ class CompetitionAdmin(admin.ModelAdmin):
     list_select_related = ('competition_type',)
     date_hierarchy = 'start_date'
     ordering = ('-start_date', 'name')
+    inlines = [CompetitionProjectInline]
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('competition_type').annotate(
