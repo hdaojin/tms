@@ -44,6 +44,5 @@ items:
             size: 4
           is_visible: true
           login_required: true
-          required_perms: 
-            - "accounts.add_ivitationcode"
+          superuser_required: true
           
