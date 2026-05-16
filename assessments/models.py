@@ -2,12 +2,10 @@ from decimal import Decimal
 from pathlib import PurePosixPath
 from django.db import models
 from django.conf import settings
-from django.core.validators import MinValueValidator, FileExtensionValidator
+from django.core.validators import MinValueValidator
 from django.core.exceptions import ValidationError
-from django.core.files.storage import FileSystemStorage
 
 from core.constants import (
-    ASSESSMENT_UPLOAD_DIR,
     ASSESSMENT_TP_ALLOWED_EXTENSIONS,
     ASSESSMENT_TP_UPLOAD_MAX_SIZE_MB,
     ASSESSMENT_MC_ALLOWED_EXTENSIONS,
@@ -20,10 +18,18 @@ from core.constants import (
     ASSESSMENT_ATTACHMENT_UPLOAD_MAX_SIZE_MB,
     GROUP_COACH,
 )
+from core.uploads import (
+    ASSESSMENT_ATTACHMENT_UPLOAD_SPEC,
+    ASSESSMENT_MC_UPLOAD_SPEC,
+    ASSESSMENT_MS_UPLOAD_SPEC,
+    ASSESSMENT_MT_UPLOAD_SPEC,
+    ASSESSMENT_TP_UPLOAD_SPEC,
+    PrivateMediaStorage,
+)
 from core.utils.validators import validate_file_size
 from core.utils.signals import register_file_cleanup_signals
 
-assessment_storage = FileSystemStorage(location=str(ASSESSMENT_UPLOAD_DIR))
+assessment_storage = PrivateMediaStorage("assessments")
 
 def validate_assessment_tp_file_size(file):
     validate_file_size(file, ASSESSMENT_TP_UPLOAD_MAX_SIZE_MB)
@@ -228,11 +234,8 @@ class AssessmentModule(models.Model):
         storage=assessment_storage,
         upload_to=question_upload_path,
         blank=True,
-        validators=[
-            FileExtensionValidator(allowed_extensions=ASSESSMENT_TP_ALLOWED_EXTENSIONS),
-            validate_assessment_tp_file_size,
-        ],
-        help_text=f"上传试题文件，支持 {', '.join(ASSESSMENT_TP_ALLOWED_EXTENSIONS)}，大小不超过 {ASSESSMENT_TP_UPLOAD_MAX_SIZE_MB}MB"
+        validators=ASSESSMENT_TP_UPLOAD_SPEC.validators(),
+        help_text=ASSESSMENT_TP_UPLOAD_SPEC.help_text("上传试题文件"),
     )
     
     scoring_standard_file = models.FileField(
@@ -240,11 +243,8 @@ class AssessmentModule(models.Model):
         storage=assessment_storage,
         upload_to=scoring_standard_upload_path,
         blank=True,
-        validators=[
-            FileExtensionValidator(allowed_extensions=ASSESSMENT_MC_ALLOWED_EXTENSIONS),
-            validate_assessment_mc_file_size,
-        ],
-        help_text=f"上传评分标准文件，支持 {', '.join(ASSESSMENT_MC_ALLOWED_EXTENSIONS)}，大小不超过 {ASSESSMENT_MC_UPLOAD_MAX_SIZE_MB}MB"
+        validators=ASSESSMENT_MC_UPLOAD_SPEC.validators(),
+        help_text=ASSESSMENT_MC_UPLOAD_SPEC.help_text("上传评分标准文件"),
     )
     
     scoring_sheet_file = models.FileField(
@@ -252,11 +252,8 @@ class AssessmentModule(models.Model):
         storage=assessment_storage,
         upload_to=scoring_sheet_upload_path,
         blank=True,
-        validators=[
-            FileExtensionValidator(allowed_extensions=ASSESSMENT_MT_ALLOWED_EXTENSIONS),
-            validate_assessment_mt_file_size,
-        ],
-        help_text=f"上传评分表文件，支持 {', '.join(ASSESSMENT_MT_ALLOWED_EXTENSIONS)}，大小不超过 {ASSESSMENT_MT_UPLOAD_MAX_SIZE_MB}MB"
+        validators=ASSESSMENT_MT_UPLOAD_SPEC.validators(),
+        help_text=ASSESSMENT_MT_UPLOAD_SPEC.help_text("上传评分表文件"),
     )
     
     scoring_script_file = models.FileField(
@@ -264,11 +261,8 @@ class AssessmentModule(models.Model):
         storage=assessment_storage,
         upload_to=scoring_script_upload_path,
         blank=True,
-        validators=[
-            FileExtensionValidator(allowed_extensions=ASSESSMENT_MS_ALLOWED_EXTENSIONS),
-            validate_assessment_ms_file_size,
-        ],
-        help_text=f"上传评分脚本文件，支持 {', '.join(ASSESSMENT_MS_ALLOWED_EXTENSIONS)}，大小不超过 {ASSESSMENT_MS_UPLOAD_MAX_SIZE_MB}MB"
+        validators=ASSESSMENT_MS_UPLOAD_SPEC.validators(),
+        help_text=ASSESSMENT_MS_UPLOAD_SPEC.help_text("上传评分脚本文件"),
     )
     
     # 移除旧的 paper_file 字段，数据迁移时需要处理
@@ -298,11 +292,8 @@ class AssessmentAttachment(models.Model):
         "附件文件",
         storage=assessment_storage,
         upload_to=attachment_upload_path,
-        validators=[
-            FileExtensionValidator(allowed_extensions=ASSESSMENT_ATTACHMENT_ALLOWED_EXTENSIONS),
-            validate_assessment_attachment_file_size,
-        ],
-        help_text=f"上传附件文件，支持 {', '.join(ASSESSMENT_ATTACHMENT_ALLOWED_EXTENSIONS)}，大小不超过 {ASSESSMENT_ATTACHMENT_UPLOAD_MAX_SIZE_MB}MB"
+        validators=ASSESSMENT_ATTACHMENT_UPLOAD_SPEC.validators(),
+        help_text=ASSESSMENT_ATTACHMENT_UPLOAD_SPEC.help_text("上传附件文件"),
     )
     description = models.CharField("文件说明", max_length=200, blank=True)
     uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)

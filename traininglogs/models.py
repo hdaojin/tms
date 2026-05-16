@@ -3,13 +3,12 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-from django.core.validators import FileExtensionValidator
 from django.utils.text import slugify
 from pathlib import Path
-from functools import partial
 
-from core.constants import GROUP_COACH, GROUP_COMPETITOR, TRAININGLOG_UPLOAD_DIR, TRAININGLOG_ALLOWED_EXTENSIONS, TRAININGLOG_UPLOAD_MAX_SIZE_MB
-from core.utils.validators import validate_file_size, validate_date_not_future
+from core.constants import GROUP_COACH, GROUP_COMPETITOR, TRAININGLOG_UPLOAD_DIR
+from core.uploads import TRAININGLOG_UPLOAD_SPEC
+from core.utils.validators import validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
 
 """避免循环导入：使用字符串引用外键模型。"""
@@ -65,14 +64,8 @@ class TrainingLog(models.Model):
     file = models.FileField(
         "日志文件",
         upload_to=traininglog_upload_to,
-        help_text=f"支持格式：{', '.join(TRAININGLOG_ALLOWED_EXTENSIONS)}，文件大小不超过 {TRAININGLOG_UPLOAD_MAX_SIZE_MB}MB",
-        validators=[
-            FileExtensionValidator(
-                allowed_extensions=TRAININGLOG_ALLOWED_EXTENSIONS,
-                message=f"仅支持以下格式的文件：{', '.join(TRAININGLOG_ALLOWED_EXTENSIONS)}"
-            ),
-            partial(validate_file_size, max_size_mb=TRAININGLOG_UPLOAD_MAX_SIZE_MB),
-        ],
+        help_text=TRAININGLOG_UPLOAD_SPEC.help_text("上传训练日志文件"),
+        validators=TRAININGLOG_UPLOAD_SPEC.validators(),
     )
     uploaded_by = models.ForeignKey(
         get_user_model(), on_delete=models.PROTECT,

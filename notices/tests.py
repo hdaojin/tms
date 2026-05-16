@@ -1,11 +1,15 @@
 from pathlib import Path
 import tempfile
 
+from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .models import Notice, NoticeAttachment
+
+
+User = get_user_model()
 
 
 class NoticeAttachmentCleanupTests(TestCase):
@@ -75,3 +79,50 @@ class NoticeAttachmentCleanupTests(TestCase):
 class NoticeUrlTests(TestCase):
 	def test_notice_list_is_mounted_at_app_root(self):
 		self.assertEqual(reverse('notices:notice_list'), '/notices/')
+
+
+class NoticeAttachmentUploadTests(TestCase):
+	def setUp(self):
+		self.temp_media = tempfile.TemporaryDirectory()
+		self.override = override_settings(MEDIA_ROOT=self.temp_media.name)
+		self.override.enable()
+		self.user = User.objects.create_user(
+			username='notice-user',
+			password='testpass123',
+		)
+
+	def tearDown(self):
+		for attachment in NoticeAttachment.objects.all():
+			if attachment.file:
+				attachment.file.delete(save=False)
+
+		self.override.disable()
+		self.temp_media.cleanup()
+		super().tearDown()
+
+	def _build_upload_file(self, name):
+		return SimpleUploadedFile(name, b'notice attachment content', content_type='text/plain')
+
+	def test_notice_create_accepts_multiple_attachments(self):
+		self.client.force_login(self.user)
+
+		response = self.client.post(
+			reverse('notices:notice_create'),
+			{
+				'title': '多附件通知',
+				'content': '通知内容',
+				'send_to_all': 'on',
+				'attachments': [
+					self._build_upload_file('notice-1.txt'),
+					self._build_upload_file('notice-2.txt'),
+				],
+			},
+		)
+
+		self.assertEqual(response.status_code, 302)
+		notice = Notice.objects.get(title='多附件通知')
+		self.assertEqual(notice.attachments.count(), 2)
+		self.assertCountEqual(
+			[attachment.file_name for attachment in notice.attachments.all()],
+			['notice-1.txt', 'notice-2.txt'],
+		)

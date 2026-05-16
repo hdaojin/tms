@@ -1,16 +1,13 @@
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.core.files.storage import FileSystemStorage
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.validators import MinValueValidator, MaxValueValidator, FileExtensionValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 
-from core.utils.validators import validate_file_size
-from core.constants import COMPETITION_UPLOAD_DIR, COMPETITION_ALLOWED_EXTENSIONS, DEFAULT_UPLOAD_MAX_SIZE_MB
-from functools import partial
+from core.uploads import COMPETITION_DOCUMENT_UPLOAD_SPEC, PrivateMediaStorage
 
-competition_storage = FileSystemStorage(location=str(COMPETITION_UPLOAD_DIR))
+competition_storage = PrivateMediaStorage("competitions")
 
 DEFAULT_MODULE_SET_CODE = 'default'
 DEFAULT_MODULE_SET_NAME = '默认标准模块集'
@@ -273,11 +270,10 @@ class CompetitionProject(models.Model):
         storage=competition_storage,
         upload_to=competition_document_path,
         blank=True,
-        validators=[
-            FileExtensionValidator(allowed_extensions=COMPETITION_ALLOWED_EXTENSIONS, message=f"仅支持以下格式的文件：{', '.join(COMPETITION_ALLOWED_EXTENSIONS)}"),
-            partial(validate_file_size, max_size_mb=DEFAULT_UPLOAD_MAX_SIZE_MB),
-        ],
-        help_text=f"上传与该赛项相关的归档文件，支持格式：{', '.join(COMPETITION_ALLOWED_EXTENSIONS)}，文件大小不超过 {DEFAULT_UPLOAD_MAX_SIZE_MB}MB"
+        validators=COMPETITION_DOCUMENT_UPLOAD_SPEC.validators(),
+        help_text=COMPETITION_DOCUMENT_UPLOAD_SPEC.help_text(
+            "上传与该赛项相关的归档文件"
+        ),
     )
     description = models.TextField("本届赛项描述", blank=True) 
 

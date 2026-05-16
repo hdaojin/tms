@@ -8,6 +8,7 @@ from core.constants import (
     CONDUCT_NATURE_PENALTY,
     GROUP_COMPETITOR,
 )
+from core.uploads import CONDUCT_ATTACHMENT_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
 from .models import ConductItem, ConductRecord, get_conduct_severity_choices_with_multiplier
 
@@ -45,7 +46,9 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
                 'aria-label': 'reason-input',
                 'placeholder': '请描述具体原因',
             }),
-            'attachment': forms.FileInput(attrs={'aria-label': 'file-input'}),
+            'attachment': forms.FileInput(attrs=CONDUCT_ATTACHMENT_UPLOAD_SPEC.widget_attrs(
+                **{'aria-label': 'file-input'}
+            )),
         }
 
     field_order = ['student', 'nature', 'item', 'severity', 'occurred_date', 'reason', 'attachment']

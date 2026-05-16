@@ -1,32 +1,8 @@
 from django import forms
 from .models import Notice, NoticeAttachment
+from core.forms.fields import MultipleFileField, MultipleFileInput
+from core.uploads import NOTICE_ATTACHMENT_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
-from core.constants import NOTICE_ALLOWED_EXTENSIONS
-
-
-class MultipleFileInput(forms.ClearableFileInput):
-    """
-    支持多文件上传的自定义widget, 目前官方提供的方法
-    “Django 有可能在未来的某个时候提供适当的多文件字段支持。”
-    """
-    allow_multiple_selected = True
-
-
-class MultipleFileField(forms.FileField):
-    """
-    支持多文件上传的自定义字段
-    """
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault("widget", MultipleFileInput())
-        super().__init__(*args, **kwargs)
-
-    def clean(self, data, initial=None):
-        single_file_clean = super().clean
-        if isinstance(data, (list, tuple)):
-            result = [single_file_clean(d, initial) for d in data]
-        else:
-            result = single_file_clean(data, initial)
-        return result
 
 
 class NoticeForm(StyledFormMixin, forms.ModelForm):
@@ -42,15 +18,15 @@ class NoticeForm(StyledFormMixin, forms.ModelForm):
     )
     
     attachments = MultipleFileField(
+        upload_spec=NOTICE_ATTACHMENT_UPLOAD_SPEC,
         widget=MultipleFileInput(attrs={
             'type': 'file',
             'aria-label': 'file-input',
             'class': 'file-input w-full file-input-primary',
-            'accept': ','.join(['.' + ext for ext in NOTICE_ALLOWED_EXTENSIONS]),
         }),
         required=False,
         label='附件',
-        help_text='支持多个文件上传，支持格式：PDF、Word、图片、压缩包等'
+        help_text=NOTICE_ATTACHMENT_UPLOAD_SPEC.help_text('支持多个文件上传')
     )
 
 
@@ -116,6 +92,6 @@ class NoticeAttachmentForm(forms.ModelForm):
         widgets = {
             'file': forms.ClearableFileInput(attrs={
                 'class': 'file-input file-input-bordered file-input-sm w-full',
-                'accept': ','.join(['.' + ext for ext in NOTICE_ALLOWED_EXTENSIONS])
+                **NOTICE_ATTACHMENT_UPLOAD_SPEC.widget_attrs(),
             })
         }

@@ -4,9 +4,10 @@ from django.utils.text import slugify
 from django.contrib.auth import get_user_model
 from pathlib import Path
 
-from core.utils.validators import validate_file_size, validate_date_not_future, validate_pdf_file
+from core.uploads import MEETING_FILE_UPLOAD_SPEC
+from core.utils.validators import validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
-from core.constants import MEETINGS_UPLOAD_DIR, DEFAULT_UPLOAD_MAX_SIZE_MB
+from core.constants import MEETINGS_UPLOAD_DIR
 
 
 def meeting_file_upload_to(instance, original_name: str) -> str:
@@ -21,8 +22,7 @@ def meeting_file_upload_to(instance, original_name: str) -> str:
 
 def meeting_file_validator(file):
     """验证会议记录文件（PDF 格式和大小）"""
-    validate_pdf_file(file)
-    validate_file_size(file, max_size_mb=DEFAULT_UPLOAD_MAX_SIZE_MB)
+    MEETING_FILE_UPLOAD_SPEC.validate_file(file)
 
 
 class Meeting(models.Model):
@@ -36,8 +36,8 @@ class Meeting(models.Model):
     file = models.FileField(
         "会议记录文件",
         upload_to=meeting_file_upload_to,
-        help_text=f"支持 PDF 格式, 文件大小不超过 {DEFAULT_UPLOAD_MAX_SIZE_MB}MB",
-        validators=[meeting_file_validator]
+        help_text=MEETING_FILE_UPLOAD_SPEC.help_text("上传会议记录文件"),
+        validators=MEETING_FILE_UPLOAD_SPEC.validators(),
     )
     uploaded_by = models.ForeignKey(
         get_user_model(),

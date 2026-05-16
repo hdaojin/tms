@@ -1,10 +1,13 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from django.db.models.deletion import ProtectedError
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve, reverse
 
 from .admin import CompetitionProjectMemberAdminForm, CompetitorAdminForm, ExpertAdminForm
@@ -117,6 +120,17 @@ class StandardModuleSetVersioningTests(TestCase):
 				module_set=other_module_set,
 				code='B',
 				name='错误模块',
+			)
+
+
+class CompetitionUploadStorageTests(TestCase):
+	def test_competition_document_uses_private_media_storage_root(self):
+		with TemporaryDirectory() as tmpdir, override_settings(PRIVATE_MEDIA_ROOT=tmpdir):
+			field = CompetitionProject._meta.get_field('document')
+
+			self.assertEqual(
+				field.storage.path('sample.pdf'),
+				str(Path(tmpdir) / 'competitions' / 'sample.pdf'),
 			)
 
 

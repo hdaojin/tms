@@ -475,6 +475,26 @@ class AssessmentCoachingWorkflowTests(TestCase):
         self.assessment_module.refresh_from_db()
         self.assertTrue(bool(self.assessment_module.question_file))
 
+    def test_file_upload_accepts_multiple_question_attachments(self):
+        self.client.force_login(self.coach)
+
+        response = self.client.post(
+            reverse("assessments:file_upload", args=[self.assessment_module.pk]),
+            {
+                "attachments": [
+                    self._build_upload_file("attachment-1.pdf"),
+                    self._build_upload_file("attachment-2.pdf"),
+                ],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        attachments = list(self.assessment_module.attachments.order_by("file"))
+        self.assertEqual(len(attachments), 2)
+        for attachment in attachments:
+            self.assertIn("/试题附件/", attachment.file.name)
+            self.assertTrue(attachment.file.name.endswith(".pdf"))
+
     def test_material_lock_rejects_module_file_deletion(self):
         self.assessment_module.question_file = self._build_upload_file("question.pdf")
         self.assessment_module.save(update_fields=["question_file"])

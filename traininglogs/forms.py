@@ -4,8 +4,8 @@ from django.utils import timezone
 from competitions.models import StandardModule
 
 from .models import TrainingLog
+from core.uploads import TRAININGLOG_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
-from core.constants import TRAININGLOG_ALLOWED_EXTENSIONS
 
 class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
     def __init__(self, *args, user=None, **kwargs):
@@ -41,7 +41,10 @@ class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
             'training_date': forms.DateInput(attrs={'type': 'date', 'aria-label': 'date-input'}),
             'module': forms.RadioSelect(attrs={'aria-label': 'radio'}),
             'task': forms.TextInput(attrs={'type':'text', 'aria-label': 'input', 'placeholder': '例如: Nginx安装与配置'}),
-            'file': forms.ClearableFileInput(attrs={'type':'file', 'aria-label': 'file-input', 'accept': ','.join(['.' + ext for ext in TRAININGLOG_ALLOWED_EXTENSIONS])})
+            'file': forms.ClearableFileInput(attrs=TRAININGLOG_UPLOAD_SPEC.widget_attrs(
+                type='file',
+                **{'aria-label': 'file-input'},
+            ))
             }
 
         # labels = {

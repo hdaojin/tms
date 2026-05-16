@@ -178,6 +178,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # 注意：公共文件上传目录是通过Web服务器静态文件功能直接提供服务的，无法控制用户权限。
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+PRIVATE_MEDIA_ROOT = env.path('PRIVATE_MEDIA_ROOT', default=BASE_DIR / 'media-private')  # type: ignore
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

@@ -35,7 +35,7 @@ TMS（Training Management System）是一个基于 Django 的培训与竞赛管�
 - `static/`：项目静态资源目录，包含前端构建产物和随仓库分发的第三方静态文件
 - `staticfiles/`：`collectstatic` 输出目录，供生产环境 Web 服务器直接提供
 - `media/`：公共上传目录，例如训练日志、通知附件等
-- `media-private/`：私有资料目录，例如考核、竞赛、操行、笔记等敏感文件
+- `media-private/`：私有资料目录，例如考核、竞赛、操行、笔记等敏感文件，可通过 `PRIVATE_MEDIA_ROOT` 覆盖
 
 注意：
 
@@ -225,6 +225,7 @@ ALLOWED_HOSTS=tms.example.com,127.0.0.1
 DATABASE_URL=postgres://tms:password@127.0.0.1:5432/tms
 CACHE_TIMEOUT=300
 UPLOAD_MAX_SIZE_MB=100
+PRIVATE_MEDIA_ROOT=/srv/tms/media-private
 ```
 
 说明：
@@ -233,6 +234,7 @@ UPLOAD_MAX_SIZE_MB=100
 - `ALLOWED_HOSTS` 填写真实域名或 IP
 - 推荐生产环境使用 PostgreSQL 或 MySQL，不建议继续使用 SQLite
 - 如果必须使用 SQLite，所有管理命令仍然必须在项目根目录执行
+- `PRIVATE_MEDIA_ROOT` 指向私有上传文件根目录，不要在 Nginx 中直接暴露
 
 ### 4. 创建运行目录
 

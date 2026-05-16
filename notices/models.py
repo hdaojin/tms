@@ -2,18 +2,13 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.core.validators import FileExtensionValidator
 from pathlib import Path
 
-from functools import partial
-
 from core.constants import (
-    NOTICE_ALLOWED_EXTENSIONS,
     NOTICE_UPLOAD_DIR,
-    NOTICE_UPLOAD_MAX_SIZE_MB,
 )
+from core.uploads import NOTICE_ATTACHMENT_UPLOAD_SPEC
 from core.utils.signals import register_file_cleanup_signals
-from core.utils.validators import validate_file_size
 
 # Create your models here.
 # 站内通知模型
@@ -74,14 +69,8 @@ class NoticeAttachment(models.Model):
     file = models.FileField(
         upload_to=notice_attachment_upload_to,
         verbose_name='附件文件',
-        help_text="支持多个文件上传",
-        validators=[
-            FileExtensionValidator(
-                allowed_extensions=NOTICE_ALLOWED_EXTENSIONS,
-                message=f"仅支持以下格式的文件：{', '.join(NOTICE_ALLOWED_EXTENSIONS)}"
-            ),
-            partial(validate_file_size, max_size_mb=NOTICE_UPLOAD_MAX_SIZE_MB),
-        ],
+        help_text=NOTICE_ATTACHMENT_UPLOAD_SPEC.help_text("支持多个文件上传"),
+        validators=NOTICE_ATTACHMENT_UPLOAD_SPEC.validators(),
     )   # type: ignore[arg-type]
     uploaded_at = models.DateTimeField(auto_now_add=True, verbose_name='上传时间')
     file_size = models.BigIntegerField(null=True, blank=True, verbose_name='文件大小(字节)')

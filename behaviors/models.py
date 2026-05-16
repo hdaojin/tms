@@ -1,18 +1,14 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
-from django.core.validators import FileExtensionValidator
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from pathlib import Path
-from functools import partial
 from decimal import Decimal
 
 from core.constants import (
     GROUP_COMPETITOR,
-    CONDUCT_ALLOWED_EXTENSIONS,
-    CONDUCT_UPLOAD_MAX_SIZE_MB,
     BEHAVIORS_UPLOAD_DIR,
     CONDUCT_NATURE_REWARD,
     CONDUCT_NATURE_PENALTY,
@@ -24,7 +20,8 @@ from core.constants import (
     CONDUCT_PENALTY_SEVERITY_NAMES,
 )
 from core.models import AuditedModel
-from core.utils.validators import validate_file_size, validate_date_not_future
+from core.uploads import CONDUCT_ATTACHMENT_UPLOAD_SPEC
+from core.utils.validators import validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
 
 
@@ -259,14 +256,8 @@ class ConductRecord(models.Model):
         upload_to=conduct_attachment_upload_to,
         blank=True,
         null=True,
-        help_text=f'支持PDF、图片等格式，文件大小不超过 {CONDUCT_UPLOAD_MAX_SIZE_MB}MB',
-        validators=[
-            FileExtensionValidator(
-                allowed_extensions=CONDUCT_ALLOWED_EXTENSIONS,
-                message=f'仅支持以下文件格式: {", ".join(CONDUCT_ALLOWED_EXTENSIONS)}'
-            ),
-            partial(validate_file_size, max_size_mb=CONDUCT_UPLOAD_MAX_SIZE_MB),
-        ]
+        help_text=CONDUCT_ATTACHMENT_UPLOAD_SPEC.help_text('上传奖惩附件'),
+        validators=CONDUCT_ATTACHMENT_UPLOAD_SPEC.validators(),
     )
     status = models.CharField(
         '状态',
