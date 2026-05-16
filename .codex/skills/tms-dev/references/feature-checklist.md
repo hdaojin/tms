@@ -7,7 +7,9 @@
 ## Models & Files
 - Prefer constants from `core/constants.py`.
 - For file fields:
-  - Validate with `validate_file_size` and type validators.
+  - Define or reuse an upload spec in `core/uploads.py`.
+  - Validate with `UploadSpec.validators()` / `UploadSizeValidator`.
+  - Use `PrivateMediaStorage` for private uploads; do not serialize machine-specific `FileSystemStorage(location=...)` paths.
   - Use a stable `upload_to` path with date-based folders.
   - Register cleanup via `register_file_cleanup_signals`.
 
@@ -18,12 +20,14 @@
 
 ## Forms & Tables
 - Use `StyledFormMixin` for forms.
+- Use `core.forms.fields.MultipleFileField` / `MultipleFileInput` for multiple uploads.
+- Use `UploadSpec.widget_attrs()` for file input `accept` attributes.
 - Use `BaseTable`, `BaseDateColumn`, and `ActionsColumn` for list pages.
 
 ## Templates & UI
 - Extend `templates/base.html`.
 - Use Iconify syntax `icon-[tabler--calendar]`.
-- Ensure sidebar menus are updated in `core/config/menus/*.yml` or app `menus.yml`.
+- Ensure sidebar menus are updated in `core/config/menus/*.yml`; group placement lives in `core/config/menus.yml`.
 
 ## URLs & Menus
 - Wire routes in `tmsproject/urls.py` and app `urls.py`.

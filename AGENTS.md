@@ -1,13 +1,13 @@
 # AGENTS.md
 
 ## Project Overview
-TMS is a Django 6 monolith for training, assessment, meeting, notice, notes, behavior, competition, and account management. Use Chinese (`zh-hans`) for user-facing model names, form labels, validation errors, messages, and documentation. The default timezone is `Asia/Shanghai`.
+TMS is a Django 6 monolith for training logs, assessments, meetings, notices, notes, behaviors, competitions, skills, Samba integration, articles, and account management. Use Chinese (`zh-hans`) for user-facing model names, form labels, validation errors, messages, and documentation. The default timezone is `Asia/Shanghai`.
 
 ## First Reads
-- Read `.github/copilot-instructions.md` before changing code.
+- Treat this `AGENTS.md` as the authoritative project instruction file.
 - Read `README.md` for setup, deployment, and command conventions.
 - For user-visible feature changes, inspect and update `docs/user-manual/`.
-- Check the target app's `models.py`, `forms.py`, `views.py`, `tables.py`, `urls.py`, templates, menus, tests, and migrations before editing.
+- Check the target app's `models.py`, `forms.py`, `views.py`, `tables.py`, `urls.py`, templates, relevant `core/config/menus/*.yml`, tests, and migrations before editing.
 
 ## Commands
 Run all Django commands from the repository root because `.env` may use a relative SQLite URL.
@@ -25,7 +25,7 @@ Prefer focused app tests over the full suite unless the change crosses app bound
 
 ## Architecture Rules
 - Use Django's default `auth.User`; do not introduce a custom User model.
-- Keep role/group names, upload limits, paths, and shared constants in `core/constants.py`.
+- Keep role/group names, upload limits, paths, and shared constants in `core/constants.py`; keep reusable upload behavior, upload specs, and private storage helpers in `core/uploads.py`.
 - Global login is enforced by `LoginRequiredMiddleware`; public views must explicitly use `login_not_required`.
 - Preserve middleware ordering in `tmsproject/settings.py`.
 - App URLs must be included from `tmsproject/urls.py` with `app_name` namespaces.
@@ -37,7 +37,8 @@ Prefer focused app tests over the full suite unless the change crosses app bound
 - Use `BaseTable`, `BaseDateColumn`, and `ActionsColumn` for list/table pages.
 - Use `OwnerRequiredMixin`, `CrossGroupAccessMixin`, `PermissionRequiredMixin`, or `SuperuserRequiredMixin` for access control.
 - Display users as `user.display_name` or `user.full_info`.
-- For file fields, use project upload constants, validators, and cleanup signals.
+- For file fields, use `core.uploads.UploadSpec`, `UploadSizeValidator`, `PrivateMediaStorage`, project upload constants, and cleanup signals.
+- For multiple file form inputs, use `core.forms.fields.MultipleFileField` and `MultipleFileInput`.
 - Keep edits scoped; do not refactor unrelated modules.
 
 ## Templates And Frontend
@@ -51,7 +52,7 @@ Prefer focused app tests over the full suite unless the change crosses app bound
 ## Security And Sensitive Data
 - Never read, print, or commit `.env` secrets unless explicitly required and safe.
 - `.env` is ignored; `.env.example` documents required variables.
-- Public uploads live in `media/`; private/sensitive uploads live in `media-private/`.
+- Public uploads live in `media/`; private/sensitive uploads live under `settings.PRIVATE_MEDIA_ROOT` (default `media-private/`) and must not be served directly.
 - AI API keys are encrypted through `accounts.services.ai_crypto`.
 - `UserAIModelCredential` must not be registered in Django admin.
 - Shared AI credentials may be callable through backend helpers but must never reveal raw API keys.

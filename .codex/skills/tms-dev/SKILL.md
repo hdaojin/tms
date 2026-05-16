@@ -6,7 +6,9 @@ description: TMS 项目开发规范与流程。用于在该仓库中新增或修
 # TMS Development
 
 ## Required Reading
-- Open `.github/copilot-instructions.md` first to get stack, conventions, and commands.
+- Open repo-root `AGENTS.md` first; it is the authoritative project instruction file.
+- Open `README.md` when setup, deployment, command, or environment details matter.
+- Treat `.github/copilot-instructions.md` as a Copilot-facing summary, not as the primary Codex source.
 
 ## References
 - Open `references/project-overview.md` when you need a quick map of apps, key entry points, and URL/menu notes.
@@ -17,7 +19,9 @@ description: TMS 项目开发规范与流程。用于在该仓库中新增或修
 - Use `StyledFormMixin` for forms.
 - Use `BaseTable` + `ActionsColumn` and `BaseDateColumn` for list pages.
 - Use constants from `core/constants.py`; avoid hard-coded group names, upload limits, or paths.
-- Validate file uploads with `validate_file_size` and type validators; register cleanup with `register_file_cleanup_signals`.
+- Model and form upload rules live in `core.uploads`; use `UploadSpec`, `UploadSizeValidator`, reusable upload specs, and `PrivateMediaStorage` instead of ad hoc validators or `FileSystemStorage(location=...)`.
+- For multiple file form inputs, use `core.forms.fields.MultipleFileField` and `MultipleFileInput`.
+- Register cleanup with `register_file_cleanup_signals` for file fields.
 - Use `upload_to` helpers with stable, date-based paths; prefer `*_UPLOAD_DIR` and `*_ALLOWED_EXTENSIONS` from settings or constants.
 - Keep LoginRequired as the default; open pages with `login_not_required` only when intended.
 - Use `CrossGroupAccessMixin` for coach/competitor cross-group access.
@@ -28,7 +32,7 @@ description: TMS 项目开发规范与流程。用于在该仓库中新增或修
 ## Feature Workflow
 - Identify the target app and reuse its patterns by reading `models.py`, `views.py`, `forms.py`, `tables.py`, `urls.py`, and templates.
 - Add or update URLs in `tmsproject/urls.py` and the app `urls.py`.
-- Update menus in `core/config/menus/*.yml` or the app `menus.yml`.
+- Update menus only in `core/config/menus/*.yml`; the group layout is defined in `core/config/menus.yml`.
 - Add permissions to models or views as needed and reflect them in templates.
 - Add or update tests in `<app>/tests.py` for new behavior.
 
