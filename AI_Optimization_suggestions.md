@@ -41,4 +41,4 @@ TMS 的基础方向是对的：Django 6、全站 `LoginRequiredMiddleware`、`co
 
 **框架功能建议**
 
-项目已经使用 Django 6 的全站登录中间件，这点很好。后续可逐步把 `unique_together` 迁到 `UniqueConstraint`，Django 官方文档也建议这么做；另外 Django 6 新增了内置 CSP middleware，可以替代部分手写响应头策略。参考：Django `unique_together` 文档、Django file storage API、Django middleware 文档。
+项目已经使用 Django 6 的全站登录中间件，这点很好。后续可逐步把 `unique_together` 迁到 `UniqueConstraint`，Django 官方文档也建议这么做；另外 Django 6 新增了内置 CSP middleware，可以替代部分手写响应头策略。参考：Django `unique_together` 文档、Django file storage API、Django middleware 文档。Ok

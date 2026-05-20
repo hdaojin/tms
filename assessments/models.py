@@ -286,7 +286,12 @@ class AssessmentModule(models.Model):
         verbose_name = "考核模块"
         verbose_name_plural = "考核模块"
         ordering = ["assessment", "sort_order", "module__code", "pk"]
-        unique_together = ['assessment', 'module']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['assessment', 'module'],
+                name='uniq_assessmentmodule_assessment_module',
+            ),
+        ]
 
     def clean(self):
         if self.responsible_coach and not self.responsible_coach.groups.filter(name=GROUP_COACH).exists():
@@ -365,8 +370,13 @@ class Score(models.Model):
     class Meta:
         verbose_name = "成绩"
         verbose_name_plural = "成绩"
-        unique_together = ["assessment_module", "user"]
         ordering = ["assessment_module", "user"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['assessment_module', 'user'],
+                name='uniq_score_assessmentmodule_user',
+            ),
+        ]
 
     def clean(self):
         # 验证分数不超过满分

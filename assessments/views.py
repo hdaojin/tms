@@ -223,34 +223,8 @@ def delete_module_file(request, module_id, field_name):
     if assessment_module.is_material_locked:
         raise PermissionDenied("该模块资料已锁定，无法删除")
 
-    field_config = {
-        "question_file": {
-            "label": "试题文件",
-            "accept": ".pdf,.doc,.docx,.xls,.xlsx,.zip",
-            "required": False,
-            "help_text": "上传试题文件",
-        },
-        "scoring_standard_file": {
-            "label": "评分标准文件",
-            "accept": ".pdf,.doc,.docx,.xls,.xlsx",
-            "required": False,
-            "help_text": "上传评分标准文件",
-        },
-        "scoring_sheet_file": {
-            "label": "评分表文件",
-            "accept": ".pdf,.xls,.xlsx",
-            "required": False,
-            "help_text": "上传评分表文件（非必须）",
-        },
-        "scoring_script_file": {
-            "label": "评分脚本文件",
-            "accept": ".py,.sh,.zip",
-            "required": False,
-            "help_text": "上传评分脚本文件（非必须）",
-        },
-    }
-
-    if field_name not in field_config:
+    form = AssessmentFileUploadForm(instance=assessment_module)
+    if field_name not in form.fields:
         messages.error(request, "无效的文件字段")
         return redirect("assessments:file_upload", module_id=module_id)
 
@@ -260,16 +234,10 @@ def delete_module_file(request, module_id, field_name):
         messages.success(request, "文件已删除")
 
     if request.headers.get("HX-Request"):
-        config = field_config[field_name]
         html = render_to_string(
             "assessments/partials/file_uploader_wrapper.html",
             {
-                "name": field_name,
-                "accept": config["accept"],
-                "required": config["required"],
-                "label": config["label"],
-                "help_text": config["help_text"],
-                "field_name": field_name,
+                "field": form[field_name],
             },
             request=request,
         )

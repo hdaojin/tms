@@ -115,8 +115,13 @@ class CompetitionProject(models.Model):
     class Meta:
         verbose_name = '具体赛事项目'
         verbose_name_plural = '具体赛事项目'
-        unique_together = ['competition', 'project']
         ordering = ['competition', 'project']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['competition', 'project'],
+                name='uniq_competitionproject_competition_project',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.competition.name} - {self.project.name}"
@@ -179,8 +184,13 @@ class CompetitionModule(models.Model):
     class Meta:
         verbose_name = '具体赛项模块'
         verbose_name_plural = '具体赛项模块'
-        unique_together = ['competition_project', 'code']
         ordering = ['competition_project', 'sort_order', 'code', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['competition_project', 'code'],
+                name='uniq_competitionmodule_competition_project_code',
+            ),
+        ]
 
     @property
     def project(self):
@@ -238,9 +248,12 @@ class CompetitionModuleStandardModuleMap(models.Model):
     class Meta:
         verbose_name = '官方模块标准映射'
         verbose_name_plural = '官方模块标准映射'
-        unique_together = ['competition_module', 'module']
         ordering = ['competition_module', '-is_primary', 'module__sort_order', 'module__code', 'pk']
         constraints = [
+            models.UniqueConstraint(
+                fields=['competition_module', 'module'],
+                name='uniq_compmodule_standardmodule',
+            ),
             models.UniqueConstraint(
                 fields=['competition_module'],
                 condition=models.Q(is_primary=True),
@@ -300,9 +313,12 @@ class CompetitionModuleAxisMap(models.Model):
     class Meta:
         verbose_name = '官方模块主线映射'
         verbose_name_plural = '官方模块主线映射'
-        unique_together = ['competition_module', 'module_axis']
         ordering = ['competition_module', '-is_primary', 'module_axis__sort_order', 'module_axis__code', 'pk']
         constraints = [
+            models.UniqueConstraint(
+                fields=['competition_module', 'module_axis'],
+                name='uniq_compmodule_axis',
+            ),
             models.UniqueConstraint(
                 fields=['competition_module'],
                 condition=models.Q(is_primary=True),

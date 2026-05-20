@@ -35,8 +35,7 @@ def pdf_inline_response(file_path: str, filename: str) -> FileResponse:
         raise Http404(f"无法打开文件: {e}")
     
     resp['Content-Disposition'] = f'inline; filename="{filename}"'
-    resp["X-Frame-Options"] = "SAMEORIGIN"
-    resp["Content-Security-Policy"] = "frame-ancestors 'self';"
+    resp['X-Frame-Options'] = 'SAMEORIGIN'
     return resp
 
 

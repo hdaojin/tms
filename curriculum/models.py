@@ -225,7 +225,12 @@ class StandardModule(models.Model):
         verbose_name = '标准模块'
         verbose_name_plural = '标准模块'
         ordering = ['project', 'module_set__sort_order', 'sort_order', 'code', 'name']
-        unique_together = ['module_set', 'code']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['module_set', 'code'],
+                name='uniq_standardmodule_moduleset_code',
+            ),
+        ]
 
     def clean(self):
         if self.module_set_id and self.project_id and self.module_set.project_id != self.project_id:
@@ -285,9 +290,12 @@ class StandardModuleAxisMap(models.Model):
     class Meta:
         verbose_name = '标准模块主线映射'
         verbose_name_plural = '标准模块主线映射'
-        unique_together = ['module', 'module_axis']
         ordering = ['module', '-is_primary', 'module_axis__sort_order', 'module_axis__code', 'pk']
         constraints = [
+            models.UniqueConstraint(
+                fields=['module', 'module_axis'],
+                name='uniq_standardmoduleaxis_module_axis',
+            ),
             models.UniqueConstraint(
                 fields=['module'],
                 condition=models.Q(is_primary=True),

@@ -14,6 +14,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 
 import environ
+from django.utils.csp import CSP
 
 from core.constants import (
     DEFAULT_CACHE_TIMEOUT,
@@ -94,6 +95,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.LoginRequiredMiddleware',   # 启用将所有未认证请求重定向到登录页面
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.csp.ContentSecurityPolicyMiddleware',
     'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',   # 启用 flatpages 中间件
 ]
 
@@ -196,6 +198,9 @@ LOGIN_REDIRECT_URL = '/accounts/home/'  # 登录成功后跳转的页面
 # 自定义变量（默认值定义在 core/constants.py，可通过环境变量覆盖）
 CACHE_TIMEOUT = env.int('CACHE_TIMEOUT', default=DEFAULT_CACHE_TIMEOUT)  # type: ignore
 UPLOAD_MAX_SIZE_MB = env.int('UPLOAD_MAX_SIZE_MB', default=DEFAULT_UPLOAD_MAX_SIZE_MB)  # type: ignore
+SECURE_CSP = {
+    'frame-ancestors': [CSP.SELF],
+}
 SAMBA_INTEGRATION_ENABLED = env.bool('SAMBA_INTEGRATION_ENABLED', default=True)  # type: ignore
 SAMBA_ASYNC_OPERATIONS_ENABLED = env.bool('SAMBA_ASYNC_OPERATIONS_ENABLED', default=True)  # type: ignore
 SAMBA_COMMAND_TIMEOUT_SECONDS = env.int('SAMBA_COMMAND_TIMEOUT_SECONDS', default=15)  # type: ignore

@@ -8,6 +8,9 @@ class ArticleExperimentMixin:
     experimental_module_label = '低优先实验模块'
     experimental_module_notice = '文章模块当前仅作为低优先实验模块保留，界面、流程和权限规则后续都可能继续调整。'
 
+    def get_visible_articles_queryset(self):
+        return Article.objects.filter(status=Article.Status.PUBLISHED).order_by('-publish_date')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['experimental_module_label'] = self.experimental_module_label
@@ -21,6 +24,9 @@ class ArticleListView(ArticleExperimentMixin, LoginRequiredMixin, ListView):
     context_object_name = 'articles'
     ordering = ['-publish_date']
 
+    def get_queryset(self):
+        return self.get_visible_articles_queryset()
+
 
 class ArticleDetailView(ArticleExperimentMixin, LoginRequiredMixin, DetailView):
     model = Article
@@ -28,7 +34,7 @@ class ArticleDetailView(ArticleExperimentMixin, LoginRequiredMixin, DetailView):
     context_object_name = 'article'
 
     def get_queryset(self):
-        return Article.objects.filter(status=Article.Status.PUBLISHED)
+        return self.get_visible_articles_queryset()
     
 
     

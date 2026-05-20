@@ -3,13 +3,9 @@
 仅用于删除文件后返回上传组件
 
 参数:
-  - name: 表单字段名称
-  - accept: 接受的文件类型
-  - required: 是否必填
-  - label: 标签文字
-  - help_text: 帮助文字
-  - field_name: 字段名称（用于 ID）
+  - field: Django BoundField 对象
 {% endcomment %}
-<div id="file-display-{{ field_name }}">
-  {% include 'components/file_uploader.html' with name=name accept=accept required=required label=label help_text=help_text %}
+{% load form_extras %}
+<div id="file-display-{{ field.name }}">
+  {% include 'components/file_uploader.html' with name=field.html_name accept=field|get_accept_types multiple=field|is_multiple_file required=field.field.required label=field.label help_text=field.help_text %}
 </div>

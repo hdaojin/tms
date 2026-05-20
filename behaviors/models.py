@@ -88,7 +88,12 @@ class ConductCategory(AuditedModel):
         verbose_name = '奖惩分类'
         verbose_name_plural = '奖惩分类'
         ordering = ['nature', 'order', 'name']
-        unique_together = [['nature', 'name']]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['nature', 'name'],
+                name='uniq_conduct_category_nature_name',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_nature_display()} - {self.name}"
@@ -119,7 +124,12 @@ class ConductSeverityRule(AuditedModel):
         verbose_name = '严重程度系数规则'
         verbose_name_plural = '严重程度系数规则'
         ordering = ['nature', 'order', 'severity']
-        unique_together = [['nature', 'severity']]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['nature', 'severity'],
+                name='uniq_conduct_severity_rule_nature_severity',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_nature_display()} - {self.severity_label} ({self.multiplier:.2f}倍)"
@@ -168,7 +178,12 @@ class ConductItem(AuditedModel):
         verbose_name = '奖惩事项'
         verbose_name_plural = '奖惩事项'
         ordering = ['category__nature', 'category__order', 'name']
-        unique_together = [['category', 'name']]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['category', 'name'],
+                name='uniq_conduct_item_category_name',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.category.name} - {self.name} ({self.default_score:+.1f}分)"
@@ -436,44 +451,24 @@ class ConductSummary(models.Model):
         return f"{self.student.display_name} - 总分: {self.total_score:+.1f}"
     
     def update_summary(self):
-        """更新汇总信息（仅统计已通过的记录）"""
-        approved_records = self.student.conduct_records.filter(
-            status=ConductRecord.STATUS_APPROVED,
-        ).select_related('item__category')
-        rule_map = {
-            (rule.nature, rule.severity): rule.multiplier
-            for rule in ConductSeverityRule.objects.all()
-        }
+        """更新汇总信息（仅统计已通过的记录）。"""
+        from .services import recalculate_conduct_summary
 
-        total_score = Decimal('0')
-        reward_count = 0
-        penalty_count = 0
-
-        for record in approved_records:
-            total_score += record.get_score(rule_map=rule_map)
-            if record.item.category.nature == CONDUCT_NATURE_REWARD:
-                reward_count += 1
-            elif record.item.category.nature == CONDUCT_NATURE_PENALTY:
-                penalty_count += 1
-
-        self.total_score = total_score
-        self.reward_count = reward_count
-        self.penalty_count = penalty_count
-
-        self.save()
+        return recalculate_conduct_summary(self)
 
 
 def refresh_conduct_summary(student_id):
     """重算单个学生的奖惩汇总。"""
-    summary, _ = ConductSummary.objects.get_or_create(student_id=student_id)
-    summary.update_summary()
+    from .services import refresh_conduct_summary as refresh_conduct_summary_service
+
+    return refresh_conduct_summary_service(student_id)
 
 
 def refresh_conduct_summaries(student_ids):
     """批量重算多个学生的奖惩汇总。"""
-    for student_id in set(student_ids):
-        if student_id is not None:
-            refresh_conduct_summary(student_id)
+    from .services import refresh_conduct_summaries as refresh_conduct_summaries_service
+
+    return refresh_conduct_summaries_service(student_ids)
 
 
 # 注册文件清理信号
@@ -484,57 +479,46 @@ register_file_cleanup_signals(ConductRecord, 'attachment')
 @receiver(post_save, sender=ConductRecord)
 def update_conduct_summary_on_save(sender, instance, **kwargs):
     """当记录状态变为已通过或已驳回时，更新汇总表"""
-    if instance.status in [ConductRecord.STATUS_APPROVED, ConductRecord.STATUS_REJECTED]:
-        refresh_conduct_summary(instance.student_id)
+    from .services import sync_conduct_summary_after_record_save
+
+    sync_conduct_summary_after_record_save(instance)
 
 
 @receiver(post_delete, sender=ConductRecord)
 def update_conduct_summary_on_delete(sender, instance, **kwargs):
     """当记录被删除时，更新汇总表"""
-    try:
-        summary = ConductSummary.objects.get(student_id=instance.student_id)
-        summary.update_summary()
-    except ConductSummary.DoesNotExist:
-        pass
+    from .services import sync_conduct_summary_after_record_delete
+
+    sync_conduct_summary_after_record_delete(instance)
 
 
 @receiver(post_save, sender=ConductItem)
 def update_conduct_summary_on_item_save(sender, instance, **kwargs):
     """事项或所属分类变化后，重算受影响学生汇总。"""
-    student_ids = ConductRecord.objects.filter(
-        item=instance,
-        status=ConductRecord.STATUS_APPROVED,
-    ).values_list('student_id', flat=True).distinct()
-    refresh_conduct_summaries(student_ids)
+    from .services import sync_conduct_summaries_for_item
+
+    sync_conduct_summaries_for_item(instance)
 
 
 @receiver(post_save, sender=ConductCategory)
 def update_conduct_summary_on_category_save(sender, instance, **kwargs):
     """分类性质变化后，重算受影响学生汇总。"""
-    student_ids = ConductRecord.objects.filter(
-        item__category=instance,
-        status=ConductRecord.STATUS_APPROVED,
-    ).values_list('student_id', flat=True).distinct()
-    refresh_conduct_summaries(student_ids)
+    from .services import sync_conduct_summaries_for_category
+
+    sync_conduct_summaries_for_category(instance)
 
 
 @receiver(post_save, sender=ConductSeverityRule)
 def update_conduct_summary_on_rule_save(sender, instance, **kwargs):
     """分值规则变化后，重算受影响学生汇总。"""
-    student_ids = ConductRecord.objects.filter(
-        item__category__nature=instance.nature,
-        severity=instance.severity,
-        status=ConductRecord.STATUS_APPROVED,
-    ).values_list('student_id', flat=True).distinct()
-    refresh_conduct_summaries(student_ids)
+    from .services import sync_conduct_summaries_for_rule
+
+    sync_conduct_summaries_for_rule(instance)
 
 
 @receiver(post_delete, sender=ConductSeverityRule)
 def update_conduct_summary_on_rule_delete(sender, instance, **kwargs):
     """分值规则删除后，重算受影响学生汇总。"""
-    student_ids = ConductRecord.objects.filter(
-        item__category__nature=instance.nature,
-        severity=instance.severity,
-        status=ConductRecord.STATUS_APPROVED,
-    ).values_list('student_id', flat=True).distinct()
-    refresh_conduct_summaries(student_ids)
+    from .services import sync_conduct_summaries_for_rule
+
+    sync_conduct_summaries_for_rule(instance)

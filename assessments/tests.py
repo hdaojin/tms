@@ -18,6 +18,7 @@ from django.urls import reverse
 
 from curriculum.models import CompetitionType, Project, StandardModule, StandardModuleSet
 from core.constants import GROUP_COACH
+from core.uploads import ASSESSMENT_TP_UPLOAD_SPEC
 from trainingcycles.models import TrainingCycle
 
 from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
@@ -696,6 +697,30 @@ class AssessmentCoachingWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assessment_module.refresh_from_db()
         self.assertTrue(bool(self.assessment_module.question_file))
+
+    def test_htmx_module_file_deletion_rerenders_upload_using_form_field_config(self):
+        self.assessment_module.question_file = self._build_upload_file("question.pdf")
+        self.assessment_module.save(update_fields=["question_file"])
+        self.client.force_login(self.coach)
+
+        response = self.client.delete(
+            reverse(
+                "assessments:delete_module_file",
+                args=[self.assessment_module.pk, "question_file"],
+            ),
+            HTTP_HX_REQUEST="true",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assessment_module.refresh_from_db()
+        self.assertFalse(bool(self.assessment_module.question_file))
+        self.assertContains(response, 'id="file-display-question_file"')
+        self.assertContains(response, 'name="question_file"')
+        self.assertContains(response, f'accept="{ASSESSMENT_TP_UPLOAD_SPEC.accept}"')
+        self.assertContains(
+            response,
+            ASSESSMENT_TP_UPLOAD_SPEC.help_text("上传试题文件"),
+        )
 
     def test_material_lock_rejects_attachment_deletion(self):
         attachment = AssessmentAttachment.objects.create(
