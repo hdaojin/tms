@@ -36,7 +36,7 @@ Prefer focused app tests over the full suite unless the change crosses app bound
 - Use `StyledFormMixin` for forms.
 - Use `BaseTable`, `BaseDateColumn`, and `ActionsColumn` for list/table pages.
 - Use `OwnerRequiredMixin`, `CrossGroupAccessMixin`, `PermissionRequiredMixin`, or `SuperuserRequiredMixin` for access control.
-- Display users as `user.display_name` or `user.full_info`.
+- Templates and compatibility layers may display users as `user.display_name` or `user.full_info`; new Python logic should prefer `accounts.services.users.get_user_display_name()` or `get_user_full_info()`.
 - For file fields, use `core.uploads.UploadSpec`, `UploadSizeValidator`, `PrivateMediaStorage`, project upload constants, and cleanup signals.
 - For multiple file form inputs, use `core.forms.fields.MultipleFileField` and `MultipleFileInput`.
 - Keep edits scoped; do not refactor unrelated modules.

@@ -3,7 +3,7 @@ from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin, GroupAdmin as DefaultGroupAdmin
 from django.utils.translation import gettext_lazy as _
 
-from behaviors.services import discard_conduct_summary_delete_permission
+from core.utils.admin_deletion import discard_registered_delete_permissions
 from .admin_forms import GroupPermissionBundleAdminForm, UserPermissionBundleAdminForm
 from .models import UserProfile, GroupProfile
 from .services.permission_bundles import sync_group_permission_bundles, sync_user_permission_bundles
@@ -43,8 +43,7 @@ class CustomUserAdmin(DefaultUserAdmin):
         deleted_objects, model_count, perms_needed, protected = (
             super().get_deleted_objects(objs, request)
         )
-        # 允许级联删除奖惩汇总（单独删除仍被 ConductSummaryAdmin 拦截）
-        discard_conduct_summary_delete_permission(perms_needed)
+        discard_registered_delete_permissions(objs, perms_needed)
         return deleted_objects, model_count, perms_needed, protected
 
     def save_related(self, request, form, formsets, change):

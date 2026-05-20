@@ -16,6 +16,7 @@
 - 文件上传规则复用 `core.uploads`；多文件表单使用 `core.forms.fields.MultipleFileField` / `MultipleFileInput`。
 - 私有上传使用 `settings.PRIVATE_MEDIA_ROOT` 和 `PrivateMediaStorage`，不要在迁移中写入本机绝对路径。
 - 新增或修改页面时复用 `TitleMixin`、`StyledFormMixin`、`BaseTable`、`ActionsColumn` 和现有模板组件。
+- 模板与兼容层可继续使用 `user.display_name` / `user.full_info`；新增 Python 逻辑优先使用 `accounts.services.users.get_user_display_name()` / `get_user_full_info()`。
 - 用户可见文案、模型名、表单标签、校验错误和文档使用中文。
 - 不要读取、打印或提交 `.env` 密钥；AI API 密钥只能通过后端加密服务处理。
 

@@ -10,10 +10,53 @@ from django.urls import reverse
 from accounts.admin_forms import GroupPermissionBundleAdminForm, UserPermissionBundleAdminForm
 from accounts.models import UserProfile
 from accounts.services.permission_bundles import sync_group_permission_bundles, sync_user_permission_bundles
+from accounts.services.users import get_user_display_name, get_user_full_info
 from behaviors.models import ConductSummary
 from core.constants import GROUP_COMPETITOR
 
 User = get_user_model()
+
+
+class UserDisplayNameServiceTests(TestCase):
+	def test_display_name_prefers_joined_last_and_first_name(self):
+		user = User.objects.create_user(
+			username='display-user',
+			password='testpass123',
+			first_name='三',
+			last_name='张',
+		)
+
+		self.assertEqual(get_user_display_name(user), '张三')
+		self.assertEqual(user.display_name, '张三')
+
+	def test_display_name_falls_back_to_username(self):
+		user = User.objects.create_user(
+			username='display-user',
+			password='testpass123',
+		)
+
+		self.assertEqual(get_user_display_name(user), 'display-user')
+		self.assertEqual(user.display_name, 'display-user')
+
+	def test_full_info_appends_username_when_name_exists(self):
+		user = User.objects.create_user(
+			username='student001',
+			password='testpass123',
+			first_name='三',
+			last_name='张',
+		)
+
+		self.assertEqual(get_user_full_info(user), '张三(student001)')
+		self.assertEqual(user.full_info, '张三(student001)')
+
+	def test_full_info_returns_username_when_name_missing(self):
+		user = User.objects.create_user(
+			username='student001',
+			password='testpass123',
+		)
+
+		self.assertEqual(get_user_full_info(user), 'student001')
+		self.assertEqual(user.full_info, 'student001')
 
 
 class AccountHomeTestCase(TestCase):

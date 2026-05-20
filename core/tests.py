@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -17,6 +17,7 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from assessments.models import Assessment, AssessmentModule
+from behaviors.models import ConductSummary
 from competitions.models import Competition, CompetitionProject
 from core.management.commands.reconcile_curriculum_training_cutovers import Command as CurriculumTrainingCutoverCommand
 from core.forms.fields import MultipleFileField
@@ -36,12 +37,35 @@ from core.uploads import (
     is_image_file,
     validate_upload_file,
 )
+from core.utils.admin_deletion import discard_registered_delete_permissions, register_delete_permission_exemptions
 from curriculum.models import CompetitionType, Project, StandardModule, StandardModuleAxisMap, StandardModuleSet
 from trainingcycles.models import TrainingCycle
 from traininglogs.models import TrainingLog
 
 
 User = get_user_model()
+
+
+class DeletePermissionExemptionRegistryTests(TestCase):
+    def test_registered_source_model_discards_registered_target_permission(self):
+        register_delete_permission_exemptions(
+            "auth.User",
+            ["behaviors.ConductSummary"],
+        )
+        user = User(username="registry-user")
+        perms_needed = {str(ConductSummary._meta.verbose_name), "其他模型"}
+
+        discard_registered_delete_permissions([user], perms_needed)
+
+        self.assertSetEqual(perms_needed, {"其他模型"})
+
+    def test_unregistered_source_model_keeps_permission_set_unchanged(self):
+        group = Group(name="registry-group")
+        perms_needed = {str(ConductSummary._meta.verbose_name)}
+
+        discard_registered_delete_permissions([group], perms_needed)
+
+        self.assertSetEqual(perms_needed, {str(ConductSummary._meta.verbose_name)})
 
 
 class SiteRobotsDirectiveTests(TestCase):

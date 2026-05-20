@@ -25,7 +25,7 @@ from core.constants import (
     CONDUCT_SEVERITY_SEVERE,
     GROUP_COMPETITOR,
 )
-from behaviors.admin import ConductCategoryAdmin, ConductItemAdmin, ConductRecordAdmin, ConductSeverityRuleAdmin
+from behaviors.admin import ConductCategoryAdmin, ConductItemAdmin, ConductRecordAdmin, ConductSeverityRuleAdmin, ConductSummaryAdmin
 from behaviors.models import ConductCategory, ConductItem, ConductRecord, ConductSeverityRule, ConductSummary
 from behaviors.services import prepare_conduct_record_for_save
 
@@ -387,6 +387,15 @@ class ConductSummaryZeroScoreCountTestCase(TestCase):
         self.assertEqual(summary.total_score, Decimal('0.00'))
         self.assertEqual(summary.penalty_count, 1)
         self.assertEqual(summary.reward_count, 0)
+
+
+class ConductSummaryAdminTestCase(TestCase):
+    def test_summary_cannot_be_deleted_directly_in_admin(self):
+        request = RequestFactory().get('/admin/behaviors/conductsummary/')
+        request.user = User.objects.create_superuser('summary-admin', password='testpass123')
+        model_admin = ConductSummaryAdmin(ConductSummary, AdminSite())
+
+        self.assertFalse(model_admin.has_delete_permission(request))
 
 
 class ConductRecordAdminTestCase(TestCase):

@@ -23,10 +23,3 @@ def prepare_conduct_record_for_save(record, *, actor, change, now=None):
         record.reviewed_at = current_time
 
     return record
-
-
-def discard_conduct_summary_delete_permission(perms_needed):
-    from .models import ConductSummary
-
-    perms_needed.discard(ConductSummary._meta.verbose_name)
-    return perms_needed
