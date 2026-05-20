@@ -1,83 +1,27 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from django.db.models import Q
 
+from accounts.services.users import get_user_display_name
 from core.utils.forms import StyledFormMixin
 
-from .models import CompetitionPerson, CompetitionProject, CompetitionProjectMember, CompetitionResult, Competitor, CompetitorUser, Expert, Member, SkillPosition
-
-
-def get_competition_project_queryset():
-    return CompetitionProject.objects.select_related(
-        'competition__competition_type',
-        'project',
-    ).order_by('-competition__start_date', 'competition__name', 'project__name')
-
-
-def get_member_queryset(competition_project):
-    if competition_project is None or not getattr(competition_project, 'pk', None):
-        return Member.objects.none()
-    return Member.objects.filter(
-        competition_project_links__competition_project=competition_project,
-    ).distinct().order_by('level', 'name')
-
-
-def get_available_member_queryset(competition_project):
-    if competition_project is None or not getattr(competition_project, 'pk', None):
-        return Member.objects.none()
-    required_level = competition_project.required_member_level
-    if required_level is None:
-        return Member.objects.none()
-    return Member.objects.filter(level=required_level).exclude(
-        competition_project_links__competition_project=competition_project,
-    ).distinct().order_by('level', 'name')
-
-
-def get_competitor_user_queryset():
-    return CompetitorUser.objects.order_by('last_name', 'first_name', 'username')
-
-
-def get_competition_person_queryset():
-    return CompetitionPerson.objects.select_related('user').order_by('name', 'organization', 'pk')
-
-
-def get_available_competition_person_queryset(competition_project, include_person=None):
-    queryset = get_competition_person_queryset()
-    if competition_project is None or not getattr(competition_project, 'pk', None):
-        return queryset.none()
-
-    queryset = queryset.exclude(competitor_assignments__competition_project=competition_project)
-    if include_person is not None and getattr(include_person, 'pk', None):
-        queryset = (queryset | CompetitionPerson.objects.filter(pk=include_person.pk).select_related('user')).distinct()
-    return queryset.order_by('name', 'organization', 'pk')
-
-
-def format_competition_person_label(person):
-    parts = [person.name]
-    if person.organization:
-        parts.append(person.organization)
-    if person.user_id:
-        parts.append(person.user.display_name)
-    return ' / '.join(parts)
-
-
-def get_available_competitor_queryset(competition_project, include_competitor=None):
-    queryset = Competitor.objects.select_related(
-        'member',
-        'person__user',
-        'competition_project__competition',
-        'competition_project__project',
-    )
-    if competition_project is None:
-        return queryset.none()
-
-    queryset = queryset.filter(competition_project=competition_project)
-    if include_competitor is not None and include_competitor.pk:
-        return queryset.filter(Q(results__isnull=True) | Q(pk=include_competitor.pk)).distinct().order_by(
-            'person__name',
-            'pk',
-        )
-    return queryset.filter(results__isnull=True).order_by('person__name', 'pk')
+from .models import CompetitionProject, CompetitionResult, Competitor, CompetitorUser, Expert, Member, SkillPosition
+from .selectors import (
+    format_competition_project_label,
+    format_competition_person_label,
+    format_competitor_label,
+    format_member_label,
+    get_available_competition_people_for_competition_project,
+    get_available_competitors_for_competition_project,
+    get_available_members_for_competition_project,
+    get_competition_person_queryset,
+    get_competition_project_queryset,
+    get_competitor_user_queryset,
+    get_members_for_competition_project,
+)
+from .services import (
+    create_or_link_competition_project_member,
+    resolve_or_create_competition_person,
+)
 
 
 class CompetitionProjectFormMixin:
@@ -105,7 +49,7 @@ class CompetitionProjectFormMixin:
             return
 
         field.queryset = get_competition_project_queryset()
-        field.label_from_instance = lambda obj: f'{obj.competition.name} / {obj.project.name}'
+        field.label_from_instance = format_competition_project_label
 
 
 class CompetitionPersonAssignmentFormMixin:
@@ -138,7 +82,7 @@ class CompetitionPersonAssignmentFormMixin:
         self.fields['new_person_organization'].help_text = f'仅在新增{self.person_noun}时填写。'
         self.fields['new_person_user'].label = self.new_person_user_label
         self.fields['new_person_user'].queryset = get_competitor_user_queryset()
-        self.fields['new_person_user'].label_from_instance = lambda obj: obj.display_name
+        self.fields['new_person_user'].label_from_instance = get_user_display_name
 
     def clean(self):
         cleaned_data = super().clean()
@@ -152,14 +96,12 @@ class CompetitionPersonAssignmentFormMixin:
 
     def save(self, commit=True):
         instance = super().save(commit=False)
-        person = self.cleaned_data.get('person')
-        if person is None:
-            person = CompetitionPerson.objects.create(
-                name=self.cleaned_data['new_person_name'].strip(),
-                organization=(self.cleaned_data.get('new_person_organization') or '').strip(),
-                user=self.cleaned_data.get('new_person_user'),
-            )
-        instance.person = person
+        instance.person = resolve_or_create_competition_person(
+            person=self.cleaned_data.get('person'),
+            new_person_name=self.cleaned_data.get('new_person_name') or '',
+            new_person_organization=self.cleaned_data.get('new_person_organization') or '',
+            new_person_user=self.cleaned_data.get('new_person_user'),
+        )
         if commit:
             instance.save()
             self.save_m2m()
@@ -179,8 +121,8 @@ class CompetitionProjectMemberLinkForm(StyledFormMixin, forms.Form):
     def __init__(self, *args, competition_project, **kwargs):
         self.competition_project = competition_project
         super().__init__(*args, **kwargs)
-        self.fields['existing_member'].queryset = get_available_member_queryset(competition_project)
-        self.fields['existing_member'].label_from_instance = lambda obj: f'{obj.name} [{obj.get_level_display()}]'
+        self.fields['existing_member'].queryset = get_available_members_for_competition_project(competition_project)
+        self.fields['existing_member'].label_from_instance = format_member_label
         self.fields['existing_member'].help_text = (
             f'当前赛项要求选择“{competition_project.required_member_level_label}”代表队。'
             '如库中已有，可直接选择并关联到当前赛项。'
@@ -251,24 +193,13 @@ class CompetitionProjectMemberLinkForm(StyledFormMixin, forms.Form):
         return cleaned_data
 
     def save(self):
-        existing_member = self.cleaned_data.get('existing_member')
-        if existing_member is not None:
-            member = existing_member
-        else:
-            member = Member(
-                name=self.cleaned_data['new_member_name'],
-                code=self.cleaned_data['new_member_code'],
-                level=self.competition_project.required_member_level,
-                flag=self.cleaned_data.get('new_member_flag'),
-            )
-            member.full_clean()
-            member.save()
-
-        link, _created = CompetitionProjectMember.objects.get_or_create(
+        return create_or_link_competition_project_member(
             competition_project=self.competition_project,
-            member=member,
+            existing_member=self.cleaned_data.get('existing_member'),
+            new_member_name=self.cleaned_data.get('new_member_name') or '',
+            new_member_code=self.cleaned_data.get('new_member_code') or '',
+            new_member_flag=self.cleaned_data.get('new_member_flag'),
         )
-        return link
 
 
 class CompetitorCreateForm(CompetitionPersonAssignmentFormMixin, CompetitionProjectFormMixin, StyledFormMixin, forms.ModelForm):
@@ -292,7 +223,7 @@ class CompetitorCreateForm(CompetitionPersonAssignmentFormMixin, CompetitionProj
 
         if self.fixed_competition_project is not None:
             self.fields.pop('competition_project', None)
-            self.fields['person'].queryset = get_available_competition_person_queryset(competition_project)
+            self.fields['person'].queryset = get_available_competition_people_for_competition_project(competition_project)
             self.fields['person'].help_text = '如该选手参加过往届或已在人员库中，可直接选择；通常请直接填写下方新增选手信息。'
             self.fields['new_person_name'].help_text = '默认直接新增本届选手；仅在上方未选择已有选手时填写。'
             self.fields['new_person_organization'].help_text = '仅在新增选手时填写。'
@@ -316,8 +247,8 @@ class CompetitorCreateForm(CompetitionPersonAssignmentFormMixin, CompetitionProj
                 'gender',
             ])
 
-        self.fields['member'].queryset = get_member_queryset(competition_project)
-        self.fields['member'].label_from_instance = lambda obj: f'{obj.name} [{obj.get_level_display()}]'
+        self.fields['member'].queryset = get_members_for_competition_project(competition_project)
+        self.fields['member'].label_from_instance = format_member_label
         if competition_project is None:
             self.fields['member'].help_text = '请先选择具体赛项，再选择匹配层级的代表队。'
         else:
@@ -363,8 +294,8 @@ class ExpertCreateForm(CompetitionPersonAssignmentFormMixin, CompetitionProjectF
         ])
 
         competition_project = self.get_selected_competition_project()
-        self.fields['member'].queryset = get_member_queryset(competition_project)
-        self.fields['member'].label_from_instance = lambda obj: f'{obj.name} [{obj.get_level_display()}]'
+        self.fields['member'].queryset = get_members_for_competition_project(competition_project)
+        self.fields['member'].label_from_instance = format_member_label
         if competition_project is None:
             self.fields['member'].help_text = '请先选择具体赛项，再选择匹配层级的代表队。'
         else:
@@ -414,13 +345,11 @@ class CompetitionResultCreateForm(CompetitionProjectFormMixin, StyledFormMixin, 
 
         competition_project = self.get_selected_competition_project()
         include_competitor = self.instance.competitor if getattr(self.instance, 'competitor_id', None) else None
-        self.fields['competitor'].queryset = get_available_competitor_queryset(
+        self.fields['competitor'].queryset = get_available_competitors_for_competition_project(
             competition_project,
             include_competitor=include_competitor,
         )
-        self.fields['competitor'].label_from_instance = (
-            lambda obj: f'{obj.name} / {obj.member.name}'
-        )
+        self.fields['competitor'].label_from_instance = format_competitor_label
         if competition_project is None:
             self.fields['competitor'].help_text = '请先选择具体赛项。'
         else:

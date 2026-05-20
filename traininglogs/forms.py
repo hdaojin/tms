@@ -1,12 +1,11 @@
 from django import forms
-from django.utils import timezone
 
 from curriculum.models import StandardModule
 from trainingcycles.models import TrainingCycle
 
 from .models import TrainingLog
 from core.uploads import TRAININGLOG_UPLOAD_SPEC
-from core.utils.forms import StyledFormMixin
+from core.utils.forms import DefaultTodayDateFormMixin, StyledFormMixin
 
 
 def get_training_cycle_modules_queryset(training_cycle):
@@ -19,7 +18,9 @@ def get_training_cycle_modules_queryset(training_cycle):
     )
 
 
-class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
+class TrainingLogCreateForm(DefaultTodayDateFormMixin, StyledFormMixin, forms.ModelForm):
+    default_today_date_fields = ('training_date',)
+
     def __init__(self, *args, user=None, **kwargs):
         self.current_user = user
         super().__init__(*args, **kwargs)
@@ -46,13 +47,6 @@ class TrainingLogCreateForm(StyledFormMixin, forms.ModelForm):
         module_field.required = True
         module_field.empty_label = None
         module_field.label_from_instance = lambda obj: f"{obj.code} - {obj.name}"  # type: ignore
-        # 如果需要，可以在这里添加自定义初始化逻辑
-        # 例如，动态设置某些字段的选项或初始值
-        # 设置默认日期为今天（每次实例化时动态设置）
-        if not self.instance.pk:
-            today = timezone.localdate()
-            self.fields['training_date'].initial = today.strftime('%Y-%m-%d')
-            self.fields['training_date'].widget.attrs['value'] = today.strftime('%Y-%m-%d')
 
     class Meta:
         model = TrainingLog

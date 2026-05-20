@@ -2,7 +2,7 @@ from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -18,7 +18,17 @@ from .forms import (
 	ExpertCreateForm,
 	SkillPositionCreateForm,
 )
-from .models import Competition, CompetitionProject, CompetitionResult, Competitor, Expert, Member, SkillPosition
+from .models import Competition, CompetitionProject, CompetitionResult, Competitor, Expert, SkillPosition
+from .selectors import (
+	get_competition_project_competitors_queryset,
+	get_competition_project_experts_queryset,
+	get_competition_project_official_modules_queryset,
+	get_competition_project_queryset,
+	get_competition_project_results_queryset,
+	get_competition_project_skill_positions_queryset,
+	get_competition_projects_for_competition,
+	get_members_for_competition_project,
+)
 from .tables import CompetitionTable
 
 
@@ -27,6 +37,30 @@ def build_competition_project_url(name, competition_project_id, next_url=None):
 	if next_url:
 		params['next'] = next_url
 	return f"{reverse(name)}?{urlencode(params)}"
+
+
+class CompetitionProjectScopedPathMixin:
+	competition_project_url_kwarg = 'pk'
+	competition_project_form_kwarg = 'competition_project'
+
+	def get_competition_project_queryset(self):
+		return get_competition_project_queryset()
+
+	def get_competition_project(self):
+		if not hasattr(self, '_competition_project'):
+			self._competition_project = get_object_or_404(
+				self.get_competition_project_queryset(),
+				pk=self.kwargs[self.competition_project_url_kwarg],
+			)
+		return self._competition_project
+
+	def get_form_kwargs(self):
+		kwargs = super().get_form_kwargs()
+		kwargs[self.competition_project_form_kwarg] = self.get_competition_project()
+		return kwargs
+
+	def get_competition_project_detail_url(self):
+		return reverse('competitions:competitionproject_detail', args=[self.get_competition_project().pk])
 
 
 class CompetitionListView(TitleMixin, LoginRequiredMixin, SingleTableView):
@@ -55,14 +89,7 @@ class CompetitionDetailView(TitleMixin, LoginRequiredMixin, DetailView):
 
 	def get_context_data(self, **kwargs):
 		context = super().get_context_data(**kwargs)
-		context['competition_projects'] = self.object.competition_projects.select_related(
-			'project',
-		).annotate(
-			official_module_total=Count('competition_modules', distinct=True),
-			competitor_total=Count('competitors', distinct=True),
-			expert_total=Count('experts', distinct=True),
-			result_total=Count('competitors__results', distinct=True),
-		).order_by('project__name')
+		context['competition_projects'] = get_competition_projects_for_competition(self.object)
 		return context
 
 
@@ -92,19 +119,12 @@ class CompetitionProjectDetailView(TitleMixin, LoginRequiredMixin, DetailView):
 		competition_project = self.object
 		detail_url = reverse('competitions:competitionproject_detail', args=[competition_project.pk])
 
-		context['official_modules'] = competition_project.competition_modules.all().order_by('sort_order', 'code', 'pk')
-		context['competitors'] = competition_project.competitors.select_related('person__user', 'member').all().order_by('person__name', 'pk')
-		context['experts'] = competition_project.experts.select_related('person__user', 'member').all().order_by('person__name')
-		context['skill_positions'] = competition_project.skill_positions.select_related('person__user').all().order_by('position_name', 'person__name')
-		context['results'] = CompetitionResult.objects.filter(
-			competitor__competition_project=competition_project,
-		).select_related(
-			'competitor__member',
-			'competitor__person__user',
-		).order_by('rank', '-score_700', 'competitor__person__name')
-		context['members'] = Member.objects.filter(
-			competition_project_links__competition_project=competition_project,
-		).distinct().order_by('level', 'name')
+		context['official_modules'] = get_competition_project_official_modules_queryset(competition_project)
+		context['competitors'] = get_competition_project_competitors_queryset(competition_project)
+		context['experts'] = get_competition_project_experts_queryset(competition_project)
+		context['skill_positions'] = get_competition_project_skill_positions_queryset(competition_project)
+		context['results'] = get_competition_project_results_queryset(competition_project)
+		context['members'] = get_members_for_competition_project(competition_project)
 		context['member_link_url'] = reverse('competitions:competitionproject_member_create', args=[competition_project.pk])
 		context['competitor_create_url'] = reverse('competitions:competitor_create', args=[competition_project.pk])
 		context['expert_create_url'] = build_competition_project_url(
@@ -172,7 +192,7 @@ class CompetitionCreateViewMixin(TitleMixin, LoginRequiredMixin, PermissionRequi
 		return response
 
 
-class CompetitionProjectMemberCreateView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, FormView):
+class CompetitionProjectMemberCreateView(CompetitionProjectScopedPathMixin, TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, FormView):
 	raise_exception = True
 	template_name = 'competitions/create_form.html'
 	form_class = CompetitionProjectMemberLinkForm
@@ -181,21 +201,8 @@ class CompetitionProjectMemberCreateView(TitleMixin, LoginRequiredMixin, Permiss
 	title_icon = 'icon-[tabler--flag]'
 	submit_label = '保存'
 
-	def get_competition_project(self):
-		if not hasattr(self, '_competition_project'):
-			self._competition_project = get_object_or_404(
-				CompetitionProject.objects.select_related('competition__competition_type', 'project'),
-				pk=self.kwargs['pk'],
-			)
-		return self._competition_project
-
-	def get_form_kwargs(self):
-		kwargs = super().get_form_kwargs()
-		kwargs['competition_project'] = self.get_competition_project()
-		return kwargs
-
 	def get_back_url(self):
-		return reverse('competitions:competitionproject_detail', args=[self.get_competition_project().pk])
+		return self.get_competition_project_detail_url()
 
 	def get_success_url(self):
 		return self.get_back_url()
@@ -224,7 +231,7 @@ class CompetitionProjectMemberCreateView(TitleMixin, LoginRequiredMixin, Permiss
 		return super().form_valid(form)
 
 
-class CompetitorCreateView(CompetitionCreateViewMixin):
+class CompetitorCreateView(CompetitionProjectScopedPathMixin, CompetitionCreateViewMixin):
 	model = Competitor
 	form_class = CompetitorCreateForm
 	permission_required = 'competitions.add_competitor'
@@ -232,19 +239,6 @@ class CompetitorCreateView(CompetitionCreateViewMixin):
 	title_icon = 'icon-[tabler--user-plus]'
 	submit_label = '保存'
 	success_message = '选手信息已保存。'
-
-	def get_competition_project(self):
-		if not hasattr(self, '_competition_project'):
-			self._competition_project = get_object_or_404(
-				CompetitionProject.objects.select_related('competition__competition_type', 'project'),
-				pk=self.kwargs['pk'],
-			)
-		return self._competition_project
-
-	def get_form_kwargs(self):
-		kwargs = super().get_form_kwargs()
-		kwargs['competition_project'] = self.get_competition_project()
-		return kwargs
 
 	def get_context_data(self, **kwargs):
 		context = super().get_context_data(**kwargs)
@@ -256,7 +250,7 @@ class CompetitorCreateView(CompetitionCreateViewMixin):
 		return context
 
 	def get_default_success_url(self):
-		return reverse('competitions:competitionproject_detail', args=[self.get_competition_project().pk])
+		return self.get_competition_project_detail_url()
 
 
 class ExpertCreateView(CompetitionCreateViewMixin):

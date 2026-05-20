@@ -7,6 +7,28 @@ from __future__ import annotations
 from typing import Any, Dict, Tuple, Type
 
 from django import forms
+from django.utils import timezone
+
+
+class DefaultTodayDateFormMixin:
+    """为新建表单中的日期字段填充当天默认值。"""
+
+    default_today_date_fields: tuple[str, ...] = ()
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+
+        instance = getattr(self, 'instance', None)
+        if getattr(instance, 'pk', None):
+            return
+
+        today_value = timezone.localdate().strftime('%Y-%m-%d')
+        for field_name in self.default_today_date_fields:
+            field = self.fields.get(field_name)
+            if field is None:
+                continue
+            field.initial = today_value
+            field.widget.attrs['value'] = today_value
 
 
 class StyledFormMixin:

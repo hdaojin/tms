@@ -7,6 +7,10 @@ from django.core.validators import MinValueValidator
 
 from core.uploads import COMPETITION_DOCUMENT_UPLOAD_SPEC, PrivateMediaStorage
 from curriculum.models import CompetitionType, Level, ModuleAxis, Project, StandardModule
+from .validators import (
+    validate_competition_module_mapping_target,
+    validate_single_primary_mapping,
+)
 
 competition_storage = PrivateMediaStorage("competitions")
 
@@ -245,19 +249,24 @@ class CompetitionModuleStandardModuleMap(models.Model):
         ]
 
     def clean(self):
-        if self.competition_module_id and self.module_id and self.competition_module.competition_project.project_id != self.module.project_id:
-            raise ValidationError({'module': '标准模块必须属于当前具体赛项对应的竞赛项目。'})
-        if self.is_primary and self.competition_module_id:
-            existing_primary = type(self).objects.filter(
-                competition_module_id=self.competition_module_id,
-                is_primary=True,
-            ).exclude(pk=self.pk)
-            if existing_primary.exists():
-                raise ValidationError({'is_primary': '同一官方模块只能设置一个主映射。'})
+        validate_competition_module_mapping_target(
+            competition_module=getattr(self, 'competition_module', None),
+            target=getattr(self, 'module', None),
+            field_name='module',
+            error_message='标准模块必须属于当前具体赛项对应的竞赛项目。',
+        )
+        validate_single_primary_mapping(
+            instance=self,
+            error_message='同一官方模块只能设置一个主映射。',
+        )
 
     def save(self, *args, **kwargs):
-        if self.competition_module_id and self.module_id and self.competition_module.competition_project.project_id != self.module.project_id:
-            raise ValidationError({'module': '标准模块必须属于当前具体赛项对应的竞赛项目。'})
+        validate_competition_module_mapping_target(
+            competition_module=getattr(self, 'competition_module', None),
+            target=getattr(self, 'module', None),
+            field_name='module',
+            error_message='标准模块必须属于当前具体赛项对应的竞赛项目。',
+        )
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -302,27 +311,24 @@ class CompetitionModuleAxisMap(models.Model):
         ]
 
     def clean(self):
-        if (
-            self.competition_module_id
-            and self.module_axis_id
-            and self.competition_module.competition_project.project_id != self.module_axis.project_id
-        ):
-            raise ValidationError({'module_axis': '模块主线必须属于当前具体赛项对应的竞赛项目。'})
-        if self.is_primary and self.competition_module_id:
-            existing_primary = type(self).objects.filter(
-                competition_module_id=self.competition_module_id,
-                is_primary=True,
-            ).exclude(pk=self.pk)
-            if existing_primary.exists():
-                raise ValidationError({'is_primary': '同一官方模块只能设置一个主主线映射。'})
+        validate_competition_module_mapping_target(
+            competition_module=getattr(self, 'competition_module', None),
+            target=getattr(self, 'module_axis', None),
+            field_name='module_axis',
+            error_message='模块主线必须属于当前具体赛项对应的竞赛项目。',
+        )
+        validate_single_primary_mapping(
+            instance=self,
+            error_message='同一官方模块只能设置一个主主线映射。',
+        )
 
     def save(self, *args, **kwargs):
-        if (
-            self.competition_module_id
-            and self.module_axis_id
-            and self.competition_module.competition_project.project_id != self.module_axis.project_id
-        ):
-            raise ValidationError({'module_axis': '模块主线必须属于当前具体赛项对应的竞赛项目。'})
+        validate_competition_module_mapping_target(
+            competition_module=getattr(self, 'competition_module', None),
+            target=getattr(self, 'module_axis', None),
+            field_name='module_axis',
+            error_message='模块主线必须属于当前具体赛项对应的竞赛项目。',
+        )
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -1,6 +1,24 @@
+from pathlib import Path
+
 from django.conf import settings
 from django.core.cache import cache
 from django.db import models
+
+
+class UploadedDocumentModel(models.Model):
+    """通用文档上传字段与文件名展示。"""
+
+    file_field_name = 'file'
+
+    uploaded_at = models.DateTimeField('上传时间', auto_now_add=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def filename(self) -> str:
+        file_obj = getattr(self, self.file_field_name, None)
+        return Path(file_obj.name).name if file_obj else ''
 
 
 class AuditedModel(models.Model):

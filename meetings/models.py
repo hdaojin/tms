@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from pathlib import Path
 
 from core.uploads import MEETING_FILE_UPLOAD_SPEC
+from core.models import UploadedDocumentModel
 from core.utils.validators import validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
 from core.constants import MEETINGS_UPLOAD_DIR
@@ -25,7 +26,7 @@ def meeting_file_validator(file):
     MEETING_FILE_UPLOAD_SPEC.validate_file(file)
 
 
-class Meeting(models.Model):
+class Meeting(UploadedDocumentModel):
     title = models.CharField(max_length=200, verbose_name="会议名称")
     date = models.DateField(
         verbose_name="会议日期",
@@ -47,7 +48,6 @@ class Meeting(models.Model):
         null=True,
         blank=True
     )
-    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
 
     class Meta:
         verbose_name = '会议记录'
@@ -61,11 +61,6 @@ class Meeting(models.Model):
     def date_chinese(self):
         """返回中文格式的日期，如：2024年1月1日"""
         return self.date.strftime('%Y年%m月%d日')
-    
-    @property
-    def filename(self):
-        """返回去掉路径的文件名，供模板显示使用"""
-        return Path(self.file.name).name if self.file else ''
 
 
 # 注册文件清理信号

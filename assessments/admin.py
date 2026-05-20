@@ -2,6 +2,8 @@ from django.contrib import admin
 from django import forms
 from django.contrib.auth import get_user_model
 from django.db.models import Max
+from django.http import JsonResponse
+from django.urls import path, reverse
 
 from curriculum.models import StandardModule
 from core.constants import GROUP_COACH
@@ -10,6 +12,12 @@ from .models import Assessment, Score, AssessmentModule, AssessmentAttachment
 
 
 User = get_user_model()
+
+
+ASSESSMENT_MODULE_RANKING_HELP_TEXT = (
+    '选择模块后会显示该标准模块的默认排名规则；未手动修改时会自动同步，'
+    '如需例外可再手动调整。'
+)
 
 
 def get_current_module_queryset():
@@ -33,6 +41,7 @@ def get_training_cycle_module_queryset(training_cycle):
 
 
 class AssessmentModuleInline(admin.TabularInline):
+    form = None
     model = AssessmentModule
     extra = 0
     autocomplete_fields = ['module']
@@ -43,13 +52,20 @@ class AssessmentModuleInline(admin.TabularInline):
         'responsible_coach',
         'max_score',
         'duration',
+        'counts_towards_ranking',
         'is_locked',
         'is_material_locked',
     )
     readonly_fields = ('is_locked', 'is_material_locked')
 
+    class Media:
+        js = ('assessments/js/assessment_module_admin.js',)
+
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
+        formset.form.ranking_default_url = reverse(
+            'admin:assessments_assessmentmodule_module_ranking_default'
+        )
         next_sort_order = 0
         module_queryset = get_training_cycle_module_queryset(obj.training_cycle if obj else None)
         if obj and obj.pk:
@@ -97,6 +113,40 @@ class AssessmentModuleInline(admin.TabularInline):
         if form_field and db_field.name == "responsible_coach":
             form_field.label_from_instance = lambda obj: obj.full_info  # type: ignore
         return form_field
+
+
+class AssessmentModuleAdminForm(forms.ModelForm):
+    ranking_default_url = ''
+
+    class Meta:
+        model = AssessmentModule
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        module_field = self.fields.get('module')
+        counts_field = self.fields.get('counts_towards_ranking')
+
+        if module_field and self.ranking_default_url:
+            module_field.widget.attrs['data-ranking-default-url'] = self.ranking_default_url
+
+        if counts_field:
+            counts_field.help_text = ASSESSMENT_MODULE_RANKING_HELP_TEXT
+            counts_field.widget.attrs['data-follow-module-default'] = (
+                'true' if self.should_follow_module_default() else 'false'
+            )
+            counts_field.widget.attrs['data-ranking-default-help'] = (
+                ASSESSMENT_MODULE_RANKING_HELP_TEXT
+            )
+
+    def should_follow_module_default(self):
+        return not self.instance.pk and not self.is_bound
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if not self.instance.pk and 'counts_towards_ranking' in self.changed_data:
+            self.instance._counts_towards_ranking_explicit = True
+        return cleaned_data
 
 class AssessmentAttachmentInline(admin.TabularInline):
     """附件内联编辑"""
@@ -151,18 +201,20 @@ class ScoreInline(admin.TabularInline):
 
 @admin.register(AssessmentModule)
 class AssessmentModuleAdmin(admin.ModelAdmin):
+    form = AssessmentModuleAdminForm
     list_display = (
         'assessment',
         'sort_order',
         'module',
         'responsible_coach',
         'max_score',
+        'counts_towards_ranking',
         'is_locked',
         'is_material_locked',
     )
     list_display_links = ('assessment', 'module')
     list_editable = ('sort_order',)
-    list_filter = ('assessment', 'responsible_coach', 'is_locked', 'is_material_locked')
+    list_filter = ('assessment', 'responsible_coach', 'counts_towards_ranking', 'is_locked', 'is_material_locked')
     search_fields = ('assessment__name', 'module__name')
     readonly_fields = (
         'locked_at',
@@ -177,6 +229,7 @@ class AssessmentModuleAdmin(admin.ModelAdmin):
         'sort_order',
         'max_score',
         'duration',
+        'counts_towards_ranking',
         'is_locked',
         'locked_at',
         'locked_by',
@@ -190,6 +243,43 @@ class AssessmentModuleAdmin(admin.ModelAdmin):
     )
     inlines = [AssessmentAttachmentInline, ScoreInline]
     ordering = ('assessment', 'sort_order', 'module__code', 'pk')
+
+    class Media:
+        js = ('assessments/js/assessment_module_admin.js',)
+
+    def get_urls(self):
+        return [
+            path(
+                'module-ranking-default/',
+                self.admin_site.admin_view(self.module_ranking_default_view),
+                name='assessments_assessmentmodule_module_ranking_default',
+            ),
+        ] + super().get_urls()
+
+    def module_ranking_default_view(self, request):
+        module_id = request.GET.get('module_id')
+        if not module_id:
+            return JsonResponse({'found': False})
+
+        module = StandardModule.objects.filter(pk=module_id).only(
+            'pk',
+            'code',
+            'name',
+            'default_counts_towards_ranking',
+        ).first()
+        if module is None:
+            return JsonResponse({'found': False})
+
+        return JsonResponse(
+            {
+                'found': True,
+                'module': {
+                    'id': module.pk,
+                    'label': str(module),
+                    'default_counts_towards_ranking': module.default_counts_towards_ranking,
+                },
+            }
+        )
 
     def get_changeform_initial_data(self, request):
         initial = super().get_changeform_initial_data(request)
@@ -216,10 +306,11 @@ class AssessmentModuleAdmin(admin.ModelAdmin):
             )
         elif db_field.name == "module":
             assessment = None
+            assessment_id = request.GET.get('assessment') or request.POST.get('assessment')
             if getattr(request, '_obj_', None) is not None:
                 assessment = request._obj_.assessment
-            elif request.GET.get('assessment'):
-                assessment = Assessment.objects.filter(pk=request.GET.get('assessment')).select_related('training_cycle__module_set').first()
+            elif assessment_id:
+                assessment = Assessment.objects.filter(pk=assessment_id).select_related('training_cycle__module_set').first()
             kwargs["queryset"] = get_training_cycle_module_queryset(assessment.training_cycle if assessment else None)
 
         form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
@@ -230,7 +321,14 @@ class AssessmentModuleAdmin(admin.ModelAdmin):
     def get_form(self, request, obj=None, **kwargs):   # type: ignore
         # 保存 obj 到 request 中，以便在 Inline 中使用
         request._obj_ = obj
-        return super().get_form(request, obj, **kwargs)
+        form = super().get_form(request, obj, **kwargs)
+        form.ranking_default_url = reverse(
+            'admin:assessments_assessmentmodule_module_ranking_default'
+        )
+        return form
+
+
+AssessmentModuleInline.form = AssessmentModuleAdminForm
 
 
 

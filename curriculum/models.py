@@ -210,6 +210,11 @@ class StandardModule(models.Model):
     code = models.CharField("编号", max_length=50)
     name = models.CharField("名称", max_length=100)
     description = models.TextField("描述", blank=True)
+    default_counts_towards_ranking = models.BooleanField(
+        "默认计入排名分",
+        default=True,
+        help_text="新建考核模块时默认继承此设置。",
+    )
     sort_order = models.PositiveIntegerField("显示顺序", default=0, help_text="数值越小越靠前显示。")
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)

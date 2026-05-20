@@ -1,10 +1,16 @@
 from __future__ import annotations
 
-from .models import AssessmentModule, Score
+from decimal import Decimal
+
+from django.db.models import Prefetch, Sum
+from django.utils import timezone
+
+from .models import Assessment, AssessmentModule, Score
 from .permissions import (
     can_lock_assessment_module,
     can_manage_assessment_module,
     can_unlock_assessment_module,
+    is_coach,
 )
 
 
@@ -15,6 +21,138 @@ def _get_assessment_modules_queryset(assessment):
         .filter(assessment=assessment)
         .order_by("sort_order", "module__code", "pk")
     )
+
+
+def assessment_module_counts_towards_ranking(assessment_module):
+    return assessment_module.counts_towards_ranking
+
+
+def _get_all_assessments_queryset():
+    return (
+        Assessment.objects.select_related("training_cycle")
+        .prefetch_related("assessmentmodule_set__module")
+        .order_by("-start_date")
+    )
+
+
+def _get_managed_assessments_queryset(user):
+    return (
+        Assessment.objects.filter(assessmentmodule__responsible_coach=user)
+        .select_related("training_cycle")
+        .prefetch_related("assessmentmodule_set__module")
+        .distinct()
+        .order_by("-start_date")
+    )
+
+
+def _get_participant_assessments_queryset(user):
+    user_scores_prefetch = Prefetch(
+        "scores",
+        queryset=Score.objects.filter(user=user),
+        to_attr="user_score",
+    )
+    modules_prefetch = Prefetch(
+        "assessmentmodule_set",
+        queryset=AssessmentModule.objects.select_related("module").prefetch_related(
+            user_scores_prefetch
+        ).order_by("sort_order", "module__code", "pk"),
+        to_attr="user_modules_info",
+    )
+    return (
+        Assessment.objects.filter(participants=user)
+        .select_related("training_cycle")
+        .prefetch_related(modules_prefetch)
+        .order_by("-start_date")
+    )
+
+
+def _split_assessments_by_date(assessments, today):
+    current_assessments = []
+    past_assessments = []
+    upcoming_assessments = []
+
+    for assessment in assessments:
+        if assessment.end_date < today:
+            past_assessments.append(assessment)
+        elif assessment.start_date > today:
+            upcoming_assessments.append(assessment)
+        else:
+            current_assessments.append(assessment)
+
+    return current_assessments, past_assessments, upcoming_assessments
+
+
+def build_assessment_list_context(user, today=None):
+    today = today or timezone.now().date()
+    can_view_all = user.is_superuser or user.has_perm("assessments.view_all_scores")
+    managed_assessments = Assessment.objects.none()
+    if is_coach(user):
+        managed_assessments = _get_managed_assessments_queryset(user)
+
+    show_management_actions = can_view_all or managed_assessments.exists()
+    if can_view_all:
+        assessments = _get_all_assessments_queryset()
+    elif show_management_actions:
+        assessments = managed_assessments
+    else:
+        assessments = _get_participant_assessments_queryset(user)
+
+    current_assessments, past_assessments, upcoming_assessments = _split_assessments_by_date(
+        assessments,
+        today,
+    )
+    if not show_management_actions:
+        populate_user_assessment_history(past_assessments)
+
+    return {
+        "can_view_all": can_view_all,
+        "show_management_actions": show_management_actions,
+        "current_assessments": current_assessments,
+        "past_assessments": past_assessments,
+        "upcoming_assessments": upcoming_assessments,
+    }
+
+
+def populate_user_assessment_history(past_assessments):
+    for assessment in past_assessments:
+        my_total = Decimal("0.00")
+        my_grand_total = Decimal("0.00")
+        assessment.max_ranking_score = Decimal("0.00")
+        assessment.max_grand_total_score = Decimal("0.00")
+        ranking_module_ids = []
+
+        if hasattr(assessment, "user_modules_info"):
+            for assessment_module in assessment.user_modules_info:
+                score_val = Decimal("0.00")
+                if assessment_module.user_score:
+                    score_val = assessment_module.user_score[0].score
+
+                my_grand_total += score_val
+                assessment.max_grand_total_score += assessment_module.max_score
+
+                if assessment_module_counts_towards_ranking(assessment_module):
+                    ranking_module_ids.append(assessment_module.pk)
+                    my_total += score_val
+                    assessment.max_ranking_score += assessment_module.max_score
+
+        assessment.my_total_score = my_total
+        assessment.my_grand_total_score = my_grand_total
+
+        my_rank = "-"
+        if ranking_module_ids:
+            rank_data = (
+                Score.objects.filter(assessment_module_id__in=ranking_module_ids)
+                .values("user")
+                .annotate(total=Sum("score"))
+                .order_by("-total")
+            )
+            scores_list = [data["total"] for data in rank_data]
+            if my_total in scores_list:
+                my_rank = scores_list.index(my_total) + 1
+
+        assessment.my_rank = my_rank
+
+    return past_assessments
 
 
 def build_assessment_score_table_context(assessment, sort_param, user=None):
@@ -79,7 +217,7 @@ def build_assessment_score_table_context(assessment, sort_param, user=None):
             )
             if score_obj:
                 total_score += value
-                if "english" not in assessment_module.module.name.lower():
+                if assessment_module_counts_towards_ranking(assessment_module):
                     rank_score += value
 
         row["total"] = total_score
@@ -122,7 +260,7 @@ def build_assessment_score_table_context(assessment, sort_param, user=None):
     max_grand_total_score = 0
     for assessment_module in modules:
         max_grand_total_score += assessment_module.max_score
-        if "english" not in assessment_module.module.name.lower():
+        if assessment_module_counts_towards_ranking(assessment_module):
             max_ranking_score += assessment_module.max_score
 
     return {

@@ -21,6 +21,7 @@ from core.constants import GROUP_COACH
 from trainingcycles.models import TrainingCycle
 
 from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
+from .selectors import build_assessment_list_context, build_assessment_score_table_context
 
 
 User = get_user_model()
@@ -138,6 +139,151 @@ class AssessmentModuleAdminModuleQuerysetTests(TestCase):
 class AssessmentsUrlTests(TestCase):
     def test_assessment_list_is_mounted_at_app_root(self):
         self.assertEqual(reverse("assessments:list"), "/assessments/")
+
+
+class AssessmentRankingConfigurationTests(TestCase):
+    def setUp(self):
+        self.participant_a = User.objects.create_user(
+            username="ranking-a",
+            password="testpass123",
+            first_name="学员甲",
+        )
+        self.participant_b = User.objects.create_user(
+            username="ranking-b",
+            password="testpass123",
+            first_name="学员乙",
+        )
+        competition_type = CompetitionType.objects.create(
+            code="WSC-RANK",
+            name="排名规则测试赛事",
+        )
+        project = Project.objects.create(
+            competition_type=competition_type,
+            code="ITNSA-RANK",
+            name="排名规则测试项目",
+        )
+        module_set = project.get_or_create_default_standard_module_set()
+        self.training_cycle = TrainingCycle.objects.create(
+            code="TC-RANK",
+            name="排名规则测试周期",
+            project=project,
+            module_set=module_set,
+            start_date=date(2026, 1, 1),
+        )
+        ranking_module = StandardModule.objects.create(
+            project=project,
+            code="A",
+            name="模块 A",
+            default_counts_towards_ranking=True,
+        )
+        english_module = StandardModule.objects.create(
+            project=project,
+            code="ENG",
+            name="English Interview",
+            default_counts_towards_ranking=False,
+        )
+        self.assessment = Assessment.objects.create(
+            name="2026 排名规则考核",
+            training_cycle=self.training_cycle,
+            start_date=date(2026, 1, 10),
+            end_date=date(2026, 1, 11),
+        )
+        self.assessment.participants.set([self.participant_a, self.participant_b])
+        self.ranking_assessment_module = AssessmentModule.objects.create(
+            assessment=self.assessment,
+            module=ranking_module,
+            sort_order=0,
+            max_score=Decimal("25.00"),
+            counts_towards_ranking=True,
+        )
+        self.non_ranking_assessment_module = AssessmentModule.objects.create(
+            assessment=self.assessment,
+            module=english_module,
+            sort_order=1,
+            max_score=Decimal("10.00"),
+            counts_towards_ranking=False,
+        )
+        Score.objects.create(
+            assessment_module=self.ranking_assessment_module,
+            user=self.participant_a,
+            score=Decimal("20.00"),
+        )
+        Score.objects.create(
+            assessment_module=self.non_ranking_assessment_module,
+            user=self.participant_a,
+            score=Decimal("8.00"),
+        )
+        Score.objects.create(
+            assessment_module=self.ranking_assessment_module,
+            user=self.participant_b,
+            score=Decimal("22.00"),
+        )
+        Score.objects.create(
+            assessment_module=self.non_ranking_assessment_module,
+            user=self.participant_b,
+            score=Decimal("5.00"),
+        )
+
+    def test_score_table_context_uses_explicit_ranking_flag(self):
+        context = build_assessment_score_table_context(self.assessment, "-total")
+        rows = {row["user"].pk: row for row in context["table_rows"]}
+
+        self.assertEqual(context["max_grand_total_score"], Decimal("35.00"))
+        self.assertEqual(context["max_ranking_score"], Decimal("25.00"))
+        self.assertEqual(rows[self.participant_a.pk]["total"], Decimal("28.00"))
+        self.assertEqual(rows[self.participant_a.pk]["rank_score"], Decimal("20.00"))
+        self.assertEqual(rows[self.participant_a.pk]["rank"], 2)
+        self.assertEqual(rows[self.participant_b.pk]["total"], Decimal("27.00"))
+        self.assertEqual(rows[self.participant_b.pk]["rank_score"], Decimal("22.00"))
+        self.assertEqual(rows[self.participant_b.pk]["rank"], 1)
+
+    def test_assessment_list_uses_explicit_ranking_flag_for_history_summary(self):
+        self.client.force_login(self.participant_a)
+
+        response = self.client.get(reverse("assessments:list"))
+
+        self.assertEqual(response.status_code, 200)
+        assessment = response.context["past_assessments"][0]
+        self.assertEqual(assessment.my_grand_total_score, Decimal("28.00"))
+        self.assertEqual(assessment.my_total_score, Decimal("20.00"))
+        self.assertEqual(assessment.max_grand_total_score, Decimal("35.00"))
+        self.assertEqual(assessment.max_ranking_score, Decimal("25.00"))
+        self.assertEqual(assessment.my_rank, 2)
+        self.assertContains(response, "(仅计入排名分的模块)")
+
+    def test_assessment_list_selector_splits_sections_and_populates_history(self):
+        context = build_assessment_list_context(self.participant_a, today=date(2026, 1, 20))
+
+        self.assertFalse(context["show_management_actions"])
+        self.assertEqual(len(context["current_assessments"]), 0)
+        self.assertEqual(len(context["upcoming_assessments"]), 0)
+        self.assertEqual(len(context["past_assessments"]), 1)
+        assessment = context["past_assessments"][0]
+        self.assertEqual(assessment.my_total_score, Decimal("20.00"))
+        self.assertEqual(assessment.my_grand_total_score, Decimal("28.00"))
+
+    def test_assessment_module_inherits_standard_module_ranking_default(self):
+        interview_module = StandardModule.objects.create(
+            project=self.training_cycle.project,
+            code="ENG2",
+            name="English Presentation",
+            default_counts_towards_ranking=False,
+        )
+        followup_assessment = Assessment.objects.create(
+            name="2026 排名规则复测",
+            training_cycle=self.training_cycle,
+            start_date=date(2026, 1, 12),
+            end_date=date(2026, 1, 13),
+        )
+
+        assessment_module = AssessmentModule.objects.create(
+            assessment=followup_assessment,
+            module=interview_module,
+            sort_order=0,
+            max_score=Decimal("10.00"),
+        )
+
+        self.assertFalse(assessment_module.counts_towards_ranking)
 
 
 class AssessmentCoachingWorkflowTests(TestCase):
@@ -644,6 +790,71 @@ class AssessmentAdminSortOrderTests(TestCase):
         self.assertEqual(response.context['adminform'].form.initial['assessment'], self.assessment.pk)
         self.assertEqual(response.context['adminform'].form.initial['sort_order'], 2)
 
+    def test_assessment_module_add_view_exposes_ranking_default_sync_metadata(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(
+            reverse("admin:assessments_assessmentmodule_add"),
+            {"assessment": self.assessment.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        form = response.context['adminform'].form
+        self.assertEqual(
+            form.fields['module'].widget.attrs['data-ranking-default-url'],
+            reverse('admin:assessments_assessmentmodule_module_ranking_default'),
+        )
+        self.assertEqual(
+            form.fields['counts_towards_ranking'].widget.attrs['data-follow-module-default'],
+            'true',
+        )
+        self.assertContains(response, 'assessments/js/assessment_module_admin.js')
+
+    def test_assessment_admin_inline_empty_form_exposes_ranking_default_sync_metadata(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(
+            reverse("admin:assessments_assessment_change", args=[self.assessment.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        inline_formset = response.context['inline_admin_formsets'][0].formset
+        self.assertEqual(
+            inline_formset.empty_form.fields['module'].widget.attrs['data-ranking-default-url'],
+            reverse('admin:assessments_assessmentmodule_module_ranking_default'),
+        )
+        self.assertEqual(
+            inline_formset.empty_form.fields['counts_towards_ranking'].widget.attrs['data-follow-module-default'],
+            'true',
+        )
+
+    def test_assessment_module_ranking_default_endpoint_returns_standard_module_default(self):
+        module_c = StandardModule.objects.create(
+            project=self.training_cycle.project,
+            code="ENG",
+            name="English 口语",
+            default_counts_towards_ranking=False,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(
+            reverse('admin:assessments_assessmentmodule_module_ranking_default'),
+            {'module_id': module_c.pk},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                'found': True,
+                'module': {
+                    'id': module_c.pk,
+                    'label': str(module_c),
+                    'default_counts_towards_ranking': False,
+                },
+            },
+        )
+
     def test_assessment_module_change_view_keeps_file_fields_and_attachment_inline(self):
         self.client.force_login(self.admin_user)
 
@@ -662,6 +873,11 @@ class AssessmentAdminSortOrderTests(TestCase):
         self.assertIn('scoring_standard_file', form.fields)
         self.assertIn('scoring_sheet_file', form.fields)
         self.assertIn('scoring_script_file', form.fields)
+        self.assertIn('counts_towards_ranking', form.fields)
+        self.assertEqual(
+            form.fields['counts_towards_ranking'].widget.attrs['data-follow-module-default'],
+            'false',
+        )
         field_names = list(form.fields)
         self.assertLess(field_names.index('question_file'), field_names.index('scoring_standard_file'))
         self.assertLess(field_names.index('question_file'), field_names.index('scoring_sheet_file'))
@@ -680,6 +896,44 @@ class AssessmentAdminSortOrderTests(TestCase):
         self.assertEqual(attachment_inline.opts.verbose_name_plural, '试题附件')
         self.assertIn('file', attachment_inline.formset.empty_form.fields)
         self.assertIn('description', attachment_inline.formset.empty_form.fields)
+
+    def test_assessment_module_add_view_inherits_standard_module_default_ranking_rule(self):
+        module_c = StandardModule.objects.create(
+            project=self.training_cycle.project,
+            code="ENG",
+            name="English 口语",
+            default_counts_towards_ranking=False,
+        )
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse("admin:assessments_assessmentmodule_add"),
+            {
+                'assessment': str(self.assessment.pk),
+                'module': str(module_c.pk),
+                'responsible_coach': '',
+                'sort_order': '2',
+                'max_score': '25.00',
+                'duration': '0.0',
+                'counts_towards_ranking': 'on',
+                'attachments-TOTAL_FORMS': '1',
+                'attachments-INITIAL_FORMS': '0',
+                'attachments-MIN_NUM_FORMS': '0',
+                'attachments-MAX_NUM_FORMS': '1000',
+                'scores-TOTAL_FORMS': '0',
+                'scores-INITIAL_FORMS': '0',
+                'scores-MIN_NUM_FORMS': '0',
+                'scores-MAX_NUM_FORMS': '1000',
+                '_save': '保存',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        created_module = AssessmentModule.objects.get(
+            assessment=self.assessment,
+            module=module_c,
+        )
+        self.assertFalse(created_module.counts_towards_ranking)
 
     def test_assessment_attachment_is_not_registered_as_standalone_admin_model(self):
         self.assertNotIn(AssessmentAttachment, admin.site._registry)

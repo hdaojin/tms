@@ -136,8 +136,8 @@ class StandardModuleAxisMapInline(admin.TabularInline):
 @admin.register(StandardModule)
 class StandardModuleAdmin(admin.ModelAdmin):
     search_fields = ('name', 'code', 'project__name', 'module_set__name')
-    list_display = ('name', 'code', 'project', 'module_set', 'sort_order', 'is_current_module')
-    list_filter = ('project__competition_type', 'project', 'module_set', 'module_set__is_current')
+    list_display = ('name', 'code', 'project', 'module_set', 'default_counts_towards_ranking', 'sort_order', 'is_current_module')
+    list_filter = ('project__competition_type', 'project', 'module_set', 'module_set__is_current', 'default_counts_towards_ranking')
     autocomplete_fields = ['project', 'module_set']
     list_select_related = ('project', 'module_set')
     ordering = ('project__name', '-module_set__is_current', 'module_set__sort_order', 'sort_order', 'code', 'name')

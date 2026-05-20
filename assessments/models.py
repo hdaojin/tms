@@ -156,6 +156,10 @@ class Assessment(models.Model):
         return self.name
 
 class AssessmentModule(models.Model):
+    def __init__(self, *args, **kwargs):
+        self._counts_towards_ranking_explicit = "counts_towards_ranking" in kwargs
+        super().__init__(*args, **kwargs)
+
     assessment = models.ForeignKey(
         Assessment,
         on_delete=models.CASCADE,
@@ -196,6 +200,11 @@ class AssessmentModule(models.Model):
         default=Decimal("0.0"),
         validators=[MinValueValidator(Decimal("0.0"))],
         help_text="该模块的考核时长，单位为小时"
+    )
+    counts_towards_ranking = models.BooleanField(
+        "计入排名分",
+        default=True,
+        help_text="关闭后该模块仍计入总分，但不计入排名分。",
     )
     is_locked = models.BooleanField(
         "已锁定",
@@ -289,7 +298,13 @@ class AssessmentModule(models.Model):
         ):
             raise ValidationError({"module": "考核模块必须属于当前备赛周期的模块标准集。"})
 
+    def apply_default_ranking_rule(self):
+        if not self._state.adding or self._counts_towards_ranking_explicit or not self.module_id:
+            return
+        self.counts_towards_ranking = self.module.default_counts_towards_ranking
+
     def save(self, *args, **kwargs):
+        self.apply_default_ranking_rule()
         self.clean()
         super().save(*args, **kwargs)
 

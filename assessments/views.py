@@ -1,23 +1,20 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
-from django.db.models import Prefetch, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
-from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .forms import AssessmentFileUploadForm, ModuleScoreBatchForm
-from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
+from .models import Assessment, AssessmentAttachment, AssessmentModule
 from .permissions import (
     can_access_assessment_detail,
     can_lock_assessment_module,
     can_manage_assessment_module,
     can_unlock_assessment_module,
-    is_coach,
 )
-from .selectors import build_assessment_score_table_context
+from .selectors import build_assessment_list_context, build_assessment_score_table_context
 from .services import set_material_lock_state, set_score_lock_state
 
 
@@ -29,105 +26,8 @@ def assessment_list(request):
     - 有权限用户：显示所有考核列表，点击进入详情查看所有人成绩
     - 负责教练：显示自己负责模块所属的考核，点击进入详情录入成绩/管理资料
     """
-    today = timezone.now().date()
-    can_view_all = request.user.is_superuser or request.user.has_perm(
-        "assessments.view_all_scores"
-    )
-    managed_assessments = Assessment.objects.none()
-    if is_coach(request.user):
-        managed_assessments = (
-            Assessment.objects.filter(assessmentmodule__responsible_coach=request.user)
-            .select_related("training_cycle")
-            .prefetch_related("assessmentmodule_set__module")
-            .distinct()
-            .order_by("-start_date")
-        )
-    show_management_actions = can_view_all or managed_assessments.exists()
-
-    if can_view_all:
-        assessments = Assessment.objects.select_related("training_cycle").prefetch_related("assessmentmodule_set__module").order_by(
-            "-start_date"
-        )
-    elif show_management_actions:
-        assessments = managed_assessments
-    else:
-        user_scores_prefetch = Prefetch(
-            "scores",
-            queryset=Score.objects.filter(user=request.user),
-            to_attr="user_score",
-        )
-        modules_prefetch = Prefetch(
-            "assessmentmodule_set",
-            queryset=AssessmentModule.objects.select_related("module").prefetch_related(
-                user_scores_prefetch
-            ).order_by("sort_order", "module__code", "pk"),
-            to_attr="user_modules_info",
-        )
-        assessments = (
-            Assessment.objects.filter(participants=request.user)
-            .select_related("training_cycle")
-            .prefetch_related(modules_prefetch)
-            .order_by("-start_date")
-        )
-
-    current_assessments = []
-    past_assessments = []
-    upcoming_assessments = []
-
-    for assessment in assessments:
-        if assessment.end_date < today:
-            past_assessments.append(assessment)
-        elif assessment.start_date > today:
-            upcoming_assessments.append(assessment)
-        else:
-            current_assessments.append(assessment)
-
-    if not show_management_actions:
-        for assessment in past_assessments:
-            my_total = 0
-            my_grand_total = 0
-            assessment.max_ranking_score = 0
-            assessment.max_grand_total_score = 0
-
-            if hasattr(assessment, "user_modules_info"):
-                for assessment_module in assessment.user_modules_info:
-                    score_val = 0
-                    if assessment_module.user_score:
-                        score_val = assessment_module.user_score[0].score
-
-                    my_grand_total += score_val
-                    assessment.max_grand_total_score += assessment_module.max_score
-
-                    if "english" not in assessment_module.module.name.lower():
-                        my_total += score_val
-                        assessment.max_ranking_score += assessment_module.max_score
-
-            assessment.my_total_score = my_total
-            assessment.my_grand_total_score = my_grand_total
-
-            valid_am_ids = assessment.assessmentmodule_set.exclude(
-                module__name__icontains="english"
-            ).values_list("id", flat=True)
-            rank_data = (
-                Score.objects.filter(assessment_module_id__in=valid_am_ids)
-                .values("user")
-                .annotate(total=Sum("score"))
-                .order_by("-total")
-            )
-
-            my_rank = "-"
-            scores_list = [data["total"] for data in rank_data]
-            if my_total in scores_list:
-                my_rank = scores_list.index(my_total) + 1
-
-            assessment.my_rank = my_rank
-
     context = {
-        "can_view_all": can_view_all,
-        "show_management_actions": show_management_actions,
-        "current_assessments": current_assessments,
-        "past_assessments": past_assessments,
-        "upcoming_assessments": upcoming_assessments,
+        **build_assessment_list_context(request.user),
         "title": "考核列表",
     }
     return render(request, "assessments/assessment_list.html", context)

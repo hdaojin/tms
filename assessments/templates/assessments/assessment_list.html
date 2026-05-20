@@ -36,11 +36,11 @@
                   <th class="text-start">模块成绩</th>
                   <th class="whitespace-nowrap text-center bg-primary/10">
                     <p class="font-bold text-primary">总分</p>
-                    <p class="text-xs font-normal text-primary/70">(含English)</p>
+                    <p class="text-xs font-normal text-primary/70">(含全部模块)</p>
                   </th>
                   <th class="whitespace-nowrap text-center bg-secondary/10">
                     <p class="font-bold text-secondary">排名分</p>
-                    <p class="text-xs font-normal text-secondary/70">(不含English)</p>
+                    <p class="text-xs font-normal text-secondary/70">(仅计入排名分的模块)</p>
                   </th>
                   <th class="whitespace-nowrap text-center">排名</th>
                 {% endif %}
@@ -85,7 +85,7 @@
                         <div class="flex flex-wrap gap-2 justify-start">
                           {% for am in assessment.user_modules_info %}
                             <div class="tooltip" data-tip="{{ am.module.name }}">
-                              <div class="badge badge-outline gap-1 {% if 'English' in am.module.name %}opacity-60 border-dashed{% endif %}">
+                              <div class="badge badge-outline gap-1 {% if not am.counts_towards_ranking %}opacity-60 border-dashed{% endif %}">
                                 {{ am.module.name|truncatechars:10 }}
                                 <span class="font-bold border-l pl-1 ml-1 border-base-content/20">
                                   {% if am.user_score %}

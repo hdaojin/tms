@@ -1,11 +1,14 @@
 from django import forms
+
 from .models import Meeting
-from django.utils import timezone
 
 from core.uploads import MEETING_FILE_UPLOAD_SPEC
-from core.utils.forms import StyledFormMixin
+from core.utils.forms import DefaultTodayDateFormMixin, StyledFormMixin
 
-class MeetingUploadForm(StyledFormMixin, forms.ModelForm):
+
+class MeetingUploadForm(DefaultTodayDateFormMixin, StyledFormMixin, forms.ModelForm):
+    default_today_date_fields = ('date',)
+
     class Meta:
         model = Meeting
         fields = ['title', 'date', 'file']
@@ -23,12 +26,3 @@ class MeetingUploadForm(StyledFormMixin, forms.ModelForm):
             'date': '会议日期',
             'file': '会议记录文件',
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        
-        # 设置默认日期为今天（每次实例化时动态设置）
-        if not self.instance.pk: 
-            today = timezone.localdate()
-            self.fields['date'].initial = today.strftime('%Y-%m-%d')
-            self.fields['date'].widget.attrs['value'] = today.strftime('%Y-%m-%d')

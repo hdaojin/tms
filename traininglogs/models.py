@@ -7,6 +7,7 @@ from django.utils.text import slugify
 from pathlib import Path
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR, TRAININGLOG_UPLOAD_DIR
+from core.models import UploadedDocumentModel
 from core.uploads import TRAININGLOG_UPLOAD_SPEC
 from core.utils.validators import validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
@@ -49,7 +50,7 @@ def traininglog_upload_to(instance: "TrainingLog", filename: str) -> str:
     return f"{base_dir}/{date:%Y}/{date:%m}/{basename}"
 
 
-class TrainingLog(models.Model):
+class TrainingLog(UploadedDocumentModel):
     training_cycle = models.ForeignKey(
         'trainingcycles.TrainingCycle',
         on_delete=models.PROTECT,
@@ -78,7 +79,6 @@ class TrainingLog(models.Model):
         related_name='training_logs', verbose_name='上传者',
         blank=True, null=True
     )
-    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
 
     class Meta:
         verbose_name = '训练日志'
@@ -119,11 +119,6 @@ class TrainingLog(models.Model):
     def __str__(self):
         m = self.module.name if self.module else "未分配模块"
         return f"{m} - {self.task} - {self.training_date:%Y-%m-%d}"
-
-    @property
-    def filename(self) -> str:
-        """供模板展示的文件名（去掉目录，仅文件名）。"""
-        return Path(self.file.name).name if self.file else ''
 
 
 # 注册文件清理信号

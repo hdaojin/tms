@@ -42,7 +42,7 @@
             </th>
           {% endfor %}
           <th class="cursor-pointer bg-primary/10 font-bold"
-            title="包含English的所有模块总分"
+            title="包含全部模块的总分"
             onclick="window.location.href='?sort={% if current_sort == '-grand_total' %}grand_total{% else %}-grand_total{% endif %}'">
             <div class="flex items-center justify-center gap-1">
               <div class="flex flex-col items-center">
@@ -59,7 +59,7 @@
             </div>
           </th>
           <th class="cursor-pointer bg-secondary/10 font-bold"
-            title="用于排名的总分 (不含English)"
+            title="用于排名的总分（仅统计计入排名分的模块）"
             onclick="window.location.href='?sort={% if current_sort == '-total' %}total{% else %}-total{% endif %}'">
             <div class="flex items-center justify-center gap-1">
               <div class="flex flex-col items-center">

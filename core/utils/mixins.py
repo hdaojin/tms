@@ -7,8 +7,10 @@ from __future__ import annotations
 
 from typing import Any, Set
 
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404
+from django.urls import reverse
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
 
@@ -173,6 +175,44 @@ class TitleMixin:
         context = super().get_context_data(**kwargs)  # type: ignore
         context['title'] = self.get_title()
         context['title_icon'] = self.title_icon
+        return context
+
+
+class UploadedDocumentCreateMixin:
+    """为上传类 CreateView 统一写入上传者与成功提示。"""
+
+    uploaded_by_field: str = 'uploaded_by'
+    success_message: str | None = None
+
+    def prepare_document_for_save(self, form: Any) -> None:
+        """子类可覆盖以补充保存前准备逻辑。"""
+
+    def form_valid(self, form: Any):
+        if getattr(form.instance, f'{self.uploaded_by_field}_id', None) is None:
+            setattr(form.instance, self.uploaded_by_field, self.request.user)  # type: ignore[attr-defined]
+
+        self.prepare_document_for_save(form)
+        response = super().form_valid(form)  # type: ignore[misc]
+        if self.success_message:
+            messages.success(self.request, self.success_message)  # type: ignore[attr-defined]
+        return response
+
+
+class PdfPreviewDetailMixin:
+    """为文档详情页补充统一的 PDF 预览上下文。"""
+
+    document_context_name: str = 'document'
+    pdf_preview_url_name: str | None = None
+
+    def get_pdf_preview_url(self) -> str | None:
+        if not self.pdf_preview_url_name:
+            return None
+        return reverse(self.pdf_preview_url_name, args=[self.object.pk])  # type: ignore[attr-defined]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)  # type: ignore[misc]
+        context[self.document_context_name] = self.object  # type: ignore[attr-defined]
+        context['pdf_preview_url'] = self.get_pdf_preview_url()
         return context
 
 

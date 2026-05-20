@@ -1,5 +1,6 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
@@ -37,6 +38,21 @@ from .models import (
 	MemberScope,
 	SkillPosition,
 )
+from .selectors import (
+	format_competition_project_label,
+	format_competition_person_label,
+	format_competitor_label,
+	get_available_competition_people_for_competition_project,
+	get_available_competitors_for_competition_project,
+	get_available_members_for_competition_project,
+	get_competition_project_results_queryset,
+	get_members_for_competition_project,
+)
+from .services import (
+	create_or_link_competition_project_member,
+	resolve_or_create_competition_person,
+)
+from .validators import validate_primary_inline_forms
 
 
 User = get_user_model()
@@ -347,6 +363,24 @@ class CompetitionModuleStandardModuleMapTests(TestCase):
 
 		self.assertIn('is_primary', context.exception.message_dict)
 
+	def test_only_one_primary_axis_mapping_is_allowed_per_competition_module(self):
+		competition_module = self.create_competition_module(primary_standard_module=self.module)
+		CompetitionModuleAxisMap.objects.create(
+			competition_module=competition_module,
+			module_axis=self.primary_axis,
+			is_primary=True,
+		)
+		duplicate_primary_mapping = CompetitionModuleAxisMap(
+			competition_module=competition_module,
+			module_axis=self.secondary_axis,
+			is_primary=True,
+		)
+
+		with self.assertRaises(ValidationError) as context:
+			duplicate_primary_mapping.full_clean()
+
+		self.assertIn('is_primary', context.exception.message_dict)
+
 	def test_mapping_module_must_match_competition_project_project(self):
 		other_project = Project.objects.create(
 			competition_type=self.competition_type,
@@ -364,6 +398,25 @@ class CompetitionModuleStandardModuleMapTests(TestCase):
 			CompetitionModuleStandardModuleMap.objects.create(
 				competition_module=competition_module,
 				module=other_module,
+			)
+
+	def test_axis_mapping_must_match_competition_project_project(self):
+		other_project = Project.objects.create(
+			competition_type=self.competition_type,
+			code='CLD-CM-AXIS',
+			name='其他主线项目',
+		)
+		other_axis = ModuleAxis.objects.create(
+			project=other_project,
+			code='AX-Z',
+			name='越界主线',
+		)
+		competition_module = self.create_competition_module(primary_standard_module=self.module)
+
+		with self.assertRaises(ValidationError):
+			CompetitionModuleAxisMap.objects.create(
+				competition_module=competition_module,
+				module_axis=other_axis,
 			)
 
 	def test_standard_module_primary_axis_comes_from_primary_axis_mapping(self):
@@ -404,6 +457,35 @@ class CompetitionModuleStandardModuleMapTests(TestCase):
 		)
 
 		self.assertEqual(competition_module.primary_axis, self.secondary_axis)
+
+
+class CompetitionMappingValidatorTests(TestCase):
+	def test_primary_inline_forms_require_one_primary_form(self):
+		forms = [SimpleNamespace(cleaned_data={'is_primary': False, 'DELETE': False})]
+
+		with self.assertRaises(ValidationError) as context:
+			validate_primary_inline_forms(
+				forms,
+				duplicate_message='重复主映射',
+				missing_message='缺少主映射',
+			)
+
+		self.assertEqual(context.exception.messages, ['缺少主映射'])
+
+	def test_primary_inline_forms_reject_multiple_primary_forms(self):
+		forms = [
+			SimpleNamespace(cleaned_data={'is_primary': True, 'DELETE': False}),
+			SimpleNamespace(cleaned_data={'is_primary': True, 'DELETE': False}),
+		]
+
+		with self.assertRaises(ValidationError) as context:
+			validate_primary_inline_forms(
+				forms,
+				duplicate_message='重复主映射',
+				missing_message='缺少主映射',
+			)
+
+		self.assertEqual(context.exception.messages, ['重复主映射'])
 
 
 class CompetitionArchiveIntegrityTests(TestCase):
@@ -1270,6 +1352,212 @@ class CompetitionReusableDataTests(TestCase):
 		)
 
 		self.assertEqual(person.skill_position_assignments.count(), 2)
+
+
+class CompetitionServiceTests(TestCase):
+	def setUp(self):
+		self.competition_type = CompetitionType.objects.create(
+			code='WSC-SERVICE',
+			name='服务测试赛事',
+			level=Level.INTERNATIONAL,
+		)
+		self.project = Project.objects.create(
+			competition_type=self.competition_type,
+			code='ITNSA-SERVICE',
+			name='服务测试项目',
+		)
+		self.competition = Competition.objects.create(
+			competition_type=self.competition_type,
+			name='服务测试竞赛',
+			code='WSC2026-SERVICE',
+		)
+		self.competition_project = CompetitionProject.objects.create(
+			competition=self.competition,
+			project=self.project,
+		)
+		self.user = User.objects.create_user(username='service-user', password='testpass123')
+		self.member = Member.objects.create(
+			name='中国队',
+			code='CN-SERVICE',
+			level=MemberScope.INTERNATIONAL,
+		)
+
+	def test_resolve_or_create_competition_person_returns_existing_person(self):
+		person = CompetitionPerson.objects.create(name='现有人员', organization='现有单位')
+
+		resolved = resolve_or_create_competition_person(
+			person=person,
+			new_person_name='新人员',
+		)
+
+		self.assertEqual(resolved, person)
+		self.assertEqual(CompetitionPerson.objects.count(), 1)
+
+	def test_resolve_or_create_competition_person_creates_new_person(self):
+		resolved = resolve_or_create_competition_person(
+			new_person_name='新增人员',
+			new_person_organization='服务单位',
+			new_person_user=self.user,
+		)
+
+		self.assertEqual(resolved.name, '新增人员')
+		self.assertEqual(resolved.organization, '服务单位')
+		self.assertEqual(resolved.user, self.user)
+
+	def test_create_or_link_competition_project_member_reuses_existing_member(self):
+		link = create_or_link_competition_project_member(
+			competition_project=self.competition_project,
+			existing_member=self.member,
+		)
+
+		self.assertEqual(link.member, self.member)
+		self.assertTrue(
+			CompetitionProjectMember.objects.filter(
+				competition_project=self.competition_project,
+				member=self.member,
+			).exists()
+		)
+
+	def test_create_or_link_competition_project_member_creates_required_level_member(self):
+		link = create_or_link_competition_project_member(
+			competition_project=self.competition_project,
+			new_member_name='韩国队',
+			new_member_code='KR-SERVICE',
+		)
+
+		self.assertEqual(link.member.name, '韩国队')
+		self.assertEqual(link.member.level, MemberScope.INTERNATIONAL)
+		self.assertTrue(
+			CompetitionProjectMember.objects.filter(
+				competition_project=self.competition_project,
+				member=link.member,
+			).exists()
+		)
+
+
+class CompetitionSelectorTests(TestCase):
+	def setUp(self):
+		self.user = User.objects.create_user(
+			username='selector-user',
+			password='testpass123',
+			first_name='三',
+			last_name='张',
+		)
+		self.competition_type = CompetitionType.objects.create(
+			code='WSC-SELECTOR',
+			name='选择器测试赛事',
+			level=Level.INTERNATIONAL,
+		)
+		self.project = Project.objects.create(
+			competition_type=self.competition_type,
+			code='ITNSA-SELECTOR',
+			name='选择器测试项目',
+		)
+		self.competition = Competition.objects.create(
+			competition_type=self.competition_type,
+			name='选择器测试竞赛',
+			code='WSC2026-SELECTOR',
+		)
+		self.competition_project = CompetitionProject.objects.create(
+			competition=self.competition,
+			project=self.project,
+		)
+		self.linked_member = Member.objects.create(
+			name='中国队',
+			code='CN-SELECTOR',
+			level=MemberScope.INTERNATIONAL,
+		)
+		self.available_member = Member.objects.create(
+			name='日本队',
+			code='JP-SELECTOR',
+			level=MemberScope.INTERNATIONAL,
+		)
+		Member.objects.create(
+			name='浙江队',
+			code='ZJ-SELECTOR',
+			level=MemberScope.NATIONAL,
+		)
+		CompetitionProjectMember.objects.create(
+			competition_project=self.competition_project,
+			member=self.linked_member,
+		)
+		self.available_person = CompetitionPerson.objects.create(
+			name='选手甲',
+			organization='测试单位',
+			user=self.user,
+		)
+		self.reusable_person = CompetitionPerson.objects.create(
+			name='选手丙',
+			organization='可复用单位',
+		)
+		self.used_person = CompetitionPerson.objects.create(
+			name='选手乙',
+			organization='已使用单位',
+		)
+		self.available_competitor = Competitor.objects.create(
+			competition_project=self.competition_project,
+			person=self.available_person,
+			member=self.linked_member,
+		)
+		self.archived_competitor = Competitor.objects.create(
+			competition_project=self.competition_project,
+			person=self.used_person,
+			member=self.linked_member,
+		)
+		CompetitionResult.objects.create(
+			competitor=self.archived_competitor,
+			score_700='680.00',
+			rank=2,
+		)
+
+	def test_format_competition_person_label_includes_display_name(self):
+		self.assertEqual(
+			format_competition_person_label(self.available_person),
+			'选手甲 / 测试单位 / 张三',
+		)
+
+	def test_format_competition_project_label_includes_competition_and_project(self):
+		self.assertEqual(
+			format_competition_project_label(self.competition_project),
+			'选择器测试竞赛 / 选择器测试项目',
+		)
+
+	def test_format_competitor_label_includes_member_name(self):
+		self.assertEqual(
+			format_competitor_label(self.available_competitor),
+			'选手甲 / 中国队',
+		)
+
+	def test_available_members_only_include_unlinked_matching_level_members(self):
+		queryset = get_available_members_for_competition_project(self.competition_project)
+
+		self.assertEqual(list(queryset.values_list('pk', flat=True)), [self.available_member.pk])
+
+	def test_members_for_competition_project_only_include_linked_members(self):
+		queryset = get_members_for_competition_project(self.competition_project)
+
+		self.assertEqual(list(queryset.values_list('pk', flat=True)), [self.linked_member.pk])
+
+	def test_available_competition_people_exclude_assigned_people_unless_included(self):
+		queryset = get_available_competition_people_for_competition_project(
+			self.competition_project,
+			include_person=self.used_person,
+		)
+
+		self.assertCountEqual(
+			list(queryset.values_list('pk', flat=True)),
+			[self.reusable_person.pk, self.used_person.pk],
+		)
+
+	def test_available_competitors_exclude_already_archived_results(self):
+		queryset = get_available_competitors_for_competition_project(self.competition_project)
+
+		self.assertEqual(list(queryset.values_list('pk', flat=True)), [self.available_competitor.pk])
+
+	def test_competition_project_results_queryset_returns_project_results(self):
+		queryset = get_competition_project_results_queryset(self.competition_project)
+
+		self.assertEqual(list(queryset.values_list('competitor_id', flat=True)), [self.archived_competitor.pk])
 
 
 class CompetitionMenuConfigTests(TestCase):

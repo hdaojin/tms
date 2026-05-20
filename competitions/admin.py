@@ -1,7 +1,6 @@
 from django import forms
 from django.contrib import admin
-from django.core.exceptions import ValidationError
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.forms.models import BaseInlineFormSet
 from django.urls import reverse
 from django.utils.html import format_html
@@ -24,77 +23,19 @@ from .models import (
     Member,
     SkillPosition,
 )
-
-
-def format_standard_module_label(module):
-    return f'{module.code} - {module.name} [{module.module_set.name}]'
-
-
-def format_module_axis_label(module_axis):
-    return f'{module_axis.code} - {module_axis.name}'
-
-
-def format_member_label(member):
-    return f'{member.name} [{member.get_level_display()}]'
-
-
-def format_competition_person_label(person):
-    parts = [person.name]
-    if person.organization:
-        parts.append(person.organization)
-    if person.user_id:
-        parts.append(person.user.display_name)
-    return ' / '.join(parts)
-
-
-def get_project_module_queryset(project):
-    if project is None:
-        return StandardModule.objects.none()
-    return StandardModule.objects.filter(project=project).select_related('project', 'module_set').order_by(
-        '-module_set__is_current',
-        'module_set__sort_order',
-        'sort_order',
-        'code',
-        'name',
-    )
-
-
-def get_project_module_axis_queryset(project):
-    if project is None:
-        return ModuleAxis.objects.none()
-    return ModuleAxis.objects.filter(project=project).order_by('sort_order', 'code', 'name')
-
-
-def get_member_queryset_for_competition_project(competition_project, include_member=None):
-    queryset = Member.objects.order_by('level', 'name')
-    if competition_project is None or not getattr(competition_project, 'pk', None):
-        return queryset.none()
-
-    filters = Q(competition_project_links__competition_project=competition_project)
-    if include_member is not None and getattr(include_member, 'pk', None):
-        filters |= Q(pk=include_member.pk)
-    return queryset.filter(filters).distinct()
-
-
-def get_available_member_queryset_for_competition_project(competition_project, include_member=None):
-    queryset = Member.objects.order_by('level', 'name')
-    if competition_project is None or not getattr(competition_project, 'pk', None):
-        return queryset.none()
-
-    required_level = competition_project.required_member_level
-    if required_level is None:
-        return queryset.none()
-
-    filters = Q(level=required_level) & (
-        ~Q(competition_project_links__competition_project=competition_project)
-    )
-    if include_member is not None and getattr(include_member, 'pk', None):
-        filters |= Q(pk=include_member.pk)
-    return queryset.filter(filters).distinct().order_by('level', 'name')
-
-
-def get_competition_person_queryset():
-    return CompetitionPerson.objects.select_related('user').order_by('name', 'organization', 'pk')
+from .selectors import (
+    format_competition_person_label,
+    format_member_label,
+    format_module_axis_label,
+    format_standard_module_label,
+    get_available_members_for_competition_project,
+    get_competition_person_queryset,
+    get_competition_project_queryset,
+    get_members_for_competition_project,
+    get_project_module_axis_queryset,
+    get_project_module_queryset,
+)
+from .validators import validate_primary_inline_forms
 
 
 def format_competition_module_mappings(competition_module):
@@ -140,7 +81,10 @@ class CompetitionModuleStandardModuleMapAdminForm(forms.ModelForm):
         self.fields['module'].label_from_instance = format_standard_module_label
 
 
-class CompetitionModuleStandardModuleMapInlineFormSet(BaseInlineFormSet):
+class BaseCompetitionModuleMappingInlineFormSet(BaseInlineFormSet):
+    duplicate_primary_message = ''
+    missing_primary_message = ''
+
     def get_form_kwargs(self, index):
         kwargs = super().get_form_kwargs(index)
         kwargs['competition_module'] = self.instance
@@ -151,19 +95,16 @@ class CompetitionModuleStandardModuleMapInlineFormSet(BaseInlineFormSet):
         if any(self.errors):
             return
 
-        active_forms = [
-            form
-            for form in self.forms
-            if form.cleaned_data and not form.cleaned_data.get('DELETE', False)
-        ]
-        if not active_forms:
-            return
+        validate_primary_inline_forms(
+            self.forms,
+            duplicate_message=self.duplicate_primary_message,
+            missing_message=self.missing_primary_message,
+        )
 
-        primary_forms = [form for form in active_forms if form.cleaned_data.get('is_primary')]
-        if len(primary_forms) > 1:
-            raise ValidationError('同一官方模块只能设置一个主映射。')
-        if len(primary_forms) == 0:
-            raise ValidationError('请至少选择一条主映射。')
+
+class CompetitionModuleStandardModuleMapInlineFormSet(BaseCompetitionModuleMappingInlineFormSet):
+    duplicate_primary_message = '同一官方模块只能设置一个主映射。'
+    missing_primary_message = '请至少选择一条主映射。'
 
 
 class CompetitionModuleAxisMapAdminForm(forms.ModelForm):
@@ -184,36 +125,40 @@ class CompetitionModuleAxisMapAdminForm(forms.ModelForm):
         self.fields['module_axis'].label_from_instance = format_module_axis_label
 
 
-class CompetitionModuleAxisMapInlineFormSet(BaseInlineFormSet):
-    def get_form_kwargs(self, index):
-        kwargs = super().get_form_kwargs(index)
-        kwargs['competition_module'] = self.instance
-        return kwargs
-
-    def clean(self):
-        super().clean()
-        if any(self.errors):
-            return
-
-        active_forms = [
-            form
-            for form in self.forms
-            if form.cleaned_data and not form.cleaned_data.get('DELETE', False)
-        ]
-        if not active_forms:
-            return
-
-        primary_forms = [form for form in active_forms if form.cleaned_data.get('is_primary')]
-        if len(primary_forms) > 1:
-            raise ValidationError('同一官方模块只能设置一个主主线映射。')
-        if len(primary_forms) == 0:
-            raise ValidationError('请至少选择一条主主线映射。')
+class CompetitionModuleAxisMapInlineFormSet(BaseCompetitionModuleMappingInlineFormSet):
+    duplicate_primary_message = '同一官方模块只能设置一个主主线映射。'
+    missing_primary_message = '请至少选择一条主主线映射。'
 
 
-class CompetitionProjectScopedMemberFormMixin:
+class CompetitionProjectAdminFormMixin:
+    resolve_competition_project_from_data = False
+
     def __init__(self, *args, competition_project=None, **kwargs):
         self._competition_project = competition_project
         super().__init__(*args, **kwargs)
+
+    def get_competition_project_queryset(self):
+        return get_competition_project_queryset()
+
+    def get_competition_project(self):
+        if self._competition_project is not None:
+            return self._competition_project
+
+        if self.resolve_competition_project_from_data:
+            competition_project_id = self.data.get(self.add_prefix('competition_project'))
+            if competition_project_id:
+                return self.get_competition_project_queryset().filter(pk=competition_project_id).first()
+
+        if getattr(self.instance, 'competition_project_id', None):
+            return self.instance.competition_project
+        return None
+
+
+class CompetitionProjectScopedMemberFormMixin(CompetitionProjectAdminFormMixin):
+    resolve_competition_project_from_data = True
+
+    def __init__(self, *args, competition_project=None, **kwargs):
+        super().__init__(*args, competition_project=competition_project, **kwargs)
 
         if 'person' in self.fields:
             self.fields['person'].queryset = get_competition_person_queryset()
@@ -224,7 +169,7 @@ class CompetitionProjectScopedMemberFormMixin:
 
         competition_project = self.get_competition_project()
         current_member = getattr(self.instance, 'member', None)
-        self.fields['member'].queryset = get_member_queryset_for_competition_project(
+        self.fields['member'].queryset = get_members_for_competition_project(
             competition_project,
             include_member=current_member,
         )
@@ -236,20 +181,6 @@ class CompetitionProjectScopedMemberFormMixin:
                 f'当前赛事级别要求选择“{competition_project.required_member_level_label}”代表队。'
                 '请先在当前赛项中关联代表队，再为选手或专家选择。'
             )
-
-    def get_competition_project(self):
-        if self._competition_project is not None:
-            return self._competition_project
-
-        competition_project_id = self.data.get(self.add_prefix('competition_project'))
-        if competition_project_id:
-            return CompetitionProject.objects.select_related('competition__competition_type').filter(
-                pk=competition_project_id,
-            ).first()
-
-        if getattr(self.instance, 'competition_project_id', None):
-            return self.instance.competition_project
-        return None
 
 
 class CompetitorAdminForm(CompetitionProjectScopedMemberFormMixin, forms.ModelForm):
@@ -264,17 +195,16 @@ class ExpertAdminForm(CompetitionProjectScopedMemberFormMixin, forms.ModelForm):
         fields = '__all__'
 
 
-class CompetitionProjectMemberAdminForm(forms.ModelForm):
+class CompetitionProjectMemberAdminForm(CompetitionProjectAdminFormMixin, forms.ModelForm):
     class Meta:
         model = CompetitionProjectMember
         fields = '__all__'
 
     def __init__(self, *args, competition_project=None, **kwargs):
-        self._competition_project = competition_project
-        super().__init__(*args, **kwargs)
+        super().__init__(*args, competition_project=competition_project, **kwargs)
         competition_project = self.get_competition_project()
         current_member = getattr(self.instance, 'member', None)
-        self.fields['member'].queryset = get_available_member_queryset_for_competition_project(
+        self.fields['member'].queryset = get_available_members_for_competition_project(
             competition_project,
             include_member=current_member,
         )
@@ -286,14 +216,6 @@ class CompetitionProjectMemberAdminForm(forms.ModelForm):
                 f'当前赛事级别要求选择“{competition_project.required_member_level_label}”代表队。'
                 '这里仅显示尚未关联到当前赛项的代表队。'
             )
-
-    def get_competition_project(self):
-        if self._competition_project is not None:
-            return self._competition_project
-
-        if getattr(self.instance, 'competition_project_id', None):
-            return self.instance.competition_project
-        return None
 
 
 class SkillPositionAdminForm(forms.ModelForm):

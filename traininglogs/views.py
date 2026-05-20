@@ -9,14 +9,13 @@ from django.contrib.auth.mixins import (
 )
 from django.http import Http404
 from django.views.generic import CreateView, DetailView, DeleteView
-from django.urls import reverse_lazy, reverse
-from django.contrib import messages
+from django.urls import reverse_lazy
 from django.db.models import Q
 from django.utils import timezone
 from django_tables2 import SingleTableView
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
-from core.utils.mixins import TitleMixin, OwnerRequiredMixin
+from core.utils.mixins import OwnerRequiredMixin, PdfPreviewDetailMixin, TitleMixin, UploadedDocumentCreateMixin
 from core.utils.pdf_response import create_pdf_preview_view
 
 from .models import TrainingLog
@@ -79,25 +78,21 @@ class TraininglogMonthFilterMixin:
 
 
 # 训练日志上传视图
-class TrainingLogUploadView(TitleMixin, PermissionRequiredMixin, CreateView):
+class TrainingLogUploadView(UploadedDocumentCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingLog
     form_class = TrainingLogCreateForm
-    template_name = "traininglogs/traininglog_upload.html"
+    template_name = "common/document_upload_form.html"
     success_url = reverse_lazy("traininglogs:traininglog_list")
     permission_required = "traininglogs.add_traininglog"
     raise_exception = True
     title = "上传训练日志"
     title_icon = "icon-[tabler--upload]"
+    success_message = "训练日志上传成功！"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
         return kwargs
-
-    def form_valid(self, form):
-        form.instance.uploaded_by = self.request.user
-        messages.success(self.request, "训练日志上传成功！")
-        return super().form_valid(form)
 
 
 # 训练日志列表视图
@@ -139,22 +134,16 @@ class TrainingLogAccessMixin:
         return obj
 
 
-class TrainingLogDetailView(TitleMixin, TrainingLogAccessMixin, LoginRequiredMixin, DetailView):
+class TrainingLogDetailView(TitleMixin, TrainingLogAccessMixin, LoginRequiredMixin, PdfPreviewDetailMixin, DetailView):
     model = TrainingLog
-    template_name = "traininglogs/traininglog_detail.html"
+    template_name = "common/document_detail_with_pdf.html"
     context_object_name = "traininglog"
+    pdf_preview_url_name = 'traininglogs:traininglog_pdf_inline'
     title = "{uploaded_by}的{training_date}训练日志"
     title_icon = "icon-[tabler--file-text]"
 
     def get_queryset(self):
         return super().get_queryset().select_related('uploaded_by', 'training_cycle', 'module')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["pdf_preview_url"] = reverse(
-            "traininglogs:traininglog_pdf_inline", args=[self.object.pk]  # type: ignore
-        )
-        return context
 
 
 class TrainingLogDeleteView(OwnerRequiredMixin, LoginRequiredMixin, DeleteView):

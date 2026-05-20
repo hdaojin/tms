@@ -1,7 +1,12 @@
 from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.urls import reverse
 
-from .models import CompetitionType, Project
+from .models import CompetitionType, Project, StandardModule
+
+
+User = get_user_model()
 
 
 class ProjectCompetitionTypeTests(TestCase):
@@ -39,4 +44,38 @@ class ProjectCompetitionTypeTests(TestCase):
 
         self.assertEqual(first_project.code, second_project.code)
         self.assertNotEqual(first_project.pk, second_project.pk)
+
+
+class StandardModuleRankingDefaultTests(TestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username='curriculum-admin',
+            password='testpass123',
+            email='curriculum@example.com',
+        )
+        competition_type = CompetitionType.objects.create(code='WSC-CUR', name='课程测试赛事')
+        self.project = Project.objects.create(
+            competition_type=competition_type,
+            code='CUR',
+            name='课程测试项目',
+        )
+        self.module = StandardModule.objects.create(
+            project=self.project,
+            code='ENG',
+            name='English Interview',
+            default_counts_towards_ranking=False,
+        )
+
+    def test_standard_module_persists_default_ranking_flag(self):
+        self.assertFalse(self.module.default_counts_towards_ranking)
+
+    def test_standard_module_admin_exposes_default_ranking_flag(self):
+        self.client.force_login(self.admin_user)
+
+        response = self.client.get(
+            reverse('admin:curriculum_standardmodule_change', args=[self.module.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('default_counts_towards_ranking', response.context['adminform'].form.fields)
 
