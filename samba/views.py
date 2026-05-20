@@ -3,12 +3,22 @@ from django.contrib import messages
 
 
 from .forms import SambaPasswordForm
-from .samba_sync import enable_samba_for_user, change_samba_password, is_samba_enabled
+from .models import SambaOperation
+from .services import (
+    SambaIntegrationDisabled,
+    SambaOperationConflict,
+    get_last_known_enabled_state,
+    get_latest_operation_for_user,
+    submit_operation,
+)
 
 
 def samba_account_view(request):
     user = request.user
-    enabled = is_samba_enabled(user)
+    last_known_enabled_state = get_last_known_enabled_state(user)
+    enabled = bool(last_known_enabled_state)
+    enabled_state_known = last_known_enabled_state is not None
+    latest_operation = get_latest_operation_for_user(user)
     # 获取服务器 IP（从请求的 host 中提取，去掉端口号）
     server_host = request.get_host().split(':')[0]
 
@@ -32,18 +42,26 @@ def samba_account_view(request):
 
         try:
             if action == "enable":
-                # 若已开通，再次“enable”等价于确保组并改密
-                result = enable_samba_for_user(user, form.password)
-                tip = "完成开通" if result["created"] else "已存在，已更新密码与组"
-                messages.success(request, f"Samba 账户{tip}。")
-                # 开通后刷新状态
-                enabled = True
+                submit_operation(
+                    actor=request.user,
+                    target_user=user,
+                    action=SambaOperation.Action.ENABLE,
+                    password=form.password,
+                )
+                messages.success(request, "Samba 开通请求已提交，系统会在后台处理。")
             elif action == "change":
                 if not enabled:
                     messages.error(request, "Samba 用户尚未开通，无法修改密码。")
                     return redirect("samba:accounts")
-                change_samba_password(user, form.password)
-                messages.success(request, "Samba 密码已修改。")
+                submit_operation(
+                    actor=request.user,
+                    target_user=user,
+                    action=SambaOperation.Action.CHANGE_PASSWORD,
+                    password=form.password,
+                )
+                messages.success(request, "Samba 改密请求已提交，系统会在后台处理。")
+        except (SambaIntegrationDisabled, SambaOperationConflict) as e:
+            messages.error(request, str(e))
         except Exception as e:
             messages.error(request, f"操作失败：{e}")
 
@@ -54,7 +72,9 @@ def samba_account_view(request):
     form = SambaPasswordForm(user=user)
     return render(request, "samba/samba_account.html", {
         "enabled": enabled,
+        "enabled_state_known": enabled_state_known,
         "form": form,
+        "latest_operation": latest_operation,
         "server_host": server_host,
         "title": "Samba 账户管理",
         "title_icon" : "icon-[tabler--users-plus]"

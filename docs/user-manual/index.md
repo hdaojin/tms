@@ -1,6 +1,6 @@
 # TMS 用户手册
 
-本目录用于存放 TMS 系统的用户操作手册，当前已覆盖 accounts、assessments、behaviors、competitions、meetings、notes、traininglogs 等模块，后续再逐步扩展到 skills 等模块。
+本目录用于存放 TMS 系统的用户操作手册，当前已覆盖 accounts、assessments、behaviors、competitions、meetings、notes、samba、traininglogs 等模块，后续再逐步扩展到 skills 等模块。
 
 ## 使用说明
 
@@ -19,6 +19,7 @@
 - [competitions/frontend-guide.md](competitions/frontend-guide.md): competitions 前台业务录入手册。
 - [meetings/overview.md](meetings/overview.md): meetings APP 总览与常见任务。
 - [notes/overview.md](notes/overview.md): notes APP 总览与仓库/附件访问规则。
+- [samba/overview.md](samba/overview.md): samba APP 账户开通与改密说明。
 - [traininglogs/overview.md](traininglogs/overview.md): traininglogs APP 总览与跨角色查看规则。
 
 

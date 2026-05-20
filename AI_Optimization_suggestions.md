@@ -30,8 +30,8 @@ TMS 的基础方向是对的：Django 6、全站 `LoginRequiredMiddleware`、`co
 
 **按 app 的结构建议**
 
-- `accounts`：用户显示名通过 [apps.py ready monkey patch](E:/04-codes/tms/accounts/apps.py:10) 注入到 `User`，使用方便但隐式。可以保留现状，但建议补一个显式的 `accounts.utils.users` 或 service，降低魔法感。`accounts/admin.py` 直接依赖 [behaviors.models.ConductSummary](E:/04-codes/tms/accounts/admin.py:5)，会让 accounts 不够独立，建议反向由 behaviors 注册 admin 钩子或用更通用的级联删除策略封装。
-- `competitions`：领域模型成熟但过重，forms/admin/views 里有大量相似 queryset 和 label formatter。建议把“人员主档复用、代表队过滤、赛项模块映射”抽到 app 内 service/query 模块。
+- `accounts`：用户显示名通过 [apps.py ready monkey patch](E:/04-codes/tms/accounts/apps.py:10) 注入到 `User`，使用方便但隐式。可以保留现状，但建议补一个显式的 `accounts.utils.users` 或 service，降低魔法感。`accounts/admin.py` 直接依赖 [behaviors.models.ConductSummary](E:/04-codes/tms/accounts/admin.py:5)，会让 accounts 不够独立，建议反向由 behaviors 注册 admin 钩子或用更通用的级联删除策略封装。OK
+- `competitions`：领域模型成熟但过重，forms/admin/views 里有大量相似 queryset 和 label formatter。建议把“人员主档复用、代表队过滤、赛项模块映射”抽到 app 内 service/query 模块。 OK
 - `assessments`：功能完整，但 views 过厚。成绩排名里用 `"english" not in module.name.lower()` 作为排除逻辑较脆，建议改为模块属性/标签/配置。
 - `behaviors`：模型内聚较好，但审核流、汇总重算、admin 权限较重。建议抽一个 `ConductWorkflowService`，并复用 `AuditedModel` 到 `ConductRecord` 或统一审计字段。
 - `meetings` 和 `traininglogs`：都是“日期 + 上传文件 + 上传人 + PDF 预览”的文档型流程，适合抽公共文档上传基类/视图 mixin。

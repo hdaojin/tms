@@ -196,3 +196,7 @@ LOGIN_REDIRECT_URL = '/accounts/home/'  # 登录成功后跳转的页面
 # 自定义变量（默认值定义在 core/constants.py，可通过环境变量覆盖）
 CACHE_TIMEOUT = env.int('CACHE_TIMEOUT', default=DEFAULT_CACHE_TIMEOUT)  # type: ignore
 UPLOAD_MAX_SIZE_MB = env.int('UPLOAD_MAX_SIZE_MB', default=DEFAULT_UPLOAD_MAX_SIZE_MB)  # type: ignore
+SAMBA_INTEGRATION_ENABLED = env.bool('SAMBA_INTEGRATION_ENABLED', default=True)  # type: ignore
+SAMBA_ASYNC_OPERATIONS_ENABLED = env.bool('SAMBA_ASYNC_OPERATIONS_ENABLED', default=True)  # type: ignore
+SAMBA_COMMAND_TIMEOUT_SECONDS = env.int('SAMBA_COMMAND_TIMEOUT_SECONDS', default=15)  # type: ignore
+SAMBA_TASK_ENCRYPTION_KEY = env('SAMBA_TASK_ENCRYPTION_KEY', default='')  # type: ignore

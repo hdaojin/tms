@@ -1,5 +1,11 @@
+import logging
 import subprocess
+
+from django.conf import settings
+
 from accounts.models import GroupProfile
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_unix_group_for_django_group(django_group) -> str | None:
@@ -12,12 +18,25 @@ def _resolve_unix_group_for_django_group(django_group) -> str | None:
 
 def _run(cmd: list[str], input_bytes: bytes | None = None) -> subprocess.CompletedProcess:
     full = ["sudo", "--"] + cmd
-    return subprocess.run(
-        full,
-        input=input_bytes,
-        capture_output=True,
-        check=False,
-    )
+    timeout = getattr(settings, 'SAMBA_COMMAND_TIMEOUT_SECONDS', 15)
+    logger.info('执行 Samba 系统命令', extra={'command': cmd, 'timeout': timeout})
+    try:
+        return subprocess.run(
+            full,
+            input=input_bytes,
+            capture_output=True,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(f"命令执行超时（{timeout} 秒）：{' '.join(cmd)}") from exc
+
+
+def _run_checked(cmd: list[str], input_bytes: bytes | None = None) -> subprocess.CompletedProcess:
+    result = _run(cmd, input_bytes=input_bytes)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.decode('utf-8') or result.stdout.decode('utf-8') or f"命令执行失败：{' '.join(cmd)}")
+    return result
 
 def __exists_unix_group(group: str) -> bool:
     result = _run(["getent", "group", group])
@@ -25,7 +44,7 @@ def __exists_unix_group(group: str) -> bool:
 
 def __create_unix_group(group: str) -> None:
     if not __exists_unix_group(group):
-        _run (["groupadd", group])
+        _run_checked(["groupadd", group])
 
 def _exists_unix_user(username: str) -> bool:
     result = _run(["id", "-u", username])
@@ -40,12 +59,12 @@ def _create_unix_user(username: str, password: str, primary_group: str | None, c
             args += ["-m"]
         if shell:
             args += ["-s", shell]
-        _run(args)
+        _run_checked(args)
 
 def _ensure_user_in_groups(username: str, groups: list[str]) -> None:
     if not groups:
         return
-    _run(["usermod", "-aG", ",".join(groups), username])
+    _run_checked(["usermod", "-aG", ",".join(groups), username])
 
 def _exists_samba_user(username: str) -> bool:
     result = _run(["pdbedit", "-L", "-v", "-u", username])
@@ -57,7 +76,7 @@ def _set_samba_user_password(username: str, password: str, create_if_missing: bo
         cmd.append("-a")
     cmd.append(username)
     pw_input = f"{password}\n{password}\n".encode("utf-8")
-    result= _run(cmd, input_bytes=pw_input)
+    result = _run(cmd, input_bytes=pw_input)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.decode("utf-8") or result.stdout.decode("utf-8") or "Unknown error setting Samba password")
 
@@ -101,4 +120,4 @@ def change_samba_password(user, new_password: str) -> None:
 def disable_samba_for_user(user) -> None:
     username = user.username
     if _exists_samba_user(username):
-        _run(["smbpasswd", "-x", username])
+        _run_checked(["smbpasswd", "-x", username])

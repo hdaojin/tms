@@ -1,39 +1,45 @@
-# from django.db import models
-# from django.contrib.auth.models import Group
-# from django.core.validators import RegexValidator
+from django.conf import settings
+from django.db import models
+
+from core.models import AuditedModel
 
 
-# unix_name_validator = RegexValidator(
-#     regex=r'^[a-z][a-z0-9_-]{1,30}$',
-#     message='uninx_name 必须以小写字母开头，后续字符可以是小写字母、数字、下划线或连字符，且长度不超过30个字符。'
-# )
+class SambaOperation(AuditedModel):
+	class Action(models.TextChoices):
+		ENABLE = 'enable', '开通账户'
+		CHANGE_PASSWORD = 'change_password', '修改密码'
+		DISABLE = 'disable', '停用账户'
 
-# class SambaGroupMap(models.Model):
-#     """
-#     Django 用户组与 Samba 组(Unix 系统组)映射关系。
-#     """
-#     group = models.OneToOneField(
-#         Group,
-#         on_delete=models.CASCADE,
-#         related_name='samba_group_map',
-#         primary_key=True,
-#         help_text='关联的 Django 用户组'
-#     )
-#     unix_name = models.CharField(
-#         verbose_name='Unix 组名',
-#         max_length=30,
-#         unique=True,
-#         null=True,
-#         blank=True,
-#         validators=[unix_name_validator],
-#         help_text='对应的 Samba 组名（Unix 系统组名）, 必须是Uninx/Linux系统可用的 ASCII 组名（如 smbusers、netops、dev_team）。'
-#     )
-#     updated_at = models.DateTimeField(auto_now=True)
+	class Status(models.TextChoices):
+		QUEUED = 'queued', '待处理'
+		RUNNING = 'running', '处理中'
+		SUCCEEDED = 'succeeded', '已完成'
+		FAILED = 'failed', '失败'
 
+	target_user = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name='samba_operations',
+		verbose_name='目标用户',
+	)
+	action = models.CharField('操作', max_length=32, choices=Action.choices)
+	status = models.CharField(
+		'状态',
+		max_length=16,
+		choices=Status.choices,
+		default=Status.QUEUED,
+	)
+	payload_encrypted = models.TextField('加密载荷', blank=True)
+	result_summary = models.CharField('结果摘要', max_length=255, blank=True)
+	detail = models.TextField('详细日志', blank=True)
+	last_error = models.TextField('错误信息', blank=True)
+	started_at = models.DateTimeField('开始时间', null=True, blank=True)
+	finished_at = models.DateTimeField('结束时间', null=True, blank=True)
 
-#     class Meta:
-#         verbose_name = '账号所属组与Samba组的映射'
-#         verbose_name_plural = '账号所属组与Samba组的映射'
+	class Meta:
+		ordering = ['-created_at', '-id']
+		verbose_name = 'Samba 操作'
+		verbose_name_plural = 'Samba 操作'
 
-#     def __str__(self):
-#         return f"{self.group.name} -> {self.unix_name}"
+	def __str__(self):
+		return f'{self.target_user.username} - {self.get_action_display()} - {self.get_status_display()}'

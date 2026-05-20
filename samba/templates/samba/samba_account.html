@@ -3,13 +3,29 @@
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
+{% if latest_operation %}
+  <div class="card mb-4 bg-base-200">
+    <div class="card-body">
+      <h5 class="card-title">最近一次后台任务</h5>
+      <p class="text-sm">
+        操作：{{ latest_operation.get_action_display }}
+        <span class="badge badge-outline ml-2">{{ latest_operation.get_status_display }}</span>
+      </p>
+      <p class="text-sm text-base-content/80">{{ latest_operation.result_summary|default:"已提交，等待处理。" }}</p>
+      {% if latest_operation.last_error %}
+        <div class="alert alert-error mt-2">{{ latest_operation.last_error }}</div>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
 {% if enabled %}
   <div class="card mb-4">
     <div class="card-body">
-      <h5 class="card-title">当前状态：已开通</h5>
+      <h5 class="card-title">当前状态：最近一次已知状态为已开通</h5>
       <p class="card-text">
         你的 Samba 账户已创建，用户名与本站用户名一致（{{ request.user.username }}）。
-        如需更改密码，请使用下方表单。
+        如需更改密码，请使用下方表单。提交后会进入后台任务队列。
       </p>
     </div>
   </div>
@@ -39,9 +55,10 @@
 {% else %}
   <div class="card mb-4">
     <div class="card-body">
-      <h5 class="card-title">开通 Samba 账户</h5>
+      <h5 class="card-title">{% if enabled_state_known %}当前状态：最近一次已知状态为未开通{% else %}当前状态：尚未确认{% endif %}</h5>
       <p class="card-text">
-        点击开通后，系统会按照你在 {{ site_info.site_short_name }} 中的用户名与所属组创建本地用户/组并生成 Samba 账户。
+        点击开通后，系统会按照你在 {{ site_info.site_short_name }} 中的用户名与所属组创建本地用户/组并生成 Samba 账户。提交后系统会在后台执行，不会阻塞当前页面。
+        {% if not enabled_state_known %}如果你之前已由管理员手工创建过 Samba 账户，也可以直接提交开通任务，系统会按幂等方式校验并更新密码与组。{% endif %}
       </p>
       <form method="post" novalidate>
         {% csrf_token %}
@@ -57,7 +74,7 @@
         {% endif %}
         {% include 'components/field.html' with field=form.password1 %}
         {% include 'components/field.html' with field=form.password2 %}
-        <button type="submit" class="btn btn-primary mt-4">开通并设置密码</button>
+        <button type="submit" class="btn btn-primary mt-4">提交开通任务</button>
       </form>
     </div>
   </div>
