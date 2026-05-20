@@ -1,24 +1,33 @@
 {% extends 'base.html' %}
 
-{% block title %}文章列表 | {{ site_info.site_name }}{% endblock %}
+{% block title %}文章模块（实验） | {{ site_info.site_name }}{% endblock %}
 
 
 {% block content %}
-<div class="article-list">
+<div class="space-y-6">
+    <section class="rounded-box border border-warning/40 bg-warning/10 p-5">
+        <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-semibold">文章模块</h1>
+            <span class="badge badge-warning badge-outline">{{ experimental_module_label }}</span>
+        </div>
+        <p class="mt-3 text-sm text-base-content/80">{{ experimental_module_notice }}</p>
+    </section>
+
+    <div class="article-list space-y-6">
     {% for article in articles %}
-        <article class="article-summary">
-            <h2><a href="{% url 'articles:detail' article.slug %}">{{ article.title }}</a></h2>
-            <div class="article-meta">
+        <article class="rounded-box border border-base-300 bg-base-100 p-5 shadow-sm">
+            <h2 class="text-xl font-semibold"><a href="{% url 'articles:detail' article.slug %}">{{ article.title }}</a></h2>
+            <div class="article-meta mt-2 flex flex-wrap gap-4 text-sm text-base-content/70">
                 <span>作者: {{ article.author }}</span>
                 <span>发布时间: {{ article.publish_date|date:"Y-m-d H:i" }}</span>
             </div>
-            <!-- 可选：显示文章摘要 -->
-            <div class="article-excerpt">
+            <div class="article-excerpt mt-3 text-base-content/80">
                 {{ article.content|truncatewords:50 }}
             </div>
         </article>
     {% empty %}
-        <p>没有文章。</p>
+        <div class="rounded-box border border-dashed border-base-300 bg-base-100 p-6 text-base-content/70">实验模块当前还没有可展示的文章。</div>
     {% endfor %}
+    </div>
 </div>
 {% endblock %}

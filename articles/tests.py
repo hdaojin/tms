@@ -1,3 +1,38 @@
+from django.contrib.auth.models import User
 from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
 
-# Create your tests here.
+from .apps import CmsConfig
+from .models import Article
+
+
+class ArticlesExperimentMarkerTests(TestCase):
+	def setUp(self):
+		self.user = User.objects.create_user(username='article-user', password='testpass123')
+		self.article = Article.objects.create(
+			title='实验文章',
+			slug='test-article',
+			author=self.user,
+			content='这是一个实验模块页面。',
+			status=Article.Status.PUBLISHED,
+			publish_date=timezone.now(),
+		)
+		self.client.force_login(self.user)
+
+	def test_app_config_marks_module_as_experimental(self):
+		self.assertIn('低优先实验模块', CmsConfig.verbose_name)
+
+	def test_article_list_shows_experimental_notice(self):
+		response = self.client.get(reverse('articles:list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '低优先实验模块')
+		self.assertContains(response, '文章模块当前仅作为低优先实验模块保留')
+
+	def test_article_detail_shows_experimental_notice(self):
+		response = self.client.get(reverse('articles:detail', kwargs={'slug': self.article.slug}))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '低优先实验模块')
+		self.assertContains(response, '文章详情')

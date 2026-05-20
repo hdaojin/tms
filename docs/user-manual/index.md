@@ -12,6 +12,7 @@
 
 - [assessments/overview.md](assessments/overview.md): assessments APP 总览与角色边界。
 - [accounts/overview.md](accounts/overview.md): accounts 后台用户与权限授权说明。
+- [articles/overview.md](articles/overview.md): articles 实验模块定位与使用限制说明。
 - [behaviors/overview.md](behaviors/overview.md): behaviors APP 总览与角色边界。
 - [competitions/overview.md](competitions/overview.md): competitions APP 总览与关键概念。
 - [competitions/glossary.md](competitions/glossary.md): competitions APP 术语表与易混概念说明。
