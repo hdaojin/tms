@@ -2,7 +2,7 @@ from datetime import date
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -18,6 +18,7 @@ from django.urls import reverse
 
 from assessments.models import Assessment, AssessmentModule
 from competitions.models import Competition, CompetitionProject
+from core.management.commands.reconcile_curriculum_training_cutovers import Command as CurriculumTrainingCutoverCommand
 from core.forms.fields import MultipleFileField
 from core.uploads import (
     ASSESSMENT_TP_UPLOAD_SPEC,
@@ -110,6 +111,83 @@ class CurriculumTrainingCutoverCommandTests(TestCase):
         self.assertIn(
             "当前数据库已经与 curriculum/trainingcycles 的迁移状态一致，无需收尾。",
             output.getvalue(),
+        )
+
+
+class CursorRecorder:
+    def __init__(self):
+        self.statements = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def execute(self, sql):
+        self.statements.append(sql)
+
+
+class QuoteOps:
+    def quote_name(self, name):
+        return f'"{name}"'
+
+
+class FakeConnection:
+    def __init__(self, vendor):
+        self.vendor = vendor
+        self.ops = QuoteOps()
+        self.cursor_recorder = CursorRecorder()
+
+    def cursor(self):
+        return self.cursor_recorder
+
+
+class CurriculumTrainingCutoverConstraintSqlTests(TestCase):
+    def test_postgresql_rebuild_uses_constraint_sql(self):
+        command = CurriculumTrainingCutoverCommand()
+        connection = FakeConnection("postgresql")
+        command._get_unique_constraints = Mock(
+            return_value=[
+                (
+                    "traininglogs_traininglog_uploaded_by_id_training__07aa5e07_uniq",
+                    {"index": False, "unique": True, "columns": ["uploaded_by_id", "training_date"]},
+                )
+            ]
+        )
+        command._has_unique_constraint = Mock(return_value=False)
+
+        command._rebuild_traininglog_constraints(connection, {"rebuild_traininglog_unique": True})
+
+        self.assertEqual(
+            connection.cursor_recorder.statements,
+            [
+                'ALTER TABLE "traininglogs_traininglog" DROP CONSTRAINT "traininglogs_traininglog_uploaded_by_id_training__07aa5e07_uniq"',
+                'ALTER TABLE "traininglogs_traininglog" ADD CONSTRAINT "unique_training_log_per_cycle_user_date" UNIQUE ("training_cycle_id", "uploaded_by_id", "training_date")',
+            ],
+        )
+
+    def test_sqlite_rebuild_keeps_index_sql(self):
+        command = CurriculumTrainingCutoverCommand()
+        connection = FakeConnection("sqlite")
+        command._get_unique_constraints = Mock(
+            return_value=[
+                (
+                    "traininglogs_traininglog_uploaded_by_id_training_date_legacy_uniq",
+                    {"index": True, "unique": True, "columns": ["uploaded_by_id", "training_date"]},
+                )
+            ]
+        )
+        command._has_unique_constraint = Mock(return_value=False)
+
+        command._rebuild_traininglog_constraints(connection, {"rebuild_traininglog_unique": True})
+
+        self.assertEqual(
+            connection.cursor_recorder.statements,
+            [
+                'DROP INDEX "traininglogs_traininglog_uploaded_by_id_training_date_legacy_uniq"',
+                'CREATE UNIQUE INDEX "unique_training_log_per_cycle_user_date" ON "traininglogs_traininglog" ("training_cycle_id", "uploaded_by_id", "training_date")',
+            ],
         )
 
 

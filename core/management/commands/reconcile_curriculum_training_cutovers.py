@@ -502,23 +502,32 @@ class Command(BaseCommand):
         if not training_plan["rebuild_traininglog_unique"]:
             return
 
-        old_constraints = self._get_unique_constraint_names(
+        old_constraints = self._get_unique_constraints(
             connection,
             "traininglogs_traininglog",
             ["uploaded_by_id", "training_date"],
         )
         with connection.cursor() as cursor:
-            for name in old_constraints:
-                cursor.execute(f"DROP INDEX {connection.ops.quote_name(name)}")
+            for name, details in old_constraints:
+                self._drop_unique_definition(
+                    cursor,
+                    connection,
+                    "traininglogs_traininglog",
+                    name,
+                    details,
+                )
 
             if not self._has_unique_constraint(
                 connection,
                 "traininglogs_traininglog",
                 ["training_cycle_id", "uploaded_by_id", "training_date"],
             ):
-                cursor.execute(
-                    "CREATE UNIQUE INDEX unique_training_log_per_cycle_user_date "
-                    "ON traininglogs_traininglog (training_cycle_id, uploaded_by_id, training_date)"
+                self._create_unique_definition(
+                    cursor,
+                    connection,
+                    "traininglogs_traininglog",
+                    "unique_training_log_per_cycle_user_date",
+                    ["training_cycle_id", "uploaded_by_id", "training_date"],
                 )
 
     def _record_migrations(self, connection, migration_plan):
@@ -631,15 +640,40 @@ class Command(BaseCommand):
             return connection.introspection.get_constraints(cursor, table_name)
 
     def _has_unique_constraint(self, connection, table_name, columns):
-        return bool(self._get_unique_constraint_names(connection, table_name, columns))
+        return bool(self._get_unique_constraints(connection, table_name, columns))
 
-    def _get_unique_constraint_names(self, connection, table_name, columns):
+    def _get_unique_constraints(self, connection, table_name, columns):
         constraints = self._get_constraints(connection, table_name)
-        names = []
+        matches = []
         for name, details in constraints.items():
             if details.get("unique") and list(details.get("columns") or []) == list(columns):
-                names.append(name)
-        return names
+                matches.append((name, details))
+        return matches
+
+    def _get_unique_constraint_names(self, connection, table_name, columns):
+        return [name for name, _ in self._get_unique_constraints(connection, table_name, columns)]
+
+    def _drop_unique_definition(self, cursor, connection, table_name, name, details):
+        quoted_name = connection.ops.quote_name(name)
+        quoted_table = connection.ops.quote_name(table_name)
+        if connection.vendor == "postgresql" and not details.get("index"):
+            cursor.execute(f"ALTER TABLE {quoted_table} DROP CONSTRAINT {quoted_name}")
+            return
+        if connection.vendor == "mysql":
+            cursor.execute(f"ALTER TABLE {quoted_table} DROP INDEX {quoted_name}")
+            return
+        cursor.execute(f"DROP INDEX {quoted_name}")
+
+    def _create_unique_definition(self, cursor, connection, table_name, name, columns):
+        quoted_name = connection.ops.quote_name(name)
+        quoted_table = connection.ops.quote_name(table_name)
+        quoted_columns = ", ".join(connection.ops.quote_name(column) for column in columns)
+        if connection.vendor in {"postgresql", "mysql"}:
+            cursor.execute(
+                f"ALTER TABLE {quoted_table} ADD CONSTRAINT {quoted_name} UNIQUE ({quoted_columns})"
+            )
+            return
+        cursor.execute(f"CREATE UNIQUE INDEX {quoted_name} ON {quoted_table} ({quoted_columns})")
 
     def _fetch_scalar(self, connection, sql):
         with connection.cursor() as cursor:
