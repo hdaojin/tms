@@ -8,6 +8,9 @@ from core.constants import CONDUCT_SEVERITY_MODERATE
 from core.utils.mixins import TitleMixin
 from .forms import ConductRecordForm
 from .models import ConductItem, ConductRecord, ConductSummary, get_conduct_severity_choices_with_multiplier
+from .permissions import ADD_CONDUCT_RECORD_PERMISSION
+from .selectors import get_conduct_record_list_queryset, get_conduct_summary_list_queryset
+from .services import prepare_conduct_record_for_save
 from .tables import ConductRecordTable, ConductSummaryTable
 
 
@@ -16,13 +19,13 @@ class ConductRecordCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     form_class = ConductRecordForm
     template_name = 'behaviors/conductrecord_create.html'
     success_url = reverse_lazy('behaviors:conductrecord_list')
-    permission_required = 'behaviors.add_conduct_record'
+    permission_required = ADD_CONDUCT_RECORD_PERMISSION
     raise_exception = True
     title = "录入奖惩记录"
     title_icon = "icon-[tabler--plus]"
 
     def form_valid(self, form):
-        form.instance.recorded_by = self.request.user
+        prepare_conduct_record_for_save(form.instance, actor=self.request.user, change=False)
         return super().form_valid(form)
 
 
@@ -38,9 +41,7 @@ class ConductRecordListView(TitleMixin, SingleTableView):
         qs = super().get_queryset().select_related(
             'student', 'item__category', 'recorded_by',
         )
-        if not self.request.user.has_perm('behaviors.view_all_conduct_records'):
-            qs = qs.filter(student=self.request.user)
-        return qs
+        return get_conduct_record_list_queryset(qs, self.request.user)
 
 
 class ConductSummaryListView(TitleMixin, SingleTableView):
@@ -53,9 +54,7 @@ class ConductSummaryListView(TitleMixin, SingleTableView):
 
     def get_queryset(self):
         qs = super().get_queryset().select_related('student')
-        if not self.request.user.has_perm('behaviors.view_all_conduct_records'):
-            qs = qs.filter(student=self.request.user)
-        return qs
+        return get_conduct_summary_list_queryset(qs, self.request.user)
 
 
 def item_choices_view(request):

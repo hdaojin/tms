@@ -1,11 +1,15 @@
 from datetime import date
+from io import StringIO
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
+from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
 
+from accounts.admin_forms import GroupPermissionBundleAdminForm, UserPermissionBundleAdminForm
 from accounts.models import UserProfile
+from accounts.services.permission_bundles import sync_group_permission_bundles, sync_user_permission_bundles
 from behaviors.models import ConductSummary
 from core.constants import GROUP_COMPETITOR
 
@@ -80,3 +84,166 @@ class UserListTableTemplateRegressionTest(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '选手01')
 		self.assertContains(response, '?page=2')
+
+
+class PermissionBundleSyncServiceTests(TestCase):
+	def test_sync_group_permission_bundles_records_codes_and_preserves_extra_permissions(self):
+		group = Group.objects.create(name='奖惩录入组')
+		extra_permission = Permission.objects.get(codename='review_conduct_record')
+
+		sync_group_permission_bundles(group, ['behaviors.record_conduct'], [extra_permission])
+
+		group.refresh_from_db()
+		self.assertEqual(group.profile.selected_permission_bundles, ['behaviors.record_conduct'])
+		self.assertSetEqual(
+			set(group.permissions.values_list('codename', flat=True)),
+			{
+				'add_conduct_record',
+				'review_conduct_record',
+				'view_all_conduct_records',
+				'view_conductrecord',
+				'view_conductsummary',
+			},
+		)
+
+	def test_sync_user_permission_bundles_records_codes_and_preserves_extra_permissions(self):
+		user = User.objects.create_user('bundle-user', password='testpass123')
+		extra_permission = Permission.objects.get(codename='view_all_profiles')
+
+		sync_user_permission_bundles(user, ['traininglogs.upload_traininglog'], [extra_permission])
+
+		user.refresh_from_db()
+		self.assertEqual(user.profile.selected_permission_bundles, ['traininglogs.upload_traininglog'])
+		self.assertSetEqual(
+			set(user.user_permissions.values_list('codename', flat=True)),
+			{
+				'add_traininglog',
+				'view_traininglog',
+				'view_all_profiles',
+			},
+		)
+
+	def test_sync_group_permission_bundles_for_traininglog_view_all_grants_all_view_permissions(self):
+		group = Group.objects.create(name='训练日志全看组')
+
+		sync_group_permission_bundles(group, ['traininglogs.view_all_traininglogs'])
+
+		group.refresh_from_db()
+		self.assertEqual(group.profile.selected_permission_bundles, ['traininglogs.view_all_traininglogs'])
+		self.assertSetEqual(
+			set(group.permissions.values_list('codename', flat=True)),
+			{
+				'view_all_traininglog',
+				'view_coach_traininglog',
+				'view_competitor_traininglog',
+				'view_traininglog',
+			},
+		)
+
+
+class PermissionBundleAdminFormTests(TestCase):
+	def test_group_admin_form_only_shows_extra_permissions(self):
+		group = Group.objects.create(name='表单测试组')
+		extra_permission = Permission.objects.get(codename='review_conduct_record')
+		sync_group_permission_bundles(group, ['behaviors.record_conduct'], [extra_permission])
+
+		form = GroupPermissionBundleAdminForm(instance=group)
+
+		self.assertEqual(form.initial['selected_permission_bundles'], ['behaviors.record_conduct'])
+		self.assertQuerySetEqual(
+			form.fields['permissions'].initial.order_by('pk'),
+			Permission.objects.filter(pk=extra_permission.pk),
+			transform=lambda permission: permission,
+		)
+
+	def test_user_admin_form_only_shows_extra_permissions(self):
+		user = User.objects.create_user('form-user', password='testpass123')
+		extra_permission = Permission.objects.get(codename='view_all_profiles')
+		sync_user_permission_bundles(user, ['traininglogs.upload_traininglog'], [extra_permission])
+
+		form = UserPermissionBundleAdminForm(instance=user)
+
+		self.assertEqual(form.initial['selected_permission_bundles'], ['traininglogs.upload_traininglog'])
+		self.assertQuerySetEqual(
+			form.fields['user_permissions'].initial.order_by('pk'),
+			Permission.objects.filter(pk=extra_permission.pk),
+			transform=lambda permission: permission,
+		)
+
+
+class PermissionBundleAdminPageTests(TestCase):
+	def setUp(self):
+		self.admin = User.objects.create_superuser('permission-admin', password='testpass123')
+		self.client.force_login(self.admin)
+
+	def test_group_admin_change_page_shows_business_permission_bundle_field(self):
+		group = Group.objects.create(name='后台权限组')
+
+		response = self.client.get(reverse('admin:auth_group_change', args=[group.pk]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '业务权限包')
+		self.assertContains(response, '额外原生权限')
+
+	def test_user_admin_change_page_shows_business_permission_bundle_field(self):
+		user = User.objects.create_user('page-user', password='testpass123')
+
+		response = self.client.get(reverse('admin:auth_user_change', args=[user.pk]))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '业务权限包')
+		self.assertContains(response, '额外原生权限')
+
+
+class PermissionBundleBackfillCommandTests(TestCase):
+	def test_command_preview_does_not_write_profiles(self):
+		group = Group.objects.create(name='预检查组')
+		group.permissions.add(
+			Permission.objects.get(codename='add_traininglog'),
+			Permission.objects.get(codename='view_traininglog'),
+		)
+
+		output = StringIO()
+		call_command('backfill_permission_bundles', stdout=output)
+
+		self.assertFalse(hasattr(group, 'profile'))
+		self.assertIn('用户组 预检查组: 业务权限包 -> traininglogs.upload_traininglog', output.getvalue())
+		self.assertIn('以上为预检查结果', output.getvalue())
+
+	def test_command_execute_backfills_group_and_user_bundles(self):
+		group = Group.objects.create(name='训练日志组')
+		group.permissions.add(
+			Permission.objects.get(codename='add_traininglog'),
+			Permission.objects.get(codename='view_traininglog'),
+		)
+
+		user = User.objects.create_user('bundle-backfill-user', password='testpass123')
+		user.user_permissions.add(
+			Permission.objects.get(codename='add_conduct_record'),
+			Permission.objects.get(codename='review_conduct_record'),
+			Permission.objects.get(codename='view_all_conduct_records'),
+			Permission.objects.get(codename='view_conductrecord'),
+			Permission.objects.get(codename='view_conductsummary'),
+		)
+
+		output = StringIO()
+		call_command('backfill_permission_bundles', '--execute', stdout=output)
+
+		group.refresh_from_db()
+		user.refresh_from_db()
+		self.assertEqual(group.profile.selected_permission_bundles, ['traininglogs.upload_traininglog'])
+		self.assertEqual(
+			user.profile.selected_permission_bundles,
+			['behaviors.record_conduct', 'behaviors.review_conduct'],
+		)
+		self.assertSetEqual(
+			set(user.user_permissions.values_list('codename', flat=True)),
+			{
+				'add_conduct_record',
+				'review_conduct_record',
+				'view_all_conduct_records',
+				'view_conductrecord',
+				'view_conductsummary',
+			},
+		)
+		self.assertIn('已回填 2 个对象的业务权限包。', output.getvalue())

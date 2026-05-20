@@ -31,6 +31,12 @@ class UserProfile(models.Model):
     notes = models.TextField('备注', null=True, blank=True)
 
     locked = models.BooleanField('信息锁定', default=False, help_text='锁定后用户无法修改个人资料。')
+    selected_permission_bundles = models.JSONField(
+        '业务权限包',
+        default=list,
+        blank=True,
+        help_text='后台授权时勾选的业务权限包编码列表。',
+    )
 
     class Meta:
         verbose_name = '用户信息'
@@ -62,6 +68,12 @@ class GroupProfile(models.Model):
                                 help_text='用于脚本或系统集成的组codename, 必须以字母开头, 后续字符可以是字母、数字或下划线, 且长度不超过30个字符, 如: coach。'
                                 )
     description = models.TextField('描述', null=True, blank=True)
+    selected_permission_bundles = models.JSONField(
+        '业务权限包',
+        default=list,
+        blank=True,
+        help_text='后台授权时勾选的业务权限包编码列表。',
+    )
 
     class Meta:
         verbose_name = '用户组信息'

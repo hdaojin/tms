@@ -17,12 +17,12 @@ from django.db.models import Prefetch
 
 from core.utils.markdown import render_markdown_text
 from core.constants import NOTES_ROOT
+from .permissions import can_access_note_content, can_access_note_repo
 
 from .models import NoteRepo
 from .utils import (
 	InvalidNotePathError,
 	NoteNotFoundError,
-	check_note_permission,
 	normalize_repo_name,
 	render_note_markdown,
 	resolve_note_markdown_path,
@@ -190,7 +190,7 @@ def note_detail_view(
 		logger.warning("Note not found: repo=%s slug=%s", repo, slug)
 		raise Http404("Note not found") from exc
 
-	if not check_note_permission(request.user, note):
+	if not can_access_note_content(request.user, note):
 		logger.warning("Permission denied for user=%s repo=%s slug=%s", request.user, repo, slug)
 		return HttpResponseForbidden()
 
@@ -288,7 +288,7 @@ def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
 		logger.warning("Note not found: repo=%s slug=%s", repo, slug)
 		raise Http404("Note not found") from exc
 
-	if not check_note_permission(request.user, note):
+	if not can_access_note_content(request.user, note):
 		logger.warning("Permission denied for user=%s repo=%s slug=%s", request.user, repo, slug)
 		return HttpResponseForbidden()
 
@@ -351,7 +351,7 @@ def note_asset_view(request: HttpRequest, repo: str, asset_path: str) -> HttpRes
 		logger.info("Asset not a file: repo=%s path=%s", repo, asset_path)
 		raise Http404("File not found")
 
-	if not check_note_permission(request.user, None):  # TODO: enforce fine-grained permission
+	if not can_access_note_repo(request.user, safe_repo):
 		logger.info("Permission denied for asset: user=%s repo=%s path=%s", request.user, repo, asset_path)
 		return HttpResponseForbidden()
 

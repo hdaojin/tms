@@ -8,198 +8,17 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from core.constants import GROUP_COACH
-
 from .forms import AssessmentFileUploadForm, ModuleScoreBatchForm
 from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
-
-
-def _is_coach(user):
-    return user.is_authenticated and user.groups.filter(name=GROUP_COACH).exists()
-
-
-def _is_superuser(user):
-    return user.is_authenticated and user.is_superuser
-
-
-def _get_managed_modules_queryset(user, assessment=None):
-    queryset = AssessmentModule.objects.select_related(
-        "assessment", "module", "responsible_coach"
-    )
-    if assessment is not None:
-        queryset = queryset.filter(assessment=assessment)
-    if not _is_coach(user):
-        return queryset.none()
-    return queryset.filter(responsible_coach=user).order_by(
-        "sort_order", "module__code", "pk"
-    )
-
-
-def _can_access_assessment_detail(user, assessment):
-    return (
-        user.is_superuser
-        or user.has_perm("assessments.view_all_scores")
-        or _get_managed_modules_queryset(user, assessment).exists()
-    )
-
-
-def _can_manage_assessment_module(user, assessment_module):
-    return _is_coach(user) and assessment_module.responsible_coach_id == user.id
-
-
-def _can_lock_assessment_module(user, assessment_module):
-    return _is_superuser(user) or _can_manage_assessment_module(user, assessment_module)
-
-
-def _can_unlock_assessment_module(user):
-    return _is_superuser(user)
-
-
-def _set_score_lock_state(assessment_module, *, is_locked, user=None):
-    assessment_module.is_locked = is_locked
-    assessment_module.locked_at = timezone.now() if is_locked else None
-    assessment_module.locked_by = user if is_locked else None
-    assessment_module.save(update_fields=["is_locked", "locked_at", "locked_by"])
-
-
-def _set_material_lock_state(assessment_module, *, is_locked, user=None):
-    assessment_module.is_material_locked = is_locked
-    assessment_module.material_locked_at = timezone.now() if is_locked else None
-    assessment_module.material_locked_by = user if is_locked else None
-    assessment_module.save(
-        update_fields=[
-            "is_material_locked",
-            "material_locked_at",
-            "material_locked_by",
-        ]
-    )
-
-
-def _get_assessment_modules_queryset(assessment):
-    return (
-        AssessmentModule.objects.select_related("module", "responsible_coach")
-        .prefetch_related("attachments")
-        .filter(assessment=assessment)
-        .order_by("sort_order", "module__code", "pk")
-    )
-
-
-def _build_assessment_score_table_context(assessment, sort_param, user=None):
-    sort_param = (sort_param or "-total").strip() or "-total"
-    modules = list(_get_assessment_modules_queryset(assessment))
-
-    for assessment_module in modules:
-        attachments = list(assessment_module.attachments.all())
-        assessment_module.attachment_count = len(attachments)
-        assessment_module.has_attachments = bool(attachments)
-        assessment_module.has_any_material = bool(
-            assessment_module.question_file
-            or assessment_module.scoring_standard_file
-            or assessment_module.scoring_sheet_file
-            or assessment_module.scoring_script_file
-            or assessment_module.has_attachments
-        )
-        can_manage = _can_manage_assessment_module(user, assessment_module) if user else False
-        can_lock = _can_lock_assessment_module(user, assessment_module) if user else False
-        can_unlock = _can_unlock_assessment_module(user) if user else False
-        assessment_module.can_manage = can_manage
-        assessment_module.can_manage_scores = can_manage
-        assessment_module.can_manage_materials = can_manage
-        assessment_module.can_lock_scores = can_lock and not assessment_module.is_locked
-        assessment_module.can_unlock_scores = can_unlock and assessment_module.is_locked
-        assessment_module.can_lock_materials = (
-            can_lock and not assessment_module.is_material_locked
-        )
-        assessment_module.can_unlock_materials = (
-            can_unlock and assessment_module.is_material_locked
-        )
-
-    participants = assessment.participants.all().order_by(
-        "last_name", "first_name", "username"
-    )
-    all_scores = Score.objects.filter(assessment_module__assessment=assessment).select_related(
-        "user", "assessment_module"
-    )
-    score_map = {
-        (score.user_id, score.assessment_module_id): score for score in all_scores
-    }
-
-    table_rows = []
-    for participant in participants:
-        row = {
-            "user": participant,
-            "scores": [],
-        }
-        total_score = 0
-        rank_score = 0
-
-        for assessment_module in modules:
-            score_obj = score_map.get((participant.pk, assessment_module.pk))
-            value = score_obj.score if score_obj else 0
-            row["scores"].append(
-                {
-                    "module_id": assessment_module.pk,
-                    "val": value,
-                    "obj": score_obj,
-                    "can_manage": assessment_module.can_manage,
-                }
-            )
-            if score_obj:
-                total_score += value
-                if "english" not in assessment_module.module.name.lower():
-                    rank_score += value
-
-        row["total"] = total_score
-        row["rank_score"] = rank_score
-        table_rows.append(row)
-
-    if sort_param.startswith("-"):
-        sort_key = sort_param[1:]
-        reverse = True
-    else:
-        sort_key = sort_param
-        reverse = False
-
-    def get_sort_value(row):
-        if sort_key == "total":
-            return row["rank_score"]
-        if sort_key == "grand_total":
-            return row["total"]
-        if sort_key.startswith("module_"):
-            try:
-                module_id = int(sort_key.split("_")[1])
-            except (ValueError, IndexError):
-                return 0
-            for score in row["scores"]:
-                if score["module_id"] == module_id:
-                    return score["val"]
-        return 0
-
-    table_rows.sort(key=lambda item: item["rank_score"], reverse=True)
-    current_rank = 1
-    for index, row in enumerate(table_rows):
-        if index > 0 and row["rank_score"] < table_rows[index - 1]["rank_score"]:
-            current_rank = index + 1
-        row["rank"] = current_rank
-
-    if sort_param != "-total":
-        table_rows.sort(key=get_sort_value, reverse=reverse)
-
-    max_ranking_score = 0
-    max_grand_total_score = 0
-    for assessment_module in modules:
-        max_grand_total_score += assessment_module.max_score
-        if "english" not in assessment_module.module.name.lower():
-            max_ranking_score += assessment_module.max_score
-
-    return {
-        "assessment": assessment,
-        "modules": modules,
-        "table_rows": table_rows,
-        "current_sort": sort_param,
-        "max_ranking_score": max_ranking_score,
-        "max_grand_total_score": max_grand_total_score,
-    }
+from .permissions import (
+    can_access_assessment_detail,
+    can_lock_assessment_module,
+    can_manage_assessment_module,
+    can_unlock_assessment_module,
+    is_coach,
+)
+from .selectors import build_assessment_score_table_context
+from .services import set_material_lock_state, set_score_lock_state
 
 
 @login_required
@@ -215,7 +34,7 @@ def assessment_list(request):
         "assessments.view_all_scores"
     )
     managed_assessments = Assessment.objects.none()
-    if _is_coach(request.user):
+    if is_coach(request.user):
         managed_assessments = (
             Assessment.objects.filter(assessmentmodule__responsible_coach=request.user)
             .select_related("training_cycle")
@@ -322,11 +141,11 @@ def assessment_detail(request, pk):
     - 负责教练：可查看详情，并录入自己负责模块的成绩
     """
     assessment = get_object_or_404(Assessment, pk=pk)
-    if not _can_access_assessment_detail(request.user, assessment):
+    if not can_access_assessment_detail(request.user, assessment):
         raise PermissionDenied("你没有权限查看该考核详情")
 
     sort_param = request.GET.get("sort", "-total")
-    table_context = _build_assessment_score_table_context(
+    table_context = build_assessment_score_table_context(
         assessment, sort_param, user=request.user
     )
 
@@ -350,7 +169,7 @@ def module_score_entry(request, module_id):
         ),
         pk=module_id,
     )
-    if not _can_manage_assessment_module(request.user, assessment_module):
+    if not can_manage_assessment_module(request.user, assessment_module):
         raise PermissionDenied("只有负责该模块的教练可以录入成绩")
 
     if request.method == "POST":
@@ -385,20 +204,20 @@ def module_score_lock(request, module_id):
     action = request.POST.get("action")
 
     if action == "lock":
-        if not _can_lock_assessment_module(request.user, assessment_module):
+        if not can_lock_assessment_module(request.user, assessment_module):
             raise PermissionDenied("只有负责该模块的教练或管理员可以锁定成绩")
         if assessment_module.is_locked:
             messages.info(request, "该模块成绩已经锁定。")
         else:
-            _set_score_lock_state(assessment_module, is_locked=True, user=request.user)
+            set_score_lock_state(assessment_module, is_locked=True, user=request.user)
             messages.success(request, f"{assessment_module.module.name} 成绩已锁定。")
     elif action == "unlock":
-        if not _can_unlock_assessment_module(request.user):
+        if not can_unlock_assessment_module(request.user):
             raise PermissionDenied("只有管理员可以解锁成绩")
         if not assessment_module.is_locked:
             messages.info(request, "该模块成绩当前未锁定。")
         else:
-            _set_score_lock_state(assessment_module, is_locked=False)
+            set_score_lock_state(assessment_module, is_locked=False)
             messages.success(request, f"{assessment_module.module.name} 成绩已解锁。")
     else:
         raise PermissionDenied("无效的成绩锁定操作")
@@ -416,20 +235,20 @@ def module_material_lock(request, module_id):
     action = request.POST.get("action")
 
     if action == "lock":
-        if not _can_lock_assessment_module(request.user, assessment_module):
+        if not can_lock_assessment_module(request.user, assessment_module):
             raise PermissionDenied("只有负责该模块的教练或管理员可以锁定资料")
         if assessment_module.is_material_locked:
             messages.info(request, "该模块资料已经锁定。")
         else:
-            _set_material_lock_state(assessment_module, is_locked=True, user=request.user)
+            set_material_lock_state(assessment_module, is_locked=True, user=request.user)
             messages.success(request, f"{assessment_module.module.name} 资料已锁定。")
     elif action == "unlock":
-        if not _can_unlock_assessment_module(request.user):
+        if not can_unlock_assessment_module(request.user):
             raise PermissionDenied("只有管理员可以解锁资料")
         if not assessment_module.is_material_locked:
             messages.info(request, "该模块资料当前未锁定。")
         else:
-            _set_material_lock_state(assessment_module, is_locked=False)
+            set_material_lock_state(assessment_module, is_locked=False)
             messages.success(request, f"{assessment_module.module.name} 资料已解锁。")
     else:
         raise PermissionDenied("无效的资料锁定操作")
@@ -450,7 +269,7 @@ def assessment_file_upload(request, module_id):
         ),
         pk=module_id,
     )
-    if not _can_manage_assessment_module(request.user, assessment_module):
+    if not can_manage_assessment_module(request.user, assessment_module):
         raise PermissionDenied("只有负责该模块的教练可以上传考核资料")
 
     if request.method == "POST":
@@ -499,7 +318,7 @@ def delete_module_file(request, module_id, field_name):
         AssessmentModule.objects.select_related("assessment", "responsible_coach"),
         pk=module_id,
     )
-    if not _can_manage_assessment_module(request.user, assessment_module):
+    if not can_manage_assessment_module(request.user, assessment_module):
         raise PermissionDenied("只有负责该模块的教练可以删除考核资料")
     if assessment_module.is_material_locked:
         raise PermissionDenied("该模块资料已锁定，无法删除")
@@ -571,7 +390,7 @@ def delete_attachment(request, attachment_id):
         ),
         pk=attachment_id,
     )
-    if not _can_manage_assessment_module(request.user, attachment.assessment_module):
+    if not can_manage_assessment_module(request.user, attachment.assessment_module):
         raise PermissionDenied("只有负责该模块的教练可以删除附件")
     if attachment.assessment_module.is_material_locked:
         raise PermissionDenied("该模块资料已锁定，无法删除附件")

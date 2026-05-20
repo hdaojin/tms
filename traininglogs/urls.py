@@ -1,5 +1,6 @@
 from django.urls import path
 from .views import (
+    AllTraininglogListView,
     TrainingLogUploadView,
     TraininglogListView,
     TrainingLogDetailView,
@@ -14,6 +15,7 @@ app_name = 'traininglogs'
 
 urlpatterns = [
     path('', TraininglogListView.as_view(), name='traininglog_list'),
+    path('all/', AllTraininglogListView.as_view(), name='traininglog_all_list'),
     path('coaches/', CoachTraininglogListView.as_view(), name='traininglog_coach_list'),
     path('competitors/', CompetitorTraininglogListView.as_view(), name='traininglog_competitor_list'),
     path('stats/', TraininglogMonthlyStatView.as_view(), name='traininglog_stats'),

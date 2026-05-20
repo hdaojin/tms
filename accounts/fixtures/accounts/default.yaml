@@ -6,7 +6,7 @@
     name: "教练"
     permissions:
       - ["add_traininglog", "traininglogs", "traininglog"]
-      # - ["view_coach_traininglog", "traininglogs", "traininglog"]
+      - ["view_traininglog", "traininglogs", "traininglog"]
       - ["view_competitor_traininglog", "traininglogs", "traininglog"]
 
 - model: accounts.groupprofile
@@ -15,6 +15,9 @@
     group: 1
     codename: "coach"
     description: "教练组"
+    selected_permission_bundles:
+      - "traininglogs.upload_traininglog"
+      - "traininglogs.view_competitor_traininglogs"
 
 - model: auth.group
   pk: 2
@@ -22,6 +25,8 @@
     name: "选手"
     permissions:
       - ["add_traininglog", "traininglogs", "traininglog"]
+      - ["view_traininglog", "traininglogs", "traininglog"]
+      - ["view_coach_traininglog", "traininglogs", "traininglog"]
 
 - model: accounts.groupprofile
   pk: 2
@@ -29,6 +34,9 @@
     group: 2
     codename: "competitor"
     description: "选手组"
+    selected_permission_bundles:
+      - "traininglogs.upload_traininglog"
+      - "traininglogs.view_coach_traininglogs"
 
 - model: auth.group
   pk: 3

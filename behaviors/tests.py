@@ -27,6 +27,7 @@ from core.constants import (
 )
 from behaviors.admin import ConductCategoryAdmin, ConductItemAdmin, ConductRecordAdmin, ConductSeverityRuleAdmin
 from behaviors.models import ConductCategory, ConductItem, ConductRecord, ConductSeverityRule, ConductSummary
+from behaviors.services import prepare_conduct_record_for_save
 
 
 User = get_user_model()
@@ -462,6 +463,15 @@ class ConductRecordAdminTestCase(TestCase):
             transform=lambda value: value,
         )
 
+    def test_reviewer_queryset_contains_all_records(self):
+        queryset = self.admin.get_queryset(self.build_request(self.reviewer))
+
+        self.assertQuerySetEqual(
+            queryset.order_by('pk').values_list('pk', flat=True),
+            [self.record.pk, self.other_record.pk],
+            transform=lambda value: value,
+        )
+
     def test_record_fieldsets_include_severity(self):
         fieldsets = self.admin.get_fieldsets(self.build_request(self.recorder))
 
@@ -587,6 +597,60 @@ class ConductRecordAdminTestCase(TestCase):
         )
 
 
+class ConductWorkflowServiceTests(TestCase):
+    def setUp(self):
+        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        self.student = User.objects.create_user(username='workflow-student', password='testpass123')
+        self.student.groups.add(competitor_group)
+        self.recorder = User.objects.create_user(username='workflow-recorder', password='testpass123')
+        self.reviewer = User.objects.create_user(username='workflow-reviewer', password='testpass123')
+        category = ConductCategory.objects.create(
+            nature=CONDUCT_NATURE_REWARD,
+            name='服务测试分类',
+        )
+        ConductSeverityRule.objects.update_or_create(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=CONDUCT_SEVERITY_MODERATE,
+            defaults={'multiplier': Decimal('1.00'), 'order': 20},
+        )
+        self.item = ConductItem.objects.create(
+            category=category,
+            name='服务测试事项',
+            default_score=Decimal('3.00'),
+        )
+
+    def test_prepare_conduct_record_for_create_sets_recorder_and_pending_status(self):
+        record = ConductRecord(
+            student=self.student,
+            item=self.item,
+            severity=CONDUCT_SEVERITY_MODERATE,
+            reason='创建时由 service 补齐记录信息',
+            status=ConductRecord.STATUS_APPROVED,
+        )
+
+        prepare_conduct_record_for_save(record, actor=self.recorder, change=False)
+
+        self.assertEqual(record.recorded_by, self.recorder)
+        self.assertEqual(record.status, ConductRecord.STATUS_PENDING)
+
+    def test_prepare_conduct_record_for_update_sets_review_metadata_on_first_review(self):
+        record = ConductRecord.objects.create(
+            student=self.student,
+            item=self.item,
+            severity=CONDUCT_SEVERITY_MODERATE,
+            reason='等待审核',
+            recorded_by=self.recorder,
+        )
+        review_time = timezone.now()
+        record.status = ConductRecord.STATUS_APPROVED
+
+        prepare_conduct_record_for_save(record, actor=self.reviewer, change=True, now=review_time)
+
+        self.assertEqual(record.updated_by, self.reviewer)
+        self.assertEqual(record.reviewed_by, self.reviewer)
+        self.assertEqual(record.reviewed_at, review_time)
+
+
 class ConductUrlTests(TestCase):
     def test_conduct_record_list_is_mounted_at_app_root(self):
         self.assertEqual(reverse('behaviors:conductrecord_list'), '/behaviors/')
@@ -602,6 +666,8 @@ class ConductRecordListViewTests(TestCase):
         self.other_student = User.objects.create_user(username='list-other-student', password='testpass123')
         self.other_student.groups.add(competitor_group)
         self.recorder = User.objects.create_user(username='list-recorder', password='testpass123')
+        self.viewer = User.objects.create_user(username='list-viewer', password='testpass123')
+        self.viewer.user_permissions.add(Permission.objects.get(codename='view_all_conduct_records'))
 
         category = ConductCategory.objects.create(
             nature=CONDUCT_NATURE_REWARD,
@@ -668,6 +734,59 @@ class ConductRecordListViewTests(TestCase):
         self.assertContains(response, '0.0')
         self.assertNotContains(response, '+0.0')
         self.assertNotContains(response, '-0.0')
+
+    def test_view_all_permission_user_can_see_other_students_records(self):
+        self.client.force_login(self.viewer)
+
+        response = self.client.get(reverse('behaviors:conductrecord_list'))
+
+        self.assertContains(response, '课堂表现积极，主动帮助同学')
+        self.assertContains(response, '不应显示的其他学生原因')
+
+
+class ConductRecordCreateViewTests(TestCase):
+    def setUp(self):
+        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        self.student = User.objects.create_user(username='create-student', password='testpass123')
+        self.student.groups.add(competitor_group)
+        self.recorder = User.objects.create_user(username='create-recorder', password='testpass123')
+        self.recorder.user_permissions.add(Permission.objects.get(codename='add_conduct_record'))
+
+        self.category = ConductCategory.objects.create(
+            nature=CONDUCT_NATURE_REWARD,
+            name='录入测试分类',
+        )
+        ConductSeverityRule.objects.update_or_create(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=CONDUCT_SEVERITY_MODERATE,
+            defaults={'multiplier': Decimal('1.00'), 'order': 20},
+        )
+        self.item = ConductItem.objects.create(
+            category=self.category,
+            name='录入测试事项',
+            default_score=Decimal('4.00'),
+        )
+
+    def test_create_view_sets_recorded_by_and_pending_status(self):
+        self.client.force_login(self.recorder)
+
+        response = self.client.post(
+            reverse('behaviors:conductrecord_create'),
+            data={
+                'student': self.student.pk,
+                'nature': CONDUCT_NATURE_REWARD,
+                'item': self.item.pk,
+                'severity': CONDUCT_SEVERITY_MODERATE,
+                'occurred_date': timezone.localdate().isoformat(),
+                'reason': '前台录入测试',
+            },
+        )
+
+        self.assertRedirects(response, reverse('behaviors:conductrecord_list'))
+
+        record = ConductRecord.objects.get(reason='前台录入测试')
+        self.assertEqual(record.recorded_by, self.recorder)
+        self.assertEqual(record.status, ConductRecord.STATUS_PENDING)
 
 
 class ConductAuditAdminTestCase(TestCase):

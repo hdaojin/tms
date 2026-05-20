@@ -7,6 +7,7 @@ from django.contrib.auth.mixins import (
     PermissionRequiredMixin,
     UserPassesTestMixin,
 )
+from django.http import Http404
 from django.views.generic import CreateView, DetailView, DeleteView
 from django.urls import reverse_lazy, reverse
 from django.contrib import messages
@@ -15,11 +16,17 @@ from django.utils import timezone
 from django_tables2 import SingleTableView
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
-from core.utils.mixins import TitleMixin, CrossGroupAccessMixin, OwnerRequiredMixin
+from core.utils.mixins import TitleMixin, OwnerRequiredMixin
 from core.utils.pdf_response import create_pdf_preview_view
 
 from .models import TrainingLog
 from .forms import TrainingLogCreateForm
+from .permissions import (
+    can_access_traininglog,
+    can_access_traininglog_request,
+    can_view_all_traininglogs,
+    can_view_cross_group_traininglog_list,
+)
 from .tables import TrainingLogTable, TrainingLogOthersTable, MonthlyStatTable
 
 
@@ -117,45 +124,25 @@ class TraininglogListView(
             )
         return qs.none()
 
-
-def _check_traininglog_cross_group_access(request, obj):
-    """检查训练日志的跨组访问权限"""
-    user = request.user
-    if not user.is_authenticated:
-        return False
-    if getattr(user, "is_superuser", False):
-        return True
-    if getattr(obj, "uploaded_by_id", None) == getattr(user, "pk", None):
-        return True
-    
-    owner_user = getattr(obj, "uploaded_by", None)
-    owner_groups = (
-        set(owner_user.groups.values_list("name", flat=True))
-        if owner_user is not None
-        else set()
-    )
-    user_groups = (
-        set(user.groups.values_list("name", flat=True))
-        if getattr(user, "pk", None)
-        else set()
-    )
-    return (GROUP_COMPETITOR in user_groups and GROUP_COACH in owner_groups) or (
-        GROUP_COACH in user_groups and GROUP_COMPETITOR in owner_groups
-    )
-
-
 # 使用工厂函数创建 PDF 预览视图
 traininglog_pdf_inline = create_pdf_preview_view(
     TrainingLog,
-    permission_checker=_check_traininglog_cross_group_access
+    permission_checker=can_access_traininglog_request
 )
 
 
-class TrainingLogDetailView(TitleMixin, CrossGroupAccessMixin, LoginRequiredMixin, DetailView):
+class TrainingLogAccessMixin:
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        if not can_access_traininglog(self.request.user, obj):  # type: ignore[attr-defined]
+            raise Http404
+        return obj
+
+
+class TrainingLogDetailView(TitleMixin, TrainingLogAccessMixin, LoginRequiredMixin, DetailView):
     model = TrainingLog
     template_name = "traininglogs/traininglog_detail.html"
     context_object_name = "traininglog"
-    owner_field = "uploaded_by"
     title = "{uploaded_by}的{training_date}训练日志"
     title_icon = "icon-[tabler--file-text]"
 
@@ -179,16 +166,13 @@ class TrainingLogDeleteView(OwnerRequiredMixin, LoginRequiredMixin, DeleteView):
 
 class CrossGroupTraininglogListAccessMixin(UserPassesTestMixin):
     raise_exception = True
-    allowed_viewer_groups: tuple[str, ...] = ()
+    uploaded_group_name: str = ""
 
     def test_func(self):
-        user = self.request.user
-        if not user.is_authenticated:
-            return False
-        if getattr(user, "is_superuser", False):
-            return True
-        user_groups = set(user.groups.values_list("name", flat=True))
-        return bool(user_groups.intersection(self.allowed_viewer_groups))
+        return can_view_cross_group_traininglog_list(
+            self.request.user,
+            self.uploaded_group_name,
+        )
 
 
 class CoachTraininglogListView(
@@ -204,7 +188,7 @@ class CoachTraininglogListView(
     table_class = TrainingLogOthersTable
     template_name = "traininglogs/traininglog_list.html"
     raise_exception = True
-    allowed_viewer_groups = (GROUP_COMPETITOR,)
+    uploaded_group_name = GROUP_COACH
     paginate_by = pagination_per_page
     title = "教练训练日志"
     title_icon = "icon-[tabler--file-search]"
@@ -233,7 +217,7 @@ class CompetitorTraininglogListView(
     table_class = TrainingLogOthersTable
     template_name = "traininglogs/traininglog_list.html"
     raise_exception = True
-    allowed_viewer_groups = (GROUP_COACH,)
+    uploaded_group_name = GROUP_COMPETITOR
     paginate_by = pagination_per_page
     title = "选手训练日志"
     title_icon = "icon-[tabler--file-search]"
@@ -247,6 +231,32 @@ class CompetitorTraininglogListView(
             uploaded_by__groups__name=GROUP_COMPETITOR,
             training_date__range=(start, end),
         ).distinct()
+
+
+class AllTraininglogListView(
+    TraininglogMonthFilterMixin,
+    TitleMixin,
+    LoginRequiredMixin,
+    UserPassesTestMixin,
+    SingleTableView,
+):
+    model = TrainingLog
+    table_class = TrainingLogOthersTable
+    template_name = "traininglogs/traininglog_list.html"
+    raise_exception = True
+    paginate_by = pagination_per_page
+    title = "全部训练日志"
+    title_icon = "icon-[tabler--files]"
+
+    def test_func(self):
+        return can_view_all_traininglogs(self.request.user)
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('uploaded_by', 'training_cycle', 'module')
+        if not self.request.user.is_authenticated:
+            return qs.none()
+        start, end = self._get_selected_month_range()
+        return qs.filter(training_date__range=(start, end))
 
 
 class TraininglogMonthlyStatView(

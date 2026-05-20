@@ -2,10 +2,19 @@ from django import forms
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path, reverse
-from django.utils import timezone
 
 from core.constants import CONDUCT_SEVERITY_MODERATE
 from core.utils.mixins import CreatedUpdatedAdminMixin
+from .permissions import (
+    can_access_conduct_record_admin_module,
+    can_change_conduct_record_admin,
+    can_record_conduct,
+    can_review_conduct,
+    can_view_all_conduct_records,
+    can_view_conduct_record_admin,
+)
+from .selectors import get_conduct_record_admin_queryset
+from .services import prepare_conduct_record_for_save
 
 from .models import (
     ConductCategory,
@@ -220,50 +229,25 @@ class ConductRecordAdmin(admin.ModelAdmin):
         js = ('behaviors/js/conduct_record_admin.js',)
 
     def _can_record(self, request):
-        return request.user.is_superuser or request.user.has_perm('behaviors.add_conduct_record')
+        return can_record_conduct(request.user)
 
     def _can_review(self, request):
-        return request.user.is_superuser or request.user.has_perm('behaviors.review_conduct_record')
+        return can_review_conduct(request.user)
 
     def _can_view_all(self, request):
-        return (
-            request.user.is_superuser
-            or request.user.has_perm('behaviors.view_all_conduct_records')
-            or request.user.has_perm('behaviors.view_conductrecord')
-            or request.user.has_perm('behaviors.change_conductrecord')
-            or request.user.has_perm('behaviors.delete_conductrecord')
-            or self._can_review(request)
-        )
+        return can_view_all_conduct_records(request.user)
 
     def has_module_permission(self, request):
-        return self._can_record(request) or self._can_review(request) or self._can_view_all(request)
+        return can_access_conduct_record_admin_module(request.user)
 
     def has_view_permission(self, request, obj=None):
-        if not self.has_module_permission(request):
-            return False
-
-        if obj is None or self._can_view_all(request):
-            return True
-
-        return self._can_record(request) and obj.recorded_by_id == request.user.id
+        return can_view_conduct_record_admin(request.user, obj)
 
     def has_add_permission(self, request):
-        return self._can_record(request)
+        return can_record_conduct(request.user)
 
     def has_change_permission(self, request, obj=None):
-        if obj is None:
-            return self._can_record(request) or self._can_review(request)
-
-        if not self.has_view_permission(request, obj):
-            return False
-
-        if obj.status != ConductRecord.STATUS_PENDING:
-            return False
-
-        if self._can_review(request):
-            return True
-
-        return self._can_record(request) and obj.recorded_by_id == request.user.id
+        return can_change_conduct_record_admin(request.user, obj)
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request).select_related(
@@ -273,14 +257,7 @@ class ConductRecordAdmin(admin.ModelAdmin):
             'updated_by',
             'reviewed_by',
         )
-
-        if self._can_view_all(request):
-            return queryset
-
-        if self._can_record(request):
-            return queryset.filter(recorded_by=request.user)
-
-        return queryset.none()
+        return get_conduct_record_admin_queryset(queryset, request.user)
 
     def get_urls(self):
         return [
@@ -397,19 +374,7 @@ class ConductRecordAdmin(admin.ModelAdmin):
         return obj.reviewed_by.full_info if obj.reviewed_by else '-'
     
     def save_model(self, request, obj, form, change):
-        if not change:
-            obj.recorded_by = request.user
-            obj.status = ConductRecord.STATUS_PENDING
-        else:
-            obj.updated_by = request.user
-            original_status = ConductRecord.objects.filter(pk=obj.pk).values_list('status', flat=True).first()
-            if (
-                original_status == ConductRecord.STATUS_PENDING
-                and obj.status in [ConductRecord.STATUS_APPROVED, ConductRecord.STATUS_REJECTED]
-            ):
-                obj.reviewed_by = request.user
-                obj.reviewed_at = timezone.now()
-
+        prepare_conduct_record_for_save(obj, actor=request.user, change=change)
         super().save_model(request, obj, form, change)
 
 

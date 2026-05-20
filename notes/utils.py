@@ -221,40 +221,11 @@ def render_note_markdown(path: Path, repo: str, slug: str) -> NoteContent:
     )
 
 def check_note_permission(user, note_content: NoteContent | None) -> bool:
-    """笔记访问权限检查（按 repo 配置）。
+    """兼容旧调用，转发到 notes.permissions。"""
 
-    规则：
-    - 找不到 NoteRepo 配置：默认允许（视图层通常已保证用户已登录）。
-    - `is_visible=False`：仅超级管理员可访问。
-    - `allowed_groups` 非空：用户必须属于其中任意一个组。
-    - `allowed_groups` 为空：默认允许。
+    from .permissions import can_access_note_content
 
-    注：LoginRequiredMixin / @login_required 通常会在调用前保证已认证。
-    """
-
-    from .models import NoteRepo
-
-    if note_content is None:
-        return True
-
-    try:
-        note_repo = NoteRepo.objects.filter(slug=note_content.repo).prefetch_related("allowed_groups").first()
-    except Exception as exc:  # noqa: BLE001
-        # 发生数据库/ORM 异常时，保守起见拒绝访问。
-        return False
-
-    if note_repo is None:
-        return True
-
-    if note_repo.is_visible is False and not getattr(user, "is_superuser", False):
-        return False
-
-    allowed = list(note_repo.allowed_groups.all())
-    if allowed:
-        user_groups = set(user.groups.all())
-        return any(g in user_groups for g in allowed)
-
-    return True
+    return can_access_note_content(user, note_content)
 
 
 def get_nav_order_from_readme(repo_path: Path) -> list[dict[str, str]]:

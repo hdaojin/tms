@@ -25,6 +25,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import GroupProfile, UserProfile
+from accounts.services.permission_bundles import sync_group_permission_bundles
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
 
 
@@ -36,7 +37,8 @@ class BuiltinGroupSpec:
     name: str
     codename: str
     description: str
-    permissions: tuple[PermissionSpec, ...]
+    permission_bundles: tuple[str, ...] = ()
+    extra_permissions: tuple[PermissionSpec, ...] = ()
 
 
 BUILTIN_GROUP_SPECS = (
@@ -44,22 +46,25 @@ BUILTIN_GROUP_SPECS = (
         name=GROUP_COACH,
         codename="coach",
         description="教练组",
-        permissions=(
-            ("add_traininglog", "traininglogs", "traininglog"),
-            ("view_competitor_traininglog", "traininglogs", "traininglog"),
+        permission_bundles=(
+            "traininglogs.upload_traininglog",
+            "traininglogs.view_competitor_traininglogs",
         ),
     ),
     BuiltinGroupSpec(
         name=GROUP_COMPETITOR,
         codename="competitor",
         description="选手组",
-        permissions=(("add_traininglog", "traininglogs", "traininglog"),),
+        permission_bundles=(
+            "traininglogs.upload_traininglog",
+            "traininglogs.view_coach_traininglogs",
+        ),
     ),
     BuiltinGroupSpec(
         name="班务",
         codename="assistant",
         description="班务组",
-        permissions=(
+        extra_permissions=(
             ("add_notice", "notices", "notice"),
             ("add_meeting", "meeting", "meeting"),
         ),
@@ -134,7 +139,8 @@ def ensure_group_profile(group: Group, spec: BuiltinGroupSpec | None = None) -> 
     return profile
 
 
-def ensure_group_permissions(group: Group, permissions: tuple[PermissionSpec, ...]) -> None:
+def resolve_permissions(permissions: tuple[PermissionSpec, ...]) -> list[Permission]:
+    resolved_permissions: list[Permission] = []
     for codename, app_label, model_name in permissions:
         permission = Permission.objects.filter(
             codename=codename,
@@ -142,7 +148,8 @@ def ensure_group_permissions(group: Group, permissions: tuple[PermissionSpec, ..
             content_type__model=model_name,
         ).first()
         if permission is not None:
-            group.permissions.add(permission)
+            resolved_permissions.append(permission)
+    return resolved_permissions
 
 
 def ensure_builtin_groups() -> list[Group]:
@@ -150,7 +157,11 @@ def ensure_builtin_groups() -> list[Group]:
     for spec in BUILTIN_GROUP_SPECS:
         group, _ = Group.objects.get_or_create(name=spec.name)
         ensure_group_profile(group, spec)
-        ensure_group_permissions(group, spec.permissions)
+        sync_group_permission_bundles(
+            group,
+            spec.permission_bundles,
+            resolve_permissions(spec.extra_permissions),
+        )
         groups.append(group)
     return groups
 

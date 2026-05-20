@@ -19,6 +19,12 @@ from trainingcycles.models import TrainingCycle
 
 from .forms import TrainingLogCreateForm
 from .models import TrainingLog
+from .permissions import (
+	can_access_traininglog,
+	can_view_competitor_traininglogs,
+	can_view_coach_traininglogs,
+	can_view_cross_group_traininglog_list,
+)
 
 
 TEST_MEDIA_ROOT = Path(tempfile.mkdtemp())
@@ -252,9 +258,22 @@ class TrainingLogListViewTestCase(TestCase):
 
 		self.coach_user = User.objects.create_user(username='coach1', password='testpass123')
 		self.coach_user.groups.add(coach_group)
+		self.coach_user.user_permissions.add(
+			Permission.objects.get(codename='view_competitor_traininglog'),
+			Permission.objects.get(codename='view_traininglog'),
+		)
 
 		self.competitor_user = User.objects.create_user(username='competitor1', password='testpass123')
 		self.competitor_user.groups.add(competitor_group)
+		self.competitor_user.user_permissions.add(
+			Permission.objects.get(codename='view_coach_traininglog'),
+			Permission.objects.get(codename='view_traininglog'),
+		)
+		self.plain_user = User.objects.create_user(username='plain-user', password='testpass123')
+		self.all_view_user = User.objects.create_user(username='all-viewer', password='testpass123')
+		self.all_view_user.user_permissions.add(
+			Permission.objects.get(codename='view_all_traininglog'),
+		)
 
 		today = timezone.localdate()
 		self.current_month_date = date(today.year, today.month, 10)
@@ -319,6 +338,32 @@ class TrainingLogListViewTestCase(TestCase):
 		self.assertEqual(response.context['selected_year'], self.previous_month_date.year)
 		self.assertEqual(response.context['selected_month'], self.previous_month_date.month)
 
+	def test_all_list_defaults_to_current_month(self):
+		self.client.force_login(self.all_view_user)
+		response = self.client.get(reverse('traininglogs:traininglog_all_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'id="month-select"')
+		self.assertCountEqual(
+			list(response.context['object_list']),
+			[self.current_coach_log, self.current_competitor_log],
+		)
+		self.assertEqual(response.context['selected_year'], self.current_month_date.year)
+		self.assertEqual(response.context['selected_month'], self.current_month_date.month)
+
+	def test_all_list_requires_view_all_permission(self):
+		self.client.force_login(self.coach_user)
+		response = self.client.get(reverse('traininglogs:traininglog_all_list'))
+
+		self.assertEqual(response.status_code, 403)
+
+	def test_stats_is_visible_to_any_logged_in_user(self):
+		self.client.force_login(self.plain_user)
+		response = self.client.get(reverse('traininglogs:traininglog_stats'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '日志提交统计')
+
 	def test_competitor_list_defaults_to_current_month(self):
 		response = self.client.get(reverse('traininglogs:traininglog_competitor_list'))
 
@@ -381,6 +426,9 @@ class TrainingLogListViewTestCase(TestCase):
 	def test_my_list_route_is_mounted_at_app_root(self):
 		self.assertEqual(reverse('traininglogs:traininglog_list'), '/traininglogs/')
 
+	def test_all_list_route_is_mounted_under_all(self):
+		self.assertEqual(reverse('traininglogs:traininglog_all_list'), '/traininglogs/all/')
+
 	def test_competitor_can_view_coach_traininglog_detail(self):
 		self.client.force_login(self.competitor_user)
 		response = self.client.get(reverse('traininglogs:traininglog_detail', args=[self.current_coach_log.pk]))
@@ -394,3 +442,70 @@ class TrainingLogListViewTestCase(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertEqual(response.context['traininglog'], self.current_competitor_log)
+
+
+class TrainingLogPermissionHelperTests(TestCase):
+	def setUp(self):
+		competition_type = CompetitionType.objects.create(
+			code='WSC-PERM',
+			name='权限测试赛事',
+		)
+		project = Project.objects.create(
+			competition_type=competition_type,
+			code='ITNSA-PERM',
+			name='权限测试项目',
+		)
+		module = StandardModule.objects.create(project=project, code='M1', name='模块一')
+		training_cycle = TrainingCycle.objects.create(
+			code='TC-PERM',
+			name='权限测试周期',
+			project=project,
+			module_set=project.current_standard_module_set,
+			start_date=date(2026, 1, 1),
+		)
+
+		coach_group = Group.objects.create(name=GROUP_COACH)
+		competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+
+		self.coach_user = User.objects.create_user(username='perm-coach', password='testpass123')
+		self.coach_user.groups.add(coach_group)
+		self.coach_user.user_permissions.add(
+			Permission.objects.get(codename='view_competitor_traininglog'),
+			Permission.objects.get(codename='view_traininglog'),
+		)
+		self.competitor_user = User.objects.create_user(username='perm-competitor', password='testpass123')
+		self.competitor_user.groups.add(competitor_group)
+		self.competitor_user.user_permissions.add(
+			Permission.objects.get(codename='view_coach_traininglog'),
+			Permission.objects.get(codename='view_traininglog'),
+		)
+		self.other_competitor = User.objects.create_user(username='perm-peer', password='testpass123')
+		self.other_competitor.groups.add(competitor_group)
+		self.all_view_user = User.objects.create_user(username='perm-all', password='testpass123')
+		self.all_view_user.user_permissions.add(
+			Permission.objects.get(codename='view_all_traininglog'),
+		)
+
+		self.competitor_log = TrainingLog.objects.create(
+			training_cycle=training_cycle,
+			module=module,
+			task='权限测试日志',
+			training_date=date(2026, 1, 10),
+			file=SimpleUploadedFile('perm.pdf', b'%PDF-1.4 test file', content_type='application/pdf'),
+			uploaded_by=self.competitor_user,
+		)
+
+	def test_cross_group_user_can_access_traininglog(self):
+		self.assertTrue(can_access_traininglog(self.coach_user, self.competitor_log))
+
+	def test_same_group_user_cannot_access_peer_traininglog(self):
+		self.assertFalse(can_access_traininglog(self.other_competitor, self.competitor_log))
+
+	def test_cross_group_list_permission_respects_granted_view_permissions(self):
+		self.assertTrue(can_view_cross_group_traininglog_list(self.competitor_user, GROUP_COACH))
+		self.assertFalse(can_view_cross_group_traininglog_list(self.competitor_user, GROUP_COMPETITOR))
+
+	def test_view_all_permission_can_access_any_traininglog(self):
+		self.assertTrue(can_access_traininglog(self.all_view_user, self.competitor_log))
+		self.assertTrue(can_view_coach_traininglogs(self.all_view_user))
+		self.assertTrue(can_view_competitor_traininglogs(self.all_view_user))

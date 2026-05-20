@@ -14,7 +14,7 @@ TMS 的基础方向是对的：Django 6、全站 `LoginRequiredMiddleware`、`co
 
    当前活跃菜单来自 `core/config/menus/*.yml`，但 app 目录下还有 `menus.yml`，同时 [core/utils/menus_parse.py](E:/04-codes/tms/core/utils/menus_parse.py:10) 和 [core/templatetags/menus.py](E:/04-codes/tms/core/templatetags/menus.py:15) 像旧链路。建议只保留一种菜单来源。另外 [accounts.yml](E:/04-codes/tms/core/config/menus/accounts.yml:48) 里有 `accounts.add_ivitationcode` 拼写/权限疑似无效。
 
-3. 重新划分 competitions 的边界  
+3. 重新划分 competitions 的边界 OK 
 
    `traininglogs`、`assessments`、`skills` 都依赖 `competitions.StandardModule`。这说明 `Project / StandardModule / ModuleAxis` 更像“训练/课程/模块标准库”，不完全是 competitions 私有能力。建议中期拆出 `taxonomy`、`curriculum` 或 `trainingcore` app，让 competitions 只管赛事、赛项、人员、成绩归档。
 

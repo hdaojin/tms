@@ -15,14 +15,25 @@ items:
         is_visible: true
         login_required: true
 
+      - name: 全部训练日志
+        named_url: "traininglogs:traininglog_all_list"
+        icon:
+          pic: icon-[tabler--files]
+        is_visible: true
+        login_required: true
+        required_perms:
+          - traininglogs.view_all_traininglog
+
       - name: 教练训练日志
         named_url: "traininglogs:traininglog_coach_list"
         icon: 
           pic: icon-[tabler--file-search]
         is_visible: true
         login_required: true
-        visible_for_groups:
-          - 选手
+        perm_match_all: false
+        required_perms:
+          - traininglogs.view_coach_traininglog
+          - traininglogs.view_all_traininglog
 
       - name: 选手训练日志
         named_url: "traininglogs:traininglog_competitor_list"
@@ -30,8 +41,10 @@ items:
           pic: icon-[tabler--file-search]
         is_visible: true
         login_required: true
-        visible_for_groups:
-          - 教练
+        perm_match_all: false
+        required_perms:
+          - traininglogs.view_competitor_traininglog
+          - traininglogs.view_all_traininglog
 
       - name: 上传训练日志
         named_url: "traininglogs:traininglog_upload"
