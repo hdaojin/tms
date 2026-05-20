@@ -334,6 +334,10 @@ def note_asset_view(request: HttpRequest, repo: str, asset_path: str) -> HttpRes
 		logger.warning("Invalid asset repo: %s", repo)
 		raise Http404("Invalid repo") from exc
 
+	if not can_access_note_repo(request.user, safe_repo):
+		logger.info("Permission denied for asset: user=%s repo=%s path=%s", request.user, repo, asset_path)
+		return HttpResponseForbidden()
+
 	base = Path(NOTES_ROOT) / safe_repo
 	candidate = base / asset_path
 
@@ -350,10 +354,6 @@ def note_asset_view(request: HttpRequest, repo: str, asset_path: str) -> HttpRes
 	if not resolved.is_file():
 		logger.info("Asset not a file: repo=%s path=%s", repo, asset_path)
 		raise Http404("File not found")
-
-	if not can_access_note_repo(request.user, safe_repo):
-		logger.info("Permission denied for asset: user=%s repo=%s path=%s", request.user, repo, asset_path)
-		return HttpResponseForbidden()
 
 	mime_type, _ = mimetypes.guess_type(str(resolved))
 	return FileResponse(open(resolved, "rb"), content_type=mime_type or "application/octet-stream") # type: ignore

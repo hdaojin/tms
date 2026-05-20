@@ -83,6 +83,15 @@ class NoteAssetViewTests(TestCase):
 
 		self.assertEqual(response.status_code, 403)
 
+	def test_asset_view_hides_missing_asset_from_user_without_repo_access(self):
+		self.client.force_login(self.denied_user)
+
+		response = self.client.get(
+			reverse("note_asset", kwargs={"repo": "private-repo", "asset_path": "assets/missing.png"})
+		)
+
+		self.assertEqual(response.status_code, 403)
+
 	def test_asset_view_allows_user_with_repo_access(self):
 		self.client.force_login(self.allowed_user)
 

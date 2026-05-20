@@ -35,7 +35,7 @@ TMS 的基础方向是对的：Django 6、全站 `LoginRequiredMiddleware`、`co
 - `assessments`：功能完整，但 views 过厚。成绩排名里用 `"english" not in module.name.lower()` 作为排除逻辑较脆，建议改为模块属性/标签/配置。
 - `behaviors`：模型内聚较好，但审核流、汇总重算、admin 权限较重。建议抽一个 `ConductWorkflowService`，并复用 `AuditedModel` 到 `ConductRecord` 或统一审计字段。
 - `meetings` 和 `traininglogs`：都是“日期 + 上传文件 + 上传人 + PDF 预览”的文档型流程，适合抽公共文档上传基类/视图 mixin。
-- `notes`：路径安全处理不错，但 [note_asset_view](E:/04-codes/tms/notes/views.py:354) 仍有细粒度权限 TODO，建议资产访问也按 repo 权限校验，而不是传 `None`。
+- `notes`：路径安全处理不错；[note_asset_view](E:/04-codes/tms/notes/views.py:338) 现已在文件存在性检查前按 repo 权限拒绝未授权访问，避免通过 404/403 区分资产是否存在。OK
 - `samba`：Web 请求里同步跑 `sudo` 命令，风险和阻塞都偏高。建议抽成 integration service，加超时、审计日志、功能开关，最好后台任务化。
 - `articles`：目前像半成品内容 app，没用 `TitleMixin`，列表也未明显过滤发布状态。要么补齐结构，要么标记为低优先实验模块。
 
