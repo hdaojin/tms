@@ -108,7 +108,7 @@ class TraininglogListView(
     title_icon = "icon-[tabler--file-stack]"
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('uploaded_by', 'module')
+        qs = super().get_queryset().select_related('uploaded_by', 'training_cycle', 'module')
         if self.request.user.is_authenticated:
             start, end = self._get_selected_month_range()
             return qs.filter(
@@ -160,7 +160,7 @@ class TrainingLogDetailView(TitleMixin, CrossGroupAccessMixin, LoginRequiredMixi
     title_icon = "icon-[tabler--file-text]"
 
     def get_queryset(self):
-        return super().get_queryset().select_related('uploaded_by', 'module')
+        return super().get_queryset().select_related('uploaded_by', 'training_cycle', 'module')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -210,7 +210,7 @@ class CoachTraininglogListView(
     title_icon = "icon-[tabler--file-search]"
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('uploaded_by', 'module')
+        qs = super().get_queryset().select_related('uploaded_by', 'training_cycle', 'module')
         if not self.request.user.is_authenticated:
             return qs.none()
         start, end = self._get_selected_month_range()
@@ -239,7 +239,7 @@ class CompetitorTraininglogListView(
     title_icon = "icon-[tabler--file-search]"
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('uploaded_by', 'module')
+        qs = super().get_queryset().select_related('uploaded_by', 'training_cycle', 'module')
         if not self.request.user.is_authenticated:
             return qs.none()
         start, end = self._get_selected_month_range()

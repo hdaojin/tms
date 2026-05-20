@@ -3,7 +3,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.db.models import Max
 
-from competitions.models import StandardModule
+from curriculum.models import StandardModule
 from core.constants import GROUP_COACH
 
 from .models import Assessment, Score, AssessmentModule, AssessmentAttachment
@@ -19,6 +19,16 @@ def get_current_module_queryset():
         'sort_order',
         'code',
         'name',
+    )
+
+
+def get_training_cycle_module_queryset(training_cycle):
+    if training_cycle is None:
+        return StandardModule.objects.none()
+    return (
+        StandardModule.objects.filter(module_set=training_cycle.module_set)
+        .select_related('project', 'module_set')
+        .order_by('sort_order', 'code', 'name')
     )
 
 
@@ -41,6 +51,7 @@ class AssessmentModuleInline(admin.TabularInline):
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
         next_sort_order = 0
+        module_queryset = get_training_cycle_module_queryset(obj.training_cycle if obj else None)
         if obj and obj.pk:
             max_sort_order = obj.assessmentmodule_set.aggregate(
                 max_sort_order=Max('sort_order')
@@ -56,6 +67,11 @@ class AssessmentModuleInline(admin.TabularInline):
                         initial_value = next_sort_order + index
                         form.fields['sort_order'].initial = initial_value
                         form.initial['sort_order'] = initial_value
+                    if 'module' in form.fields:
+                        form.fields['module'].queryset = module_queryset
+                for form in self.initial_forms:
+                    if 'module' in form.fields:
+                        form.fields['module'].queryset = module_queryset
 
             @property
             def empty_form(self):
@@ -63,6 +79,8 @@ class AssessmentModuleInline(admin.TabularInline):
                 if 'sort_order' in form.fields and form.initial.get('sort_order') in (None, ''):
                     form.fields['sort_order'].initial = next_sort_order
                     form.initial['sort_order'] = next_sort_order
+                if 'module' in form.fields:
+                    form.fields['module'].queryset = module_queryset
                 return form
 
         return PrefilledAssessmentModuleInlineFormSet
@@ -73,7 +91,7 @@ class AssessmentModuleInline(admin.TabularInline):
                 "last_name", "first_name", "username"
             )
         elif db_field.name == "module":
-            kwargs["queryset"] = get_current_module_queryset()
+            kwargs["queryset"] = StandardModule.objects.none()
 
         form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
         if form_field and db_field.name == "responsible_coach":
@@ -104,9 +122,11 @@ class AssessmentForm(forms.ModelForm):
 @admin.register(Assessment)
 class AssessmentAdmin(admin.ModelAdmin):
     form = AssessmentForm
-    list_display = ('name', 'start_date', 'end_date', 'created_at', 'updated_at')
-    search_fields = ('name',)
-    list_filter = ('start_date', 'end_date')
+    list_display = ('name', 'training_cycle', 'start_date', 'end_date', 'created_at', 'updated_at')
+    search_fields = ('name', 'training_cycle__name', 'training_cycle__code')
+    list_filter = ('training_cycle', 'start_date', 'end_date')
+    autocomplete_fields = ['training_cycle']
+    list_select_related = ('training_cycle',)
     filter_horizontal = ('participants',)
     inlines = [AssessmentModuleInline]
     date_hierarchy = 'start_date'
@@ -195,7 +215,12 @@ class AssessmentModuleAdmin(admin.ModelAdmin):
                 "last_name", "first_name", "username"
             )
         elif db_field.name == "module":
-            kwargs["queryset"] = get_current_module_queryset()
+            assessment = None
+            if getattr(request, '_obj_', None) is not None:
+                assessment = request._obj_.assessment
+            elif request.GET.get('assessment'):
+                assessment = Assessment.objects.filter(pk=request.GET.get('assessment')).select_related('training_cycle__module_set').first()
+            kwargs["queryset"] = get_training_cycle_module_queryset(assessment.training_cycle if assessment else None)
 
         form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
         if form_field and db_field.name == "responsible_coach":

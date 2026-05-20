@@ -117,11 +117,17 @@ def assessment_paper_path(instance, filename):
 
 class Assessment(models.Model):
     name = models.CharField("考核名称", max_length=100, unique=True)
+    training_cycle = models.ForeignKey(
+        'trainingcycles.TrainingCycle',
+        verbose_name='备赛周期',
+        on_delete=models.PROTECT,
+        related_name='assessments',
+    )
     start_date = models.DateField("开始日期", help_text="考核开始的日期")
     end_date = models.DateField("结束日期", help_text="考核结束的日期")
     description = models.TextField("描述", blank=True)
     modules = models.ManyToManyField(
-        'competitions.StandardModule',
+        'curriculum.StandardModule',
         through='AssessmentModule',
         verbose_name="考核模块",
         related_name="assessments",
@@ -156,7 +162,7 @@ class AssessmentModule(models.Model):
         verbose_name="考核"
     )
     module = models.ForeignKey(
-        'competitions.StandardModule',
+        'curriculum.StandardModule',
         on_delete=models.PROTECT,
         verbose_name="模块"
     )
@@ -276,6 +282,16 @@ class AssessmentModule(models.Model):
     def clean(self):
         if self.responsible_coach and not self.responsible_coach.groups.filter(name=GROUP_COACH).exists():
             raise ValidationError({"responsible_coach": "负责教练必须属于教练组"})
+        if (
+            self.assessment_id
+            and self.module_id
+            and self.module.module_set_id != self.assessment.training_cycle.module_set_id
+        ):
+            raise ValidationError({"module": "考核模块必须属于当前备赛周期的模块标准集。"})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.assessment.name} - {self.module.name}"

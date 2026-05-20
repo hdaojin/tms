@@ -12,6 +12,15 @@ from django.urls import resolve, reverse
 
 from .admin import CompetitionProjectMemberAdminForm, CompetitorAdminForm, ExpertAdminForm
 from core.utils.menus import get_layout_sections, get_section_menu, get_sections
+from curriculum.models import (
+	CompetitionType,
+	Level,
+	ModuleAxis,
+	Project,
+	StandardModule,
+	StandardModuleAxisMap,
+	StandardModuleSet,
+)
 from .models import (
 	Competition,
 	CompetitionModuleAxisMap,
@@ -21,19 +30,12 @@ from .models import (
 	CompetitionProject,
 	CompetitionProjectMember,
 	CompetitionResult,
-	CompetitionType,
 	Competitor,
 	CompetitorUser,
 	Expert,
-	Level,
 	Member,
 	MemberScope,
-	ModuleAxis,
-	Project,
 	SkillPosition,
-	StandardModule,
-	StandardModuleAxisMap,
-	StandardModuleSet,
 )
 
 
@@ -47,6 +49,7 @@ class StandardModuleSetVersioningTests(TestCase):
 			name='世界技能大赛',
 		)
 		self.project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='ITNSA',
 			name='网络系统管理',
 		)
@@ -104,6 +107,7 @@ class StandardModuleSetVersioningTests(TestCase):
 
 	def test_module_set_must_belong_to_same_project(self):
 		other_project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='CLD',
 			name='云计算',
 		)
@@ -121,6 +125,77 @@ class StandardModuleSetVersioningTests(TestCase):
 				code='B',
 				name='错误模块',
 			)
+
+
+class CompetitionProjectLegacyCompatibilityTests(TestCase):
+	def test_existing_legacy_cross_type_project_link_can_still_pass_validation(self):
+		world_type = CompetitionType.objects.create(
+			code='WSC-LEGACY',
+			name='世界级历史赛事',
+		)
+		national_type = CompetitionType.objects.create(
+			code='NSC-LEGACY',
+			name='国家级历史赛事',
+		)
+		project = Project.objects.create(
+			competition_type=national_type,
+			code='ITNSA-LEGACY',
+			name='网络系统管理历史项目',
+		)
+		national_competition = Competition.objects.create(
+			competition_type=national_type,
+			name='第三届全国技能大赛',
+			code='NSC2025-LEGACY',
+		)
+		legacy_link = CompetitionProject.objects.create(
+			competition=national_competition,
+			project=project,
+		)
+
+		project.competition_type = world_type
+		project.save(update_fields=['competition_type'])
+
+		world_competition = Competition.objects.create(
+			competition_type=world_type,
+			name='第47届世界技能大赛',
+			code='WSC2024-LEGACY',
+		)
+		CompetitionProject.objects.create(
+			competition=world_competition,
+			project=project,
+		)
+
+		legacy_link.full_clean()
+
+	def test_new_cross_type_project_link_still_requires_matching_competition_type(self):
+		world_type = CompetitionType.objects.create(
+			code='WSC-STRICT',
+			name='世界级校验赛事',
+		)
+		national_type = CompetitionType.objects.create(
+			code='NSC-STRICT',
+			name='国家级校验赛事',
+		)
+		project = Project.objects.create(
+			competition_type=world_type,
+			code='ITNSA-STRICT',
+			name='网络系统管理校验项目',
+		)
+		national_competition = Competition.objects.create(
+			competition_type=national_type,
+			name='第四届全国技能大赛',
+			code='NSC2027-STRICT',
+		)
+
+		competition_project = CompetitionProject(
+			competition=national_competition,
+			project=project,
+		)
+
+		with self.assertRaises(ValidationError) as context:
+			competition_project.full_clean()
+
+		self.assertIn('project', context.exception.message_dict)
 
 
 class CompetitionUploadStorageTests(TestCase):
@@ -141,6 +216,7 @@ class CompetitionModuleStandardModuleMapTests(TestCase):
 			name='模块映射测试赛事',
 		)
 		self.project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='ITNSA-CM',
 			name='模块映射测试项目',
 		)
@@ -273,6 +349,7 @@ class CompetitionModuleStandardModuleMapTests(TestCase):
 
 	def test_mapping_module_must_match_competition_project_project(self):
 		other_project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='CLD-CM',
 			name='其他项目',
 		)
@@ -336,6 +413,7 @@ class CompetitionArchiveIntegrityTests(TestCase):
 			name='归档完整性测试赛事',
 		)
 		self.project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='ITNSA-ARCHIVE',
 			name='归档完整性测试项目',
 		)
@@ -407,6 +485,7 @@ class CompetitionMemberLevelTests(TestCase):
 			level=Level.INTERNATIONAL,
 		)
 		self.project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='ITNSA-LEVEL',
 			name='代表队层级测试项目',
 		)
@@ -597,6 +676,7 @@ class CompetitionAdminVisibilityTests(TestCase):
 			name='后台入口测试赛事',
 		)
 		project = Project.objects.create(
+			competition_type=competition_type,
 			code='ITNSA-ADMIN',
 			name='后台入口测试项目',
 		)
@@ -646,6 +726,32 @@ class CompetitionAdminVisibilityTests(TestCase):
 			any(getattr(inline, 'model', None) is CompetitionProject for inline in competition_admin.inlines)
 		)
 
+	def test_competition_project_rejects_project_from_other_competition_type(self):
+		competition_type = CompetitionType.objects.create(
+			code='WSC-TYPE-MATCH',
+			name='类型匹配赛事',
+		)
+		other_type = CompetitionType.objects.create(
+			code='NSC-TYPE-MATCH',
+			name='类型不匹配赛事',
+		)
+		project = Project.objects.create(
+			competition_type=other_type,
+			code='ITNSA-TYPE-MATCH',
+			name='类型不匹配项目',
+		)
+		competition = Competition.objects.create(
+			competition_type=competition_type,
+			name='第49届世界技能大赛',
+			code='WSC-TYPE-MATCH-1',
+		)
+
+		with self.assertRaises(ValidationError):
+			CompetitionProject.objects.create(
+				competition=competition,
+				project=project,
+			)
+
 
 class CompetitionFrontendViewTests(TestCase):
 	def setUp(self):
@@ -662,6 +768,7 @@ class CompetitionFrontendViewTests(TestCase):
 			level=Level.INTERNATIONAL,
 		)
 		self.project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='ITNSA-FRONTEND',
 			name='前台视图测试项目',
 		)
@@ -1062,6 +1169,12 @@ class CompetitionReusableDataTests(TestCase):
 			level=Level.NATIONAL,
 		)
 		self.project = Project.objects.create(
+			competition_type=self.international_type,
+			code='ITNSA-REUSE',
+			name='可复用项目',
+		)
+		self.national_project_definition = Project.objects.create(
+			competition_type=self.national_type,
 			code='ITNSA-REUSE',
 			name='可复用项目',
 		)
@@ -1081,14 +1194,12 @@ class CompetitionReusableDataTests(TestCase):
 		)
 		self.national_project = CompetitionProject.objects.create(
 			competition=self.national_competition,
-			project=self.project,
+			project=self.national_project_definition,
 		)
 
-	def test_project_can_be_reused_across_competition_types(self):
-		self.assertEqual(
-			CompetitionProject.objects.filter(project=self.project).count(),
-			2,
-		)
+	def test_project_code_can_be_reused_across_competition_types(self):
+		self.assertEqual(self.project.code, self.national_project_definition.code)
+		self.assertNotEqual(self.project.pk, self.national_project_definition.pk)
 
 	def test_competition_person_can_be_reused_for_experts_across_projects(self):
 		person = CompetitionPerson.objects.create(name='复用专家', organization='专家库')

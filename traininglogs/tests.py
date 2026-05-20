@@ -14,7 +14,8 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
-from competitions.models import CompetitionType, Project, StandardModule, StandardModuleSet
+from curriculum.models import CompetitionType, Project, StandardModule, StandardModuleSet
+from trainingcycles.models import TrainingCycle
 
 from .forms import TrainingLogCreateForm
 from .models import TrainingLog
@@ -31,11 +32,19 @@ class TrainingLogCreateFormTestCase(TestCase):
 			name='世界技能大赛',
 		)
 		self.project = Project.objects.create(
+			competition_type=competition_type,
 			code='ITNSA',
 			name='网络系统管理',
 		)
 		StandardModule.objects.create(project=self.project, code='A', name='网络配置')
 		StandardModule.objects.create(project=self.project, code='B', name='服务部署')
+		self.training_cycle = TrainingCycle.objects.create(
+			code='TC-FORM',
+			name='表单测试周期',
+			project=self.project,
+			module_set=self.project.current_standard_module_set,
+			start_date=date(2026, 1, 1),
+		)
 
 	def test_module_field_uses_radio_select_widget(self):
 		form = TrainingLogCreateForm()
@@ -87,10 +96,18 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 			name='重复校验赛事',
 		)
 		project = Project.objects.create(
+			competition_type=competition_type,
 			code='ITNSA-DUP',
 			name='重复校验项目',
 		)
 		self.module = StandardModule.objects.create(project=project, code='A', name='网络配置')
+		self.training_cycle = TrainingCycle.objects.create(
+			code='TC-DUP',
+			name='重复校验周期',
+			project=project,
+			module_set=project.current_standard_module_set,
+			start_date=date(2026, 1, 1),
+		)
 
 		self.user = User.objects.create_user(username='coach-dup', password='testpass123')
 		self.other_user = User.objects.create_user(username='coach-other', password='testpass123')
@@ -101,6 +118,7 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 		today = timezone.localdate()
 		self.training_date = date(today.year, today.month, min(today.day, 28))
 		self.existing_log = TrainingLog.objects.create(
+			training_cycle=self.training_cycle,
 			module=self.module,
 			task='已有日志',
 			training_date=self.training_date,
@@ -115,6 +133,7 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 		form = TrainingLogCreateForm(
 			data={
 				'training_date': self.training_date.isoformat(),
+				'training_cycle': self.training_cycle.pk,
 				'module': self.module.pk,
 				'task': '重复日志',
 			},
@@ -125,13 +144,14 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 		self.assertFalse(form.is_valid())
 		self.assertIn('training_date', form.errors)
 		self.assertEqual(len(form.errors['training_date']), 1)
-		self.assertIn('同一训练日期只能上传一条训练日志', form.errors['training_date'][0])
+		self.assertIn('同一备赛周期内，同一训练日期只能上传一条训练日志', form.errors['training_date'][0])
 
 	def test_form_allows_same_user_on_different_date(self):
 		other_date = self.training_date - timedelta(days=1)
 		form = TrainingLogCreateForm(
 			data={
 				'training_date': other_date.isoformat(),
+				'training_cycle': self.training_cycle.pk,
 				'module': self.module.pk,
 				'task': '新日期日志',
 			},
@@ -143,6 +163,7 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 
 	def test_model_clean_rejects_duplicate_training_log_for_same_user_and_date(self):
 		duplicate_log = TrainingLog(
+			training_cycle=self.training_cycle,
 			module=self.module,
 			task='模型重复日志',
 			training_date=self.training_date,
@@ -157,6 +178,7 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 
 	def test_same_date_is_allowed_for_different_user(self):
 		other_log = TrainingLog.objects.create(
+			training_cycle=self.training_cycle,
 			module=self.module,
 			task='其他人的日志',
 			training_date=self.training_date,
@@ -177,6 +199,7 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 			reverse('traininglogs:traininglog_upload'),
 			{
 				'training_date': self.training_date.isoformat(),
+				'training_cycle': self.training_cycle.pk,
 				'module': self.module.pk,
 				'task': '重复上传',
 				'file': self._build_upload_file('view-duplicate.pdf'),
@@ -184,7 +207,7 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 		)
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, '同一训练日期只能上传一条训练日志')
+		self.assertContains(response, '同一备赛周期内，同一训练日期只能上传一条训练日志')
 		self.assertEqual(
 			TrainingLog.objects.filter(uploaded_by=self.user, training_date=self.training_date).count(),
 			1,
@@ -204,10 +227,18 @@ class TrainingLogListViewTestCase(TestCase):
 			name='列表测试赛事',
 		)
 		project = Project.objects.create(
+			competition_type=competition_type,
 			code='ITNSA-LIST',
 			name='列表测试项目',
 		)
 		self.module = StandardModule.objects.create(project=project, code='M1', name='模块一')
+		self.training_cycle = TrainingCycle.objects.create(
+			code='TC-LIST',
+			name='列表测试周期',
+			project=project,
+			module_set=project.current_standard_module_set,
+			start_date=date(2026, 1, 1),
+		)
 
 		self.superuser = User.objects.create_superuser(
 			username='admin',
@@ -254,6 +285,7 @@ class TrainingLogListViewTestCase(TestCase):
 
 	def _create_traininglog(self, user, training_date, suffix):
 		return TrainingLog.objects.create(
+			training_cycle=self.training_cycle,
 			module=self.module,
 			task=f'任务-{suffix}',
 			training_date=training_date,

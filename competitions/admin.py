@@ -7,6 +7,8 @@ from django.urls import reverse
 from django.utils.html import format_html
 from urllib.parse import urlencode
 
+from curriculum.models import ModuleAxis, StandardModule
+
 from .models import (
     Competition,
     CompetitionModuleAxisMap,
@@ -16,16 +18,10 @@ from .models import (
     CompetitionProject,
     CompetitionProjectMember,
     CompetitionResult,
-    CompetitionType,
     Competitor,
     CompetitorUser,
     Expert,
     Member,
-    ModuleAxis,
-    Project,
-    StandardModule,
-    StandardModuleAxisMap,
-    StandardModuleSet,
     SkillPosition,
 )
 
@@ -168,50 +164,6 @@ class CompetitionModuleStandardModuleMapInlineFormSet(BaseInlineFormSet):
             raise ValidationError('同一官方模块只能设置一个主映射。')
         if len(primary_forms) == 0:
             raise ValidationError('请至少选择一条主映射。')
-
-
-class StandardModuleAxisMapAdminForm(forms.ModelForm):
-    class Meta:
-        model = StandardModuleAxisMap
-        fields = '__all__'
-
-    def __init__(self, *args, module=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        module = module or getattr(self.instance, 'module', None)
-        queryset = ModuleAxis.objects.none()
-        if module is not None and module.pk:
-            queryset = get_project_module_axis_queryset(module.project)
-        elif self.instance.pk and self.instance.module_axis_id:
-            queryset = ModuleAxis.objects.filter(pk=self.instance.module_axis_id).select_related('project')
-
-        self.fields['module_axis'].queryset = queryset
-        self.fields['module_axis'].label_from_instance = format_module_axis_label
-
-
-class StandardModuleAxisMapInlineFormSet(BaseInlineFormSet):
-    def get_form_kwargs(self, index):
-        kwargs = super().get_form_kwargs(index)
-        kwargs['module'] = self.instance
-        return kwargs
-
-    def clean(self):
-        super().clean()
-        if any(self.errors):
-            return
-
-        active_forms = [
-            form
-            for form in self.forms
-            if form.cleaned_data and not form.cleaned_data.get('DELETE', False)
-        ]
-        if not active_forms:
-            return
-
-        primary_forms = [form for form in active_forms if form.cleaned_data.get('is_primary')]
-        if len(primary_forms) > 1:
-            raise ValidationError('同一标准模块只能设置一个主主线映射。')
-        if len(primary_forms) == 0:
-            raise ValidationError('请至少选择一条主主线映射。')
 
 
 class CompetitionModuleAxisMapAdminForm(forms.ModelForm):
@@ -379,14 +331,6 @@ class CompetitionProjectMemberInline(admin.TabularInline):
 
 
 
-@admin.register(CompetitionType)
-class CompetitionTypeAdmin(admin.ModelAdmin):
-    list_display = ('name', 'code', 'level', 'weight', 'created_at')
-    list_filter = ('level',)
-    search_fields = ('name', 'code')
-    ordering = ('level', 'name')
-
-
 class CompetitionProjectInline(admin.TabularInline):
     model = CompetitionProject
     extra = 0
@@ -417,36 +361,6 @@ class CompetitionAdmin(admin.ModelAdmin):
     @admin.display(description='赛项数', ordering='competition_project_total')
     def competition_project_total(self, obj):
         return obj.competition_project_total
-
-
-class StandardModuleSetInline(admin.TabularInline):
-    model = StandardModuleSet
-    extra = 0
-    fields = ('code', 'name', 'sort_order', 'is_current')
-    show_change_link = True
-    ordering = ('-is_current', 'sort_order', 'name')
-
-
-@admin.register(Project)
-class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('name', 'code', 'current_standard_module_set_display', 'created_at')
-    search_fields = ('name', 'code')
-    ordering = ('name', 'code')
-    inlines = [StandardModuleSetInline]
-
-    @admin.display(description='当前标准模块集')
-    def current_standard_module_set_display(self, obj):
-        return obj.current_standard_module_set or '-'
-
-
-@admin.register(ModuleAxis)
-class ModuleAxisAdmin(admin.ModelAdmin):
-    list_display = ('name', 'code', 'project', 'is_active', 'sort_order')
-    list_filter = ('project', 'is_active')
-    search_fields = ('name', 'code', 'project__name')
-    autocomplete_fields = ['project']
-    list_select_related = ('project',)
-    ordering = ('project__name', 'sort_order', 'code', 'name')
 
 
 @admin.register(CompetitionPerson)
@@ -643,41 +557,6 @@ class CompetitionResultAdmin(admin.ModelAdmin):
         return obj.competitor.member
 
 
-@admin.register(StandardModuleSet)
-class StandardModuleSetAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
-    search_fields = ('name', 'code', 'project__name')
-    list_display = ('name', 'code', 'project', 'is_current', 'sort_order')
-    list_filter = ('project', 'is_current')
-    autocomplete_fields = ['project']
-    list_select_related = ('project',)
-    ordering = ('project__name', '-is_current', 'sort_order', 'name')
-
-
-class StandardModuleAxisMapInline(admin.TabularInline):
-    model = StandardModuleAxisMap
-    form = StandardModuleAxisMapAdminForm
-    formset = StandardModuleAxisMapInlineFormSet
-    extra = 1
-    fields = ('module_axis', 'is_primary', 'weight', 'note')
-    verbose_name = '模块主线映射'
-    verbose_name_plural = '模块主线映射（若已配置，需确保一条且仅一条主映射）'
-
-
-@admin.register(StandardModule)
-class StandardModuleAdmin(admin.ModelAdmin):
-    search_fields = ('name', 'code', 'project__name', 'module_set__name')
-    list_display = ('name', 'code', 'project', 'module_set', 'sort_order', 'is_current_module')
-    list_filter = ('project', 'module_set', 'module_set__is_current')
-    autocomplete_fields = ['project', 'module_set']
-    list_select_related = ('project', 'module_set')
-    ordering = ('project__name', '-module_set__is_current', 'module_set__sort_order', 'sort_order', 'code', 'name')
-    inlines = [StandardModuleAxisMapInline]
-
-    @admin.display(description='当前模块')
-    def is_current_module(self, obj):
-        return obj.is_current
-
-
 class CompetitionModuleStandardModuleMapInline(admin.TabularInline):
     model = CompetitionModuleStandardModuleMap
     form = CompetitionModuleStandardModuleMapAdminForm
@@ -779,14 +658,6 @@ class CompetitionModuleStandardModuleMapAdmin(HiddenFromAdminIndexMixin, admin.M
     list_display = ('competition_module', 'module', 'is_primary', 'weight')
     list_filter = ('is_primary', 'module__project', 'module__module_set')
     autocomplete_fields = ['competition_module']
-
-
-@admin.register(StandardModuleAxisMap)
-class StandardModuleAxisMapAdmin(HiddenFromAdminIndexMixin, admin.ModelAdmin):
-    search_fields = ('module__code', 'module__name', 'module_axis__code', 'module_axis__name')
-    list_display = ('module', 'module_axis', 'is_primary', 'weight')
-    list_filter = ('is_primary', 'module__project', 'module_axis')
-    autocomplete_fields = ['module', 'module_axis']
 
 
 @admin.register(CompetitionModuleAxisMap)

@@ -10,7 +10,8 @@ from django.urls import reverse
 from django.views.generic import FormView
 from django_tables2 import SingleTableView
 
-from competitions.models import CompetitionProject, StandardModule
+from competitions.models import CompetitionProject
+from curriculum.models import StandardModule
 from core.utils.mixins import TitleMixin
 from .forms import ExamPointEntryForm, SkillFilterForm
 from .models import ExamPoint, Skill, Topic

@@ -37,6 +37,7 @@ sections:
       size: 8
       color: "success"
     include:
+      - "trainingcycles"
       - "traininglogs"
       - "skills"
 

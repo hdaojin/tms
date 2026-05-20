@@ -50,8 +50,14 @@ def traininglog_upload_to(instance: "TrainingLog", filename: str) -> str:
 
 
 class TrainingLog(models.Model):
+    training_cycle = models.ForeignKey(
+        'trainingcycles.TrainingCycle',
+        on_delete=models.PROTECT,
+        related_name='training_logs',
+        verbose_name='备赛周期',
+    )
     module = models.ForeignKey(
-        'competitions.StandardModule', on_delete=models.SET_NULL,
+        'curriculum.StandardModule', on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='training_logs', verbose_name='训练模块'
     )
@@ -78,7 +84,12 @@ class TrainingLog(models.Model):
         verbose_name = '训练日志'
         verbose_name_plural = '训练日志'
         ordering = ('-training_date', '-uploaded_at')
-        unique_together = [('uploaded_by', 'training_date')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['training_cycle', 'uploaded_by', 'training_date'],
+                name='unique_training_log_per_cycle_user_date',
+            ),
+        ]
         permissions = [
             ('view_all_traininglog', '查看所有训练日志'),
             ('view_coach_traininglog', '查看教练训练日志'),
@@ -87,10 +98,13 @@ class TrainingLog(models.Model):
 
     def clean(self):
         super().clean()
+        if self.training_cycle_id and self.module_id and self.module.module_set_id != self.training_cycle.module_set_id:
+            raise ValidationError({'module': '训练模块必须属于当前备赛周期的模块标准集。'})
         if not self.uploaded_by_id or not self.training_date:
             return
 
         duplicate_qs = type(self).objects.filter(
+            training_cycle_id=self.training_cycle_id,
             uploaded_by_id=self.uploaded_by_id,
             training_date=self.training_date,
         )
@@ -99,7 +113,7 @@ class TrainingLog(models.Model):
 
         if duplicate_qs.exists():
             raise ValidationError({
-                'training_date': '同一训练日期只能上传一条训练日志。如需更正，请先删除原日志后再重新上传。'
+                'training_date': '同一备赛周期内，同一训练日期只能上传一条训练日志。如需更正，请先删除原日志后再重新上传。'
             })
 
     def __str__(self):

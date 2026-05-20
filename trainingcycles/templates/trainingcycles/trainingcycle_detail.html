@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="grid gap-4 md:grid-cols-2">
+    <div class="rounded-box border border-base-300 bg-base-100 p-4">
+      <div class="text-sm text-base-content/60">竞赛项目</div>
+      <div class="mt-1 font-medium">{{ training_cycle.project }}</div>
+    </div>
+    <div class="rounded-box border border-base-300 bg-base-100 p-4">
+      <div class="text-sm text-base-content/60">模块标准集</div>
+      <div class="mt-1 font-medium">{{ training_cycle.module_set }}</div>
+    </div>
+    <div class="rounded-box border border-base-300 bg-base-100 p-4">
+      <div class="text-sm text-base-content/60">主目标赛项</div>
+      <div class="mt-1 font-medium">{{ training_cycle.primary_competition_project|default:"未设置" }}</div>
+    </div>
+    <div class="rounded-box border border-base-300 bg-base-100 p-4">
+      <div class="text-sm text-base-content/60">参考赛项</div>
+      <div class="mt-1 font-medium">{{ training_cycle.reference_competition_project|default:"未设置" }}</div>
+    </div>
+  </div>
+
+  <div class="rounded-box border border-base-300 bg-base-100 p-4">
+    <div class="grid gap-3 md:grid-cols-4">
+      <div>
+        <div class="text-sm text-base-content/60">状态</div>
+        <div class="mt-1 font-medium">{{ training_cycle.get_status_display }}</div>
+      </div>
+      <div>
+        <div class="text-sm text-base-content/60">开始日期</div>
+        <div class="mt-1 font-medium">{{ training_cycle.start_date }}</div>
+      </div>
+      <div>
+        <div class="text-sm text-base-content/60">结束日期</div>
+        <div class="mt-1 font-medium">{{ training_cycle.end_date|default:"未设置" }}</div>
+      </div>
+      <div>
+        <div class="text-sm text-base-content/60">周期代码</div>
+        <div class="mt-1 font-medium">{{ training_cycle.code }}</div>
+      </div>
+    </div>
+    {% if training_cycle.description %}
+      <div class="mt-4 border-t border-base-300 pt-4">
+        <div class="text-sm text-base-content/60">描述</div>
+        <div class="mt-1 whitespace-pre-line">{{ training_cycle.description }}</div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

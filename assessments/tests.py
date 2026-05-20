@@ -16,8 +16,9 @@ from django.db.migrations.recorder import MigrationRecorder
 from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.urls import reverse
 
-from competitions.models import CompetitionType, Project, StandardModule, StandardModuleSet
+from curriculum.models import CompetitionType, Project, StandardModule, StandardModuleSet
 from core.constants import GROUP_COACH
+from trainingcycles.models import TrainingCycle
 
 from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
 
@@ -32,11 +33,21 @@ class AssessmentModuleOrderingTests(TestCase):
             name="世界技能大赛",
         )
         project = Project.objects.create(
+            competition_type=competition_type,
             code="ITNSA",
             name="信息网络布线",
         )
+        module_set = project.get_or_create_default_standard_module_set()
+        training_cycle = TrainingCycle.objects.create(
+            code="TC-ORDER",
+            name="排序测试周期",
+            project=project,
+            module_set=module_set,
+            start_date=date(2026, 1, 1),
+        )
         self.assessment = Assessment.objects.create(
             name="2026 春季考核",
+            training_cycle=training_cycle,
             start_date=date(2026, 4, 1),
             end_date=date(2026, 4, 2),
         )
@@ -76,6 +87,7 @@ class AssessmentModuleAdminModuleQuerysetTests(TestCase):
             name="后台测试赛事",
         )
         self.project = Project.objects.create(
+            competition_type=competition_type,
             code="ITNSA-ADMIN",
             name="后台测试项目",
         )
@@ -96,10 +108,26 @@ class AssessmentModuleAdminModuleQuerysetTests(TestCase):
             code="B",
             name="历史模块",
         )
-        self.request = RequestFactory().get("/admin/assessments/assessmentmodule/add/")
+        self.training_cycle = TrainingCycle.objects.create(
+            code="TC-ADMIN",
+            name="后台测试周期",
+            project=self.project,
+            module_set=self.project.current_standard_module_set,
+            start_date=date(2026, 1, 1),
+        )
+        self.assessment = Assessment.objects.create(
+            name="后台测试考核",
+            training_cycle=self.training_cycle,
+            start_date=date(2026, 2, 1),
+            end_date=date(2026, 2, 2),
+        )
+        self.request = RequestFactory().get(
+            "/admin/assessments/assessmentmodule/add/",
+            {"assessment": self.assessment.pk},
+        )
         self.admin = admin.site._registry[AssessmentModule]
 
-    def test_admin_module_field_only_shows_current_modules(self):
+    def test_admin_module_field_only_shows_training_cycle_modules(self):
         field = AssessmentModule._meta.get_field("module")
 
         form_field = self.admin.formfield_for_foreignkey(field, self.request)
@@ -158,14 +186,24 @@ class AssessmentCoachingWorkflowTests(TestCase):
             name="世界技能大赛",
         )
         project = Project.objects.create(
+            competition_type=competition_type,
             code="ITSA",
             name="信息网络综合布线",
+        )
+        module_set = project.get_or_create_default_standard_module_set()
+        self.training_cycle = TrainingCycle.objects.create(
+            code="TC-WORKFLOW",
+            name="流程测试周期",
+            project=project,
+            module_set=module_set,
+            start_date=date(2026, 1, 1),
         )
         module_a = StandardModule.objects.create(project=project, code="A", name="模块 A")
         module_b = StandardModule.objects.create(project=project, code="B", name="模块 B")
 
         self.assessment = Assessment.objects.create(
             name="2026 夏季考核",
+            training_cycle=self.training_cycle,
             start_date=date(2026, 6, 1),
             end_date=date(2026, 6, 2),
         )
@@ -542,11 +580,21 @@ class AssessmentAdminSortOrderTests(TestCase):
             name="世界技能大赛",
         )
         project = Project.objects.create(
+            competition_type=competition_type,
             code="ITSA",
             name="信息网络综合布线",
         )
+        module_set = project.get_or_create_default_standard_module_set()
+        self.training_cycle = TrainingCycle.objects.create(
+            code="TC-SORT",
+            name="排序后台周期",
+            project=project,
+            module_set=module_set,
+            start_date=date(2026, 1, 1),
+        )
         self.assessment = Assessment.objects.create(
             name="2026 秋季考核",
+            training_cycle=self.training_cycle,
             start_date=date(2026, 9, 1),
             end_date=date(2026, 9, 2),
         )
@@ -655,8 +703,25 @@ class AssessmentCutoverCommandTests(TestCase):
 
 class AssessmentCutoverRecoveryTests(TransactionTestCase):
     def test_cutover_command_recovers_dual_table_state_when_new_table_is_empty(self):
+        competition_type = CompetitionType.objects.create(
+            code="WSC-CUTOVER",
+            name="切换测试赛事",
+        )
+        project = Project.objects.create(
+            competition_type=competition_type,
+            code="CUTOVER",
+            name="切换测试项目",
+        )
+        training_cycle = TrainingCycle.objects.create(
+            code="TC-CUTOVER",
+            name="切换测试周期",
+            project=project,
+            module_set=project.get_or_create_default_standard_module_set(),
+            start_date=date(2026, 1, 1),
+        )
         assessment = Assessment.objects.create(
             name="2026 夏季考核",
+            training_cycle=training_cycle,
             start_date=date(2026, 7, 1),
             end_date=date(2026, 7, 2),
         )

@@ -1,0 +1,17 @@
+---
+menu_slug: "trainingcycles"
+app_name: "trainingcycles"
+items:
+  - name: "备赛周期"
+    icon:
+      pic: "icon-[tabler--calendar]"
+      size: 4
+    is_group_header: true
+    children:
+      - name: "周期列表"
+        named_url: "trainingcycles:list"
+        icon:
+          pic: "icon-[tabler--list-details]"
+          size: 4
+        is_visible: true
+        login_required: true

@@ -8,6 +8,8 @@ from competitions.models import (
 	CompetitionModule,
 	CompetitionModuleStandardModuleMap,
 	CompetitionProject,
+)
+from curriculum.models import (
 	CompetitionType,
 	Project,
 	StandardModule,
@@ -26,10 +28,12 @@ class ExamPointModelTests(TestCase):
 			name='世界技能大赛',
 		)
 		self.project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='ITNSA',
 			name='信息网络布线',
 		)
 		self.second_project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='CLD',
 			name='云计算',
 		)
@@ -165,10 +169,12 @@ class SkillListViewTests(TestCase):
 			name='世界技能大赛',
 		)
 		project = Project.objects.create(
+			competition_type=competition_type,
 			code='ITNSA',
 			name='信息网络布线',
 		)
 		other_project = Project.objects.create(
+			competition_type=competition_type,
 			code='CLD',
 			name='云计算',
 		)
@@ -227,14 +233,17 @@ class ExamPointCreateViewTests(TestCase):
 			code='WSC2026',
 		)
 		self.project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='ITNSA',
 			name='信息网络布线',
 		)
 		self.second_project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='NSAUX',
 			name='网络系统辅助项目',
 		)
 		self.other_project = Project.objects.create(
+			competition_type=self.competition_type,
 			code='CLD',
 			name='云计算',
 		)

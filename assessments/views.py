@@ -218,6 +218,7 @@ def assessment_list(request):
     if _is_coach(request.user):
         managed_assessments = (
             Assessment.objects.filter(assessmentmodule__responsible_coach=request.user)
+            .select_related("training_cycle")
             .prefetch_related("assessmentmodule_set__module")
             .distinct()
             .order_by("-start_date")
@@ -225,7 +226,7 @@ def assessment_list(request):
     show_management_actions = can_view_all or managed_assessments.exists()
 
     if can_view_all:
-        assessments = Assessment.objects.prefetch_related("assessmentmodule_set__module").order_by(
+        assessments = Assessment.objects.select_related("training_cycle").prefetch_related("assessmentmodule_set__module").order_by(
             "-start_date"
         )
     elif show_management_actions:
@@ -245,6 +246,7 @@ def assessment_list(request):
         )
         assessments = (
             Assessment.objects.filter(participants=request.user)
+            .select_related("training_cycle")
             .prefetch_related(modules_prefetch)
             .order_by("-start_date")
         )

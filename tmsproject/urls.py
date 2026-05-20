@@ -46,6 +46,7 @@ urlpatterns = [
     path("accounts/", include("accounts.urls", namespace="accounts")),
     path("samba/", include("samba.urls", namespace="samba")),
     path("articles/", include("articles.urls", namespace="articles")),
+    path("trainingcycles/", include("trainingcycles.urls", namespace="trainingcycles")),
     path("traininglogs/", include("traininglogs.urls", namespace="traininglogs")),
     path("meetings/", include("meetings.urls", namespace="meetings")),
     path("notices/", include("notices.urls", namespace="notices")),

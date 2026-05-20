@@ -4,7 +4,8 @@ from django import forms
 from django.db import transaction
 from django.urls import reverse
 
-from competitions.models import CompetitionProject, StandardModule
+from competitions.models import CompetitionProject
+from curriculum.models import StandardModule
 from core.utils.forms import StyledFormMixin
 from .models import ExamPoint, ExamPointSkill, Skill, Topic
 

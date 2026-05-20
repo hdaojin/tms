@@ -1,15 +1,23 @@
+from datetime import date
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.db import connection
+from django.db.migrations.recorder import MigrationRecorder
 from django.db.migrations.writer import MigrationWriter
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
+from assessments.models import Assessment, AssessmentModule
+from competitions.models import Competition, CompetitionProject
 from core.forms.fields import MultipleFileField
 from core.uploads import (
     ASSESSMENT_TP_UPLOAD_SPEC,
@@ -27,6 +35,12 @@ from core.uploads import (
     is_image_file,
     validate_upload_file,
 )
+from curriculum.models import CompetitionType, Project, StandardModule, StandardModuleAxisMap, StandardModuleSet
+from trainingcycles.models import TrainingCycle
+from traininglogs.models import TrainingLog
+
+
+User = get_user_model()
 
 
 class SiteRobotsDirectiveTests(TestCase):
@@ -85,6 +99,240 @@ class InternalCutoverOrchestratorCommandTests(TestCase):
         self.assertIn("==> migrate", value)
         self.assertIn("No migrations to apply.", value)
         self.assertIn("内部切换收尾与 migrate 已执行完成。", value)
+
+
+class CurriculumTrainingCutoverCommandTests(TestCase):
+    def test_reconcile_curriculum_training_cutovers_is_noop_for_current_state(self):
+        output = StringIO()
+
+        call_command("reconcile_curriculum_training_cutovers", stdout=output)
+
+        self.assertIn(
+            "当前数据库已经与 curriculum/trainingcycles 的迁移状态一致，无需收尾。",
+            output.getvalue(),
+        )
+
+
+class CurriculumTrainingCutoverRecoveryTests(TransactionTestCase):
+    def test_reconcile_command_recovers_legacy_curriculum_and_training_state(self):
+        with TemporaryDirectory() as temp_dir, override_settings(MEDIA_ROOT=temp_dir):
+            competition_type = CompetitionType.objects.create(
+                code="WSC-LEGACY",
+                name="历史迁移赛事",
+            )
+            project = Project.objects.create(
+                competition_type=competition_type,
+                code="LEGACY",
+                name="历史迁移项目",
+            )
+            module_set = project.get_or_create_default_standard_module_set()
+            module = StandardModule.objects.create(
+                project=project,
+                module_set=module_set,
+                code="A",
+                name="历史模块",
+            )
+            competition = Competition.objects.create(
+                competition_type=competition_type,
+                name="第 47 届世界技能大赛",
+                code="WSC47",
+            )
+            CompetitionProject.objects.create(
+                competition=competition,
+                project=project,
+            )
+            user = User.objects.create_user(username="legacy-user", password="testpass123")
+            training_cycle = TrainingCycle.objects.create(
+                code="TC-LEGACY",
+                name="旧训练周期",
+                project=project,
+                module_set=module_set,
+                start_date=date(2026, 4, 17),
+                end_date=date(2026, 5, 16),
+                status=TrainingCycle.Status.COMPLETED,
+            )
+            training_log = TrainingLog.objects.create(
+                training_cycle=training_cycle,
+                module=module,
+                task="历史日志",
+                training_date=date(2026, 4, 17),
+                file=SimpleUploadedFile("legacy.pdf", b"%PDF-1.4 legacy", content_type="application/pdf"),
+                uploaded_by=user,
+            )
+            assessment = Assessment.objects.create(
+                name="历史考核",
+                training_cycle=training_cycle,
+                start_date=date(2026, 5, 1),
+                end_date=date(2026, 5, 2),
+            )
+            AssessmentModule.objects.create(
+                assessment=assessment,
+                module=module,
+            )
+
+            old_content_type = ContentType.objects.create(app_label="competitions", model="project")
+            Permission.objects.create(
+                name="旧项目查看权限",
+                codename="view_project_legacy",
+                content_type=old_content_type,
+            )
+            ContentType.objects.filter(app_label="trainingcycles", model="trainingcycle").delete()
+            MigrationRecorder.Migration.objects.filter(app="curriculum", name="0001_initial").delete()
+            MigrationRecorder.Migration.objects.filter(app="trainingcycles", name="0001_initial").delete()
+            MigrationRecorder.Migration.objects.filter(app="assessments", name="0002_initial").delete()
+
+            self._convert_database_to_legacy_shape()
+
+            output = StringIO()
+            call_command("reconcile_curriculum_training_cutovers", "--execute", stdout=output)
+
+        self.assertIn("curriculum/trainingcycles 收尾已完成", output.getvalue())
+        self.assertTrue(self._table_exists("curriculum_project"))
+        self.assertFalse(self._table_exists("competitions_project"))
+        self.assertTrue(self._table_exists("trainingcycles_trainingcycle"))
+        self.assertTrue(
+            MigrationRecorder.Migration.objects.filter(app="curriculum", name="0001_initial").exists()
+        )
+        self.assertTrue(
+            MigrationRecorder.Migration.objects.filter(app="trainingcycles", name="0001_initial").exists()
+        )
+        self.assertTrue(
+            MigrationRecorder.Migration.objects.filter(app="assessments", name="0002_initial").exists()
+        )
+        self.assertFalse(ContentType.objects.filter(app_label="competitions", model="project").exists())
+        self.assertTrue(ContentType.objects.filter(app_label="trainingcycles", model="trainingcycle").exists())
+        self.assertTrue(
+            Permission.objects.filter(
+                codename="view_project_legacy",
+                content_type__app_label="curriculum",
+            ).exists()
+        )
+
+        project.refresh_from_db()
+        training_log.refresh_from_db()
+        assessment.refresh_from_db()
+        generated_cycle = TrainingCycle.objects.get()
+
+        self.assertEqual(project.competition_type_id, competition_type.pk)
+        self.assertEqual(training_log.training_cycle_id, generated_cycle.pk)
+        self.assertEqual(assessment.training_cycle_id, generated_cycle.pk)
+        self.assertEqual(generated_cycle.project_id, project.pk)
+        self.assertEqual(generated_cycle.module_set_id, module_set.pk)
+        self.assertEqual(generated_cycle.start_date, date(2026, 4, 17))
+        self.assertEqual(generated_cycle.end_date, date(2026, 5, 2))
+
+    def _convert_database_to_legacy_shape(self):
+        with connection.constraint_checks_disabled():
+            with connection.schema_editor(atomic=False) as schema_editor:
+                schema_editor.alter_db_table(
+                    CompetitionType,
+                    CompetitionType._meta.db_table,
+                    "competitions_competitiontype",
+                )
+                schema_editor.alter_db_table(
+                    Project,
+                    Project._meta.db_table,
+                    "competitions_project",
+                )
+                schema_editor.alter_db_table(
+                    StandardModuleSet,
+                    StandardModuleSet._meta.db_table,
+                    "competitions_standardmoduleset",
+                )
+                schema_editor.alter_db_table(
+                    StandardModule,
+                    StandardModule._meta.db_table,
+                    "competitions_standardmodule",
+                )
+                schema_editor.alter_db_table(
+                    StandardModuleAxisMap,
+                    StandardModuleAxisMap._meta.db_table,
+                    "competitions_standardmoduleaxismap",
+                )
+
+            with connection.cursor() as cursor:
+                cursor.execute("PRAGMA foreign_keys = OFF")
+                cursor.execute(
+                    """
+                    CREATE TABLE traininglogs_traininglog_legacy (
+                        id integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        task varchar(100) NOT NULL,
+                        training_date date NOT NULL,
+                        file varchar(100) NOT NULL,
+                        uploaded_at datetime NOT NULL,
+                        module_id bigint NULL,
+                        uploaded_by_id integer NULL
+                    )
+                    """
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO traininglogs_traininglog_legacy (id, task, training_date, file, uploaded_at, module_id, uploaded_by_id)
+                    SELECT id, task, training_date, file, uploaded_at, module_id, uploaded_by_id
+                    FROM traininglogs_traininglog
+                    """
+                )
+                cursor.execute("DROP TABLE traininglogs_traininglog")
+                cursor.execute("ALTER TABLE traininglogs_traininglog_legacy RENAME TO traininglogs_traininglog")
+                cursor.execute(
+                    "CREATE UNIQUE INDEX traininglogs_traininglog_uploaded_by_id_training_date_legacy_uniq "
+                    "ON traininglogs_traininglog (uploaded_by_id, training_date)"
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE assessments_assessment_legacy (
+                        id integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        name varchar(100) NOT NULL,
+                        description text NOT NULL,
+                        created_at datetime NOT NULL,
+                        updated_at datetime NOT NULL,
+                        end_date date NOT NULL,
+                        start_date date NOT NULL
+                    )
+                    """
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO assessments_assessment_legacy (id, name, description, created_at, updated_at, end_date, start_date)
+                    SELECT id, name, description, created_at, updated_at, end_date, start_date
+                    FROM assessments_assessment
+                    """
+                )
+                cursor.execute("DROP TABLE assessments_assessment")
+                cursor.execute("ALTER TABLE assessments_assessment_legacy RENAME TO assessments_assessment")
+
+                cursor.execute("DROP TABLE trainingcycles_trainingcycle")
+                cursor.execute(
+                    """
+                    CREATE TABLE competitions_project_legacy (
+                        id integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        code varchar(50) NOT NULL,
+                        name varchar(100) NOT NULL,
+                        description text NOT NULL,
+                        created_at datetime NOT NULL,
+                        updated_at datetime NOT NULL
+                    )
+                    """
+                )
+                cursor.execute(
+                    """
+                    INSERT INTO competitions_project_legacy (id, code, name, description, created_at, updated_at)
+                    SELECT id, code, name, description, created_at, updated_at
+                    FROM competitions_project
+                    """
+                )
+                cursor.execute("DROP TABLE competitions_project")
+                cursor.execute("ALTER TABLE competitions_project_legacy RENAME TO competitions_project")
+                cursor.execute("PRAGMA foreign_keys = ON")
+
+    def _table_exists(self, table_name):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = %s",
+                [table_name],
+            )
+            return cursor.fetchone() is not None
 
 
 class UploadSpecTests(TestCase):
