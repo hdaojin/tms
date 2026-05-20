@@ -114,33 +114,67 @@ def _filter_sections(slug_string: str | None, default_key: str | None = None) ->
     return [lookup[slug] for slug in desired if slug in lookup]
 
 
+def _build_sections_data(request, user, slugs: str | None = None, default_key: str | None = None, *, include_items: bool = False):
+    current_section_slug = _resolve_section_slug_for_request(request) if request else None
+    sections = []
+
+    for section in _filter_sections(slugs, default_key=default_key):
+        login_flag = section.get("login_required")
+        login_needed = True if login_flag is None else bool(login_flag)
+        if (login_needed or section.get("required_perms")) and not user.is_authenticated:
+            continue
+
+        slug = section.get("section")
+        items = get_section_menu(slug, user, request=request) if slug else []
+        if not items:
+            continue
+
+        active = any(item.active for item in items) or slug == current_section_slug
+        section_data = {
+            "slug": slug,
+            "label": section.get("label", slug),
+            "icon": section.get("icon"),
+            "description": section.get("description"),
+            "url": _first_item_url(items) or "#",
+            "active": active,
+            "count": len(items),
+        }
+        if include_items:
+            section_data["items"] = items
+        sections.append(section_data)
+
+    return sections
+
+
 @register.inclusion_tag("core/partials/sections_nav.html", takes_context=True)
 def render_sections_nav(context, slugs: str | None = None):
     """顶部导航：可按逗号分隔指定，或从 layout.yml.header_sections 读取。"""
     request = context.get("request")
     if not request:
         return {"sections": []}
-    user = request.user
-    sections = []
-    for section in _filter_sections(slugs, default_key="header_menu"):
-        login_flag = section.get("login_required")
-        login_needed = True if login_flag is None else bool(login_flag)
-        if (login_needed or section.get("required_perms")) and not user.is_authenticated:
-            continue
-        slug = section.get("section")
-        items = get_section_menu(slug, user, request=request)  #type: ignore
-        if not items:
-            continue
-        url = _first_item_url(items) or "#"
-        active = any(item.active for item in items)
-        sections.append({
-            "slug": slug,
-            "label": section.get("label", slug),
-            "icon": section.get("icon"),
-            "url": url,
-            "active": active,
-        })
+    sections = _build_sections_data(request, request.user, slugs, default_key="header_menu")
     return {"sections": sections}
+
+
+@register.inclusion_tag("core/partials/mobile_navigation_drawer.html", takes_context=True)
+def render_mobile_navigation(context, slugs: str | None = None):
+    request = context.get("request")
+    if not request:
+        return {"sections": [], "current_section": None, "site_info": None}
+
+    sections = _build_sections_data(
+        request,
+        request.user,
+        slugs,
+        default_key=None,
+        include_items=True,
+    )
+    current_section = next((section for section in sections if section.get("active")), None)
+    return {
+        "sections": sections,
+        "current_section": current_section,
+        "site_info": context.get("site_info"),
+    }
 
 
 @register.inclusion_tag("core/partials/sections_cards.html", takes_context=True)

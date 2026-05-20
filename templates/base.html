@@ -8,7 +8,7 @@
     {% htmx_script %}
   </head>
 
-  <body class="flex min-h-screen flex-col" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <body class="flex min-h-screen flex-col overflow-x-hidden" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
     {# Header：默认显示；设置 show_header=False 可隐藏 #}
     {% block header %}
       {% if show_header|default:True %}
@@ -16,7 +16,7 @@
       {% endif %}
     {% endblock %}
 
-    <div class="flex flex-1">
+    <div class="flex min-w-0 flex-1">
       {# 左侧边栏：默认显示；设置 show_left_sidebar=False 可隐藏 #}
       {% block left_sidebar %}
         {% if show_left_sidebar|default:True %}
@@ -25,9 +25,9 @@
       {% endblock %}
 
       {% block main %}
-        <main class="flex-1 p-4">
+        <main class="min-w-0 flex-1 p-4">
         {#  <div class="mx-auto flex w-full flex-col space-y-4 max-w-7xl"> #}
-          <div class="mx-auto flex flex-col w-full md:max-w-9/10 space-y-4">
+          <div class="mx-auto flex min-w-0 w-full flex-col space-y-4 md:max-w-9/10">
             {# 全局消息提示区域 #}
             {% if messages %}
               <div class="space-y-2">

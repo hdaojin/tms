@@ -117,14 +117,15 @@ class ActionsColumn(tables.Column):
         app_label = getattr(getattr(record, "_meta", None), "app_label", None)
         model_name = getattr(getattr(record, "_meta", None), "model_name", None)
         
-        parts: List[str] = []
+        buttons: List[str] = []
+        dialogs: List[str] = []
 
         # 查看按钮
         if self.view_url and self._has_perm(user, self.view_perm):
             try:
                 url = reverse(self.view_url, args=[pk])
-                parts.append(
-                    f'<a class="btn btn-soft btn-primary btn-xs" href="{url}">{self.view_label}</a>'
+                buttons.append(
+                    f'<a class="btn btn-soft btn-primary btn-xs whitespace-nowrap" href="{url}">{self.view_label}</a>'
                 )
             except Exception:
                 pass
@@ -133,8 +134,8 @@ class ActionsColumn(tables.Column):
         if self.edit_url and self._has_perm(user, self.edit_perm):
             try:
                 url = reverse(self.edit_url, args=[pk])
-                parts.append(
-                    f'<a class="btn btn-soft btn-warning btn-xs" href="{url}">{self.edit_label}</a>'
+                buttons.append(
+                    f'<a class="btn btn-soft btn-warning btn-xs whitespace-nowrap" href="{url}">{self.edit_label}</a>'
                 )
             except Exception:
                 pass
@@ -145,9 +146,11 @@ class ActionsColumn(tables.Column):
                 del_url = reverse(self.delete_url, args=[pk])
                 modal_id = f"modal-del-{app_label}-{model_name}-{pk}"
                 csrf = get_token(request) if request else ""
-                parts.append(
+                buttons.append(
+                    f'<button class="btn btn-soft btn-error btn-xs whitespace-nowrap" onclick="document.getElementById(\'{modal_id}\').showModal()">{self.delete_label}</button>'
+                )
+                dialogs.append(
                     "".join([
-                        f'<button class="btn btn-soft btn-error btn-xs" onclick="document.getElementById(\'{modal_id}\').showModal()">{self.delete_label}</button>',
                         f'<dialog id="{modal_id}" class="modal">',
                         '<div class="modal-box">',
                         f'<h3 class="font-bold text-lg">{self.delete_confirm_title}</h3>',
@@ -166,7 +169,17 @@ class ActionsColumn(tables.Column):
             except Exception:
                 pass
 
-        return mark_safe(" ".join(parts)) if parts else ""
+        if not buttons:
+            return ""
+
+        return mark_safe(
+            "".join([
+                '<div class="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:justify-center">',
+                "".join(buttons),
+                '</div>',
+                "".join(dialogs),
+            ])
+        )
 
 
 

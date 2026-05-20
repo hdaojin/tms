@@ -2,10 +2,13 @@ from datetime import date
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import django_tables2 as tables
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.core.cache import cache
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -13,8 +16,9 @@ from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.migrations.writer import MigrationWriter
-from django.test import TestCase, TransactionTestCase, override_settings
-from django.urls import reverse
+from django.template import Context, Template
+from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
+from django.urls import resolve, reverse
 
 from assessments.models import Assessment, AssessmentModule
 from behaviors.models import ConductSummary
@@ -37,6 +41,7 @@ from core.uploads import (
     is_image_file,
     validate_upload_file,
 )
+from core.utils.tables import ActionsColumn, BaseTable
 from core.utils.admin_deletion import discard_registered_delete_permissions, register_delete_permission_exemptions
 from curriculum.models import CompetitionType, Project, StandardModule, StandardModuleAxisMap, StandardModuleSet
 from trainingcycles.models import TrainingCycle
@@ -93,6 +98,84 @@ class SiteRobotsDirectiveTests(TestCase):
             '<meta name="googlebot" content="noindex, nofollow" />',
             html=True,
         )
+
+
+class MobileNavigationTemplateTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.factory = RequestFactory()
+
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
+
+    def test_render_mobile_navigation_shows_current_section_and_permitted_nested_items(self):
+        user = User.objects.create_user(username="mobile-nav-user", password="testpass123")
+        user.user_permissions.add(Permission.objects.get(codename="add_skillposition"))
+
+        request = self.factory.get(reverse("competitions:skillposition_create"))
+        request.user = user
+        request.resolver_match = resolve(request.path)
+
+        html = Template("{% load menu_tags %}{% render_mobile_navigation %}").render(
+            Context({"request": request})
+        )
+
+        self.assertIn("当前位于“竞赛”", html)
+        self.assertIn("竞赛信息", html)
+        self.assertIn("新增岗位人员", html)
+        self.assertNotIn("新增专家", html)
+
+    def test_authenticated_page_header_includes_mobile_navigation_trigger_and_panel(self):
+        user = User.objects.create_user(username="mobile-nav-header", password="testpass123")
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("accounts:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-mobile-nav-trigger")
+        self.assertContains(response, "data-mobile-nav-panel")
+
+
+class ResponsiveTableTemplateTests(TestCase):
+    def test_render_table_wraps_table_in_horizontal_scroll_container(self):
+        class DemoTable(BaseTable):
+            name = tables.Column(verbose_name="名称")
+
+            class Meta(BaseTable.Meta):
+                pass
+
+        table = DemoTable([{"name": "示例数据"}])
+        request = RequestFactory().get(reverse("home"))
+
+        html = Template("{% load django_tables2 %}{% render_table table %}").render(
+            Context({"table": table, "request": request})
+        )
+
+        self.assertIn('class="table-container w-full max-w-full overflow-x-auto"', html)
+
+
+class ActionsColumnRenderingTests(TestCase):
+    @patch("core.utils.tables.get_token", return_value="csrf-token")
+    @patch("core.utils.tables.reverse")
+    def test_actions_column_renders_nowrap_buttons_with_mobile_gap(self, mock_reverse, _mock_token):
+        mock_reverse.side_effect = lambda name, args: f"/{name}/{args[0]}/"
+
+        class DummyMeta:
+            app_label = "core"
+            model_name = "dummy"
+
+        record = SimpleNamespace(pk=7, _meta=DummyMeta())
+        user = User.objects.create_user(username="actions-user", password="testpass123")
+        table = SimpleNamespace(request=SimpleNamespace(user=user))
+        column = ActionsColumn(view_url="core:view", edit_url="core:edit", delete_url="core:delete")
+
+        html = column.render(None, record=record, table=table)
+
+        self.assertIn("flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:justify-center", html)
+        self.assertIn("btn btn-soft btn-primary btn-xs whitespace-nowrap", html)
+        self.assertIn("btn btn-soft btn-warning btn-xs whitespace-nowrap", html)
+        self.assertIn("btn btn-soft btn-error btn-xs whitespace-nowrap", html)
 
 
 class InternalCutoverOrchestratorCommandTests(TestCase):

@@ -1,15 +1,23 @@
 {% load static %}
 {% load menu_tags %}
 
-<nav class="navbar bg-base-100 shadow-lg px-2 md:px-8 sticky top-0 z-20 print:hidden">
+<nav
+  x-data="{ mobileNavOpen: false }"
+  x-effect="document.body.classList.toggle('overflow-hidden', mobileNavOpen)"
+  @keydown.escape.window="mobileNavOpen = false"
+  class="navbar sticky top-0 z-20 w-full max-w-full overflow-x-hidden bg-base-100 px-2 shadow-lg md:px-8 print:hidden"
+>
   <div class="navbar-start">
-    <div class="dropdown">
-      <div tabindex="0" role="button" class="btn btn-ghost md:hidden">
+    <div>
+      <button
+        type="button"
+        class="btn btn-ghost md:hidden"
+        aria-label="打开导航菜单"
+        data-mobile-nav-trigger
+        @click="mobileNavOpen = true"
+      >
         <span class="icon-[tabler--menu-2] size-6"></span>
-      </div>
-      <div tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow">
-        {% render_sections_nav %}
-      </div>
+      </button>
     </div>
     <div class="flex items-center gap-2">
       <div class="btn btn-ghost normal-case p-0">
@@ -34,7 +42,7 @@
               <img src="{% static 'images/avatar.png' %}" alt="avatar" />
             </div>
           </div>
-          <span class="text-primary font-medium">
+          <span class="hidden text-primary font-medium sm:inline">
             {{ user.display_name }}
           </span>
         </div>
@@ -68,8 +76,35 @@
     {% else %}
       <a href="{% url 'accounts:login' %}" class="btn btn-primary">
         <span class="icon-[tabler--login] size-5"></span>
-        登录
+        <span class="hidden sm:inline">登录</span>
       </a>
     {% endif %}
+  </div>
+
+  <div
+    x-show="mobileNavOpen"
+    x-transition.opacity
+    class="fixed inset-0 z-40 md:hidden"
+    style="display: none;"
+  >
+    <div
+      class="absolute inset-0 bg-base-content/35 backdrop-blur-sm"
+      aria-hidden="true"
+      @click="mobileNavOpen = false"
+    ></div>
+    <div
+      x-show="mobileNavOpen"
+      x-transition:enter="transform transition ease-out duration-200"
+      x-transition:enter-start="-translate-x-full"
+      x-transition:enter-end="translate-x-0"
+      x-transition:leave="transform transition ease-in duration-150"
+      x-transition:leave-start="translate-x-0"
+      x-transition:leave-end="-translate-x-full"
+      class="absolute inset-y-0 left-0 w-[min(92vw,24rem)] max-w-full shadow-2xl"
+      style="display: none;"
+      data-mobile-nav-panel
+    >
+      {% render_mobile_navigation %}
+    </div>
   </div>
 </nav>
