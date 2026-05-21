@@ -13,6 +13,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.db import connection
 from django.db.migrations.recorder import MigrationRecorder
 from django.db.migrations.writer import MigrationWriter
@@ -262,6 +263,75 @@ class CurriculumTrainingCutoverCommandTests(TestCase):
             "当前数据库已经与 curriculum/trainingcycles 的迁移状态一致，无需收尾。",
             output.getvalue(),
         )
+
+    @patch.object(CurriculumTrainingCutoverCommand, "_execute_cutover")
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_content_type_plan", return_value=None)
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_migration_plan", return_value=[])
+    @patch.object(
+        CurriculumTrainingCutoverCommand,
+        "_collect_training_plan",
+        return_value={
+            "add_project_competition_type_column": False,
+            "backfill_project_competition_types": True,
+            "project_competition_type_backfillable": [{"id": 1, "code": "INFERABLE", "name": "可推断项目"}],
+            "project_competition_type_unresolved": [{"id": 2, "code": "ORPHAN", "name": "孤立项目"}],
+            "create_trainingcycles_table": False,
+            "add_traininglog_cycle_column": False,
+            "add_assessment_cycle_column": False,
+            "rebuild_traininglog_unique": False,
+        },
+    )
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_table_actions", return_value=[])
+    def test_reconcile_curriculum_training_cutovers_reports_unresolved_projects_in_dry_run(
+        self,
+        _mock_table_actions,
+        _mock_training_plan,
+        _mock_migration_plan,
+        _mock_content_type_plan,
+        mock_execute_cutover,
+    ):
+        output = StringIO()
+
+        call_command("reconcile_curriculum_training_cutovers", stdout=output)
+
+        value = output.getvalue()
+        self.assertIn("可根据现有赛项关系自动补齐 Project 的所属赛事类型：1 个", value)
+        self.assertIn("以下 Project 无法自动推断所属赛事类型", value)
+        self.assertIn("ID=2，code=ORPHAN，name=孤立项目", value)
+        mock_execute_cutover.assert_not_called()
+
+    @patch.object(CurriculumTrainingCutoverCommand, "_execute_cutover")
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_content_type_plan", return_value=None)
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_migration_plan", return_value=[])
+    @patch.object(
+        CurriculumTrainingCutoverCommand,
+        "_collect_training_plan",
+        return_value={
+            "add_project_competition_type_column": False,
+            "backfill_project_competition_types": True,
+            "project_competition_type_backfillable": [{"id": 1, "code": "INFERABLE", "name": "可推断项目"}],
+            "project_competition_type_unresolved": [{"id": 2, "code": "ORPHAN", "name": "孤立项目"}],
+            "create_trainingcycles_table": False,
+            "add_traininglog_cycle_column": False,
+            "add_assessment_cycle_column": False,
+            "rebuild_traininglog_unique": False,
+        },
+    )
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_table_actions", return_value=[])
+    def test_reconcile_curriculum_training_cutovers_blocks_execute_for_unresolved_projects(
+        self,
+        _mock_table_actions,
+        _mock_training_plan,
+        _mock_migration_plan,
+        _mock_content_type_plan,
+        mock_execute_cutover,
+    ):
+        output = StringIO()
+
+        with self.assertRaisesMessage(CommandError, "ORPHAN"):
+            call_command("reconcile_curriculum_training_cutovers", "--execute", stdout=output)
+
+        mock_execute_cutover.assert_not_called()
 
 
 class CursorRecorder:

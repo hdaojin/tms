@@ -45,6 +45,11 @@ class ProjectCompetitionTypeTests(TestCase):
         self.assertEqual(first_project.code, second_project.code)
         self.assertNotEqual(first_project.pk, second_project.pk)
 
+    def test_project_str_falls_back_when_competition_type_missing(self):
+        project = Project(code='LEGACY', name='遗留项目')
+
+        self.assertEqual(str(project), '未分配赛事类型 / 遗留项目 (LEGACY)')
+
 
 class StandardModuleRankingDefaultTests(TestCase):
     def setUp(self):

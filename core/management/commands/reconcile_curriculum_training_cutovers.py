@@ -72,7 +72,7 @@ class Command(BaseCommand):
 
         existing_tables = set(connection.introspection.table_names())
         table_actions = self._collect_table_actions(connection, existing_tables)
-        training_plan = self._collect_training_plan(connection, existing_tables)
+        training_plan = self._collect_training_plan(connection, existing_tables, table_actions)
         migration_plan = self._collect_migration_plan(connection)
         content_type_plan = self._collect_content_type_plan(database)
 
@@ -80,6 +80,8 @@ class Command(BaseCommand):
             (
                 table_actions,
                 training_plan["add_project_competition_type_column"],
+                training_plan["backfill_project_competition_types"],
+                training_plan["project_competition_type_unresolved"],
                 training_plan["create_trainingcycles_table"],
                 training_plan["add_traininglog_cycle_column"],
                 training_plan["add_assessment_cycle_column"],
@@ -96,6 +98,13 @@ class Command(BaseCommand):
         if not execute:
             self.stdout.write(self.style.WARNING("以上为预检查结果。确认无误后，请追加 --execute 执行实际收尾。"))
             return
+
+        unresolved_projects = training_plan["project_competition_type_unresolved"]
+        if unresolved_projects:
+            raise CommandError(
+                "检测到无法自动推断所属赛事类型的 Project，请先人工补齐后再执行："
+                f"{self._format_project_entries(unresolved_projects)}"
+            )
 
         self._execute_cutover(
             database=database,
@@ -143,7 +152,7 @@ class Command(BaseCommand):
                 actions.append(TableAction(plan=plan, mode="rename-old-table"))
         return actions
 
-    def _collect_training_plan(self, connection, existing_tables):
+    def _collect_training_plan(self, connection, existing_tables, table_actions):
         traininglogs_table = "traininglogs_traininglog"
         assessments_table = "assessments_assessment"
         project_table = None
@@ -154,8 +163,18 @@ class Command(BaseCommand):
         traininglog_columns = self._get_table_columns(connection, traininglogs_table) if traininglogs_table in existing_tables else set()
         assessment_columns = self._get_table_columns(connection, assessments_table) if assessments_table in existing_tables else set()
         project_columns = self._get_table_columns(connection, project_table) if project_table else set()
+        project_data_table = self._get_project_data_table(project_table, table_actions)
+        project_data_columns = self._get_table_columns(connection, project_data_table) if project_data_table else set()
+        project_competition_type_status = self._collect_project_competition_type_status(
+            connection,
+            project_data_table,
+            has_competition_type_column="competition_type_id" in project_data_columns,
+        )
         return {
             "add_project_competition_type_column": project_table is not None and "competition_type_id" not in project_columns,
+            "backfill_project_competition_types": bool(project_competition_type_status["backfillable"]),
+            "project_competition_type_backfillable": project_competition_type_status["backfillable"],
+            "project_competition_type_unresolved": project_competition_type_status["unresolved"],
             "create_trainingcycles_table": TrainingCycle._meta.db_table not in existing_tables,
             "add_traininglog_cycle_column": traininglogs_table in existing_tables and "training_cycle_id" not in traininglog_columns,
             "add_assessment_cycle_column": assessments_table in existing_tables and "training_cycle_id" not in assessment_columns,
@@ -209,6 +228,15 @@ class Command(BaseCommand):
                 self.stdout.write(f"- 重命名数据表: {action.plan.old_name} -> {action.plan.new_name}")
         if training_plan["add_project_competition_type_column"]:
             self.stdout.write("- 为 curriculum_project 补充 competition_type_id，并按现有赛项关系回填所属赛事类型")
+        if training_plan["backfill_project_competition_types"]:
+            self.stdout.write(
+                f"- 可根据现有赛项关系自动补齐 Project 的所属赛事类型："
+                f"{len(training_plan['project_competition_type_backfillable'])} 个"
+            )
+        if training_plan["project_competition_type_unresolved"]:
+            self.stdout.write("- 以下 Project 无法自动推断所属赛事类型，执行前需人工补齐：")
+            for entry in training_plan["project_competition_type_unresolved"]:
+                self.stdout.write(f"  - {self._format_project_entry(entry)}")
         if training_plan["create_trainingcycles_table"]:
             self.stdout.write(f"- 创建数据表: {TrainingCycle._meta.db_table}")
         if training_plan["add_traininglog_cycle_column"]:
@@ -497,6 +525,50 @@ class Command(BaseCommand):
                 "WHERE id = %s AND competition_type_id IS NULL",
                 updates,
             )
+
+    def _get_project_data_table(self, project_table, table_actions):
+        for action in table_actions:
+            if action.plan.label == "Project":
+                return action.plan.old_name
+        return project_table
+
+    def _collect_project_competition_type_status(self, connection, project_table, *, has_competition_type_column):
+        if not project_table:
+            return {"backfillable": [], "unresolved": []}
+
+        condition = "WHERE p.competition_type_id IS NULL" if has_competition_type_column else ""
+        rows = self._fetch_rows(
+            connection,
+            f"""
+            SELECT p.id, p.code, p.name, MIN(c.competition_type_id)
+            FROM {project_table} p
+            LEFT JOIN competitions_competitionproject cp ON cp.project_id = p.id
+            LEFT JOIN competitions_competition c ON c.id = cp.competition_id
+            {condition}
+            GROUP BY p.id, p.code, p.name
+            ORDER BY p.id
+            """,
+        )
+
+        backfillable = []
+        unresolved = []
+        for project_id, code, name, inferred_competition_type_id in rows:
+            entry = {"id": project_id, "code": code, "name": name}
+            if inferred_competition_type_id is None:
+                unresolved.append(entry)
+            else:
+                backfillable.append(entry)
+
+        return {
+            "backfillable": backfillable,
+            "unresolved": unresolved,
+        }
+
+    def _format_project_entry(self, entry):
+        return f"ID={entry['id']}，code={entry['code']}，name={entry['name']}"
+
+    def _format_project_entries(self, entries):
+        return "；".join(self._format_project_entry(entry) for entry in entries)
 
     def _rebuild_traininglog_constraints(self, connection, training_plan):
         if not training_plan["rebuild_traininglog_unique"]:

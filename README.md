@@ -113,6 +113,7 @@ uv run manage.py cutover_meeting_to_meetings --execute
 - `cutover_conduct_to_behaviors` 会重命名旧的 `conduct_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识，并在存在旧目录时把公共附件目录从 `media/conduct/` 迁到 `media/behaviors/`。
 - `cutover_meeting_to_meetings` 会重命名旧的 `meeting_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识；如存在遗留 `media/meeting/`，也会一并迁到 `media/meetings/`。
 - `reconcile_curriculum_training_cutovers` 会把旧的 `competitions_*` 标准库表收敛到 `curriculum_*`，补建 `trainingcycles_trainingcycle`，并按现有训练日志、考核模块自动回填默认备赛周期与对应迁移记录。
+- 如果旧标准库中的某些项目没有任何可用于推断赛事类型的历史赛项关系，`reconcile_curriculum_training_cutovers` 会在预检查和执行前显式列出这些项目的 ID、代码和名称，并要求先人工补齐所属赛事类型后再执行 `--execute`。
 - 如果生产环境已经出现“旧表和新表同时存在，但新表为空”的半切换状态，统一命令和三个单独 cutover 命令都会自动接管恢复；只有在检测到新表已有真实数据或新目录已有真实文件时才会拒绝执行。
 
 ### 5. 导入基础数据

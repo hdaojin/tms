@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 
@@ -84,7 +84,13 @@ class Project(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.competition_type.name} / {self.name} ({self.code})"
+        competition_type_name = '未分配赛事类型'
+        if self.competition_type_id:
+            try:
+                competition_type_name = self.competition_type.name
+            except ObjectDoesNotExist:
+                pass
+        return f"{competition_type_name} / {self.name} ({self.code})"
 
     @property
     def standard_module_sets(self):
