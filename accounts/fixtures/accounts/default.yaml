@@ -44,7 +44,7 @@
     name: "班务"
     permissions:
       - ["add_notice", "notices", "notice"]
-      - ["add_meeting", "meeting", "meeting"]
+      - ["add_meeting", "meetings", "meeting"]
 
 - model: accounts.groupprofile
   pk: 3
@@ -52,4 +52,6 @@
     group: 3
     codename: "assistant"
     description: "班务组"
+    selected_permission_bundles:
+      - "meetings.upload_meeting"
 

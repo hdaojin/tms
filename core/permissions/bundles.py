@@ -55,6 +55,14 @@ PERMISSION_BUNDLE_SPECS = (
         ),
     ),
     PermissionBundleSpec(
+        code="meetings.upload_meeting",
+        name="上传会议记录",
+        description="上传会议记录，并授予会议记录新增权限。",
+        permissions=(
+            ("add_meeting", "meetings", "meeting"),
+        ),
+    ),
+    PermissionBundleSpec(
         code="traininglogs.upload_traininglog",
         name="上传训练日志",
         description="上传训练日志，并自动补齐训练日志模型查看权限。",

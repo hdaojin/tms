@@ -9,6 +9,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
+from accounts.services.permission_bundles import sync_user_permission_bundles
 from meetings.admin import MeetingAdmin
 from meetings.models import Meeting
 
@@ -65,6 +66,15 @@ class MeetingViewPermissionTests(TestCase):
         response = self.client.get(reverse("meetings:meeting_upload"))
 
         self.assertEqual(response.status_code, 403)
+
+    def test_meeting_upload_business_bundle_grants_access(self):
+        bundle_user = User.objects.create_user(username="meeting-bundle", password="testpass123")
+        sync_user_permission_bundles(bundle_user, ["meetings.upload_meeting"])
+        self.client.force_login(bundle_user)
+
+        response = self.client.get(reverse("meetings:meeting_upload"))
+
+        self.assertEqual(response.status_code, 200)
 
     def test_meeting_upload_sets_uploaded_by(self):
         self.client.force_login(self.uploader)
