@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.views.generic import CreateView, DetailView, ListView, DeleteView
 from django.urls import reverse_lazy
 from django.http import Http404
@@ -85,13 +85,16 @@ class NoticeDeleteView(TitleMixin, LoginRequiredMixin, DeleteView):
 
 
 
-class NoticeCreateView(TitleMixin, LoginRequiredMixin, CreateView):
+class NoticeCreateView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     model = Notice
     form_class = NoticeForm
     template_name = 'notices/notice_create.html'
     success_url = reverse_lazy('notices:notice_list')
+    permission_required = 'notices.add_notice'
+    raise_exception = True
     title = "发布通知"
     title_icon = "icon-[tabler--plus]"
+
     def form_valid(self, form):
         form.instance.published_by = self.request.user
         # 直接发布：设置发布时间

@@ -25,4 +25,7 @@ items:
           size: 4
         is_visible: true
         login_required: true
+        perm_match_all: true
+        required_perms:
+          - "notices.add_notice"
   

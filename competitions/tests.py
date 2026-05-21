@@ -11,6 +11,7 @@ from django.db.models.deletion import ProtectedError
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve, reverse
 
+from accounts.services.permission_bundles import sync_user_permission_bundles
 from .admin import CompetitionProjectMemberAdminForm, CompetitorAdminForm, ExpertAdminForm
 from core.utils.menus import get_layout_sections, get_section_menu, get_sections
 from curriculum.models import (
@@ -839,10 +840,16 @@ class CompetitionFrontendViewTests(TestCase):
 	def setUp(self):
 		self.viewer = User.objects.create_user(username='viewer', password='testpass123')
 		self.editor = User.objects.create_user(username='editor', password='testpass123')
-		permissions = Permission.objects.filter(
-			codename__in=['add_member', 'add_competitor', 'add_competitionresult', 'add_expert', 'add_skillposition'],
+		sync_user_permission_bundles(
+			self.editor,
+			[
+				'competitions.link_member',
+				'competitions.create_competitor',
+				'competitions.create_expert',
+				'competitions.create_skillposition',
+				'competitions.record_competition_result',
+			],
 		)
-		self.editor.user_permissions.add(*permissions)
 
 		self.competition_type = CompetitionType.objects.create(
 			code='WSC-FRONTEND',

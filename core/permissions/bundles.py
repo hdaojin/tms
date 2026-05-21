@@ -63,6 +63,78 @@ PERMISSION_BUNDLE_SPECS = (
         ),
     ),
     PermissionBundleSpec(
+        code="meetings.delete_meeting",
+        name="删除会议记录",
+        description="删除会议记录，并授予会议记录删除权限。",
+        permissions=(
+            ("delete_meeting", "meetings", "meeting"),
+        ),
+    ),
+    PermissionBundleSpec(
+        code="notices.publish_notice",
+        name="发布通知",
+        description="发布通知公告，并授予通知新增权限。",
+        permissions=(
+            ("add_notice", "notices", "notice"),
+        ),
+    ),
+    PermissionBundleSpec(
+        code="accounts.view_all_profiles",
+        name="查看全部用户资料",
+        description="查看用户列表与用户详情。",
+        permissions=(
+            ("view_all_profiles", "accounts", "userprofile"),
+        ),
+    ),
+    PermissionBundleSpec(
+        code="assessments.view_all_scores",
+        name="查看全部考核成绩",
+        description="查看全部考核详情与成绩。",
+        permissions=(
+            ("view_all_scores", "assessments", "assessment"),
+        ),
+    ),
+    PermissionBundleSpec(
+        code="competitions.link_member",
+        name="关联代表队",
+        description="关联或新增代表队，并授予代表队新增权限。",
+        permissions=(
+            ("add_member", "competitions", "member"),
+        ),
+    ),
+    PermissionBundleSpec(
+        code="competitions.create_competitor",
+        name="新增选手",
+        description="新增竞赛选手，并授予选手新增权限。",
+        permissions=(
+            ("add_competitor", "competitions", "competitor"),
+        ),
+    ),
+    PermissionBundleSpec(
+        code="competitions.create_expert",
+        name="新增专家",
+        description="新增竞赛专家，并授予专家新增权限。",
+        permissions=(
+            ("add_expert", "competitions", "expert"),
+        ),
+    ),
+    PermissionBundleSpec(
+        code="competitions.create_skillposition",
+        name="新增岗位人员",
+        description="新增竞赛岗位人员，并授予岗位人员新增权限。",
+        permissions=(
+            ("add_skillposition", "competitions", "skillposition"),
+        ),
+    ),
+    PermissionBundleSpec(
+        code="competitions.record_competition_result",
+        name="录入竞赛总成绩",
+        description="录入竞赛总成绩，并授予竞赛成绩新增权限。",
+        permissions=(
+            ("add_competitionresult", "competitions", "competitionresult"),
+        ),
+    ),
+    PermissionBundleSpec(
         code="traininglogs.upload_traininglog",
         name="上传训练日志",
         description="上传训练日志，并自动补齐训练日志模型查看权限。",

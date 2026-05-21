@@ -129,6 +129,18 @@ class UserListTableTemplateRegressionTest(TestCase):
 		self.assertContains(response, '?page=2')
 
 
+class AccountPermissionBundleAccessTests(TestCase):
+	def test_user_list_allows_access_via_view_all_profiles_bundle(self):
+		user = User.objects.create_user('profile-viewer', password='testpass123')
+		sync_user_permission_bundles(user, ['accounts.view_all_profiles'])
+		self.client.force_login(user)
+
+		response = self.client.get(reverse('accounts:user_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '用户列表')
+
+
 class PermissionBundleSyncServiceTests(TestCase):
 	def test_sync_group_permission_bundles_records_codes_and_preserves_extra_permissions(self):
 		group = Group.objects.create(name='奖惩录入组')
@@ -151,7 +163,11 @@ class PermissionBundleSyncServiceTests(TestCase):
 
 	def test_sync_user_permission_bundles_records_codes_and_preserves_extra_permissions(self):
 		user = User.objects.create_user('bundle-user', password='testpass123')
-		extra_permission = Permission.objects.get(codename='view_all_profiles')
+		extra_permission = Permission.objects.get(
+			codename='add_group',
+			content_type__app_label='auth',
+			content_type__model='group',
+		)
 
 		sync_user_permission_bundles(user, ['traininglogs.upload_traininglog'], [extra_permission])
 
@@ -162,7 +178,7 @@ class PermissionBundleSyncServiceTests(TestCase):
 			{
 				'add_traininglog',
 				'view_traininglog',
-				'view_all_profiles',
+				'add_group',
 			},
 		)
 
@@ -201,7 +217,11 @@ class PermissionBundleAdminFormTests(TestCase):
 
 	def test_user_admin_form_only_shows_extra_permissions(self):
 		user = User.objects.create_user('form-user', password='testpass123')
-		extra_permission = Permission.objects.get(codename='view_all_profiles')
+		extra_permission = Permission.objects.get(
+			codename='add_group',
+			content_type__app_label='auth',
+			content_type__model='group',
+		)
 		sync_user_permission_bundles(user, ['traininglogs.upload_traininglog'], [extra_permission])
 
 		form = UserPermissionBundleAdminForm(instance=user)

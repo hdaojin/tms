@@ -64,9 +64,9 @@ BUILTIN_GROUP_SPECS = (
         name="班务",
         codename="assistant",
         description="班务组",
-        permission_bundles=("meetings.upload_meeting",),
-        extra_permissions=(
-            ("add_notice", "notices", "notice"),
+        permission_bundles=(
+            "meetings.upload_meeting",
+            "notices.publish_notice",
         ),
     ),
 )

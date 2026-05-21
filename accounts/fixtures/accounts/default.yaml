@@ -54,4 +54,5 @@
     description: "班务组"
     selected_permission_bundles:
       - "meetings.upload_meeting"
+      - "notices.publish_notice"
 

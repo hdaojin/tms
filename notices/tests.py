@@ -6,6 +6,8 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from accounts.services.permission_bundles import sync_user_permission_bundles
+
 from .models import Notice, NoticeAttachment
 
 
@@ -87,9 +89,14 @@ class NoticeAttachmentUploadTests(TestCase):
 		self.override = override_settings(MEDIA_ROOT=self.temp_media.name)
 		self.override.enable()
 		self.user = User.objects.create_user(
-			username='notice-user',
+			username='notice-viewer',
 			password='testpass123',
 		)
+		self.publisher = User.objects.create_user(
+			username='notice-publisher',
+			password='testpass123',
+		)
+		sync_user_permission_bundles(self.publisher, ['notices.publish_notice'])
 
 	def tearDown(self):
 		for attachment in NoticeAttachment.objects.all():
@@ -103,8 +110,15 @@ class NoticeAttachmentUploadTests(TestCase):
 	def _build_upload_file(self, name):
 		return SimpleUploadedFile(name, b'notice attachment content', content_type='text/plain')
 
-	def test_notice_create_accepts_multiple_attachments(self):
+	def test_notice_create_requires_add_permission(self):
 		self.client.force_login(self.user)
+
+		response = self.client.get(reverse('notices:notice_create'))
+
+		self.assertEqual(response.status_code, 403)
+
+	def test_notice_create_accepts_multiple_attachments(self):
+		self.client.force_login(self.publisher)
 
 		response = self.client.post(
 			reverse('notices:notice_create'),
@@ -121,6 +135,7 @@ class NoticeAttachmentUploadTests(TestCase):
 
 		self.assertEqual(response.status_code, 302)
 		notice = Notice.objects.get(title='多附件通知')
+		self.assertEqual(notice.published_by, self.publisher)
 		self.assertEqual(notice.attachments.count(), 2)
 		self.assertCountEqual(
 			[attachment.file_name for attachment in notice.attachments.all()],

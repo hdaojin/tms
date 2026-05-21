@@ -21,6 +21,7 @@ from django.test import RequestFactory, TestCase, TransactionTestCase, override_
 from django.urls import resolve, reverse
 
 from assessments.models import Assessment, AssessmentModule
+from accounts.services.permission_bundles import sync_user_permission_bundles
 from behaviors.models import ConductSummary
 from competitions.models import Competition, CompetitionProject
 from core.management.commands.reconcile_curriculum_training_cutovers import Command as CurriculumTrainingCutoverCommand
@@ -111,7 +112,7 @@ class MobileNavigationTemplateTests(TestCase):
 
     def test_render_mobile_navigation_shows_current_section_and_permitted_nested_items(self):
         user = User.objects.create_user(username="mobile-nav-user", password="testpass123")
-        user.user_permissions.add(Permission.objects.get(codename="add_skillposition"))
+        sync_user_permission_bundles(user, ["competitions.create_skillposition"])
 
         request = self.factory.get(reverse("competitions:skillposition_create"))
         request.user = user
@@ -125,6 +126,35 @@ class MobileNavigationTemplateTests(TestCase):
         self.assertIn("竞赛信息", html)
         self.assertIn("新增岗位人员", html)
         self.assertNotIn("新增专家", html)
+
+    def test_render_mobile_navigation_hides_notice_create_without_permission(self):
+        user = User.objects.create_user(username="notice-nav-user", password="testpass123")
+
+        request = self.factory.get(reverse("notices:notice_list"))
+        request.user = user
+        request.resolver_match = resolve(request.path)
+
+        html = Template("{% load menu_tags %}{% render_mobile_navigation %}").render(
+            Context({"request": request})
+        )
+
+        self.assertIn("通知公告列表", html)
+        self.assertNotIn("创建通知公告", html)
+
+    def test_render_mobile_navigation_shows_notice_create_with_publish_bundle(self):
+        user = User.objects.create_user(username="notice-nav-editor", password="testpass123")
+        sync_user_permission_bundles(user, ["notices.publish_notice"])
+        user = User.objects.get(pk=user.pk)
+
+        request = self.factory.get(reverse("notices:notice_list"))
+        request.user = user
+        request.resolver_match = resolve(request.path)
+
+        html = Template("{% load menu_tags %}{% render_mobile_navigation %}").render(
+            Context({"request": request})
+        )
+
+        self.assertIn("创建通知公告", html)
 
     def test_authenticated_page_header_includes_mobile_navigation_trigger_and_panel(self):
         user = User.objects.create_user(username="mobile-nav-header", password="testpass123")
