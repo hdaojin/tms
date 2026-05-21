@@ -136,6 +136,19 @@ class MobileNavigationTemplateTests(TestCase):
         self.assertContains(response, "data-mobile-nav-trigger")
         self.assertContains(response, "data-mobile-nav-panel")
 
+    def test_authenticated_page_keeps_horizontal_overflow_on_body_not_header(self):
+        user = User.objects.create_user(username="mobile-nav-overflow", password="testpass123")
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("accounts:home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'body class="flex min-h-screen flex-col overflow-x-hidden"')
+        self.assertNotContains(
+            response,
+            'class="navbar sticky top-0 z-20 w-full max-w-full overflow-x-hidden',
+        )
+
 
 class ResponsiveTableTemplateTests(TestCase):
     def test_render_table_wraps_table_in_horizontal_scroll_container(self):
