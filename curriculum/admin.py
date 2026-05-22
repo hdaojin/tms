@@ -1,6 +1,8 @@
 from django import forms
 from django.contrib import admin
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
+from django.db.models import CharField, OuterRef, Subquery, Value
+from django.db.models.functions import Coalesce
 from django.forms.models import BaseInlineFormSet
 
 from .models import (
@@ -90,13 +92,33 @@ class StandardModuleSetInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('name', 'code', 'competition_type', 'current_standard_module_set_display', 'created_at')
+    list_display = ('name', 'code', 'competition_type_display', 'current_standard_module_set_display', 'created_at')
     list_filter = ('competition_type',)
     search_fields = ('name', 'code', 'competition_type__name', 'competition_type__code')
     autocomplete_fields = ['competition_type']
-    list_select_related = ('competition_type',)
-    ordering = ('competition_type__name', 'name', 'code')
     inlines = [StandardModuleSetInline]
+
+    def get_queryset(self, request):
+        competition_type_name_subquery = CompetitionType.objects.filter(
+            pk=OuterRef('competition_type_id')
+        ).values('name')[:1]
+        return super().get_queryset(request).annotate(
+            competition_type_name_for_admin=Coalesce(
+                Subquery(competition_type_name_subquery),
+                Value('', output_field=CharField()),
+            )
+        ).order_by('competition_type_name_for_admin', 'name', 'code')
+
+    @admin.display(description='所属竞赛类型', ordering='competition_type_name_for_admin')
+    def competition_type_display(self, obj):
+        if getattr(obj, 'competition_type_name_for_admin', ''):
+            return obj.competition_type_name_for_admin
+        try:
+            return obj.competition_type.name
+        except ObjectDoesNotExist:
+            if obj.competition_type_id:
+                return f'缺失赛事类型（ID: {obj.competition_type_id}）'
+            return '未分配赛事类型'
 
     @admin.display(description='当前标准模块集')
     def current_standard_module_set_display(self, obj):

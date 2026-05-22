@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
 from django.urls import reverse
 
@@ -83,4 +84,49 @@ class StandardModuleRankingDefaultTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn('default_counts_towards_ranking', response.context['adminform'].form.fields)
+
+
+class ProjectAdminDanglingCompetitionTypeTests(TestCase):
+    def setUp(self):
+        self.admin_user = User.objects.create_superuser(
+            username='curriculum-project-admin',
+            password='testpass123',
+            email='curriculum-project@example.com',
+        )
+        self.client.force_login(self.admin_user)
+        competition_type = CompetitionType.objects.create(code='BROKEN-CT', name='损坏赛事类型')
+        self.project = Project.objects.create(
+            competition_type=competition_type,
+            code='BROKEN-PROJECT',
+            name='损坏项目',
+        )
+        self.valid_competition_type_id = competition_type.pk
+        self.addCleanup(self._restore_project_competition_type)
+
+    def _set_project_competition_type(self, competition_type_id):
+        with connection.cursor() as cursor:
+            if connection.vendor == 'sqlite':
+                cursor.execute('PRAGMA foreign_keys = OFF')
+            cursor.execute(
+                f'UPDATE {Project._meta.db_table} SET competition_type_id = %s WHERE id = %s',
+                [competition_type_id, self.project.pk],
+            )
+            if connection.vendor == 'sqlite':
+                cursor.execute('PRAGMA foreign_keys = ON')
+
+    def _restore_project_competition_type(self):
+        self._set_project_competition_type(self.valid_competition_type_id)
+
+    def _break_project_competition_type(self, broken_competition_type_id=999999):
+        self._set_project_competition_type(broken_competition_type_id)
+
+    def test_project_admin_changelist_shows_rows_with_dangling_competition_type(self):
+        self._break_project_competition_type()
+
+        response = self.client.get(reverse('admin:curriculum_project_changelist'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '损坏项目')
+        self.assertContains(response, '缺失赛事类型（ID: 999999）')
+        self.assertContains(response, reverse('admin:curriculum_project_change', args=[self.project.pk]))
 

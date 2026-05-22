@@ -78,7 +78,7 @@ class Project(models.Model):
     class Meta:
         verbose_name = '竞赛项目'
         verbose_name_plural = '竞赛项目'
-        ordering = ['competition_type', 'name', 'code']
+        ordering = ['competition_type_id', 'name', 'code']
         constraints = [
             models.UniqueConstraint(fields=['competition_type', 'code'], name='unique_project_code_within_competition_type'),
         ]
