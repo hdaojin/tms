@@ -33,7 +33,7 @@ def get_competition_project_modules_queryset(competition_project):
 
 class SkillFilterForm(StyledFormMixin, forms.Form):
     module = forms.ModelChoiceField(
-        label="竞赛模块",
+        label="标准模块",
         queryset=StandardModule.objects.none(),
         required=False,
         empty_label="全部模块",
@@ -60,9 +60,9 @@ class ExamPointEntryForm(StyledFormMixin, forms.Form):
         help_text='先选择具体赛项，系统会只提供该赛项已配置的模块。',
     )
     module = forms.ModelChoiceField(
-        label='竞赛模块',
+        label='标准模块',
         queryset=StandardModule.objects.none(),
-        help_text='模块来自当前具体赛项的官方模块映射到当前标准模块集后的结果。',
+        help_text='标准模块来自当前具体赛项的本届官方模块映射到当前标准模块版本后的结果。',
     )
     topic_mode = forms.ChoiceField(
         label='新增技能点专题处理方式',

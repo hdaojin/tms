@@ -13,13 +13,13 @@ class TrainingCycle(models.Model):
     name = models.CharField('周期名称', max_length=100)
     project = models.ForeignKey(
         'curriculum.Project',
-        verbose_name='竞赛项目',
+        verbose_name='标准赛项',
         on_delete=models.PROTECT,
         related_name='training_cycles',
     )
     module_set = models.ForeignKey(
         'curriculum.StandardModuleSet',
-        verbose_name='模块标准集',
+        verbose_name='标准模块版本',
         on_delete=models.PROTECT,
         related_name='training_cycles',
     )
@@ -58,19 +58,19 @@ class TrainingCycle(models.Model):
         if self.end_date and self.start_date and self.end_date < self.start_date:
             raise ValidationError({'end_date': '结束日期不能早于开始日期。'})
         if self.project_id and self.module_set_id and self.module_set.project_id != self.project_id:
-            raise ValidationError({'module_set': '模块标准集必须属于当前竞赛项目。'})
+            raise ValidationError({'module_set': '标准模块版本必须属于当前标准赛项。'})
         if (
             self.project_id
             and self.primary_competition_project_id
             and self.primary_competition_project.project_id != self.project_id
         ):
-            raise ValidationError({'primary_competition_project': '主目标赛项必须属于当前竞赛项目。'})
+            raise ValidationError({'primary_competition_project': '主目标赛项必须属于当前标准赛项。'})
         if (
             self.project_id
             and self.reference_competition_project_id
             and self.reference_competition_project.project_id != self.project_id
         ):
-            raise ValidationError({'reference_competition_project': '参考赛项必须属于当前竞赛项目。'})
+            raise ValidationError({'reference_competition_project': '参考赛项必须属于当前标准赛项。'})
 
     def save(self, *args, **kwargs):
         self.clean()

@@ -103,8 +103,8 @@ class BaseCompetitionModuleMappingInlineFormSet(BaseInlineFormSet):
 
 
 class CompetitionModuleStandardModuleMapInlineFormSet(BaseCompetitionModuleMappingInlineFormSet):
-    duplicate_primary_message = '同一官方模块只能设置一个主映射。'
-    missing_primary_message = '请至少选择一条主映射。'
+    duplicate_primary_message = '同一官方模块只能设置一个主标准模块映射。'
+    missing_primary_message = '请至少选择一条主标准模块映射。'
 
 
 class CompetitionModuleAxisMapAdminForm(forms.ModelForm):
@@ -126,8 +126,8 @@ class CompetitionModuleAxisMapAdminForm(forms.ModelForm):
 
 
 class CompetitionModuleAxisMapInlineFormSet(BaseCompetitionModuleMappingInlineFormSet):
-    duplicate_primary_message = '同一官方模块只能设置一个主主线映射。'
-    missing_primary_message = '请至少选择一条主主线映射。'
+    duplicate_primary_message = '同一官方模块只能设置一个主能力主线映射。'
+    missing_primary_message = '请至少选择一条主能力主线映射。'
 
 
 class CompetitionProjectAdminFormMixin:
@@ -301,7 +301,7 @@ class CompetitionModuleInline(admin.TabularInline):
     ordering = ('sort_order', 'code', 'pk')
     show_change_link = True
     verbose_name = '官方模块'
-    verbose_name_plural = '本届官方模块（可在下方快捷入口或独立“具体赛项模块”后台中集中维护）'
+    verbose_name_plural = '本届官方模块（可在下方快捷入口或独立“本届官方模块”后台中集中维护）'
 
     @admin.display(description='映射关系')
     def mapped_modules_summary(self, obj):
@@ -309,7 +309,7 @@ class CompetitionModuleInline(admin.TabularInline):
             return '-'
         return format_competition_module_mappings(obj)
 
-    @admin.display(description='主线关系')
+    @admin.display(description='能力主线关系')
     def mapped_axes_summary(self, obj):
         if obj is None or not obj.pk:
             return '-'
@@ -400,7 +400,7 @@ class CompetitionProjectAdmin(admin.ModelAdmin):
     def official_module_total(self, obj):
         return obj.official_module_total
 
-    @admin.display(description='模块入口')
+    @admin.display(description='官方模块入口')
     def module_entry_link(self, obj):
         module_total = getattr(obj, 'official_module_total', obj.competition_modules.count())
         url = '{}?{}'.format(
@@ -408,7 +408,7 @@ class CompetitionProjectAdmin(admin.ModelAdmin):
             urlencode({'competition_project__id__exact': obj.pk}),
         )
         return format_html(
-            '<a href="{}">进入具体赛项模块（{}）</a>',
+            '<a href="{}">进入本届官方模块（{}）</a>',
             url,
             module_total,
         )
@@ -495,8 +495,8 @@ class CompetitionModuleAxisMapInline(admin.TabularInline):
     formset = CompetitionModuleAxisMapInlineFormSet
     extra = 1
     fields = ('module_axis', 'is_primary', 'weight', 'note')
-    verbose_name = '模块主线映射'
-    verbose_name_plural = '模块主线映射（可为空；若配置则需确保一条且仅一条主映射）'
+    verbose_name = '能力主线映射'
+    verbose_name_plural = '能力主线映射（可为空；若配置则需确保一条且仅一条主映射）'
 
 
 @admin.register(CompetitionModule)
@@ -553,7 +553,7 @@ class CompetitionModuleAdmin(admin.ModelAdmin):
             return '-'
         return format_standard_module_label(primary_standard_module)
 
-    @admin.display(description='主映射主线')
+    @admin.display(description='主映射能力主线')
     def primary_axis_display(self, obj):
         primary_axis = obj.primary_axis
         if primary_axis is None:
@@ -564,7 +564,7 @@ class CompetitionModuleAdmin(admin.ModelAdmin):
     def mapped_modules_display(self, obj):
         return format_competition_module_mappings(obj)
 
-    @admin.display(description='全部主线')
+    @admin.display(description='全部能力主线')
     def mapped_axes_display(self, obj):
         return format_competition_module_axis_mappings(obj)
 

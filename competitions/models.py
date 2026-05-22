@@ -92,7 +92,7 @@ class CompetitionProject(models.Model):
     )
     project = models.ForeignKey(
         Project,
-        verbose_name="竞赛项目",
+        verbose_name="标准赛项",
         on_delete=models.PROTECT,
         related_name='competition_projects'
     )
@@ -113,8 +113,8 @@ class CompetitionProject(models.Model):
     # 可在此处覆盖具体的规则或属性
 
     class Meta:
-        verbose_name = '具体赛事项目'
-        verbose_name_plural = '具体赛事项目'
+        verbose_name = '具体赛项'
+        verbose_name_plural = '具体赛项'
         ordering = ['competition', 'project']
         constraints = [
             models.UniqueConstraint(
@@ -148,7 +148,7 @@ class CompetitionProject(models.Model):
             and self.competition.competition_type_id != self.project.competition_type_id
             and not self._allows_legacy_project_competition_type_mismatch()
         ):
-            raise ValidationError({'project': '竞赛项目必须属于当前具体赛事对应的竞赛类型。'})
+            raise ValidationError({'project': '标准赛项必须属于当前具体赛事对应的赛事类型。'})
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -169,21 +169,21 @@ class CompetitionProject(models.Model):
 
 
 class CompetitionModule(models.Model):
-    """具体赛项模块 (Event-Module 关联)"""
+    """本届官方模块 (Event-Module 关联)"""
     competition_project = models.ForeignKey(
         CompetitionProject,
         verbose_name="所属具体赛项",
         on_delete=models.PROTECT,
         related_name='competition_modules'
     )
-    code = models.CharField("本届模块编号", max_length=50, help_text="按该届官方模块原始编号填写。")
-    name = models.CharField("本届模块名称", max_length=100, help_text="按该届官方模块原始名称填写。")
-    description = models.TextField("本届模块描述", blank=True)
+    code = models.CharField("官方模块编号", max_length=50, help_text="按该届官方模块原始编号填写。")
+    name = models.CharField("官方模块名称", max_length=100, help_text="按该届官方模块原始名称填写。")
+    description = models.TextField("官方模块说明", blank=True)
     sort_order = models.PositiveIntegerField("显示顺序", default=0, help_text="数值越小越靠前显示。")
     
     class Meta:
-        verbose_name = '具体赛项模块'
-        verbose_name_plural = '具体赛项模块'
+        verbose_name = '本届官方模块'
+        verbose_name_plural = '本届官方模块'
         ordering = ['competition_project', 'sort_order', 'code', 'pk']
         constraints = [
             models.UniqueConstraint(
@@ -226,7 +226,7 @@ class CompetitionModuleStandardModuleMap(models.Model):
         CompetitionModule,
         on_delete=models.CASCADE,
         related_name='module_mappings',
-        verbose_name='具体赛项模块',
+        verbose_name='本届官方模块',
     )
     module = models.ForeignKey(
         StandardModule,
@@ -266,11 +266,11 @@ class CompetitionModuleStandardModuleMap(models.Model):
             competition_module=getattr(self, 'competition_module', None),
             target=getattr(self, 'module', None),
             field_name='module',
-            error_message='标准模块必须属于当前具体赛项对应的竞赛项目。',
+            error_message='标准模块必须属于当前具体赛项对应的标准赛项。',
         )
         validate_single_primary_mapping(
             instance=self,
-            error_message='同一官方模块只能设置一个主映射。',
+            error_message='同一官方模块只能设置一个主标准模块映射。',
         )
 
     def save(self, *args, **kwargs):
@@ -278,7 +278,7 @@ class CompetitionModuleStandardModuleMap(models.Model):
             competition_module=getattr(self, 'competition_module', None),
             target=getattr(self, 'module', None),
             field_name='module',
-            error_message='标准模块必须属于当前具体赛项对应的竞赛项目。',
+            error_message='标准模块必须属于当前具体赛项对应的标准赛项。',
         )
         super().save(*args, **kwargs)
 
@@ -291,28 +291,28 @@ class CompetitionModuleAxisMap(models.Model):
         CompetitionModule,
         on_delete=models.CASCADE,
         related_name='axis_mappings',
-        verbose_name='具体赛项模块',
+        verbose_name='本届官方模块',
     )
     module_axis = models.ForeignKey(
         ModuleAxis,
         on_delete=models.PROTECT,
         related_name='competition_module_mappings',
-        verbose_name='模块主线',
+        verbose_name='能力主线',
     )
-    is_primary = models.BooleanField('主映射', default=False, help_text='用于标识该官方模块当前主要归属的模块主线。')
+    is_primary = models.BooleanField('主映射', default=False, help_text='用于标识该官方模块当前主要归属的能力主线。')
     weight = models.DecimalField(
         '权重',
         max_digits=5,
         decimal_places=2,
         default=Decimal('1.00'),
         validators=[MinValueValidator(Decimal('0.01'))],
-        help_text='用于表示该官方模块映射到该模块主线时的相对权重。',
+        help_text='用于表示该官方模块映射到该能力主线时的相对权重。',
     )
     note = models.TextField('备注', blank=True)
 
     class Meta:
-        verbose_name = '官方模块主线映射'
-        verbose_name_plural = '官方模块主线映射'
+        verbose_name = '官方模块能力主线映射'
+        verbose_name_plural = '官方模块能力主线映射'
         ordering = ['competition_module', '-is_primary', 'module_axis__sort_order', 'module_axis__code', 'pk']
         constraints = [
             models.UniqueConstraint(
@@ -331,11 +331,11 @@ class CompetitionModuleAxisMap(models.Model):
             competition_module=getattr(self, 'competition_module', None),
             target=getattr(self, 'module_axis', None),
             field_name='module_axis',
-            error_message='模块主线必须属于当前具体赛项对应的竞赛项目。',
+            error_message='能力主线必须属于当前具体赛项对应的标准赛项。',
         )
         validate_single_primary_mapping(
             instance=self,
-            error_message='同一官方模块只能设置一个主主线映射。',
+            error_message='同一官方模块只能设置一个主能力主线映射。',
         )
 
     def save(self, *args, **kwargs):
@@ -343,7 +343,7 @@ class CompetitionModuleAxisMap(models.Model):
             competition_module=getattr(self, 'competition_module', None),
             target=getattr(self, 'module_axis', None),
             field_name='module_axis',
-            error_message='模块主线必须属于当前具体赛项对应的竞赛项目。',
+            error_message='能力主线必须属于当前具体赛项对应的标准赛项。',
         )
         super().save(*args, **kwargs)
 

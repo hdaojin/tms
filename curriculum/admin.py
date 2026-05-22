@@ -69,9 +69,9 @@ class StandardModuleAxisMapInlineFormSet(BaseInlineFormSet):
 
         primary_forms = [form for form in active_forms if form.cleaned_data.get('is_primary')]
         if len(primary_forms) > 1:
-            raise ValidationError('同一标准模块只能设置一个主主线映射。')
+            raise ValidationError('同一标准模块只能设置一个主能力主线映射。')
         if len(primary_forms) == 0:
-            raise ValidationError('请至少选择一条主主线映射。')
+            raise ValidationError('请至少选择一条主能力主线映射。')
 
 
 @admin.register(CompetitionType)
@@ -109,7 +109,7 @@ class ProjectAdmin(admin.ModelAdmin):
             )
         ).order_by('competition_type_name_for_admin', 'name', 'code')
 
-    @admin.display(description='所属竞赛类型', ordering='competition_type_name_for_admin')
+    @admin.display(description='所属赛事类型', ordering='competition_type_name_for_admin')
     def competition_type_display(self, obj):
         if getattr(obj, 'competition_type_name_for_admin', ''):
             return obj.competition_type_name_for_admin
@@ -120,7 +120,7 @@ class ProjectAdmin(admin.ModelAdmin):
                 return f'缺失赛事类型（ID: {obj.competition_type_id}）'
             return '未分配赛事类型'
 
-    @admin.display(description='当前标准模块集')
+    @admin.display(description='当前标准模块版本')
     def current_standard_module_set_display(self, obj):
         return obj.current_standard_module_set or '-'
 
@@ -151,8 +151,8 @@ class StandardModuleAxisMapInline(admin.TabularInline):
     formset = StandardModuleAxisMapInlineFormSet
     extra = 1
     fields = ('module_axis', 'is_primary', 'weight', 'note')
-    verbose_name = '模块主线映射'
-    verbose_name_plural = '模块主线映射（若已配置，需确保一条且仅一条主映射）'
+    verbose_name = '能力主线映射'
+    verbose_name_plural = '能力主线映射（若已配置，需确保一条且仅一条主映射）'
 
 
 @admin.register(StandardModule)
@@ -165,7 +165,7 @@ class StandardModuleAdmin(admin.ModelAdmin):
     ordering = ('project__name', '-module_set__is_current', 'module_set__sort_order', 'sort_order', 'code', 'name')
     inlines = [StandardModuleAxisMapInline]
 
-    @admin.display(description='当前模块')
+    @admin.display(description='当前版本')
     def is_current_module(self, obj):
         return obj.is_current
 

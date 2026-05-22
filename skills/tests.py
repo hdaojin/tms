@@ -191,7 +191,7 @@ class SkillListViewTests(TestCase):
 		response = self.client.get(reverse('skills:skill_list'))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, '竞赛模块')
+		self.assertContains(response, '标准模块')
 		self.assertContains(response, self.skill_a.name)
 		self.assertContains(response, self.skill_b.name)
 		self.assertContains(response, '录入考点')

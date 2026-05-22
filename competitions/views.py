@@ -275,7 +275,7 @@ class SkillPositionCreateView(CompetitionCreateViewMixin):
 	title_icon = 'icon-[tabler--briefcase-2]'
 	submit_label = '保存岗位人员'
 	success_message = '岗位人员信息已保存。'
-	page_note = '技能岗位人员仅补录本届赛事人员信息；竞赛类型、项目、模块等主干资料仍由管理员维护。'
+	page_note = '技能岗位人员仅补录本届赛事人员信息；赛事类型、标准赛项、标准模块等主干资料仍由管理员维护。'
 
 	def get_default_success_url(self):
 		return reverse('competitions:competitionproject_detail', args=[self.object.competition_project_id])

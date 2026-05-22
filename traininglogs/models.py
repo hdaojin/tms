@@ -60,7 +60,7 @@ class TrainingLog(UploadedDocumentModel):
     module = models.ForeignKey(
         'curriculum.StandardModule', on_delete=models.SET_NULL,
         null=True, blank=True,
-        related_name='training_logs', verbose_name='训练模块'
+        related_name='training_logs', verbose_name='标准模块'
     )
     task = models.CharField("训练任务", max_length=100)
     training_date = models.DateField(
@@ -99,7 +99,7 @@ class TrainingLog(UploadedDocumentModel):
     def clean(self):
         super().clean()
         if self.training_cycle_id and self.module_id and self.module.module_set_id != self.training_cycle.module_set_id:
-            raise ValidationError({'module': '训练模块必须属于当前备赛周期的模块标准集。'})
+            raise ValidationError({'module': '标准模块必须属于当前备赛周期的标准模块版本。'})
         if not self.uploaded_by_id or not self.training_date:
             return
 

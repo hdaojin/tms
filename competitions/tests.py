@@ -131,7 +131,7 @@ class StandardModuleSetVersioningTests(TestCase):
 		other_module_set = StandardModuleSet.objects.create(
 			project=other_project,
 			code='default',
-			name='默认标准模块集',
+			name='默认标准模块版本',
 			is_current=True,
 		)
 
@@ -781,9 +781,9 @@ class CompetitionAdminVisibilityTests(TestCase):
 		competition_project_admin = admin.site._registry[CompetitionProject]
 		link_html = competition_project_admin.module_entry_link(competition_project)
 
-		self.assertIn('进入具体赛项模块', link_html)
+		self.assertIn('进入本届官方模块', link_html)
 		self.assertIn('competition_project__id__exact={}'.format(competition_project.pk), link_html)
-		self.assertIn('>进入具体赛项模块（1）<', link_html)
+		self.assertIn('>进入本届官方模块（1）<', link_html)
 
 	def test_competition_module_admin_uses_module_fields_as_edit_links(self):
 		competition_module_admin = admin.site._registry[CompetitionModule]

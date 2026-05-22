@@ -24,8 +24,8 @@
   fields:
     project: 1
     code: "default"
-    name: "默认标准模块集"
-    description: "System default standard module set for IT Network Systems Administration."
+    name: "默认标准模块版本"
+    description: "System default standard module version for IT Network Systems Administration."
     sort_order: 0
     is_current: true
     created_at: "2025-01-01T00:00:00Z"

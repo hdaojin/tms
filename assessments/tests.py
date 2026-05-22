@@ -597,7 +597,7 @@ class AssessmentCoachingWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "只读模式")
         self.assertNotContains(response, "添加试题附件")
-        self.assertNotContains(response, "提交")
+        self.assertNotIn('<button type="submit"', response.content.decode())
 
     def test_file_upload_page_places_question_attachments_after_question_file(self):
         self.client.force_login(self.coach)

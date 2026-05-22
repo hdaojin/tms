@@ -6,7 +6,7 @@ from django.db import models
 
 
 DEFAULT_MODULE_SET_CODE = 'default'
-DEFAULT_MODULE_SET_NAME = '默认标准模块集'
+DEFAULT_MODULE_SET_NAME = '默认标准模块版本'
 
 
 class Level(models.TextChoices):
@@ -31,7 +31,7 @@ class StandardModuleQuerySet(models.QuerySet):
 
 
 class CompetitionType(models.Model):
-    """竞赛类型。"""
+    """赛事类型。"""
 
     code = models.CharField("赛事代码", max_length=50, unique=True, help_text="用于标识竞赛的唯一代码，如WSC或WorldSkills")
     name = models.CharField("赛事名称", max_length=100, unique=True)
@@ -52,8 +52,8 @@ class CompetitionType(models.Model):
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
-        verbose_name = '竞赛类型'
-        verbose_name_plural = '竞赛类型'
+        verbose_name = '赛事类型'
+        verbose_name_plural = '赛事类型'
         ordering = ['level', 'name']
 
     def __str__(self):
@@ -61,23 +61,23 @@ class CompetitionType(models.Model):
 
 
 class Project(models.Model):
-    """竞赛项目标准库。"""
+    """标准赛项标准库。"""
 
     competition_type = models.ForeignKey(
         CompetitionType,
-        verbose_name="所属竞赛类型",
+        verbose_name="所属赛事类型",
         on_delete=models.PROTECT,
         related_name='projects',
     )
-    code = models.CharField("项目代码", max_length=50, help_text="同一竞赛类型下唯一，如ITNSA")
-    name = models.CharField("项目名称", max_length=100)
+    code = models.CharField("赛项代码", max_length=50, help_text="同一赛事类型下唯一，如ITNSA")
+    name = models.CharField("赛项名称", max_length=100)
     description = models.TextField("描述", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
-        verbose_name = '竞赛项目'
-        verbose_name_plural = '竞赛项目'
+        verbose_name = '标准赛项'
+        verbose_name_plural = '标准赛项'
         ordering = ['competition_type_id', 'name', 'code']
         constraints = [
             models.UniqueConstraint(fields=['competition_type', 'code'], name='unique_project_code_within_competition_type'),
@@ -113,7 +113,7 @@ class Project(models.Model):
             code=DEFAULT_MODULE_SET_CODE,
             defaults={
                 'name': DEFAULT_MODULE_SET_NAME,
-                'description': '系统自动创建的默认标准模块集。',
+                'description': '系统自动创建的默认标准模块版本。',
                 'sort_order': 0,
                 'is_current': True,
             },
@@ -134,23 +134,23 @@ class Project(models.Model):
 class StandardModuleSet(models.Model):
     project = models.ForeignKey(
         Project,
-        verbose_name="所属竞赛项目",
+        verbose_name="所属标准赛项",
         on_delete=models.CASCADE,
         related_name='module_sets',
     )
-    code = models.CharField("模块集代码", max_length=50, help_text="同一项目下唯一，用于标识某一版标准模块集。")
-    name = models.CharField("模块集名称", max_length=100, help_text="例如：2025 版标准模块、2026 版标准模块。")
-    description = models.TextField("描述", blank=True)
+    code = models.CharField("版本代码", max_length=50, help_text="同一标准赛项下唯一，用于标识某一版标准模块体系。")
+    name = models.CharField("版本名称", max_length=100, help_text="例如：2025 版、2026 版。")
+    description = models.TextField("版本说明", blank=True)
     sort_order = models.PositiveIntegerField("显示顺序", default=0, help_text="数值越小越靠前显示。")
-    is_current = models.BooleanField("当前启用", default=False, help_text="同一项目同一时刻只允许一套当前启用的标准模块集。")
+    is_current = models.BooleanField("当前启用", default=False, help_text="同一标准赛项同一时刻只允许一套当前启用的标准模块版本。")
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     objects = StandardModuleSetQuerySet.as_manager()
 
     class Meta:
-        verbose_name = '标准模块集'
-        verbose_name_plural = '标准模块集'
+        verbose_name = '标准模块版本'
+        verbose_name_plural = '标准模块版本'
         ordering = ['project', '-is_current', 'sort_order', 'name']
         constraints = [
             models.UniqueConstraint(fields=['project', 'code'], name='unique_module_set_code_within_project'),
@@ -174,11 +174,11 @@ class StandardModuleSet(models.Model):
 class ModuleAxis(models.Model):
     project = models.ForeignKey(
         Project,
-        verbose_name='所属竞赛项目',
+        verbose_name='所属标准赛项',
         on_delete=models.CASCADE,
         related_name='module_axes',
     )
-    code = models.CharField('主线代码', max_length=50, help_text='同一项目下唯一，用于标识能力主线。')
+    code = models.CharField('主线代码', max_length=50, help_text='同一标准赛项下唯一，用于标识能力主线。')
     name = models.CharField('主线名称', max_length=100)
     description = models.TextField('描述', blank=True)
     sort_order = models.PositiveIntegerField('显示顺序', default=0, help_text='数值越小越靠前显示。')
@@ -187,8 +187,8 @@ class ModuleAxis(models.Model):
     updated_at = models.DateTimeField('最后更新时间', auto_now=True)
 
     class Meta:
-        verbose_name = '模块主线'
-        verbose_name_plural = '模块主线'
+        verbose_name = '能力主线'
+        verbose_name_plural = '能力主线'
         ordering = ['project', 'sort_order', 'code', 'name']
         constraints = [
             models.UniqueConstraint(fields=['project', 'code'], name='unique_module_axis_code_within_project'),
@@ -199,22 +199,22 @@ class ModuleAxis(models.Model):
 
 
 class StandardModule(models.Model):
-    """标准模块（隶属于标准项目 Project）。"""
+    """标准模块（隶属于标准赛项 Project）。"""
 
     project = models.ForeignKey(
         Project,
-        verbose_name="所属竞赛项目",
+        verbose_name="所属标准赛项",
         on_delete=models.CASCADE,
         related_name='modules',
     )
     module_set = models.ForeignKey(
         StandardModuleSet,
-        verbose_name="所属标准模块集",
+        verbose_name="所属标准模块版本",
         on_delete=models.PROTECT,
         related_name='modules',
     )
-    code = models.CharField("编号", max_length=50)
-    name = models.CharField("名称", max_length=100)
+    code = models.CharField("模块编号", max_length=50)
+    name = models.CharField("模块名称", max_length=100)
     description = models.TextField("描述", blank=True)
     default_counts_towards_ranking = models.BooleanField(
         "默认计入排名分",
@@ -240,13 +240,13 @@ class StandardModule(models.Model):
 
     def clean(self):
         if self.module_set_id and self.project_id and self.module_set.project_id != self.project_id:
-            raise ValidationError({'module_set': '所选标准模块集不属于当前竞赛项目。'})
+            raise ValidationError({'module_set': '所选标准模块版本不属于当前标准赛项。'})
 
     def save(self, *args, **kwargs):
         if not self.module_set_id and self.project_id:
             self.module_set = self.project.get_or_create_default_standard_module_set()
         if self.module_set_id and self.project_id and self.module_set.project_id != self.project_id:
-            raise ValidationError({'module_set': '所选标准模块集不属于当前竞赛项目。'})
+            raise ValidationError({'module_set': '所选标准模块版本不属于当前标准赛项。'})
         super().save(*args, **kwargs)
 
     @property
@@ -280,22 +280,22 @@ class StandardModuleAxisMap(models.Model):
         ModuleAxis,
         on_delete=models.PROTECT,
         related_name='standard_module_mappings',
-        verbose_name='模块主线',
+        verbose_name='能力主线',
     )
-    is_primary = models.BooleanField('主映射', default=False, help_text='用于标识该标准模块当前主要归属的模块主线。')
+    is_primary = models.BooleanField('主映射', default=False, help_text='用于标识该标准模块当前主要归属的能力主线。')
     weight = models.DecimalField(
         '权重',
         max_digits=5,
         decimal_places=2,
         default=Decimal('1.00'),
         validators=[MinValueValidator(Decimal('0.01'))],
-        help_text='用于表示该标准模块映射到该模块主线时的相对权重。',
+        help_text='用于表示该标准模块映射到该能力主线时的相对权重。',
     )
     note = models.TextField('备注', blank=True)
 
     class Meta:
-        verbose_name = '标准模块主线映射'
-        verbose_name_plural = '标准模块主线映射'
+        verbose_name = '标准模块能力主线映射'
+        verbose_name_plural = '标准模块能力主线映射'
         ordering = ['module', '-is_primary', 'module_axis__sort_order', 'module_axis__code', 'pk']
         constraints = [
             models.UniqueConstraint(
@@ -311,15 +311,15 @@ class StandardModuleAxisMap(models.Model):
 
     def clean(self):
         if self.module_id and self.module_axis_id and self.module.project_id != self.module_axis.project_id:
-            raise ValidationError({'module_axis': '模块主线必须属于当前标准模块对应的竞赛项目。'})
+            raise ValidationError({'module_axis': '能力主线必须属于当前标准模块对应的标准赛项。'})
         if self.is_primary and self.module_id:
             existing_primary = type(self).objects.filter(module_id=self.module_id, is_primary=True).exclude(pk=self.pk)
             if existing_primary.exists():
-                raise ValidationError({'is_primary': '同一标准模块只能设置一个主映射。'})
+                raise ValidationError({'is_primary': '同一标准模块只能设置一个主能力主线映射。'})
 
     def save(self, *args, **kwargs):
         if self.module_id and self.module_axis_id and self.module.project_id != self.module_axis.project_id:
-            raise ValidationError({'module_axis': '模块主线必须属于当前标准模块对应的竞赛项目。'})
+            raise ValidationError({'module_axis': '能力主线必须属于当前标准模块对应的标准赛项。'})
         super().save(*args, **kwargs)
 
     def __str__(self):

@@ -168,7 +168,7 @@ class AssessmentModule(models.Model):
     module = models.ForeignKey(
         'curriculum.StandardModule',
         on_delete=models.PROTECT,
-        verbose_name="模块"
+        verbose_name="标准模块"
     )
     responsible_coach = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -301,7 +301,7 @@ class AssessmentModule(models.Model):
             and self.module_id
             and self.module.module_set_id != self.assessment.training_cycle.module_set_id
         ):
-            raise ValidationError({"module": "考核模块必须属于当前备赛周期的模块标准集。"})
+            raise ValidationError({"module": "考核模块必须属于当前备赛周期的标准模块版本。"})
 
     def apply_default_ranking_rule(self):
         if not self._state.adding or self._counts_towards_ranking_explicit or not self.module_id:
