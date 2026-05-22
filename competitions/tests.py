@@ -214,6 +214,94 @@ class CompetitionProjectLegacyCompatibilityTests(TestCase):
 
 		self.assertIn('project', context.exception.message_dict)
 
+	def test_new_cross_type_link_is_rejected_even_when_legacy_mixed_links_exist(self):
+		world_type = CompetitionType.objects.create(
+			code='WSC-STRICT-MIXED',
+			name='世界级混合历史赛事',
+		)
+		national_type = CompetitionType.objects.create(
+			code='NSC-STRICT-MIXED',
+			name='国家级混合历史赛事',
+		)
+		project = Project.objects.create(
+			competition_type=national_type,
+			code='ITNSA-STRICT-MIXED',
+			name='网络系统管理混合历史项目',
+		)
+		legacy_competition = Competition.objects.create(
+			competition_type=national_type,
+			name='第三届全国技能大赛',
+			code='NSC2025-STRICT-MIXED',
+		)
+		CompetitionProject.objects.create(
+			competition=legacy_competition,
+			project=project,
+		)
+
+		project.competition_type = world_type
+		project.save(update_fields=['competition_type'])
+
+		world_competition = Competition.objects.create(
+			competition_type=world_type,
+			name='第47届世界技能大赛',
+			code='WSC2024-STRICT-MIXED',
+		)
+		CompetitionProject.objects.create(
+			competition=world_competition,
+			project=project,
+		)
+		new_national_competition = Competition.objects.create(
+			competition_type=national_type,
+			name='第四届全国技能大赛',
+			code='NSC2027-STRICT-MIXED',
+		)
+
+		competition_project = CompetitionProject(
+			competition=new_national_competition,
+			project=project,
+		)
+
+		with self.assertRaises(ValidationError) as context:
+			competition_project.full_clean()
+
+		self.assertIn('project', context.exception.message_dict)
+
+	def test_rebinding_existing_link_to_cross_type_competition_is_rejected(self):
+		world_type = CompetitionType.objects.create(
+			code='WSC-STRICT-REBIND',
+			name='世界级改绑校验赛事',
+		)
+		national_type = CompetitionType.objects.create(
+			code='NSC-STRICT-REBIND',
+			name='国家级改绑校验赛事',
+		)
+		project = Project.objects.create(
+			competition_type=world_type,
+			code='ITNSA-STRICT-REBIND',
+			name='网络系统管理改绑校验项目',
+		)
+		world_competition = Competition.objects.create(
+			competition_type=world_type,
+			name='第47届世界技能大赛',
+			code='WSC2024-STRICT-REBIND',
+		)
+		national_competition = Competition.objects.create(
+			competition_type=national_type,
+			name='第四届全国技能大赛',
+			code='NSC2027-STRICT-REBIND',
+		)
+		competition_project = CompetitionProject.objects.create(
+			competition=world_competition,
+			project=project,
+		)
+
+		competition_project.competition = national_competition
+
+		with self.assertRaises(ValidationError) as context:
+			competition_project.full_clean()
+
+		self.assertIn('project', context.exception.message_dict)
+
 
 class CompetitionUploadStorageTests(TestCase):
 	def test_competition_document_uses_private_media_storage_root(self):

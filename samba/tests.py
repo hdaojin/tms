@@ -1,11 +1,13 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from .models import SambaOperation
-from .services import process_operation
+from .services import mark_stale_running_operations, process_operation
 
 
 @override_settings(SAMBA_ASYNC_OPERATIONS_ENABLED=False)
@@ -33,6 +35,26 @@ class SambaAccountViewTests(TestCase):
 		self.assertEqual(operation.created_by, self.user)
 		self.assertEqual(operation.result_summary, 'Samba 账户已开通。')
 		mocked_enable.assert_called_once()
+
+	@override_settings(SAMBA_ASYNC_OPERATIONS_ENABLED=True)
+	@patch('samba.services.enable_samba_for_user', return_value={'username': 'samba-user', 'created': True})
+	def test_enable_post_only_queues_operation_in_async_mode(self, mocked_enable):
+		response = self.client.post(
+			reverse('samba:accounts'),
+			{
+				'action': 'enable',
+				'password1': 'ValidPass123',
+				'password2': 'ValidPass123',
+			},
+			follow=True,
+		)
+
+		self.assertRedirects(response, reverse('samba:accounts'))
+		operation = SambaOperation.objects.get(target_user=self.user)
+		self.assertEqual(operation.action, SambaOperation.Action.ENABLE)
+		self.assertEqual(operation.status, SambaOperation.Status.QUEUED)
+		self.assertEqual(operation.result_summary, '已提交，等待处理。')
+		mocked_enable.assert_not_called()
 
 	@override_settings(SAMBA_INTEGRATION_ENABLED=False)
 	def test_submit_operation_honors_feature_flag(self):
@@ -108,3 +130,36 @@ class SambaOperationProcessingTests(TestCase):
 		self.assertEqual(operation.status, SambaOperation.Status.FAILED)
 		self.assertEqual(operation.result_summary, '执行失败。')
 		self.assertIn('groupadd failed', operation.last_error)
+
+	@override_settings(SAMBA_OPERATION_STALE_MINUTES=30)
+	def test_mark_stale_running_operations_marks_failure_and_clears_payload(self):
+		now = timezone.now()
+		stale_operation = SambaOperation.objects.create(
+			target_user=self.user,
+			action=SambaOperation.Action.ENABLE,
+			status=SambaOperation.Status.RUNNING,
+			payload_encrypted='encrypted-payload',
+			result_summary='后台处理中。',
+			started_at=now - timedelta(minutes=31),
+			created_by=self.user,
+		)
+		fresh_operation = SambaOperation.objects.create(
+			target_user=self.user,
+			action=SambaOperation.Action.CHANGE_PASSWORD,
+			status=SambaOperation.Status.RUNNING,
+			payload_encrypted='fresh-payload',
+			result_summary='后台处理中。',
+			started_at=now - timedelta(minutes=5),
+			created_by=self.user,
+		)
+
+		count = mark_stale_running_operations(now=now)
+
+		self.assertEqual(count, 1)
+		stale_operation.refresh_from_db()
+		fresh_operation.refresh_from_db()
+		self.assertEqual(stale_operation.status, SambaOperation.Status.FAILED)
+		self.assertEqual(stale_operation.payload_encrypted, '')
+		self.assertIn('超时', stale_operation.last_error)
+		self.assertEqual(fresh_operation.status, SambaOperation.Status.RUNNING)
+		self.assertEqual(fresh_operation.payload_encrypted, 'fresh-payload')

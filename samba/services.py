@@ -1,7 +1,7 @@
 import json
 import logging
 from base64 import urlsafe_b64encode
-from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from hashlib import sha256
 
 from cryptography.fernet import Fernet, InvalidToken
@@ -18,8 +18,6 @@ from .samba_sync import (
 )
 
 logger = logging.getLogger(__name__)
-
-_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix='samba-ops')
 
 
 class SambaIntegrationDisabled(RuntimeError):
@@ -89,8 +87,33 @@ def has_pending_operation(user) -> bool:
     ).exists()
 
 
+def get_samba_operation_stale_cutoff(now=None):
+    current_time = now or timezone.now()
+    stale_minutes = getattr(settings, 'SAMBA_OPERATION_STALE_MINUTES', 30)
+    return current_time - timedelta(minutes=stale_minutes)
+
+
+def mark_stale_running_operations(now=None) -> int:
+    current_time = now or timezone.now()
+    cutoff = get_samba_operation_stale_cutoff(current_time)
+    stale_message = '后台任务执行超时，请重新提交。'
+    return SambaOperation.objects.filter(
+        status=SambaOperation.Status.RUNNING,
+        started_at__lt=cutoff,
+    ).update(
+        status=SambaOperation.Status.FAILED,
+        finished_at=current_time,
+        result_summary='执行超时，已标记为失败。',
+        last_error=stale_message,
+        detail=stale_message,
+        payload_encrypted='',
+        updated_at=current_time,
+    )
+
+
 def submit_operation(*, actor, target_user, action: str, password: str) -> SambaOperation:
     ensure_samba_enabled()
+    mark_stale_running_operations()
 
     if has_pending_operation(target_user):
         raise SambaOperationConflict('已有正在处理的 Samba 操作，请稍后刷新页面查看结果。')
@@ -105,15 +128,16 @@ def submit_operation(*, actor, target_user, action: str, password: str) -> Samba
         result_summary='已提交，等待处理。',
     )
 
-    if getattr(settings, 'SAMBA_ASYNC_OPERATIONS_ENABLED', True):
-        transaction.on_commit(lambda: _executor.submit(process_operation, operation.pk))
-    else:
+    if not getattr(settings, 'SAMBA_ASYNC_OPERATIONS_ENABLED', True):
         process_operation(operation.pk)
 
     return operation
 
 
-def process_pending_operations(limit: int = 20) -> int:
+def process_pending_operations(limit: int = 20, *, recover_stale: bool = True) -> int:
+    if recover_stale:
+        mark_stale_running_operations()
+
     processed = 0
     operation_ids = list(
         SambaOperation.objects.filter(status=SambaOperation.Status.QUEUED)

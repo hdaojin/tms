@@ -65,7 +65,6 @@ INSTALLED_APPS = [
     'core',
     'accounts',
     'samba',
-    'articles',
     'curriculum.apps.CurriculumConfig',
     'competitions',
     'trainingcycles.apps.TrainingcyclesConfig',
@@ -204,4 +203,5 @@ SECURE_CSP = {
 SAMBA_INTEGRATION_ENABLED = env.bool('SAMBA_INTEGRATION_ENABLED', default=True)  # type: ignore
 SAMBA_ASYNC_OPERATIONS_ENABLED = env.bool('SAMBA_ASYNC_OPERATIONS_ENABLED', default=True)  # type: ignore
 SAMBA_COMMAND_TIMEOUT_SECONDS = env.int('SAMBA_COMMAND_TIMEOUT_SECONDS', default=15)  # type: ignore
+SAMBA_OPERATION_STALE_MINUTES = env.int('SAMBA_OPERATION_STALE_MINUTES', default=30)  # type: ignore
 SAMBA_TASK_ENCRYPTION_KEY = env('SAMBA_TASK_ENCRYPTION_KEY', default='')  # type: ignore

@@ -275,6 +275,7 @@ class CurriculumTrainingCutoverCommandTests(TestCase):
             "backfill_project_competition_types": True,
             "project_competition_type_backfillable": [{"id": 1, "code": "INFERABLE", "name": "可推断项目"}],
             "project_competition_type_unresolved": [{"id": 2, "code": "ORPHAN", "name": "孤立项目"}],
+            "project_competition_type_ambiguous": [],
             "create_trainingcycles_table": False,
             "add_traininglog_cycle_column": False,
             "add_assessment_cycle_column": False,
@@ -311,6 +312,7 @@ class CurriculumTrainingCutoverCommandTests(TestCase):
             "backfill_project_competition_types": True,
             "project_competition_type_backfillable": [{"id": 1, "code": "INFERABLE", "name": "可推断项目"}],
             "project_competition_type_unresolved": [{"id": 2, "code": "ORPHAN", "name": "孤立项目"}],
+            "project_competition_type_ambiguous": [],
             "create_trainingcycles_table": False,
             "add_traininglog_cycle_column": False,
             "add_assessment_cycle_column": False,
@@ -332,6 +334,98 @@ class CurriculumTrainingCutoverCommandTests(TestCase):
             call_command("reconcile_curriculum_training_cutovers", "--execute", stdout=output)
 
         mock_execute_cutover.assert_not_called()
+
+    @patch.object(CurriculumTrainingCutoverCommand, "_execute_cutover")
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_content_type_plan", return_value=None)
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_migration_plan", return_value=[])
+    @patch.object(
+        CurriculumTrainingCutoverCommand,
+        "_collect_training_plan",
+        return_value={
+            "add_project_competition_type_column": False,
+            "backfill_project_competition_types": False,
+            "project_competition_type_backfillable": [],
+            "project_competition_type_unresolved": [],
+            "project_competition_type_ambiguous": [{"id": 3, "code": "MIXED", "name": "多赛事类型项目"}],
+            "create_trainingcycles_table": False,
+            "add_traininglog_cycle_column": False,
+            "add_assessment_cycle_column": False,
+            "rebuild_traininglog_unique": False,
+        },
+    )
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_table_actions", return_value=[])
+    def test_reconcile_curriculum_training_cutovers_reports_ambiguous_projects_in_dry_run(
+        self,
+        _mock_table_actions,
+        _mock_training_plan,
+        _mock_migration_plan,
+        _mock_content_type_plan,
+        mock_execute_cutover,
+    ):
+        output = StringIO()
+
+        call_command("reconcile_curriculum_training_cutovers", stdout=output)
+
+        value = output.getvalue()
+        self.assertIn("以下 Project 关联了多个赛事类型", value)
+        self.assertIn("ID=3，code=MIXED，name=多赛事类型项目", value)
+        mock_execute_cutover.assert_not_called()
+
+    @patch.object(CurriculumTrainingCutoverCommand, "_execute_cutover")
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_content_type_plan", return_value=None)
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_migration_plan", return_value=[])
+    @patch.object(
+        CurriculumTrainingCutoverCommand,
+        "_collect_training_plan",
+        return_value={
+            "add_project_competition_type_column": False,
+            "backfill_project_competition_types": False,
+            "project_competition_type_backfillable": [],
+            "project_competition_type_unresolved": [],
+            "project_competition_type_ambiguous": [{"id": 3, "code": "MIXED", "name": "多赛事类型项目"}],
+            "create_trainingcycles_table": False,
+            "add_traininglog_cycle_column": False,
+            "add_assessment_cycle_column": False,
+            "rebuild_traininglog_unique": False,
+        },
+    )
+    @patch.object(CurriculumTrainingCutoverCommand, "_collect_table_actions", return_value=[])
+    def test_reconcile_curriculum_training_cutovers_blocks_execute_for_ambiguous_projects(
+        self,
+        _mock_table_actions,
+        _mock_training_plan,
+        _mock_migration_plan,
+        _mock_content_type_plan,
+        mock_execute_cutover,
+    ):
+        output = StringIO()
+
+        with self.assertRaisesMessage(CommandError, "MIXED"):
+            call_command("reconcile_curriculum_training_cutovers", "--execute", stdout=output)
+
+        mock_execute_cutover.assert_not_called()
+
+    def test_project_competition_type_status_separates_ambiguous_projects(self):
+        command = CurriculumTrainingCutoverCommand()
+
+        with patch.object(
+            command,
+            "_fetch_rows",
+            return_value=[
+                (1, "ORPHAN", "孤立项目", None, 0),
+                (2, "INFERABLE", "可推断项目", 10, 1),
+                (3, "MIXED", "多赛事类型项目", 10, 2),
+            ],
+        ):
+            status = command._collect_project_competition_type_status(
+                connection=None,
+                project_table="curriculum_project",
+                has_competition_type_column=True,
+            )
+
+        self.assertEqual(status["unresolved"], [{"id": 1, "code": "ORPHAN", "name": "孤立项目"}])
+        self.assertEqual(status["backfillable"], [{"id": 2, "code": "INFERABLE", "name": "可推断项目"}])
+        self.assertEqual(status["ambiguous"], [{"id": 3, "code": "MIXED", "name": "多赛事类型项目"}])
 
 
 class CursorRecorder:

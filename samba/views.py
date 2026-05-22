@@ -48,7 +48,7 @@ def samba_account_view(request):
                     action=SambaOperation.Action.ENABLE,
                     password=form.password,
                 )
-                messages.success(request, "Samba 开通请求已提交，系统会在后台处理。")
+                messages.success(request, "Samba 开通请求已提交，等待后台队列处理。")
             elif action == "change":
                 if not enabled:
                     messages.error(request, "Samba 用户尚未开通，无法修改密码。")
@@ -59,7 +59,7 @@ def samba_account_view(request):
                     action=SambaOperation.Action.CHANGE_PASSWORD,
                     password=form.password,
                 )
-                messages.success(request, "Samba 改密请求已提交，系统会在后台处理。")
+                messages.success(request, "Samba 改密请求已提交，等待后台队列处理。")
         except (SambaIntegrationDisabled, SambaOperationConflict) as e:
             messages.error(request, str(e))
         except Exception as e:

@@ -1,12 +1,20 @@
+from unittest import skipUnless
+
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from .apps import CmsConfig
-from .models import Article
+
+ARTICLES_ENABLED = 'articles' in settings.INSTALLED_APPS
+
+if ARTICLES_ENABLED:
+	from .models import Article
 
 
+@skipUnless(ARTICLES_ENABLED, 'articles APP 当前已停用。')
 class ArticlesExperimentMarkerTests(TestCase):
 	def setUp(self):
 		self.user = User.objects.create_user(username='article-user', password='testpass123')

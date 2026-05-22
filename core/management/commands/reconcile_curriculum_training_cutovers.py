@@ -82,6 +82,7 @@ class Command(BaseCommand):
                 training_plan["add_project_competition_type_column"],
                 training_plan["backfill_project_competition_types"],
                 training_plan["project_competition_type_unresolved"],
+                training_plan["project_competition_type_ambiguous"],
                 training_plan["create_trainingcycles_table"],
                 training_plan["add_traininglog_cycle_column"],
                 training_plan["add_assessment_cycle_column"],
@@ -104,6 +105,12 @@ class Command(BaseCommand):
             raise CommandError(
                 "检测到无法自动推断所属赛事类型的 Project，请先人工补齐后再执行："
                 f"{self._format_project_entries(unresolved_projects)}"
+            )
+        ambiguous_projects = training_plan["project_competition_type_ambiguous"]
+        if ambiguous_projects:
+            raise CommandError(
+                "检测到所属赛事类型不唯一的 Project，请先人工拆分或补齐后再执行："
+                f"{self._format_project_entries(ambiguous_projects)}"
             )
 
         self._execute_cutover(
@@ -175,6 +182,7 @@ class Command(BaseCommand):
             "backfill_project_competition_types": bool(project_competition_type_status["backfillable"]),
             "project_competition_type_backfillable": project_competition_type_status["backfillable"],
             "project_competition_type_unresolved": project_competition_type_status["unresolved"],
+            "project_competition_type_ambiguous": project_competition_type_status["ambiguous"],
             "create_trainingcycles_table": TrainingCycle._meta.db_table not in existing_tables,
             "add_traininglog_cycle_column": traininglogs_table in existing_tables and "training_cycle_id" not in traininglog_columns,
             "add_assessment_cycle_column": assessments_table in existing_tables and "training_cycle_id" not in assessment_columns,
@@ -236,6 +244,10 @@ class Command(BaseCommand):
         if training_plan["project_competition_type_unresolved"]:
             self.stdout.write("- 以下 Project 无法自动推断所属赛事类型，执行前需人工补齐：")
             for entry in training_plan["project_competition_type_unresolved"]:
+                self.stdout.write(f"  - {self._format_project_entry(entry)}")
+        if training_plan["project_competition_type_ambiguous"]:
+            self.stdout.write("- 以下 Project 关联了多个赛事类型，执行前需人工拆分或补齐：")
+            for entry in training_plan["project_competition_type_ambiguous"]:
                 self.stdout.write(f"  - {self._format_project_entry(entry)}")
         if training_plan["create_trainingcycles_table"]:
             self.stdout.write(f"- 创建数据表: {TrainingCycle._meta.db_table}")
@@ -341,12 +353,16 @@ class Command(BaseCommand):
         ambiguous_assessments = self._fetch_rows(
             connection,
             """
-            SELECT a.id, a.name
-            FROM assessments_assessment a
-            JOIN assessments_assessmentmodule am ON am.assessment_id = a.id
-            JOIN curriculum_standardmodule sm ON sm.id = am.module_id
-            GROUP BY a.id, a.name
-            HAVING COUNT(DISTINCT sm.project_id || '-' || sm.module_set_id) > 1
+            SELECT pairs.id, pairs.name
+            FROM (
+                SELECT a.id, a.name, sm.project_id, sm.module_set_id
+                FROM assessments_assessment a
+                JOIN assessments_assessmentmodule am ON am.assessment_id = a.id
+                JOIN curriculum_standardmodule sm ON sm.id = am.module_id
+                GROUP BY a.id, a.name, sm.project_id, sm.module_set_id
+            ) pairs
+            GROUP BY pairs.id, pairs.name
+            HAVING COUNT(*) > 1
             """,
         )
         if ambiguous_assessments:
@@ -508,10 +524,15 @@ class Command(BaseCommand):
         for project_id, competition_type_id in self._fetch_rows(
             connection,
             """
-            SELECT cp.project_id, MIN(c.competition_type_id)
-            FROM competitions_competitionproject cp
-            JOIN competitions_competition c ON c.id = cp.competition_id
-            GROUP BY cp.project_id
+            SELECT inferred.project_id, MIN(inferred.competition_type_id)
+            FROM (
+                SELECT cp.project_id, c.competition_type_id
+                FROM competitions_competitionproject cp
+                JOIN competitions_competition c ON c.id = cp.competition_id
+                GROUP BY cp.project_id, c.competition_type_id
+            ) inferred
+            GROUP BY inferred.project_id
+            HAVING COUNT(*) = 1
             """,
         ):
             updates.append((competition_type_id, project_id))
@@ -534,13 +555,13 @@ class Command(BaseCommand):
 
     def _collect_project_competition_type_status(self, connection, project_table, *, has_competition_type_column):
         if not project_table:
-            return {"backfillable": [], "unresolved": []}
+            return {"backfillable": [], "unresolved": [], "ambiguous": []}
 
         condition = "WHERE p.competition_type_id IS NULL" if has_competition_type_column else ""
         rows = self._fetch_rows(
             connection,
             f"""
-            SELECT p.id, p.code, p.name, MIN(c.competition_type_id)
+            SELECT p.id, p.code, p.name, MIN(c.competition_type_id), COUNT(DISTINCT c.competition_type_id)
             FROM {project_table} p
             LEFT JOIN competitions_competitionproject cp ON cp.project_id = p.id
             LEFT JOIN competitions_competition c ON c.id = cp.competition_id
@@ -552,16 +573,20 @@ class Command(BaseCommand):
 
         backfillable = []
         unresolved = []
-        for project_id, code, name, inferred_competition_type_id in rows:
+        ambiguous = []
+        for project_id, code, name, inferred_competition_type_id, competition_type_count in rows:
             entry = {"id": project_id, "code": code, "name": name}
             if inferred_competition_type_id is None:
                 unresolved.append(entry)
+            elif competition_type_count > 1:
+                ambiguous.append(entry)
             else:
                 backfillable.append(entry)
 
         return {
             "backfillable": backfillable,
             "unresolved": unresolved,
+            "ambiguous": ambiguous,
         }
 
     def _format_project_entry(self, entry):

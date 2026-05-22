@@ -127,18 +127,14 @@ class CompetitionProject(models.Model):
         return f"{self.competition.name} - {self.project.name}"
 
     def _allows_legacy_project_competition_type_mismatch(self):
-        if not self.competition_id or not self.project_id:
+        if not self.pk or not self.competition_id or not self.project_id:
             return False
 
-        project_links = type(self).objects.filter(project_id=self.project_id)
-        return (
-            project_links.filter(
-                competition__competition_type_id=self.competition.competition_type_id,
-            ).exists()
-            and project_links.exclude(
-                competition__competition_type_id=self.competition.competition_type_id,
-            ).exists()
-        )
+        return type(self).objects.filter(
+            pk=self.pk,
+            competition_id=self.competition_id,
+            project_id=self.project_id,
+        ).exists()
 
     def clean(self):
         super().clean()

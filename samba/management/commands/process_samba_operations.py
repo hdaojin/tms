@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from samba.services import process_pending_operations
+from samba.services import mark_stale_running_operations, process_pending_operations
 
 
 class Command(BaseCommand):
@@ -15,5 +15,8 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        processed = process_pending_operations(limit=options['limit'])
+        stale_count = mark_stale_running_operations()
+        processed = process_pending_operations(limit=options['limit'], recover_stale=False)
+        if stale_count:
+            self.stdout.write(self.style.WARNING(f'已将 {stale_count} 条超时 Samba 操作标记为失败。'))
         self.stdout.write(self.style.SUCCESS(f'已处理 {processed} 条 Samba 操作。'))
