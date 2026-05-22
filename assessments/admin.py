@@ -5,7 +5,7 @@ from django.db.models import Max
 from django.http import JsonResponse
 from django.urls import path, reverse
 
-from curriculum.models import StandardModule
+from competition_standards.models import StandardModule
 from core.constants import GROUP_COACH
 
 from .models import Assessment, Score, AssessmentModule, AssessmentAttachment

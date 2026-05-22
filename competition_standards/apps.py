@@ -1,8 +1,7 @@
 from django.apps import AppConfig
 
 
-class CurriculumConfig(AppConfig):
+class CompetitionStandardsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'curriculum'
+    name = 'competition_standards'
     verbose_name = '赛训标准体系'
-

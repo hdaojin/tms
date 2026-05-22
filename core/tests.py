@@ -45,8 +45,7 @@ from core.uploads import (
 )
 from core.utils.tables import ActionsColumn, BaseTable
 from core.utils.admin_deletion import discard_registered_delete_permissions, register_delete_permission_exemptions
-from curriculum.models import CompetitionType, Project, StandardModule, StandardModuleAxisMap, StandardModuleSet
-from trainingcycles.models import TrainingCycle
+from competition_standards.models import CompetitionType, Project, StandardModule, StandardModuleAxisMap, StandardModuleSet, TrainingCycle
 from traininglogs.models import TrainingLog
 
 
@@ -568,7 +567,7 @@ class CurriculumTrainingCutoverRecoveryTests(TransactionTestCase):
                 codename="view_project_legacy",
                 content_type=old_content_type,
             )
-            ContentType.objects.filter(app_label="trainingcycles", model="trainingcycle").delete()
+            ContentType.objects.filter(app_label="curriculum", model="trainingcycle").delete()
             MigrationRecorder.Migration.objects.filter(app="curriculum", name="0001_initial").delete()
             MigrationRecorder.Migration.objects.filter(app="trainingcycles", name="0001_initial").delete()
             MigrationRecorder.Migration.objects.filter(app="assessments", name="0002_initial").delete()
@@ -592,7 +591,7 @@ class CurriculumTrainingCutoverRecoveryTests(TransactionTestCase):
             MigrationRecorder.Migration.objects.filter(app="assessments", name="0002_initial").exists()
         )
         self.assertFalse(ContentType.objects.filter(app_label="competitions", model="project").exists())
-        self.assertTrue(ContentType.objects.filter(app_label="trainingcycles", model="trainingcycle").exists())
+        self.assertTrue(ContentType.objects.filter(app_label="curriculum", model="trainingcycle").exists())
         self.assertTrue(
             Permission.objects.filter(
                 codename="view_project_legacy",

@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'accounts',
     'samba',
     'curriculum.apps.CurriculumConfig',
+    'competition_standards.apps.CompetitionStandardsConfig',
     'competitions',
     'trainingcycles.apps.TrainingcyclesConfig',
     'assessments.apps.AssessmentsConfig',

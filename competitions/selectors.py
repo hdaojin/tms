@@ -4,7 +4,7 @@ from django.db.models import Count
 from django.db.models import Q
 
 from accounts.services.users import get_user_display_name
-from curriculum.models import ModuleAxis, StandardModule
+from competition_standards.models import ModuleAxis, StandardModule
 
 from .models import (
     CompetitionPerson,

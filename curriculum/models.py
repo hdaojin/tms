@@ -171,6 +171,57 @@ class StandardModuleSet(models.Model):
         return f"{self.project.name} / {self.name}{suffix}"
 
 
+class TrainingCycle(models.Model):
+    """围绕某个标准赛项和标准模块版本开展的备赛周期。"""
+
+    class Status(models.TextChoices):
+        PLANNING = 'planning', '筹备中'
+        ACTIVE = 'active', '进行中'
+        COMPLETED = 'completed', '已结束'
+        ARCHIVED = 'archived', '已归档'
+
+    code = models.CharField('周期代码', max_length=50, unique=True, help_text='用于标识备赛周期的唯一代码。')
+    name = models.CharField('周期名称', max_length=100)
+    project = models.ForeignKey(
+        Project,
+        verbose_name='标准赛项',
+        on_delete=models.PROTECT,
+        related_name='training_cycles',
+    )
+    module_set = models.ForeignKey(
+        StandardModuleSet,
+        verbose_name='标准模块版本',
+        on_delete=models.PROTECT,
+        related_name='training_cycles',
+    )
+    start_date = models.DateField('开始日期')
+    end_date = models.DateField('结束日期', null=True, blank=True)
+    status = models.CharField('状态', max_length=20, choices=Status.choices, default=Status.PLANNING)
+    description = models.TextField('描述', blank=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('最后更新时间', auto_now=True)
+
+    class Meta:
+        db_table = 'trainingcycles_trainingcycle'
+        verbose_name = '备赛周期'
+        verbose_name_plural = '备赛周期'
+        ordering = ['-start_date', 'name']
+
+    def clean(self):
+        super().clean()
+        if self.end_date and self.start_date and self.end_date < self.start_date:
+            raise ValidationError({'end_date': '结束日期不能早于开始日期。'})
+        if self.project_id and self.module_set_id and self.module_set.project_id != self.project_id:
+            raise ValidationError({'module_set': '标准模块版本必须属于当前标准赛项。'})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.name} ({self.code})'
+
+
 class ModuleAxis(models.Model):
     project = models.ForeignKey(
         Project,

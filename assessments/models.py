@@ -118,7 +118,7 @@ def assessment_paper_path(instance, filename):
 class Assessment(models.Model):
     name = models.CharField("考核名称", max_length=100, unique=True)
     training_cycle = models.ForeignKey(
-        'trainingcycles.TrainingCycle',
+        'curriculum.TrainingCycle',
         verbose_name='备赛周期',
         on_delete=models.PROTECT,
         related_name='assessments',

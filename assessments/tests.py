@@ -16,10 +16,9 @@ from django.db.migrations.recorder import MigrationRecorder
 from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.urls import reverse
 
-from curriculum.models import CompetitionType, Project, StandardModule, StandardModuleSet
+from competition_standards.models import CompetitionType, Project, StandardModule, StandardModuleSet, TrainingCycle
 from core.constants import GROUP_COACH
 from core.uploads import ASSESSMENT_TP_UPLOAD_SPEC
-from trainingcycles.models import TrainingCycle
 
 from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
 from .selectors import build_assessment_list_context, build_assessment_score_table_context

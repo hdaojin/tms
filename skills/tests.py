@@ -9,7 +9,7 @@ from competitions.models import (
 	CompetitionModuleStandardModuleMap,
 	CompetitionProject,
 )
-from curriculum.models import (
+from competition_standards.models import (
 	CompetitionType,
 	Project,
 	StandardModule,

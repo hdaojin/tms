@@ -6,10 +6,11 @@ from django.urls import reverse
 from django.utils.html import format_html
 from urllib.parse import urlencode
 
-from curriculum.models import ModuleAxis, StandardModule
+from competition_standards.models import ModuleAxis, StandardModule
 
 from .models import (
     Competition,
+    CompetitionTrainingCycleTarget,
     CompetitionModuleAxisMap,
     CompetitionModule,
     CompetitionModuleStandardModuleMap,
@@ -262,6 +263,35 @@ class CompetitionProjectInline(admin.TabularInline):
     show_change_link = True
     verbose_name = '具体赛项'
     verbose_name_plural = '具体赛项'
+
+
+@admin.register(CompetitionTrainingCycleTarget)
+class CompetitionTrainingCycleTargetAdmin(admin.ModelAdmin):
+    list_display = ('training_cycle', 'kind', 'competition_project', 'project_display', 'competition_display')
+    list_filter = ('kind', 'training_cycle__project', 'competition_project__competition')
+    search_fields = (
+        'training_cycle__name',
+        'training_cycle__code',
+        'competition_project__competition__name',
+        'competition_project__competition__code',
+        'competition_project__project__name',
+        'competition_project__project__code',
+    )
+    autocomplete_fields = ['training_cycle', 'competition_project']
+    list_select_related = (
+        'training_cycle__project',
+        'competition_project__competition',
+        'competition_project__project',
+    )
+    ordering = ('training_cycle__name', 'kind')
+
+    @admin.display(description='标准赛项', ordering='training_cycle__project__name')
+    def project_display(self, obj):
+        return obj.training_cycle.project
+
+    @admin.display(description='具体赛事', ordering='competition_project__competition__name')
+    def competition_display(self, obj):
+        return obj.competition_project.competition
 
 
 @admin.register(Competition)

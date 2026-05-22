@@ -14,8 +14,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
-from curriculum.models import CompetitionType, Project, StandardModule, StandardModuleSet
-from trainingcycles.models import TrainingCycle
+from competition_standards.models import CompetitionType, Project, StandardModule, StandardModuleSet, TrainingCycle
 
 from .forms import TrainingLogCreateForm
 from .models import TrainingLog

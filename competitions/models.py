@@ -5,8 +5,8 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator
 
+from competition_standards.models import CompetitionType, Level, ModuleAxis, Project, StandardModule, TrainingCycle
 from core.uploads import COMPETITION_DOCUMENT_UPLOAD_SPEC, PrivateMediaStorage
-from curriculum.models import CompetitionType, Level, ModuleAxis, Project, StandardModule
 from .validators import (
     validate_competition_module_mapping_target,
     validate_single_primary_mapping,
@@ -162,6 +162,57 @@ class CompetitionProject(models.Model):
         if required_level is None:
             return None
         return get_member_scope_label(required_level)
+
+
+class CompetitionTrainingCycleTarget(models.Model):
+    """备赛周期与具体赛事赛项的目标/参考关系。"""
+
+    class Kind(models.TextChoices):
+        PRIMARY = 'primary', '主目标赛项'
+        REFERENCE = 'reference', '参考赛项'
+
+    training_cycle = models.ForeignKey(
+        TrainingCycle,
+        verbose_name='备赛周期',
+        on_delete=models.CASCADE,
+        related_name='competition_targets',
+    )
+    competition_project = models.ForeignKey(
+        CompetitionProject,
+        verbose_name='具体赛项',
+        on_delete=models.PROTECT,
+        related_name='training_cycle_targets',
+    )
+    kind = models.CharField('关系类型', max_length=20, choices=Kind.choices)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('最后更新时间', auto_now=True)
+
+    class Meta:
+        verbose_name = '备赛周期赛事目标'
+        verbose_name_plural = '备赛周期赛事目标'
+        ordering = ['training_cycle', 'kind', 'pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['training_cycle', 'kind'],
+                name='unique_training_cycle_target_kind',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if (
+            self.training_cycle_id
+            and self.competition_project_id
+            and self.competition_project.project_id != self.training_cycle.project_id
+        ):
+            raise ValidationError({'competition_project': '具体赛项必须属于当前备赛周期的标准赛项。'})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f'{self.training_cycle} / {self.get_kind_display()} / {self.competition_project}'
 
 
 class CompetitionModule(models.Model):

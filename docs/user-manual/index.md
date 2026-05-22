@@ -18,7 +18,7 @@
 - [competitions/glossary.md](competitions/glossary.md): competitions APP 术语表与易混概念说明。
 - [competitions/admin-guide.md](competitions/admin-guide.md): competitions 后台管理员操作手册。
 - [competitions/frontend-guide.md](competitions/frontend-guide.md): competitions 前台业务录入手册。
-- [curriculum/overview.md](curriculum/overview.md): curriculum APP 总览与赛项标准体系核心概念。
+- [curriculum/overview.md](curriculum/overview.md): curriculum APP 总览与赛训标准体系核心概念。
 - [meetings/overview.md](meetings/overview.md): meetings APP 总览与常见任务。
 - [notices/overview.md](notices/overview.md): notices APP 总览与发布权限说明。
 - [notes/overview.md](notes/overview.md): notes APP 总览与仓库/附件访问规则。

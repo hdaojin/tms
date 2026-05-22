@@ -9,15 +9,15 @@ from django.db import connections, transaction
 from django.db.migrations.recorder import MigrationRecorder
 from django.utils import timezone
 
-from curriculum.models import (
+from competition_standards.models import (
     CompetitionType,
     ModuleAxis,
     Project,
     StandardModule,
     StandardModuleAxisMap,
     StandardModuleSet,
+    TrainingCycle,
 )
-from trainingcycles.models import TrainingCycle
 
 
 @dataclass(frozen=True)
@@ -214,7 +214,7 @@ class Command(BaseCommand):
             .values_list("model", flat=True)
         )
         has_training_cycle = ContentType.objects.using(database).filter(
-            app_label="trainingcycles",
+            app_label="curriculum",
             model="trainingcycle",
         ).exists()
         if old_models or not has_training_cycle:
@@ -263,7 +263,7 @@ class Command(BaseCommand):
         if content_type_plan:
             duplicate_count = len(content_type_plan["duplicate_models"])
             rename_count = len(content_type_plan["rename_models"])
-            extra = "，并补建 trainingcycles.trainingcycle 内容类型" if content_type_plan["ensure_trainingcycle"] else ""
+            extra = "，并补建 curriculum.trainingcycle 内容类型" if content_type_plan["ensure_trainingcycle"] else ""
             self.stdout.write(
                 f"- 收敛 django_content_type: 合并重复模型 {duplicate_count} 个，迁移旧模型 {rename_count} 个{extra}"
             )
@@ -666,7 +666,7 @@ class Command(BaseCommand):
 
         if content_type_plan["ensure_trainingcycle"]:
             ContentType.objects.using(database).get_or_create(
-                app_label="trainingcycles",
+                app_label="curriculum",
                 model="trainingcycle",
             )
 

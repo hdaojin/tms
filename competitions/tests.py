@@ -14,7 +14,7 @@ from django.urls import resolve, reverse
 from accounts.services.permission_bundles import sync_user_permission_bundles
 from .admin import CompetitionProjectMemberAdminForm, CompetitorAdminForm, ExpertAdminForm
 from core.utils.menus import get_layout_sections, get_section_menu, get_sections
-from curriculum.models import (
+from competition_standards.models import (
 	CompetitionType,
 	Level,
 	ModuleAxis,

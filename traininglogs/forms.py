@@ -1,7 +1,6 @@
 from django import forms
 
-from curriculum.models import StandardModule
-from trainingcycles.models import TrainingCycle
+from competition_standards.models import StandardModule, TrainingCycle
 
 from .models import TrainingLog
 from core.uploads import TRAININGLOG_UPLOAD_SPEC

@@ -1,6 +1,6 @@
 ---
-menu_slug: "trainingcycles"
-app_name: "trainingcycles"
+menu_slug: "competition_standards"
+app_name: "competition_standards"
 items:
   - name: "备赛周期"
     icon:
@@ -9,7 +9,7 @@ items:
     is_group_header: true
     children:
       - name: "周期列表"
-        named_url: "trainingcycles:list"
+        named_url: "competition_standards:list"
         icon:
           pic: "icon-[tabler--list-details]"
           size: 4

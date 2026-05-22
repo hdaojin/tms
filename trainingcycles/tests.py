@@ -6,10 +6,8 @@ from django.db import connection
 from django.test import TestCase
 from django.urls import reverse
 
-from competitions.models import Competition, CompetitionProject
-from curriculum.models import CompetitionType, Project
-
-from .models import TrainingCycle
+from competitions.models import Competition, CompetitionProject, CompetitionTrainingCycleTarget
+from competition_standards.models import CompetitionType, Project, TrainingCycle
 
 
 User = get_user_model()
@@ -72,7 +70,7 @@ class TrainingCycleAdminTests(TestCase):
 
         with connection.constraint_checks_disabled():
             Project.objects.filter(pk=self.project.pk).update(competition_type_id=self.competition_type.pk + 9999)
-            response = self.client.get(reverse('admin:trainingcycles_trainingcycle_changelist'))
+            response = self.client.get(reverse('admin:curriculum_trainingcycle_changelist'))
             Project.objects.filter(pk=self.project.pk).update(competition_type_id=self.competition_type.pk)
 
         connection.check_constraints()
@@ -96,14 +94,19 @@ class TrainingCycleAdminTests(TestCase):
             project=other_project,
         )
 
-        cycle = TrainingCycle(
+        cycle = TrainingCycle.objects.create(
             code='TC-TARGET',
             name='目标错误周期',
             project=self.project,
             module_set=self.module_set,
-            primary_competition_project=other_competition_project,
             start_date=date(2026, 1, 1),
         )
 
+        target = CompetitionTrainingCycleTarget(
+            training_cycle=cycle,
+            competition_project=other_competition_project,
+            kind=CompetitionTrainingCycleTarget.Kind.PRIMARY,
+        )
+
         with self.assertRaises(ValidationError):
-            cycle.full_clean()
+            target.full_clean()
