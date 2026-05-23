@@ -85,15 +85,15 @@ uv run manage.py migrate
 
 如果已经先执行了 `migrate`，后来才发现忘记运行某个 cutover 命令的 `--execute`，也不要手工改库。可以直接使用统一收尾命令自动检查并收敛半切换状态。
 
-如果当前环境是在旧的 `competitions` 标准库结构上继续升级到新的 `curriculum` / `trainingcycles` 拆分，也要先执行对应收尾命令，再继续 `migrate`、`makemigrations` 等迁移相关命令。
+如果当前环境已经存在旧的 `curriculum_*` 与 `trainingcycles_trainingcycle` 数据表，并准备升级到新的 `competition_standards` 结构，必须先执行 `cutover_competition_standards --execute`，再继续 `migrate`、`makemigrations` 等迁移相关命令。否则 `competition_standards.0001_initial` 会检测到旧表并中止，避免误建空表导致数据分叉。
 
 仅适用于已有旧数据的环境：
 
 ```bash
 uv run manage.py reconcile_internal_app_cutovers
 uv run manage.py reconcile_internal_app_cutovers --execute
-uv run manage.py reconcile_curriculum_training_cutovers
-uv run manage.py reconcile_curriculum_training_cutovers --execute
+uv run manage.py cutover_competition_standards
+uv run manage.py cutover_competition_standards --execute
 uv run manage.py cutover_assessment_to_assessments
 uv run manage.py cutover_assessment_to_assessments --execute
 uv run manage.py cutover_conduct_to_behaviors
@@ -106,20 +106,19 @@ uv run manage.py cutover_meeting_to_meetings --execute
 
 - 全新初始化数据库时，不需要执行 `cutover_assessment_to_assessments`。
 - 全新初始化数据库时，不需要执行 `cutover_conduct_to_behaviors` 或 `cutover_meeting_to_meetings`。
-- 全新初始化数据库时，不需要执行 `reconcile_curriculum_training_cutovers`。
+- 全新初始化数据库时，不需要执行 `cutover_competition_standards`。
 - 推荐优先使用 `reconcile_internal_app_cutovers` 统一预检查和执行收尾；在 `--execute` 模式下，该命令会在三个 app 收尾后自动执行 `migrate`。
 - 执行 `--execute` 前，先备份数据库，以及命令涉及的旧上传目录。
+- `cutover_competition_standards` 会把 `curriculum_*` 与 `trainingcycles_trainingcycle` 表重命名为 `competition_standards_*`，把训练周期上的旧主目标/参考赛项字段迁入 `competitions_competitiontrainingcycletarget`，删除旧字段，并迁移 `django_content_type`、`auth_permission`、`django_admin_log` 和迁移记录中的 app 标识。
 - 该命令会重命名旧的 `assessment_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识，并把私有资料目录迁到 `media-private/assessments/`。
 - `cutover_conduct_to_behaviors` 会重命名旧的 `conduct_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识，并在存在旧目录时把公共附件目录从 `media/conduct/` 迁到 `media/behaviors/`。
 - `cutover_meeting_to_meetings` 会重命名旧的 `meeting_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识；如存在遗留 `media/meeting/`，也会一并迁到 `media/meetings/`。
-- `reconcile_curriculum_training_cutovers` 会把旧的 `competitions_*` 标准库表收敛到 `curriculum_*`，补建 `trainingcycles_trainingcycle`，并按现有训练日志、考核模块自动回填默认备赛周期与对应迁移记录。
-- 如果旧标准库中的某些项目没有任何可用于推断赛事类型的历史赛项关系，`reconcile_curriculum_training_cutovers` 会在预检查和执行前显式列出这些项目的 ID、代码和名称，并要求先人工补齐所属赛事类型后再执行 `--execute`。
-- 如果生产环境已经出现“旧表和新表同时存在，但新表为空”的半切换状态，统一命令和三个单独 cutover 命令都会自动接管恢复；只有在检测到新表已有真实数据或新目录已有真实文件时才会拒绝执行。
+- 如果生产环境已经出现“旧表和新表同时存在，但新表为空”的半切换状态，对应 cutover 命令会自动接管恢复；只有在检测到新表已有真实数据或新目录已有真实文件时才会拒绝执行。
 
 ### 5. 导入基础数据
 
 ```bash
-uv run manage.py loaddata core/default accounts/default curriculum/default competitions/default behaviors/default
+uv run manage.py loaddata core/default accounts/default competition_standards/default competitions/default behaviors/default
 ```
 
 ### 6. 创建超级管理员
@@ -159,7 +158,7 @@ http://127.0.0.1:8000/
 ```bash
 uv run manage.py test assessments
 uv run manage.py reconcile_internal_app_cutovers
-uv run manage.py reconcile_curriculum_training_cutovers
+uv run manage.py cutover_competition_standards
 uv run manage.py cutover_assessment_to_assessments
 uv run manage.py cutover_conduct_to_behaviors
 uv run manage.py cutover_meeting_to_meetings
@@ -260,7 +259,7 @@ mkdir -p /srv/tms/media-private
 
 ```bash
 uv run manage.py migrate
-uv run manage.py loaddata core/default accounts/default competitions/default behaviors/default
+uv run manage.py loaddata core/default accounts/default competition_standards/default competitions/default behaviors/default
 uv run manage.py createsuperuser
 ```
 

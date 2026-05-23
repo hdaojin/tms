@@ -1,4 +1,4 @@
-- model: curriculum.competitiontype
+﻿- model: competition_standards.competitiontype
   pk: 1
   fields:
     code: "WSC"
@@ -9,7 +9,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.project
+- model: competition_standards.project
   pk: 1
   fields:
     competition_type: 1
@@ -19,7 +19,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.standardmoduleset
+- model: competition_standards.standardmoduleset
   pk: 1
   fields:
     project: 1
@@ -31,7 +31,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.moduleaxis
+- model: competition_standards.moduleaxis
   pk: 1
   fields:
     project: 1
@@ -43,7 +43,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.moduleaxis
+- model: competition_standards.moduleaxis
   pk: 2
   fields:
     project: 1
@@ -55,7 +55,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.moduleaxis
+- model: competition_standards.moduleaxis
   pk: 3
   fields:
     project: 1
@@ -67,7 +67,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.moduleaxis
+- model: competition_standards.moduleaxis
   pk: 4
   fields:
     project: 1
@@ -79,7 +79,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.moduleaxis
+- model: competition_standards.moduleaxis
   pk: 5
   fields:
     project: 1
@@ -91,7 +91,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.moduleaxis
+- model: competition_standards.moduleaxis
   pk: 6
   fields:
     project: 1
@@ -103,7 +103,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.standardmodule
+- model: competition_standards.standardmodule
   pk: 1
   fields:
     project: 1
@@ -115,7 +115,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.standardmodule
+- model: competition_standards.standardmodule
   pk: 2
   fields:
     project: 1
@@ -127,7 +127,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.standardmodule
+- model: competition_standards.standardmodule
   pk: 3
   fields:
     project: 1
@@ -139,7 +139,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.standardmodule
+- model: competition_standards.standardmodule
   pk: 4
   fields:
     project: 1
@@ -151,7 +151,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.standardmodule
+- model: competition_standards.standardmodule
   pk: 5
   fields:
     project: 1
@@ -163,7 +163,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.standardmodule
+- model: competition_standards.standardmodule
   pk: 6
   fields:
     project: 1
@@ -175,7 +175,7 @@
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
 
-- model: curriculum.standardmoduleaxismap
+- model: competition_standards.standardmoduleaxismap
   pk: 1
   fields:
     module: 1
@@ -184,7 +184,7 @@
     weight: "1.00"
     note: ""
 
-- model: curriculum.standardmoduleaxismap
+- model: competition_standards.standardmoduleaxismap
   pk: 2
   fields:
     module: 2
@@ -193,7 +193,7 @@
     weight: "1.00"
     note: ""
 
-- model: curriculum.standardmoduleaxismap
+- model: competition_standards.standardmoduleaxismap
   pk: 3
   fields:
     module: 3
@@ -202,7 +202,7 @@
     weight: "1.00"
     note: ""
 
-- model: curriculum.standardmoduleaxismap
+- model: competition_standards.standardmoduleaxismap
   pk: 4
   fields:
     module: 4
@@ -211,7 +211,7 @@
     weight: "1.00"
     note: ""
 
-- model: curriculum.standardmoduleaxismap
+- model: competition_standards.standardmoduleaxismap
   pk: 5
   fields:
     module: 5
@@ -220,7 +220,7 @@
     weight: "1.00"
     note: ""
 
-- model: curriculum.standardmoduleaxismap
+- model: competition_standards.standardmoduleaxismap
   pk: 6
   fields:
     module: 6

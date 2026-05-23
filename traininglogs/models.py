@@ -52,13 +52,13 @@ def traininglog_upload_to(instance: "TrainingLog", filename: str) -> str:
 
 class TrainingLog(UploadedDocumentModel):
     training_cycle = models.ForeignKey(
-        'curriculum.TrainingCycle',
+        'competition_standards.TrainingCycle',
         on_delete=models.PROTECT,
         related_name='training_logs',
-        verbose_name='备赛周期',
+        verbose_name='训练周期',
     )
     module = models.ForeignKey(
-        'curriculum.StandardModule', on_delete=models.SET_NULL,
+        'competition_standards.StandardModule', on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='training_logs', verbose_name='标准模块'
     )
@@ -99,7 +99,7 @@ class TrainingLog(UploadedDocumentModel):
     def clean(self):
         super().clean()
         if self.training_cycle_id and self.module_id and self.module.module_set_id != self.training_cycle.module_set_id:
-            raise ValidationError({'module': '标准模块必须属于当前备赛周期的标准模块版本。'})
+            raise ValidationError({'module': '标准模块必须属于当前训练周期的标准模块版本。'})
         if not self.uploaded_by_id or not self.training_date:
             return
 
@@ -113,7 +113,7 @@ class TrainingLog(UploadedDocumentModel):
 
         if duplicate_qs.exists():
             raise ValidationError({
-                'training_date': '同一备赛周期内，同一训练日期只能上传一条训练日志。如需更正，请先删除原日志后再重新上传。'
+                'training_date': '同一训练周期内，同一训练日期只能上传一条训练日志。如需更正，请先删除原日志后再重新上传。'
             })
 
     def __str__(self):

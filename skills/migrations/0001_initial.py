@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('competitions', '0001_initial'),
-        ('curriculum', '0001_initial'),
+        ('competition_standards', '0001_initial'),
     ]
 
     operations = [
@@ -113,7 +113,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=100, verbose_name='名称')),
                 ('description', models.TextField(blank=True, verbose_name='描述')),
-                ('module', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='topics', to='curriculum.standardmodule', verbose_name='所属模块')),
+                ('module', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='topics', to='competition_standards.standardmodule', verbose_name='所属模块')),
             ],
             options={
                 'verbose_name': '专题',

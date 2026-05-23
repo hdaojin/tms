@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('curriculum', '0005_alter_competitiontype_options_and_more'),
+        ('competition_standards', '0001_initial'),
         ('traininglogs', '0001_initial'),
     ]
 
@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='traininglog',
             name='module',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='training_logs', to='curriculum.standardmodule', verbose_name='标准模块'),
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='training_logs', to='competition_standards.standardmodule', verbose_name='标准模块'),
         ),
     ]

@@ -15,7 +15,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('auth', '0012_alter_user_first_name_max_length'),
-        ('curriculum', '0001_initial'),
+        ('competition_standards', '0001_initial'),
     ]
 
     operations = [
@@ -77,7 +77,7 @@ class Migration(migrations.Migration):
                 ('description', models.TextField(blank=True, verbose_name='描述')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='创建时间')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='最后更新时间')),
-                ('competition_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='competitions', to='curriculum.competitiontype', verbose_name='所属赛事类型')),
+                ('competition_type', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='competitions', to='competition_standards.competitiontype', verbose_name='所属赛事类型')),
             ],
             options={
                 'verbose_name': '具体赛事',
@@ -94,7 +94,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='创建时间')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='最后更新时间')),
                 ('competition', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_projects', to='competitions.competition', verbose_name='所属赛事')),
-                ('project', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_projects', to='curriculum.project', verbose_name='竞赛项目')),
+                ('project', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_projects', to='competition_standards.project', verbose_name='竞赛项目')),
             ],
             options={
                 'verbose_name': '具体赛事项目',
@@ -182,7 +182,7 @@ class Migration(migrations.Migration):
                 ('weight', models.DecimalField(decimal_places=2, default=Decimal('1.00'), help_text='用于表示该官方模块映射到该模块主线时的相对权重。', max_digits=5, validators=[django.core.validators.MinValueValidator(Decimal('0.01'))], verbose_name='权重')),
                 ('note', models.TextField(blank=True, verbose_name='备注')),
                 ('competition_module', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='axis_mappings', to='competitions.competitionmodule', verbose_name='具体赛项模块')),
-                ('module_axis', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_module_mappings', to='curriculum.moduleaxis', verbose_name='模块主线')),
+                ('module_axis', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_module_mappings', to='competition_standards.moduleaxis', verbose_name='模块主线')),
             ],
             options={
                 'verbose_name': '官方模块主线映射',
@@ -200,7 +200,7 @@ class Migration(migrations.Migration):
                 ('weight', models.DecimalField(decimal_places=2, default=Decimal('1.00'), help_text='用于表示该官方模块映射到该标准模块时的相对权重。', max_digits=5, validators=[django.core.validators.MinValueValidator(Decimal('0.01'))], verbose_name='权重')),
                 ('note', models.TextField(blank=True, verbose_name='备注')),
                 ('competition_module', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='module_mappings', to='competitions.competitionmodule', verbose_name='具体赛项模块')),
-                ('module', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_module_mappings', to='curriculum.standardmodule', verbose_name='标准模块')),
+                ('module', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_module_mappings', to='competition_standards.standardmodule', verbose_name='标准模块')),
             ],
             options={
                 'verbose_name': '官方模块标准映射',

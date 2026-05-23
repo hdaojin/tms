@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('competitions', '0001_initial'),
-        ('curriculum', '0003_alter_standardmodule_unique_together_and_more'),
+        ('competition_standards', '0001_initial'),
     ]
 
     operations = [

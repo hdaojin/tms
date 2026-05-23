@@ -2,7 +2,7 @@
 menu_slug: "competition_standards"
 app_name: "competition_standards"
 items:
-  - name: "备赛周期"
+  - name: "训练周期"
     icon:
       pic: "icon-[tabler--calendar]"
       size: 4

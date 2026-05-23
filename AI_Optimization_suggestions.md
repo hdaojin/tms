@@ -16,7 +16,7 @@ TMS 的基础方向是对的：Django 6、全站 `LoginRequiredMiddleware`、`co
 
 3. 重新划分 competitions 的边界 OK 
 
-   `traininglogs`、`assessments`、`skills` 都依赖 `competitions.StandardModule`。这说明 `Project / StandardModule / ModuleAxis` 更像“训练/课程/模块标准库”，不完全是 competitions 私有能力。建议中期拆出 `taxonomy`、`curriculum` 或 `trainingcore` app，让 competitions 只管赛事、赛项、人员、成绩归档。
+   `traininglogs`、`assessments`、`skills` 都依赖标准模块。`Project / StandardModule / ModuleAxis` 已收敛到 `competition_standards`，competitions 只负责具体赛事、具体赛项、人员、官方模块和成绩归档。
 
 4. 把权限和业务规则从 views 里抽出来  OK
 

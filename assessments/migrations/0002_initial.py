@@ -11,8 +11,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('assessments', '0001_initial'),
-        ('curriculum', '0001_initial'),
-        ('trainingcycles', '0001_initial'),
+        ('competition_standards', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -20,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='assessment',
             name='training_cycle',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='assessments', to='trainingcycles.trainingcycle', verbose_name='备赛周期'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='assessments', to='competition_standards.trainingcycle', verbose_name='训练周期'),
         ),
         migrations.AddField(
             model_name='assessmentmodule',
@@ -40,7 +39,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='assessmentmodule',
             name='module',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='curriculum.standardmodule', verbose_name='模块'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='competition_standards.standardmodule', verbose_name='模块'),
         ),
         migrations.AddField(
             model_name='assessmentmodule',
@@ -55,7 +54,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='assessment',
             name='modules',
-            field=models.ManyToManyField(blank=True, help_text='本次考核包含的模块', related_name='assessments', through='assessments.AssessmentModule', to='curriculum.standardmodule', verbose_name='考核模块'),
+            field=models.ManyToManyField(blank=True, help_text='本次考核包含的模块', related_name='assessments', through='assessments.AssessmentModule', to='competition_standards.standardmodule', verbose_name='考核模块'),
         ),
         migrations.AddField(
             model_name='score',

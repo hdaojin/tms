@@ -6,7 +6,7 @@ from .models import TrainingLog
 
 class TrainingLogTable(BaseTable):
     training_date = BaseDateColumn(verbose_name="训练日期")
-    training_cycle = tables.Column(verbose_name="备赛周期", accessor="training_cycle", orderable=True)
+    training_cycle = tables.Column(verbose_name="训练周期", accessor="training_cycle", orderable=True)
     module = tables.Column(verbose_name="训练模块", accessor="module.name", orderable=True)
     filename = tables.Column(verbose_name="文件名", accessor="filename", orderable=False)
     uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by", orderable=True)
@@ -32,7 +32,7 @@ class TrainingLogTable(BaseTable):
 class TrainingLogOthersTable(BaseTable):
     """用于展示他人日志的表格（仅“查看”操作）。"""
     training_date = BaseDateColumn(verbose_name="训练日期")
-    training_cycle = tables.Column(verbose_name="备赛周期", accessor="training_cycle", orderable=True)
+    training_cycle = tables.Column(verbose_name="训练周期", accessor="training_cycle", orderable=True)
     module = tables.Column(verbose_name="训练模块", accessor="module.name", orderable=True)
     filename = tables.Column(verbose_name="文件名", accessor="filename", orderable=False)
     uploaded_by = tables.Column(verbose_name="上传者", accessor="uploaded_by", orderable=True)

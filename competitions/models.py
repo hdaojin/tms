@@ -165,7 +165,7 @@ class CompetitionProject(models.Model):
 
 
 class CompetitionTrainingCycleTarget(models.Model):
-    """备赛周期与具体赛事赛项的目标/参考关系。"""
+    """训练周期与具体赛事赛项的目标/参考关系。"""
 
     class Kind(models.TextChoices):
         PRIMARY = 'primary', '主目标赛项'
@@ -173,7 +173,7 @@ class CompetitionTrainingCycleTarget(models.Model):
 
     training_cycle = models.ForeignKey(
         TrainingCycle,
-        verbose_name='备赛周期',
+        verbose_name='训练周期',
         on_delete=models.CASCADE,
         related_name='competition_targets',
     )
@@ -188,8 +188,8 @@ class CompetitionTrainingCycleTarget(models.Model):
     updated_at = models.DateTimeField('最后更新时间', auto_now=True)
 
     class Meta:
-        verbose_name = '备赛周期赛事目标'
-        verbose_name_plural = '备赛周期赛事目标'
+        verbose_name = '训练周期赛事目标'
+        verbose_name_plural = '训练周期赛事目标'
         ordering = ['training_cycle', 'kind', 'pk']
         constraints = [
             models.UniqueConstraint(
@@ -205,7 +205,7 @@ class CompetitionTrainingCycleTarget(models.Model):
             and self.competition_project_id
             and self.competition_project.project_id != self.training_cycle.project_id
         ):
-            raise ValidationError({'competition_project': '具体赛项必须属于当前备赛周期的标准赛项。'})
+            raise ValidationError({'competition_project': '具体赛项必须属于当前训练周期的标准赛项。'})
 
     def save(self, *args, **kwargs):
         self.clean()

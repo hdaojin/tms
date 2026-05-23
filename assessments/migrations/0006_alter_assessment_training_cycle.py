@@ -8,13 +8,13 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('assessments', '0005_alter_assessmentmodule_module'),
-        ('curriculum', '0006_trainingcycle'),
+        ('competition_standards', '0001_initial'),
     ]
 
     operations = [
         migrations.AlterField(
             model_name='assessment',
             name='training_cycle',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='assessments', to='curriculum.trainingcycle', verbose_name='备赛周期'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='assessments', to='competition_standards.trainingcycle', verbose_name='训练周期'),
         ),
     ]

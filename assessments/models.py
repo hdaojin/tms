@@ -118,8 +118,8 @@ def assessment_paper_path(instance, filename):
 class Assessment(models.Model):
     name = models.CharField("考核名称", max_length=100, unique=True)
     training_cycle = models.ForeignKey(
-        'curriculum.TrainingCycle',
-        verbose_name='备赛周期',
+        'competition_standards.TrainingCycle',
+        verbose_name='训练周期',
         on_delete=models.PROTECT,
         related_name='assessments',
     )
@@ -127,7 +127,7 @@ class Assessment(models.Model):
     end_date = models.DateField("结束日期", help_text="考核结束的日期")
     description = models.TextField("描述", blank=True)
     modules = models.ManyToManyField(
-        'curriculum.StandardModule',
+        'competition_standards.StandardModule',
         through='AssessmentModule',
         verbose_name="考核模块",
         related_name="assessments",
@@ -166,7 +166,7 @@ class AssessmentModule(models.Model):
         verbose_name="考核"
     )
     module = models.ForeignKey(
-        'curriculum.StandardModule',
+        'competition_standards.StandardModule',
         on_delete=models.PROTECT,
         verbose_name="标准模块"
     )
@@ -301,7 +301,7 @@ class AssessmentModule(models.Model):
             and self.module_id
             and self.module.module_set_id != self.assessment.training_cycle.module_set_id
         ):
-            raise ValidationError({"module": "考核模块必须属于当前备赛周期的标准模块版本。"})
+            raise ValidationError({"module": "考核模块必须属于当前训练周期的标准模块版本。"})
 
     def apply_default_ranking_rule(self):
         if not self._state.adding or self._counts_towards_ranking_explicit or not self.module_id:

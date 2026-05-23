@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('assessments', '0003_assessmentmodule_counts_towards_ranking'),
-        ('curriculum', '0003_alter_standardmodule_unique_together_and_more'),
+        ('competition_standards', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

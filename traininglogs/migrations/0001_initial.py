@@ -15,8 +15,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('curriculum', '0001_initial'),
-        ('trainingcycles', '0001_initial'),
+        ('competition_standards', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -29,8 +28,8 @@ class Migration(migrations.Migration):
                 ('training_date', models.DateField(default=django.utils.timezone.now, help_text='*特别注意：请填写日志对应的实际训练日期，而非上传日期', validators=[core.utils.validators.validate_date_not_future], verbose_name='训练日期')),
                 ('file', models.FileField(help_text='上传训练日志文件，支持 doc, docx, pdf，大小不超过 20MB', upload_to=traininglogs.models.traininglog_upload_to, validators=[django.core.validators.FileExtensionValidator(allowed_extensions=('doc', 'docx', 'pdf'), message='仅支持以下格式的文件：doc, docx, pdf'), core.uploads.UploadSizeValidator(20)], verbose_name='日志文件')),
                 ('uploaded_at', models.DateTimeField(auto_now_add=True, verbose_name='上传时间')),
-                ('module', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='training_logs', to='curriculum.standardmodule', verbose_name='训练模块')),
-                ('training_cycle', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='training_logs', to='trainingcycles.trainingcycle', verbose_name='备赛周期')),
+                ('module', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='training_logs', to='competition_standards.standardmodule', verbose_name='训练模块')),
+                ('training_cycle', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='training_logs', to='competition_standards.trainingcycle', verbose_name='训练周期')),
                 ('uploaded_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='training_logs', to=settings.AUTH_USER_MODEL, verbose_name='上传者')),
             ],
             options={

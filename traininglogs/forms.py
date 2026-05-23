@@ -63,7 +63,7 @@ class TrainingLogCreateForm(DefaultTodayDateFormMixin, StyledFormMixin, forms.Mo
             }
 
         # labels = {
-        #     'training_cycle': '备赛周期',
+        #     'training_cycle': '训练周期',
         #     'training_date': '训练日期',
         #     'module': '训练模块',
         #     'task': '训练任务',

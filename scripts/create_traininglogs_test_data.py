@@ -26,7 +26,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.utils import timezone
 
-from competitions.models import StandardModule
+from competition_standards.models import StandardModule, StandardModuleSet, TrainingCycle
 from traininglogs.models import TrainingLog
 
 
@@ -151,27 +151,126 @@ def build_file_content(index: int, training_date, task: str) -> ContentFile:
     return ContentFile(build_pdf_bytes(lines), name=f"traininglog-test-{index:04d}.pdf")
 
 
+def build_test_cycle_code(module_set: StandardModuleSet) -> str:
+    project = module_set.project
+    base_code = f"TEST-{project.code}-{module_set.code}"[:50]
+    candidate = base_code
+    suffix = 2
+    while TrainingCycle.objects.filter(code=candidate).exists():
+        suffix_text = f"-{suffix}"
+        candidate = f"{base_code[:50 - len(suffix_text)]}{suffix_text}"
+        suffix += 1
+    return candidate
+
+
+def get_or_create_training_cycles() -> list[TrainingCycle]:
+    cycles = list(
+        TrainingCycle.objects.select_related("project", "module_set")
+        .order_by("-start_date", "id")
+    )
+    if cycles:
+        return cycles
+
+    module_set = (
+        StandardModuleSet.objects.select_related("project")
+        .order_by("-is_current", "sort_order", "id")
+        .first()
+    )
+    if module_set is None:
+        raise SystemExit("未找到训练周期或标准模块版本，无法创建训练日志测试数据。")
+
+    today = timezone.localdate()
+    cycle = TrainingCycle.objects.create(
+        code=build_test_cycle_code(module_set),
+        name=f"{module_set.project.name} 测试训练周期"[:100],
+        project=module_set.project,
+        module_set=module_set,
+        start_date=today,
+        status=TrainingCycle.Status.ACTIVE,
+        description="由测试数据脚本自动创建。",
+    )
+    print(f"未找到训练周期，已自动创建：{cycle}")
+    return [cycle]
+
+
+def build_modules_by_cycle(cycles: list[TrainingCycle]) -> dict[int, list[StandardModule]]:
+    modules_by_set: dict[int, list[StandardModule]] = {}
+    for module in StandardModule.objects.filter(
+        module_set_id__in=[cycle.module_set_id for cycle in cycles]
+    ).select_related("module_set").order_by("module_set_id", "sort_order", "id"):
+        modules_by_set.setdefault(module.module_set_id, []).append(module)
+    return {
+        cycle.pk: modules_by_set.get(cycle.module_set_id, [])
+        for cycle in cycles
+    }
+
+
+def choose_unique_slot(
+    cycles: list[TrainingCycle],
+    uploaded_by,
+    today,
+    days_back: int,
+    rng: random.Random,
+    used_keys: set[tuple[int, int | None, object]],
+) -> tuple[TrainingCycle, object]:
+    uploaded_by_id = uploaded_by.pk if uploaded_by else None
+    for _attempt in range(100):
+        cycle = rng.choice(cycles)
+        training_date = today - timedelta(days=rng.randint(0, days_back))
+        key = (cycle.pk, uploaded_by_id, training_date)
+        if key not in used_keys:
+            used_keys.add(key)
+            return cycle, training_date
+
+    offset = days_back + 1
+    while True:
+        for cycle in cycles:
+            training_date = today - timedelta(days=offset)
+            key = (cycle.pk, uploaded_by_id, training_date)
+            if key not in used_keys:
+                used_keys.add(key)
+                return cycle, training_date
+        offset += 1
+
+
 def create_traininglogs(count: int, days_back: int, seed: int | None) -> int:
     rng = random.Random(seed)
     today = timezone.localdate()
 
     user_model = get_user_model()
     users = [user for user in user_model.objects.order_by("id") if hasattr(user, "display_name")]
-    modules = list(StandardModule.objects.order_by("id"))
+    training_cycles = get_or_create_training_cycles()
+    modules_by_cycle = build_modules_by_cycle(training_cycles)
     uploaded_by_plan = build_uploaded_by_plan(users, count, rng)
+    used_keys = {
+        (training_cycle_id, uploaded_by_id, training_date)
+        for training_cycle_id, uploaded_by_id, training_date in TrainingLog.objects.values_list(
+            "training_cycle_id",
+            "uploaded_by_id",
+            "training_date",
+        )
+    }
 
     if not users:
         print("未找到可用用户，将创建 uploaded_by 为空的训练日志。")
-    if not modules:
-        print("未找到训练模块，将创建 module 为空的训练日志。")
+    if not any(modules_by_cycle.values()):
+        print("所选训练周期没有可用标准模块，将创建 module 为空的训练日志。")
 
     created = 0
     for index, uploaded_by in enumerate(uploaded_by_plan, start=1):
-        training_date = today - timedelta(days=rng.randint(0, days_back))
-        module = choose_or_none(modules, rng)
+        training_cycle, training_date = choose_unique_slot(
+            training_cycles,
+            uploaded_by,
+            today,
+            days_back,
+            rng,
+            used_keys,
+        )
+        module = choose_or_none(modules_by_cycle.get(training_cycle.pk, []), rng)
         task = build_task(module, rng)
 
         training_log = TrainingLog(
+            training_cycle=training_cycle,
             module=module,
             task=task,
             training_date=training_date,

@@ -149,7 +149,7 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 		self.assertFalse(form.is_valid())
 		self.assertIn('training_date', form.errors)
 		self.assertEqual(len(form.errors['training_date']), 1)
-		self.assertIn('同一备赛周期内，同一训练日期只能上传一条训练日志', form.errors['training_date'][0])
+		self.assertIn('同一训练周期内，同一训练日期只能上传一条训练日志', form.errors['training_date'][0])
 
 	def test_form_allows_same_user_on_different_date(self):
 		other_date = self.training_date - timedelta(days=1)
@@ -212,7 +212,7 @@ class TrainingLogDuplicateValidationTestCase(TestCase):
 		)
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, '同一备赛周期内，同一训练日期只能上传一条训练日志')
+		self.assertContains(response, '同一训练周期内，同一训练日期只能上传一条训练日志')
 		self.assertEqual(
 			TrainingLog.objects.filter(uploaded_by=self.user, training_date=self.training_date).count(),
 			1,

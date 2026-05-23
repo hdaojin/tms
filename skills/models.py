@@ -7,7 +7,7 @@ from django.db import models
 
 class Topic(models.Model):
     module = models.ForeignKey(
-        'curriculum.StandardModule',
+        'competition_standards.StandardModule',
         verbose_name="所属模块",
         on_delete=models.CASCADE,
         related_name='topics',

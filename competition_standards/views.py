@@ -11,9 +11,9 @@ from .tables import TrainingCycleTable
 class TrainingCycleListView(TitleMixin, LoginRequiredMixin, SingleTableView):
 	model = TrainingCycle
 	table_class = TrainingCycleTable
-	template_name = 'curriculum/trainingcycle_list.html'
+	template_name = 'competition_standards/trainingcycle_list.html'
 	paginate_by = 20
-	title = '备赛周期'
+	title = '训练周期'
 	title_icon = 'icon-[tabler--calendar]'
 
 	def get_queryset(self):
@@ -29,7 +29,7 @@ class TrainingCycleListView(TitleMixin, LoginRequiredMixin, SingleTableView):
 
 class TrainingCycleDetailView(TitleMixin, LoginRequiredMixin, DetailView):
 	model = TrainingCycle
-	template_name = 'curriculum/trainingcycle_detail.html'
+	template_name = 'competition_standards/trainingcycle_detail.html'
 	context_object_name = 'training_cycle'
 	title = '{name}'
 	title_icon = 'icon-[tabler--calendar]'

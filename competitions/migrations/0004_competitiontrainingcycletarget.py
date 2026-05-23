@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('competitions', '0003_alter_competitionmodule_options_and_more'),
-        ('curriculum', '0006_trainingcycle'),
+        ('competition_standards', '0001_initial'),
     ]
 
     operations = [
@@ -20,11 +20,11 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='创建时间')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='最后更新时间')),
                 ('competition_project', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='training_cycle_targets', to='competitions.competitionproject', verbose_name='具体赛项')),
-                ('training_cycle', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='competition_targets', to='curriculum.trainingcycle', verbose_name='备赛周期')),
+                ('training_cycle', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='competition_targets', to='competition_standards.trainingcycle', verbose_name='训练周期')),
             ],
             options={
-                'verbose_name': '备赛周期赛事目标',
-                'verbose_name_plural': '备赛周期赛事目标',
+                'verbose_name': '训练周期赛事目标',
+                'verbose_name_plural': '训练周期赛事目标',
                 'ordering': ['training_cycle', 'kind', 'pk'],
                 'constraints': [models.UniqueConstraint(fields=('training_cycle', 'kind'), name='unique_training_cycle_target_kind')],
             },

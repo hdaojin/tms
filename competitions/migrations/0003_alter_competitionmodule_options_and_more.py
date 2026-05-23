@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('competitions', '0002_alter_competitionmodule_unique_together_and_more'),
-        ('curriculum', '0005_alter_competitiontype_options_and_more'),
+        ('competition_standards', '0001_initial'),
     ]
 
     operations = [
@@ -54,7 +54,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='competitionmoduleaxismap',
             name='module_axis',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_module_mappings', to='curriculum.moduleaxis', verbose_name='能力主线'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_module_mappings', to='competition_standards.moduleaxis', verbose_name='能力主线'),
         ),
         migrations.AlterField(
             model_name='competitionmoduleaxismap',
@@ -69,6 +69,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='competitionproject',
             name='project',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_projects', to='curriculum.project', verbose_name='标准赛项'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='competition_projects', to='competition_standards.project', verbose_name='标准赛项'),
         ),
     ]
