@@ -1,0 +1,801 @@
+{% extends "base_minimal.html" %}
+{% load static %}
+
+{% block main %}
+  {{ countdown_config|json_script:"countdown-config" }}
+  <main
+    class="countdown-stage {{ active_theme.body_class }} relative isolate min-w-0 flex-1 overflow-hidden bg-slate-950 text-slate-100"
+    style="--countdown-bg: url('{% static active_theme.background_image %}'); --countdown-title-font: {{ active_theme.font_tokens.title }}; --countdown-number-font: {{ active_theme.font_tokens.number }}; --countdown-mono-font: {{ active_theme.font_tokens.mono }};"
+    x-data="countdownScreen()"
+    x-init="start()"
+  >
+    <style>
+      [x-cloak] {
+        display: none !important;
+      }
+
+      @font-face {
+        font-display: swap;
+        font-family: "YouSheBiaoTiHei";
+        font-style: normal;
+        font-weight: 400 900;
+        src: url("{% static 'fonts/countdown/YouSheBiaoTiHei.ttf' %}") format("truetype");
+      }
+
+      @font-face {
+        font-display: swap;
+        font-family: "DSEG7Classic";
+        font-style: normal;
+        font-weight: 400 900;
+        src:
+          url("{% static 'fonts/countdown/DSEG7Classic-Bold.woff2' %}") format("woff2"),
+          url("{% static 'fonts/countdown/DSEG7Classic-Bold.ttf' %}") format("truetype");
+      }
+
+      .countdown-stage {
+        width: 100%;
+        min-height: 100vh;
+        min-height: 100dvh;
+        font-family: var(--countdown-title-font);
+        background-color: #020617;
+        flex: 1 1 auto;
+      }
+
+      .countdown-bg,
+      .countdown-overlay,
+      .countdown-grid,
+      .countdown-scan,
+      .signal-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .countdown-bg {
+        z-index: 0;
+        background-image: var(--countdown-bg);
+        background-position: center;
+        background-size: cover;
+        opacity: 1;
+      }
+
+      .countdown-overlay {
+        z-index: 1;
+        background:
+          radial-gradient(circle at 50% 24%, rgba(14, 165, 233, 0.12), transparent 38%),
+          linear-gradient(180deg, rgba(2, 6, 23, 0.04), rgba(2, 6, 23, 0.34) 88%),
+          linear-gradient(90deg, rgba(2, 6, 23, 0.18), transparent 24%, transparent 76%, rgba(2, 6, 23, 0.16));
+      }
+
+      .countdown-grid {
+        z-index: 2;
+        opacity: 0.42;
+        background-image:
+          linear-gradient(rgba(34, 211, 238, 0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(34, 211, 238, 0.035) 1px, transparent 1px);
+        background-size: 36px 36px;
+        mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 92%);
+      }
+
+      .countdown-scan {
+        z-index: 3;
+        background: linear-gradient(180deg, transparent, rgba(34, 211, 238, 0.08), transparent);
+        height: 16vh;
+        animation: countdown-scan 11s linear infinite;
+      }
+
+      .signal-layer {
+        z-index: 4;
+        overflow: hidden;
+        mix-blend-mode: screen;
+      }
+
+      .signal-flow {
+        --angle: 0deg;
+        --travel-x: 18vw;
+        --travel-y: 8vh;
+        position: absolute;
+        display: block;
+        width: clamp(9rem, 18vw, 21rem);
+        height: 2px;
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(56, 189, 248, 0.18),
+          rgba(125, 211, 252, 0.92),
+          rgba(255, 255, 255, 0.86),
+          transparent
+        );
+        box-shadow:
+          0 0 10px rgba(34, 211, 238, 0.62),
+          0 0 22px rgba(14, 165, 233, 0.38);
+        opacity: 0;
+        transform: translate3d(0, 0, 0) rotate(var(--angle));
+        animation: signal-flow 6.5s linear infinite;
+      }
+
+      .signal-flow::after {
+        position: absolute;
+        right: 12%;
+        top: 50%;
+        width: 0.45rem;
+        height: 0.45rem;
+        content: "";
+        border-radius: 999px;
+        background: #e0f2fe;
+        box-shadow: 0 0 16px rgba(125, 211, 252, 0.95);
+        transform: translateY(-50%);
+      }
+
+      .signal-flow-a {
+        --angle: 22deg;
+        --travel-x: 28vw;
+        --travel-y: 9vh;
+        left: 8%;
+        top: 22%;
+      }
+
+      .signal-flow-b {
+        --angle: -18deg;
+        --travel-x: -24vw;
+        --travel-y: 11vh;
+        right: 19%;
+        top: 42%;
+        animation-delay: -2.1s;
+        animation-duration: 7.2s;
+      }
+
+      .signal-flow-c {
+        --angle: -8deg;
+        --travel-x: 22vw;
+        --travel-y: -7vh;
+        bottom: 21%;
+        left: 31%;
+        animation-delay: -4.4s;
+        animation-duration: 8.1s;
+      }
+
+      .signal-flow-d {
+        --angle: 135deg;
+        --travel-x: -18vw;
+        --travel-y: 15vh;
+        right: 10%;
+        top: 17%;
+        animation-delay: -1.2s;
+        animation-duration: 6.9s;
+      }
+
+      .signal-node {
+        position: absolute;
+        width: 0.55rem;
+        height: 0.55rem;
+        border-radius: 999px;
+        background: #7dd3fc;
+        box-shadow:
+          0 0 12px rgba(125, 211, 252, 0.96),
+          0 0 28px rgba(14, 165, 233, 0.62);
+        animation: signal-pulse 2.8s ease-in-out infinite;
+      }
+
+      .signal-node-a {
+        left: 18%;
+        top: 29%;
+      }
+
+      .signal-node-b {
+        right: 27%;
+        top: 48%;
+        animation-delay: -0.9s;
+      }
+
+      .signal-node-c {
+        bottom: 22%;
+        left: 54%;
+        animation-delay: -1.8s;
+      }
+
+      .countdown-shell {
+        position: relative;
+        z-index: 10;
+        display: flex;
+        min-height: 100vh;
+        min-height: 100dvh;
+        flex-direction: column;
+        gap: clamp(0.75rem, 1.4vh, 1.25rem);
+        padding: clamp(0.75rem, 1.8vw, 1.75rem);
+      }
+
+      .hud-font {
+        font-family: var(--countdown-title-font);
+        letter-spacing: 0;
+      }
+
+      .mono-font {
+        font-family: var(--countdown-mono-font);
+      }
+
+      .project-english-line {
+        max-width: min(30rem, 44vw);
+      }
+
+      .project-english-name {
+        display: inline-block;
+        font-family: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI Condensed", "Microsoft YaHei UI", Arial, sans-serif;
+        font-size: 0.68rem;
+        font-stretch: condensed;
+        letter-spacing: 0.045em;
+        line-height: 1;
+        text-transform: uppercase;
+        transform: scaleX(0.92);
+        transform-origin: left center;
+      }
+
+      .countdown-footer {
+        color: rgba(165, 243, 252, 0.55);
+      }
+
+      .countdown-footer > div {
+        justify-content: center;
+        gap: 0.25rem 0.7rem;
+      }
+
+      .countdown-footer a {
+        color: rgba(186, 230, 253, 0.72);
+        text-decoration: none;
+        transition: color 180ms ease;
+      }
+
+      .countdown-footer a:hover {
+        color: rgba(224, 242, 254, 0.95);
+      }
+
+      .hud-panel {
+        border: 1px solid rgba(56, 189, 248, 0.38);
+        background: linear-gradient(180deg, rgba(8, 25, 52, 0.68), rgba(3, 7, 18, 0.62));
+        box-shadow:
+          0 0 28px rgba(14, 165, 233, 0.16),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08),
+          inset 0 -20px 44px rgba(14, 165, 233, 0.07);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+
+      .hud-panel-solid {
+        border: 1px solid rgba(56, 189, 248, 0.32);
+        background: rgba(2, 8, 23, 0.74);
+        box-shadow: 0 0 20px rgba(14, 165, 233, 0.12);
+      }
+
+      .top-line {
+        position: relative;
+        border-bottom: 1px solid rgba(14, 165, 233, 0.45);
+      }
+
+      .top-line::after {
+        position: absolute;
+        bottom: -1px;
+        left: 0;
+        width: min(32rem, 42vw);
+        height: 1px;
+        content: "";
+        background: linear-gradient(90deg, #38bdf8, transparent);
+        box-shadow: 0 0 16px rgba(56, 189, 248, 0.7);
+      }
+
+      .hero-title {
+        font-family: "YouSheBiaoTiHei", var(--countdown-title-font);
+        -webkit-text-stroke: 1px rgba(224, 242, 254, 0.2);
+        paint-order: stroke fill;
+        text-shadow:
+          0 2px 0 rgba(15, 23, 42, 0.92),
+          0 0 20px rgba(226, 246, 255, 0.56),
+          0 0 34px rgba(125, 211, 252, 0.5),
+          0 0 58px rgba(14, 165, 233, 0.34);
+      }
+
+      .hero-subtitle {
+        font-family: "YouSheBiaoTiHei", var(--countdown-title-font);
+        -webkit-text-stroke: 1px rgba(186, 230, 253, 0.18);
+        paint-order: stroke fill;
+        text-shadow:
+          0 1px 0 rgba(15, 23, 42, 0.96),
+          0 0 18px rgba(186, 230, 253, 0.46),
+          0 0 34px rgba(56, 189, 248, 0.32);
+      }
+
+      .countdown-card {
+        position: relative;
+        display: grid;
+        min-height: clamp(7.8rem, 17.5vh, 13.5rem);
+        place-items: center;
+        overflow: hidden;
+        border-radius: 0.8rem;
+      }
+
+      .countdown-card::before,
+      .countdown-card::after {
+        position: absolute;
+        inset: 0.55rem;
+        content: "";
+        border-radius: 0.55rem;
+        pointer-events: none;
+      }
+
+      .countdown-card::before {
+        border: 1px solid rgba(125, 211, 252, 0.46);
+        box-shadow:
+          inset 0 0 18px rgba(56, 189, 248, 0.18),
+          0 0 20px rgba(56, 189, 248, 0.16);
+      }
+
+      .countdown-card::after {
+        background:
+          linear-gradient(120deg, rgba(255, 255, 255, 0.16), transparent 32%),
+          radial-gradient(circle at 30% 10%, rgba(125, 211, 252, 0.16), transparent 32%);
+        opacity: 0.7;
+      }
+
+      .countdown-corner {
+        position: absolute;
+        width: 1.25rem;
+        height: 1.25rem;
+        border-color: #38bdf8;
+        opacity: 0.9;
+      }
+
+      .countdown-number {
+        display: block;
+        font-family: var(--countdown-number-font);
+        font-size: clamp(3.15rem, 6.65vw, 6.85rem);
+        font-stretch: condensed;
+        font-weight: 900;
+        font-variant-numeric: tabular-nums lining-nums;
+        line-height: 0.86;
+        color: #dff8ff;
+        letter-spacing: 0;
+        transform: translateY(0.04em) scaleX(0.9);
+        transform-origin: center;
+        text-shadow:
+          0 1px 0 rgba(15, 23, 42, 0.9),
+          0 0 12px rgba(125, 211, 252, 0.95),
+          0 0 26px rgba(14, 165, 233, 0.78),
+          0 0 52px rgba(14, 165, 233, 0.38);
+      }
+
+      .countdown-label {
+        color: #a5f3fc;
+        font-size: clamp(1rem, 1.8vw, 1.75rem);
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-shadow: 0 0 16px rgba(34, 211, 238, 0.58);
+      }
+
+      .countdown-card-seconds::before {
+        border-color: rgba(251, 191, 36, 0.5);
+        box-shadow:
+          inset 0 0 18px rgba(251, 191, 36, 0.18),
+          0 0 20px rgba(251, 191, 36, 0.14);
+      }
+
+      .countdown-card-seconds .countdown-corner {
+        border-color: #fbbf24;
+      }
+
+      .countdown-card-seconds .countdown-number {
+        color: #fff7d6;
+        text-shadow:
+          0 0 12px rgba(253, 230, 138, 0.92),
+          0 0 26px rgba(251, 191, 36, 0.64),
+          0 0 52px rgba(245, 158, 11, 0.38);
+      }
+
+      .countdown-card-seconds .countdown-label {
+        color: #fde68a;
+      }
+
+      @keyframes countdown-scan {
+        0% {
+          transform: translateY(-120%);
+          opacity: 0;
+        }
+        14%,
+        82% {
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(720%);
+          opacity: 0;
+        }
+      }
+
+      @keyframes signal-flow {
+        0% {
+          opacity: 0;
+          transform: translate3d(0, 0, 0) rotate(var(--angle));
+        }
+        14% {
+          opacity: 0.78;
+        }
+        62% {
+          opacity: 0.66;
+        }
+        100% {
+          opacity: 0;
+          transform: translate3d(var(--travel-x), var(--travel-y), 0) rotate(var(--angle));
+        }
+      }
+
+      @keyframes signal-pulse {
+        0%,
+        100% {
+          opacity: 0.28;
+          transform: scale(0.82);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.42);
+        }
+      }
+
+      @keyframes cursor-blink {
+        0%,
+        48% {
+          opacity: 1;
+        }
+        49%,
+        100% {
+          opacity: 0;
+        }
+      }
+
+      .terminal-cursor {
+        animation: cursor-blink 1s step-end infinite;
+      }
+
+      @media (max-width: 900px) {
+        .countdown-shell {
+          overflow-y: auto;
+        }
+
+        .countdown-bg {
+          background-position: 45% center;
+        }
+
+        .countdown-card {
+          min-height: 8.25rem;
+        }
+      }
+
+      @media (max-height: 820px) and (min-width: 900px) {
+        .countdown-shell {
+          gap: 0.55rem;
+          padding: clamp(0.8rem, 1.35vw, 1.25rem);
+        }
+
+        .compact-hide {
+          display: none;
+        }
+
+        .countdown-card {
+          min-height: 9.2rem;
+        }
+
+        .countdown-shell > section:last-of-type {
+          max-height: 10.5rem;
+          overflow: hidden;
+        }
+
+        .countdown-shell > footer {
+          display: none;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .countdown-scan,
+        .signal-flow,
+        .signal-node,
+        .terminal-cursor {
+          animation: none;
+        }
+      }
+    </style>
+
+    <div class="countdown-bg"></div>
+    <div class="countdown-overlay"></div>
+    <div class="countdown-grid"></div>
+    <div class="countdown-scan"></div>
+    <div class="signal-layer" aria-hidden="true">
+      <span class="signal-flow signal-flow-a"></span>
+      <span class="signal-flow signal-flow-b"></span>
+      <span class="signal-flow signal-flow-c"></span>
+      <span class="signal-flow signal-flow-d"></span>
+      <span class="signal-node signal-node-a"></span>
+      <span class="signal-node signal-node-b"></span>
+      <span class="signal-node signal-node-c"></span>
+    </div>
+
+    <section class="countdown-shell">
+      <header class="top-line flex shrink-0 flex-col gap-3 pb-3 md:flex-row md:items-center md:justify-between">
+        <div class="flex min-w-0 items-center gap-4">
+          <div class="relative flex size-12 shrink-0 items-center justify-center rounded-lg border border-cyan-400/45 bg-slate-950/55 shadow-[0_0_22px_rgba(34,211,238,0.26)]">
+            <span class="icon-[tabler--network] size-8 text-cyan-300"></span>
+            <span class="absolute -right-1 -top-1 size-2 rounded-full bg-emerald-400 shadow-[0_0_14px_rgba(52,211,153,0.9)]"></span>
+          </div>
+          <div class="min-w-0">
+            {% if project_english_name_display %}
+              <div class="project-english-line mb-1 flex items-center gap-2 font-semibold text-cyan-300/80">
+                <span class="h-1.5 w-8 rounded-full bg-cyan-400/70 shadow-[0_0_12px_rgba(34,211,238,0.7)]"></span>
+                <span class="project-english-name truncate">{{ project_english_name_display }}</span>
+              </div>
+            {% endif %}
+            <h1 class="hud-font truncate text-2xl font-black text-white sm:text-3xl">
+              {{ project_name_display }}
+            </h1>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 md:justify-end">
+          <div class="hud-panel-solid inline-flex items-center gap-2 rounded-lg border-orange-500/45 px-4 py-2 text-sm font-bold text-orange-200 shadow-[0_0_16px_rgba(249,115,22,0.18)]">
+            <span class="icon-[tabler--trophy] size-5 text-amber-300"></span>
+            <span>{{ event_type_display }}</span>
+          </div>
+          <div class="hud-panel-solid inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-sky-100">
+            <span class="icon-[tabler--map-pin] size-5 text-sky-300"></span>
+            <span>{{ location_display }}</span>
+          </div>
+          <div class="hud-panel-solid mono-font inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-slate-100">
+            <span class="icon-[tabler--clock-hour-4] size-5 text-cyan-300"></span>
+            <span x-text="currentTime">{{ server_now|date:"Y-m-d H:i:s" }}</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="flex flex-1 flex-col justify-center">
+        {% if has_event %}
+          <div class="mx-auto flex w-full max-w-7xl flex-col items-center text-center">
+            <div class="hud-panel inline-flex max-w-full items-center gap-2 rounded-full px-5 py-2 text-sm font-bold text-cyan-100 shadow-[0_0_24px_rgba(14,165,233,0.2)]">
+              <span class="icon-[tabler--trophy] size-5 shrink-0 text-cyan-300"></span>
+              <span class="truncate">{{ hero_badge_text }}</span>
+            </div>
+
+            <h2 class="hero-title hud-font mt-5 max-w-6xl text-balance text-4xl font-black leading-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl">
+              {{ subtitle_display }}
+            </h2>
+            <h3 class="hero-subtitle hud-font mt-2 max-w-6xl text-balance bg-gradient-to-r from-cyan-200 via-sky-100 to-white bg-clip-text text-3xl font-black leading-tight text-transparent sm:text-4xl lg:text-5xl xl:text-6xl">
+              {{ event_name_display }}
+            </h3>
+
+            <p class="compact-hide mx-auto mt-4 max-w-4xl text-sm leading-relaxed text-slate-200/90 sm:text-base">
+              {{ description_display }}
+            </p>
+
+            <div class="mt-5 flex w-full items-center justify-center gap-3 text-sm font-bold tracking-[0.28em] text-cyan-200 sm:text-base">
+              <span class="h-px w-16 bg-gradient-to-r from-transparent to-cyan-300/75"></span>
+              <span class="size-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.9)]"></span>
+              <span>{{ countdown_prefix }}</span>
+              <span class="size-2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.9)]"></span>
+              <span class="h-px w-16 bg-gradient-to-l from-transparent to-cyan-300/75"></span>
+            </div>
+
+            <div class="mt-4 grid w-full max-w-6xl grid-cols-2 gap-4 sm:gap-5 md:grid-cols-4" x-show="!isFinished">
+              <article class="countdown-card hud-panel">
+                <span class="countdown-corner left-0 top-0 border-l-2 border-t-2"></span>
+                <span class="countdown-corner right-0 top-0 border-r-2 border-t-2"></span>
+                <span class="countdown-corner bottom-0 left-0 border-b-2 border-l-2"></span>
+                <span class="countdown-corner bottom-0 right-0 border-b-2 border-r-2"></span>
+                <div class="relative z-10 flex flex-col items-center gap-3">
+                  <div class="countdown-number" x-text="days">000</div>
+                  <div class="countdown-label">天</div>
+                </div>
+              </article>
+
+              <article class="countdown-card hud-panel">
+                <span class="countdown-corner left-0 top-0 border-l-2 border-t-2"></span>
+                <span class="countdown-corner right-0 top-0 border-r-2 border-t-2"></span>
+                <span class="countdown-corner bottom-0 left-0 border-b-2 border-l-2"></span>
+                <span class="countdown-corner bottom-0 right-0 border-b-2 border-r-2"></span>
+                <div class="relative z-10 flex flex-col items-center gap-3">
+                  <div class="countdown-number" x-text="hours">00</div>
+                  <div class="countdown-label">小时</div>
+                </div>
+              </article>
+
+              <article class="countdown-card hud-panel">
+                <span class="countdown-corner left-0 top-0 border-l-2 border-t-2"></span>
+                <span class="countdown-corner right-0 top-0 border-r-2 border-t-2"></span>
+                <span class="countdown-corner bottom-0 left-0 border-b-2 border-l-2"></span>
+                <span class="countdown-corner bottom-0 right-0 border-b-2 border-r-2"></span>
+                <div class="relative z-10 flex flex-col items-center gap-3">
+                  <div class="countdown-number" x-text="minutes">00</div>
+                  <div class="countdown-label">分钟</div>
+                </div>
+              </article>
+
+              <article class="countdown-card countdown-card-seconds hud-panel">
+                <span class="countdown-corner left-0 top-0 border-l-2 border-t-2"></span>
+                <span class="countdown-corner right-0 top-0 border-r-2 border-t-2"></span>
+                <span class="countdown-corner bottom-0 left-0 border-b-2 border-l-2"></span>
+                <span class="countdown-corner bottom-0 right-0 border-b-2 border-r-2"></span>
+                <div class="relative z-10 flex flex-col items-center gap-3">
+                  <div class="countdown-number" x-text="seconds">00</div>
+                  <div class="countdown-label">秒</div>
+                </div>
+              </article>
+            </div>
+
+            <div
+              class="hud-panel mt-6 rounded-xl border-amber-400/40 px-8 py-5 text-2xl font-black text-amber-100 sm:text-4xl"
+              x-show="isFinished"
+              x-cloak
+            >
+              <span class="icon-[tabler--shield-check] mr-3 inline-block size-9 align-[-0.15em] text-amber-300"></span>
+              <span>{{ finished_message }}</span>
+            </div>
+          </div>
+        {% else %}
+          <div class="mx-auto max-w-2xl rounded-xl border-amber-400/35 px-8 py-12 text-center hud-panel">
+            <span class="icon-[tabler--calendar-off] mx-auto block size-20 text-amber-300/90"></span>
+            <h2 class="hud-font mt-5 text-2xl font-black text-white sm:text-4xl">暂无启用倒计时事件</h2>
+            <p class="mt-4 text-sm leading-relaxed text-slate-300">
+              管理员可在 Django 管理后台添加或启用新的大屏倒计时事件，并将“启用”设置为 True。
+            </p>
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="grid shrink-0 grid-cols-1 gap-4 lg:grid-cols-[1fr_1.7fr_1fr]">
+        <article class="hud-panel-solid hidden min-h-28 rounded-lg p-4 md:flex md:flex-col md:justify-between">
+          <header class="flex items-center justify-between border-b border-cyan-400/20 pb-2">
+            <div class="flex items-center gap-1.5">
+              <span class="size-2.5 rounded-full bg-rose-400"></span>
+              <span class="size-2.5 rounded-full bg-amber-300"></span>
+              <span class="size-2.5 rounded-full bg-emerald-400"></span>
+              <span class="mono-font ml-2 text-xs font-bold text-cyan-200">event@countdown:~</span>
+            </div>
+            <span class="mono-font text-[0.65rem] font-bold uppercase tracking-wider text-cyan-300/60">READY</span>
+          </header>
+          <div class="mono-font mt-2 space-y-1 overflow-hidden text-xs leading-relaxed text-slate-300">
+            <p><span class="text-cyan-300">$</span> sync event schedule</p>
+            <p class="text-emerald-300">target_at={{ target_at_iso|default:"pending" }}</p>
+            <p><span class="text-cyan-300">$</span> render countdown theme</p>
+            <p class="text-amber-200">{{ active_theme.label }}=ACTIVE</p>
+            <p>event@countdown:~$ <span class="terminal-cursor inline-block h-3.5 w-1.5 bg-cyan-300 align-middle"></span></p>
+          </div>
+        </article>
+
+        <article class="flex items-center justify-center">
+          <div class="grid w-full max-w-3xl grid-cols-2 gap-2 sm:grid-cols-3">
+            {% for keyword in theme_keywords %}
+              <div class="hud-panel-solid flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-cyan-100">
+                <span class="{{ keyword.icon_class }} size-5 shrink-0 text-cyan-300"></span>
+                <span class="truncate">{{ keyword.label }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </article>
+
+        <article class="hud-panel-solid hidden min-h-28 rounded-lg p-4 md:block">
+          <header class="mb-3 flex items-center justify-between">
+            <span class="mono-font text-xs font-black uppercase tracking-wider text-cyan-300">System Metrics</span>
+            <span class="size-2 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]"></span>
+          </header>
+          <div class="space-y-2 text-xs font-semibold text-slate-300">
+            <div>
+              <div class="mb-1 flex justify-between mono-font"><span>CPU</span><span x-text="metrics.cpu + '%'">36%</span></div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-slate-900/80"><div class="h-full rounded-full bg-cyan-300 transition-all duration-500" :style="`width: ${metrics.cpu}%`"></div></div>
+            </div>
+            <div>
+              <div class="mb-1 flex justify-between mono-font"><span>MEMORY</span><span x-text="metrics.mem + '%'">62%</span></div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-slate-900/80"><div class="h-full rounded-full bg-sky-300 transition-all duration-500" :style="`width: ${metrics.mem}%`"></div></div>
+            </div>
+            <div>
+              <div class="mb-1 flex justify-between mono-font"><span>NETWORK</span><span x-text="metrics.net + '%'">78%</span></div>
+              <div class="h-1.5 overflow-hidden rounded-full bg-slate-900/80"><div class="h-full rounded-full bg-amber-300 transition-all duration-500" :style="`width: ${metrics.net}%`"></div></div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <footer class="countdown-footer flex shrink-0 items-center justify-center border-t border-cyan-400/15 pt-2 text-xs font-semibold">
+        {% include 'partials/footer_content.html' %}
+      </footer>
+    </section>
+  </main>
+
+  <script>
+    function countdownScreen() {
+      return {
+        target: null,
+        clockOffset: 0,
+        days: '000',
+        hours: '00',
+        minutes: '00',
+        seconds: '00',
+        isFinished: false,
+        currentTime: '{{ server_now|date:"Y-m-d H:i:s" }}',
+        timer: null,
+        metricsTimer: null,
+        metrics: {
+          cpu: 36,
+          mem: 62,
+          net: 78,
+        },
+        start() {
+          const configElement = document.getElementById('countdown-config');
+          const config = configElement ? JSON.parse(configElement.textContent) : {};
+          const serverNow = config.serverNow ? new Date(config.serverNow) : null;
+          this.target = config.targetAt ? new Date(config.targetAt) : null;
+          this.clockOffset = serverNow && !Number.isNaN(serverNow.getTime()) ? serverNow.getTime() - Date.now() : 0;
+
+          this.stop();
+          this.update();
+          this.timer = window.setInterval(() => this.update(), 1000);
+          this.metricsTimer = window.setInterval(() => {
+            this.metrics.cpu = Math.min(96, Math.max(8, 36 + Math.floor(Math.random() * 7) - 3));
+            this.metrics.mem = Math.min(96, Math.max(8, 62 + Math.floor(Math.random() * 5) - 2));
+            this.metrics.net = Math.min(96, Math.max(8, 78 + Math.floor(Math.random() * 9) - 4));
+          }, 1600);
+
+          window.addEventListener('beforeunload', () => this.stop(), { once: true });
+        },
+        update() {
+          const now = new Date(Date.now() + this.clockOffset);
+          this.currentTime = this.formatTime(now);
+
+          if (!this.target || Number.isNaN(this.target.getTime())) {
+            this.isFinished = true;
+            this.setZero();
+            return;
+          }
+
+          const distance = this.target.getTime() - now.getTime();
+          if (distance <= 0) {
+            this.isFinished = true;
+            this.setZero();
+            return;
+          }
+
+          this.isFinished = false;
+          const d = Math.floor(distance / 86400000);
+          const h = Math.floor((distance % 86400000) / 3600000);
+          const m = Math.floor((distance % 3600000) / 60000);
+          const s = Math.floor((distance % 60000) / 1000);
+
+          this.days = String(d).padStart(3, '0');
+          this.hours = String(h).padStart(2, '0');
+          this.minutes = String(m).padStart(2, '0');
+          this.seconds = String(s).padStart(2, '0');
+        },
+        formatTime(date) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const hour = String(date.getHours()).padStart(2, '0');
+          const minute = String(date.getMinutes()).padStart(2, '0');
+          const second = String(date.getSeconds()).padStart(2, '0');
+          return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+        },
+        setZero() {
+          this.days = '000';
+          this.hours = '00';
+          this.minutes = '00';
+          this.seconds = '00';
+        },
+        stop() {
+          if (this.timer) {
+            window.clearInterval(this.timer);
+            this.timer = null;
+          }
+          if (this.metricsTimer) {
+            window.clearInterval(this.metricsTimer);
+            this.metricsTimer = null;
+          }
+        },
+        destroy() {
+          this.stop();
+        },
+      };
+    }
+  </script>
+{% endblock main %}

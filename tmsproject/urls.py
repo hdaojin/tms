@@ -57,6 +57,7 @@ urlpatterns = [
     path("behaviors/", include("behaviors.urls", namespace="behaviors")),
     path("competitions/", include("competitions.urls", namespace="competitions")),
     path("skills/", include("skills.urls", namespace="skills")),
+    path("countdown/", include("event_countdown.urls", namespace="event_countdown")),
     path("notes-files/<str:repo>/<path:asset_path>", note_asset_view, name="note_asset"),
     path("", login_not_required(HomeView.as_view()), name="home"),
 ]

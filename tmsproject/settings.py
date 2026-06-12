@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'meetings.apps.MeetingsConfig',
     'notices',
     'behaviors.apps.BehaviorsConfig',
+    'event_countdown.apps.EventCountdownConfig',
 ]
 
 # 开发模式下添加 demo 应用

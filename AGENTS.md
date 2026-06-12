@@ -9,6 +9,20 @@ TMS is a Django 6 monolith for training logs, assessments, meetings, notices, no
 - For user-visible feature changes, inspect and update `docs/user-manual/`.
 - Check the target app's `models.py`, `forms.py`, `views.py`, `tables.py`, `urls.py`, templates, relevant `core/config/menus/*.yml`, tests, and migrations before editing.
 
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs are tracked in GitHub Issues for `hdaojin/tms`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default five-label triage vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repo. See `docs/agents/domain.md`.
+
 ## Commands
 Run all Django commands from the repository root because `.env` may use a relative SQLite URL.
 
