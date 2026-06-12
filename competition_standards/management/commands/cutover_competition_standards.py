@@ -51,6 +51,8 @@ LEGACY_TARGET_COLUMNS = (
     ('reference_competition_project_id', 'reference', '参考赛项'),
 )
 TARGET_RELATION_TABLE = 'competitions_competitiontrainingcycletarget'
+COMPETITIONS_PRE_TARGET_MIGRATION = ('competitions', '0003_alter_competitionmodule_options_and_more')
+COMPETITIONS_TARGET_MIGRATION = ('competitions', '0004_competitiontrainingcycletarget')
 
 
 class Command(BaseCommand):
@@ -76,6 +78,14 @@ class Command(BaseCommand):
         existing_tables = set(connection.introspection.table_names())
         table_actions = self._collect_table_actions(connection, existing_tables)
         if not table_actions and all(plan.new_name in existing_tables for plan in TABLE_RENAMES):
+            missing_migrations = self._collect_missing_completed_cutover_migrations(connection, existing_tables)
+            if missing_migrations:
+                self._handle_completed_cutover_missing_migrations(
+                    connection=connection,
+                    missing_migrations=missing_migrations,
+                    execute=execute,
+                )
+                return
             self.stdout.write(self.style.SUCCESS('当前数据库已经完成 competition_standards 切换，无需操作。'))
             return
         if not table_actions:
@@ -122,6 +132,27 @@ class Command(BaseCommand):
             if old_exists:
                 actions.append(TableAction(plan=plan, drop_empty_target_first=new_exists))
         return actions
+
+    def _collect_missing_completed_cutover_migrations(self, connection, existing_tables):
+        recorder = MigrationRecorder(connection)
+        applied = set(recorder.applied_migrations())
+        expected = [('competition_standards', '0001_initial')]
+        if TARGET_RELATION_TABLE in existing_tables:
+            expected.extend([COMPETITIONS_PRE_TARGET_MIGRATION, COMPETITIONS_TARGET_MIGRATION])
+        return [migration for migration in expected if migration not in applied]
+
+    def _handle_completed_cutover_missing_migrations(self, *, connection, missing_migrations, execute):
+        self.stdout.write('检测到 competition_standards 目标表已存在，但缺少迁移记录：')
+        for app_label, migration_name in missing_migrations:
+            self.stdout.write(f'- 补记 {app_label}.{migration_name} 已应用')
+        if not execute:
+            self.stdout.write(self.style.WARNING('以上为预检查结果。确认无误后，请追加 --execute 修复迁移记录。'))
+            return
+
+        recorder = MigrationRecorder(connection)
+        for app_label, migration_name in missing_migrations:
+            recorder.record_applied(app_label, migration_name)
+        self.stdout.write(self.style.SUCCESS('competition_standards 迁移记录已修复。接下来请运行 uv run manage.py migrate。'))
 
     def _validate_complete_legacy_tables(self, existing_tables):
         missing = [
@@ -360,8 +391,10 @@ class Command(BaseCommand):
         applied = set(recorder.applied_migrations())
         if ('competition_standards', '0001_initial') not in applied:
             recorder.record_applied('competition_standards', '0001_initial')
-        if relation_table_exists and ('competitions', '0004_competitiontrainingcycletarget') not in applied:
-            recorder.record_applied('competitions', '0004_competitiontrainingcycletarget')
+        if relation_table_exists and COMPETITIONS_PRE_TARGET_MIGRATION not in applied:
+            recorder.record_applied(*COMPETITIONS_PRE_TARGET_MIGRATION)
+        if relation_table_exists and COMPETITIONS_TARGET_MIGRATION not in applied:
+            recorder.record_applied(*COMPETITIONS_TARGET_MIGRATION)
 
     def _delete_legacy_migration_records(self, connection):
         recorder = MigrationRecorder(connection)

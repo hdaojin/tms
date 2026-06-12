@@ -259,6 +259,60 @@ class CutoverCompetitionStandardsSafetyTests(TestCase):
 
 
 class CutoverCompetitionStandardsRecoveryTests(TransactionTestCase):
+    def test_cutover_repairs_missing_migration_records_when_target_tables_already_exist(self):
+        MigrationRecorder.Migration.objects.filter(
+            app='competition_standards',
+            name='0001_initial',
+        ).delete()
+        MigrationRecorder.Migration.objects.filter(
+            app='competitions',
+            name='0003_alter_competitionmodule_options_and_more',
+        ).delete()
+        MigrationRecorder.Migration.objects.filter(
+            app='competitions',
+            name='0004_competitiontrainingcycletarget',
+        ).delete()
+
+        output = StringIO()
+        call_command('cutover_competition_standards', stdout=output)
+
+        self.assertIn('缺少迁移记录', output.getvalue())
+        self.assertFalse(
+            MigrationRecorder.Migration.objects.filter(
+                app='competition_standards',
+                name='0001_initial',
+            ).exists()
+        )
+        self.assertFalse(
+            MigrationRecorder.Migration.objects.filter(
+                app='competitions',
+                name='0003_alter_competitionmodule_options_and_more',
+            ).exists()
+        )
+
+        output = StringIO()
+        call_command('cutover_competition_standards', '--execute', stdout=output)
+
+        self.assertIn('迁移记录已修复', output.getvalue())
+        self.assertTrue(
+            MigrationRecorder.Migration.objects.filter(
+                app='competition_standards',
+                name='0001_initial',
+            ).exists()
+        )
+        self.assertTrue(
+            MigrationRecorder.Migration.objects.filter(
+                app='competitions',
+                name='0003_alter_competitionmodule_options_and_more',
+            ).exists()
+        )
+        self.assertTrue(
+            MigrationRecorder.Migration.objects.filter(
+                app='competitions',
+                name='0004_competitiontrainingcycletarget',
+            ).exists()
+        )
+
     def test_cutover_renames_tables_and_migrates_legacy_training_cycle_targets(self):
         competition_type = CompetitionType.objects.create(code='WSC-CUTOVER', name='切换测试赛事')
         project = Project.objects.create(
@@ -310,6 +364,12 @@ class CutoverCompetitionStandardsRecoveryTests(TransactionTestCase):
         self.assertFalse(self._table_exists('trainingcycles_trainingcycle'))
         self.assertTrue(
             MigrationRecorder.Migration.objects.filter(app='competition_standards', name='0001_initial').exists()
+        )
+        self.assertTrue(
+            MigrationRecorder.Migration.objects.filter(
+                app='competitions',
+                name='0003_alter_competitionmodule_options_and_more',
+            ).exists()
         )
         self.assertFalse(MigrationRecorder.Migration.objects.filter(app__in=['curriculum', 'trainingcycles']).exists())
         self.assertTrue(
@@ -381,6 +441,10 @@ class CutoverCompetitionStandardsRecoveryTests(TransactionTestCase):
                 )
 
         MigrationRecorder.Migration.objects.filter(app='competition_standards').delete()
+        MigrationRecorder.Migration.objects.filter(
+            app='competitions',
+            name='0003_alter_competitionmodule_options_and_more',
+        ).delete()
         MigrationRecorder.Migration.objects.filter(
             app='competitions',
             name='0004_competitiontrainingcycletarget',
