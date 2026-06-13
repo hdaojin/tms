@@ -86,6 +86,7 @@ sections:
     login_required: false
     include:
       - "about"
+      - "countdown"
       - "feedback"
 
   - section: "notes"

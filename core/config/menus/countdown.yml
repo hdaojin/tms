@@ -1,0 +1,10 @@
+menu_slug: "countdown"
+app_name: "event_countdown"
+items:
+  - name: "倒计时"
+    named_url: "event_countdown:countdown"
+    icon: 
+      pic: "icon-[tabler--clock]"
+      size: 4
+    is_visible: true
+    login_required: false
