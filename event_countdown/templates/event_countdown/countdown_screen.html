@@ -307,10 +307,17 @@
       .countdown-card {
         position: relative;
         display: grid;
-        min-height: clamp(7.8rem, 17.5vh, 13.5rem);
+        min-height: clamp(9.75rem, 19vh, 13.5rem);
         place-items: center;
         overflow: hidden;
         border-radius: 0.8rem;
+      }
+
+      .countdown-card > .relative {
+        position: absolute;
+        inset: 0.55rem;
+        justify-content: center;
+        gap: clamp(0.45rem, 0.95vh, 0.75rem);
       }
 
       .countdown-card::before,
@@ -347,14 +354,14 @@
       .countdown-number {
         display: block;
         font-family: var(--countdown-number-font);
-        font-size: clamp(3.15rem, 6.65vw, 6.85rem);
+        font-size: clamp(3.05rem, min(6.35vw, 11.6vh), 6.55rem);
         font-stretch: condensed;
         font-weight: 900;
         font-variant-numeric: tabular-nums lining-nums;
-        line-height: 0.86;
+        line-height: 0.84;
         color: #dff8ff;
         letter-spacing: 0;
-        transform: translateY(0.04em) scaleX(0.9);
+        transform: translateY(0.08em) scaleX(0.9);
         transform-origin: center;
         text-shadow:
           0 1px 0 rgba(15, 23, 42, 0.9),
@@ -365,7 +372,7 @@
 
       .countdown-label {
         color: #a5f3fc;
-        font-size: clamp(1rem, 1.8vw, 1.75rem);
+        font-size: clamp(0.95rem, min(1.65vw, 3.1vh), 1.65rem);
         font-weight: 800;
         letter-spacing: 0.08em;
         text-shadow: 0 0 16px rgba(34, 211, 238, 0.58);
@@ -470,7 +477,7 @@
       @media (max-height: 820px) and (min-width: 900px) {
         .countdown-shell {
           gap: 0.55rem;
-          padding: clamp(0.8rem, 1.35vw, 1.25rem);
+          padding: clamp(0.7rem, 1.1vw, 1rem);
         }
 
         .compact-hide {
@@ -478,7 +485,7 @@
         }
 
         .countdown-card {
-          min-height: 9.2rem;
+          min-height: 9.5rem;
         }
 
         .countdown-shell > section:last-of-type {
