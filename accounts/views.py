@@ -5,12 +5,18 @@ from django.contrib.auth.decorators import login_not_required  # type: ignore
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.db.models import Count
+from django.db.models import Case, CharField, Count, F, OuterRef, Subquery, Value, When
+from django.db.models.functions import Coalesce
 from django.views.generic import DetailView
 from django_tables2 import SingleTableView
 
 from .forms import CustomUserCreationForm, ProfileForm
-from .services.users import get_user_role_badges
+from .services.users import (
+    ROLE_STAFF,
+    ROLE_SUPERUSER,
+    ROLE_UNASSIGNED,
+    get_user_role_badges,
+)
 from .tables import RoleListTable, UserListTable
 from core.utils.invitation import generate_invitation_code
 from core.utils.decorators import superuser_required
@@ -121,7 +127,32 @@ class UserListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, Sing
 
     def get_queryset(self):
         """获取全部用户，并预加载 profile 与角色信息以优化查询。"""
-        return User.objects.prefetch_related("groups").order_by("-date_joined", "-pk")
+        first_group_name = (
+            Group.objects.filter(user=OuterRef("pk"))
+            .order_by("name")
+            .values("name")[:1]
+        )
+        return (
+            User.objects.select_related("profile")
+            .prefetch_related("groups")
+            .annotate(
+                role_sort=Case(
+                    When(is_superuser=True, then=Value(ROLE_SUPERUSER)),
+                    When(is_staff=True, then=Value(ROLE_STAFF)),
+                    default=Coalesce(
+                        Subquery(first_group_name, output_field=CharField()),
+                        Value(ROLE_UNASSIGNED),
+                        output_field=CharField(),
+                    ),
+                    output_field=CharField(),
+                )
+            )
+            .order_by(
+                "-is_active",
+                F("profile__join_date").desc(nulls_last=True),
+                F("pk").desc(),
+            )
+        )
 
 
 class RoleListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableView):

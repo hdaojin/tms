@@ -36,6 +36,8 @@ class AccountsConfig(AppConfig):
                 return get_user_full_info(self)
             
             User.full_info = full_info    # type: ignore
+
+        from . import signals  # noqa: F401
         
 
 

@@ -1,6 +1,6 @@
 # TMS 用户手册
 
-本目录用于存放 TMS 系统的用户操作手册，当前已覆盖 accounts、assessments、behaviors、competition_standards、competitions、meetings、notes、samba、traininglogs 等模块，后续再逐步扩展到 skills 等模块。
+本目录用于存放 TMS 系统的用户操作手册，当前已覆盖 accounts、assessments、behaviors、competition_standards、competitions、marking、skilltrees、meetings、notes、samba、traininglogs 等模块。
 
 ## 使用说明
 
@@ -20,10 +20,12 @@
 - [competitions/frontend-guide.md](competitions/frontend-guide.md): competitions 前台业务录入手册。
 - [competition_standards/overview.md](competition_standards/overview.md): competition_standards APP 总览、训练周期与赛训标准体系核心概念。
 - [event_countdown/overview.md](event_countdown/overview.md): event_countdown APP 通用竞赛倒计时大屏说明。
+- [marking/overview.md](marking/overview.md): marking APP 评分方案、评分点和 CMP 结果包归档说明。
 - [meetings/overview.md](meetings/overview.md): meetings APP 总览与常见任务。
 - [notices/overview.md](notices/overview.md): notices APP 总览与发布权限说明。
 - [notes/overview.md](notes/overview.md): notes APP 总览与仓库/附件访问规则。
 - [samba/overview.md](samba/overview.md): samba APP 账户开通与改密说明。
+- [skilltrees/overview.md](skilltrees/overview.md): skilltrees APP 标准模块级版本化技能树说明。
 - [traininglogs/overview.md](traininglogs/overview.md): traininglogs APP 总览与跨角色查看规则。
 
 

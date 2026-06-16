@@ -2,6 +2,7 @@
 import django_tables2 as tables
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.db.models import F
 from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
@@ -27,30 +28,36 @@ class UserListTable(BaseTable):
     first_name = tables.Column(
         verbose_name="姓名",
         empty_values=(),
+        order_by=("last_name", "first_name", "username"),
         attrs={"td": {"class": "min-w-20 whitespace-nowrap text-center align-middle"}},
     )
     roles = tables.Column(
         verbose_name="角色",
         empty_values=(),
-        orderable=False,
+        order_by=("role_sort", "username"),
         attrs={"td": {"class": "min-w-28 whitespace-nowrap text-center align-middle"}},
     )
 
     # 关键 Profile 字段
     gender = tables.Column(
-        verbose_name="性别", accessor="profile__get_gender_display", orderable=False
+        verbose_name="性别",
+        accessor="profile__get_gender_display",
+        order_by=("profile__gender", "pk"),
     )
     birth_date = BaseDateColumn(
         verbose_name="出生日期", accessor="profile__birth_date", orderable=True
     )
     phone_number = tables.Column(
-        verbose_name="电话号码", accessor="profile__phone_number", orderable=True
+        verbose_name="电话号码", accessor="profile__phone_number", orderable=False
     )
     school_dormitory = tables.Column(
         verbose_name="宿舍", accessor="profile__school_dormitory", orderable=False
     )
     join_date = BaseDateColumn(
-        verbose_name="入读日期", accessor="profile__join_date", orderable=True
+        verbose_name="入读日期",
+        accessor="profile__join_date",
+        orderable=True,
+        initial_sort_descending=True,
     )
     leave_date = BaseDateColumn(
         verbose_name="离开日期", accessor="profile__leave_date", orderable=True
@@ -58,7 +65,8 @@ class UserListTable(BaseTable):
     activation_status = tables.Column(
         verbose_name="激活",
         empty_values=(),
-        orderable=False,
+        order_by=("is_active", "pk"),
+        initial_sort_descending=True,
         attrs={"td": {"class": "whitespace-nowrap text-center align-middle"}},
     )
 
@@ -113,6 +121,22 @@ class UserListTable(BaseTable):
             '<span class="icon-[tabler--circle-x-filled] size-5 text-error"></span>'
             "</span>"
         )
+
+    def order_roles(self, queryset, is_descending):
+        ordering = "-role_sort" if is_descending else "role_sort"
+        return queryset.order_by(ordering, "-pk"), True
+
+    def order_join_date(self, queryset, is_descending):
+        ordering = (
+            F("profile__join_date").desc(nulls_last=True)
+            if is_descending
+            else F("profile__join_date").asc(nulls_last=True)
+        )
+        return queryset.order_by(ordering, F("pk").desc()), True
+
+    def order_activation_status(self, queryset, is_descending):
+        ordering = "-is_active" if is_descending else "is_active"
+        return queryset.order_by(ordering, "-pk"), True
 
     class Meta(BaseTable.Meta):
         model = User

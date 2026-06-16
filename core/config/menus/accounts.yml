@@ -37,6 +37,16 @@ items:
           required_perms: 
             - "accounts.view_all_profiles"
 
+        - name: "角色列表"
+          named_url: "accounts:role_list"
+          icon: 
+            pic: "icon-[tabler--users]"
+            size: 4
+          is_visible: true
+          login_required: true
+          required_perms: 
+            - "accounts.view_all_profiles"
+
         - name: "邀请注册"
           named_url: "accounts:generate_invitation"
           icon: 

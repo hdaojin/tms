@@ -1,14 +1,20 @@
 from __future__ import annotations
 
+from django.utils import timezone
+
 from core.constants import GROUP_ASSISTANT, GROUP_COACH, GROUP_COMPETITOR
 
+
+ROLE_STAFF = "工作人员"
+ROLE_SUPERUSER = "超级用户"
+ROLE_UNASSIGNED = "未分配"
 
 ROLE_BADGE_CLASSES = {
     GROUP_COACH: "badge badge-soft badge-primary",
     GROUP_COMPETITOR: "badge badge-soft badge-success",
     GROUP_ASSISTANT: "badge badge-soft badge-info",
-    "工作人员": "badge badge-soft badge-secondary",
-    "超级用户": "badge badge-soft badge-error",
+    ROLE_STAFF: "badge badge-soft badge-secondary",
+    ROLE_SUPERUSER: "badge badge-soft badge-error",
 }
 DEFAULT_ROLE_BADGE_CLASS = "badge badge-soft badge-accent"
 NO_ROLE_BADGE_CLASS = "badge badge-soft"
@@ -36,16 +42,16 @@ def get_user_role_badges(user, *, size: str = "") -> list[dict[str, str]]:
         role_names.append(group.name)
         seen_role_names.add(group.name)
 
-    if user.is_staff and not user.is_superuser and "工作人员" not in seen_role_names:
-        role_names.append("工作人员")
-        seen_role_names.add("工作人员")
+    if user.is_staff and not user.is_superuser and ROLE_STAFF not in seen_role_names:
+        role_names.append(ROLE_STAFF)
+        seen_role_names.add(ROLE_STAFF)
 
-    if user.is_superuser and "超级用户" not in seen_role_names:
-        role_names.append("超级用户")
-        seen_role_names.add("超级用户")
+    if user.is_superuser and ROLE_SUPERUSER not in seen_role_names:
+        role_names.append(ROLE_SUPERUSER)
+        seen_role_names.add(ROLE_SUPERUSER)
 
     if not role_names:
-        role_names = ["未分配"]
+        role_names = [ROLE_UNASSIGNED]
 
     return [
         {
@@ -59,7 +65,23 @@ def get_user_role_badges(user, *, size: str = "") -> list[dict[str, str]]:
 def _get_role_badge_class(role_name: str, *, size: str = "") -> str:
     css_class = (
         NO_ROLE_BADGE_CLASS
-        if role_name == "未分配"
+        if role_name == ROLE_UNASSIGNED
         else ROLE_BADGE_CLASSES.get(role_name, DEFAULT_ROLE_BADGE_CLASS)
     )
     return f"{css_class} {size}".strip()
+
+
+def fill_leave_date_on_deactivation(user, *, previous_is_active: bool) -> None:
+    """账号从有效变为无效时，给空离开日期补上当天日期。"""
+
+    if not previous_is_active or user.is_active:
+        return
+
+    from accounts.models import UserProfile
+
+    profile, _created = UserProfile.objects.get_or_create(user=user)
+    if profile.leave_date:
+        return
+
+    profile.leave_date = timezone.localdate()
+    profile.save(update_fields=["leave_date"])

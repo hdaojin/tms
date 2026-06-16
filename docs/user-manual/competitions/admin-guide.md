@@ -122,7 +122,7 @@
 结果确认：
 
 - 模块出现在对应标准赛项的当前版本中。
-- traininglogs、skills、assessments 等 APP 的新录入入口可基于当前版本使用这些模块。
+- traininglogs、assessments、marking、skilltrees 等 APP 的新录入入口可基于当前版本使用这些模块。
 
 ### 4.5 创建能力主线
 

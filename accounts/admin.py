@@ -7,6 +7,7 @@ from core.utils.admin_deletion import discard_registered_delete_permissions
 from .admin_forms import GroupPermissionBundleAdminForm, UserPermissionBundleAdminForm
 from .models import UserProfile, GroupProfile
 from .services.permission_bundles import sync_group_permission_bundles, sync_user_permission_bundles
+from .services.users import fill_leave_date_on_deactivation
 
 class UserProfileInline(admin.StackedInline):
     model = UserProfile
@@ -48,6 +49,15 @@ class CustomUserAdmin(DefaultUserAdmin):
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
+        if (
+            change
+            and 'is_active' in form.changed_data
+            and not form.cleaned_data.get('is_active')
+        ):
+            fill_leave_date_on_deactivation(
+                form.instance,
+                previous_is_active=True,
+            )
         if 'selected_permission_bundles' not in form.cleaned_data:
             return
         sync_user_permission_bundles(

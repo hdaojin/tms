@@ -96,7 +96,7 @@ competitions APP 用于管理某一届、某一次具体赛事的落地数据，
 
 ### 4.7 标准模块
 
-标准模块是系统内部用于长期复用、被其他 APP 引用的模块对象。traininglogs、skills、assessments 等模块引用的都是标准模块，而不是某一届比赛的官方模块。标准模块由 competition_standards 维护。
+标准模块是系统内部用于长期复用、被其他 APP 引用的模块对象。traininglogs、assessments、marking、skilltrees 等模块引用的都是标准模块，而不是某一届比赛的官方模块。标准模块由 competition_standards 维护。
 
 ### 4.8 本届官方模块
 
@@ -127,7 +127,7 @@ competitions APP 用于管理某一届、某一次具体赛事的落地数据，
 
 ### 4.13 竞赛总成绩
 
-竞赛总成绩记录的是具体赛项下选手的最终归档成绩、排名和奖项。模块级成绩由 assessments APP 管理，不在 competitions 前台录入。
+竞赛总成绩记录的是具体赛项下选手的最终归档成绩、排名和奖项。评分点级结果由 marking APP 归档分析，不在 competitions 前台执行评分。
 
 ## 5. 推荐阅读顺序
 

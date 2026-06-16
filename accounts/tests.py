@@ -150,7 +150,7 @@ class UserListRoleColumnTests(TestCase):
 			last_name='李',
 		)
 		self.coach.groups.add(self.coach_group)
-		UserProfile.objects.create(user=self.coach)
+		UserProfile.objects.create(user=self.coach, join_date=date(2026, 6, 1))
 
 		self.multi_role_user = User.objects.create_user(
 			username='b-multi-role',
@@ -159,7 +159,7 @@ class UserListRoleColumnTests(TestCase):
 			last_name='张',
 		)
 		self.multi_role_user.groups.add(self.coach_group, self.competitor_group)
-		UserProfile.objects.create(user=self.multi_role_user)
+		UserProfile.objects.create(user=self.multi_role_user, join_date=date(2026, 6, 2))
 
 		self.no_role_user = User.objects.create_user(
 			username='c-no-role',
@@ -168,7 +168,7 @@ class UserListRoleColumnTests(TestCase):
 			last_name='赵',
 			is_active=False,
 		)
-		UserProfile.objects.create(user=self.no_role_user)
+		UserProfile.objects.create(user=self.no_role_user, join_date=date(2026, 6, 3))
 		User.objects.filter(pk=self.coach.pk).update(
 			date_joined=datetime(2026, 6, 1, 8, 0, tzinfo=timezone.get_current_timezone())
 		)
@@ -195,6 +195,11 @@ class UserListRoleColumnTests(TestCase):
 		soup = BeautifulSoup(response.content, 'html.parser')
 		headers = [th.get_text(strip=True) for th in soup.select('thead th')]
 		self.assertEqual(headers[1:3], ['姓名', '角色'])
+		sortable_headers = {a.get_text(strip=True) for a in soup.select('thead th a')}
+		self.assertSetEqual(
+			sortable_headers,
+			{'姓名', '角色', '性别', '出生日期', '入读日期', '离开日期', '激活'},
+		)
 		roles_column_index = headers.index('角色')
 		activation_column_index = headers.index('激活')
 		self.assertLess(activation_column_index, headers.index('操作'))
@@ -244,16 +249,49 @@ class UserListRoleColumnTests(TestCase):
 		inactive_cell = inactive_user_cells[activation_column_index]
 		self.assertIsNotNone(inactive_cell.select_one('.icon-\\[tabler--circle-x-filled\\].text-error'))
 
-	def test_user_list_orders_newest_user_first(self):
+	def test_user_list_orders_by_active_join_date_and_pk_by_default(self):
 		response = self.client.get(reverse('accounts:user_list'))
 
 		self.assertEqual(response.status_code, 200)
 		soup = BeautifulSoup(response.content, 'html.parser')
-		first_row_cells = [
-			cell.get_text(strip=True)
-			for cell in soup.select('tbody tr:first-child td')
+		row_texts = [
+			row.get_text(' ', strip=True)
+			for row in soup.select('tbody tr')
 		]
-		self.assertIn('赵未分配', first_row_cells)
+		multi_role_index = next(index for index, text in enumerate(row_texts) if '张多角' in text)
+		coach_index = next(index for index, text in enumerate(row_texts) if '李教练' in text)
+		admin_index = next(index for index, text in enumerate(row_texts) if 'role-table-admin' in text)
+		inactive_index = next(index for index, text in enumerate(row_texts) if '赵未分配' in text)
+
+		self.assertLess(multi_role_index, coach_index)
+		self.assertLess(coach_index, admin_index)
+		self.assertLess(admin_index, inactive_index)
+
+	def test_join_date_sort_keeps_empty_join_dates_last(self):
+		response = self.client.get(reverse('accounts:user_list'), {'sort': '-join_date'})
+
+		self.assertEqual(response.status_code, 200)
+		soup = BeautifulSoup(response.content, 'html.parser')
+		row_texts = [
+			row.get_text(' ', strip=True)
+			for row in soup.select('tbody tr')
+		]
+		admin_index = next(index for index, text in enumerate(row_texts) if 'role-table-admin' in text)
+		self.assertEqual(admin_index, len(row_texts) - 1)
+
+	def test_role_sort_uses_stable_role_key_without_duplicate_rows(self):
+		response = self.client.get(reverse('accounts:user_list'), {'sort': 'roles'})
+
+		self.assertEqual(response.status_code, 200)
+		soup = BeautifulSoup(response.content, 'html.parser')
+		row_texts = [
+			row.get_text(' ', strip=True)
+			for row in soup.select('tbody tr')
+		]
+		self.assertEqual(
+			sum('张多角' in text for text in row_texts),
+			1,
+		)
 
 	def test_user_detail_uses_soft_role_badges(self):
 		response = self.client.get(reverse('accounts:user_detail', args=[self.multi_role_user.pk]))
@@ -276,6 +314,40 @@ class UserListRoleColumnTests(TestCase):
 		self.assertIn('badge-soft', admin_badge.get('class', []))
 		self.assertIn('badge-error', admin_badge.get('class', []))
 		self.assertIsNone(soup.find('span', string='工作人员'))
+
+	def test_deactivating_user_fills_empty_leave_date(self):
+		user = User.objects.create_user('deactivate-user', password='testpass123')
+		profile = UserProfile.objects.create(user=user)
+		today = timezone.localdate()
+
+		user.is_active = False
+		user.save(update_fields=['is_active'])
+
+		profile.refresh_from_db()
+		self.assertEqual(profile.leave_date, today)
+
+	def test_deactivating_user_preserves_existing_leave_date(self):
+		user = User.objects.create_user('deactivate-existing-leave-date', password='testpass123')
+		profile = UserProfile.objects.create(
+			user=user,
+			leave_date=date(2026, 5, 1),
+		)
+
+		user.is_active = False
+		user.save(update_fields=['is_active'])
+
+		profile.refresh_from_db()
+		self.assertEqual(profile.leave_date, date(2026, 5, 1))
+
+	def test_deactivating_user_without_profile_creates_leave_date(self):
+		user = User.objects.create_user('deactivate-without-profile', password='testpass123')
+		today = timezone.localdate()
+
+		user.is_active = False
+		user.save(update_fields=['is_active'])
+
+		profile = UserProfile.objects.get(user=user)
+		self.assertEqual(profile.leave_date, today)
 
 
 class AccountPermissionBundleAccessTests(TestCase):
