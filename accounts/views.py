@@ -4,15 +4,17 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import login_not_required  # type: ignore
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.db.models import Count
 from django.views.generic import DetailView
 from django_tables2 import SingleTableView
 
 from .forms import CustomUserCreationForm, ProfileForm
-from .tables import UserListTable
+from .services.users import get_user_role_badges
+from .tables import RoleListTable, UserListTable
 from core.utils.invitation import generate_invitation_code
 from core.utils.decorators import superuser_required
 from core.utils.mixins import TitleMixin
-from core.constants import GROUP_COMPETITOR
 from .models import UserProfile
 
 User = get_user_model()
@@ -95,6 +97,7 @@ def account_profile(request):
     return render(request, 'accounts/profile.html', {
         'form': form,
         'profile': profile,
+        'role_badges': get_user_role_badges(request.user, size='badge-lg'),
         'title': '个人资料',
         'title_icon': 'icon-[tabler--user-circle]',
         'can_edit': can_edit,
@@ -117,8 +120,28 @@ class UserListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, Sing
     title_icon = "icon-[tabler--users]"
 
     def get_queryset(self):
-        """获取用户组为"选手"的用户，并预加载 profile 信息以优化查询。"""
-        return User.objects.select_related("profile").filter(groups__name=GROUP_COMPETITOR).distinct().order_by("username")
+        """获取全部用户，并预加载 profile 与角色信息以优化查询。"""
+        return User.objects.prefetch_related("groups").order_by("-date_joined", "-pk")
+
+
+class RoleListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableView):
+    """显示所有角色列表（包含 GroupProfile 信息）。"""
+
+    model = Group
+    table_class = RoleListTable
+    template_name = "accounts/role_list.html"
+    permission_required = "accounts.view_all_profiles"
+    raise_exception = True
+    paginate_by = 20
+    title = "角色列表"
+    title_icon = "icon-[tabler--users]"
+
+    def get_queryset(self):
+        return (
+            Group.objects.select_related("profile")
+            .annotate(user_total=Count("user", distinct=True))
+            .order_by("name")
+        )
 
 
 class UserDetailView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, DetailView):
@@ -136,7 +159,7 @@ class UserDetailView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, De
     title_icon = "icon-[tabler--user-circle]"
 
     def get_queryset(self):
-        return User.objects.select_related("profile")
+        return User.objects.select_related("profile").prefetch_related("groups")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -148,4 +171,5 @@ class UserDetailView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, De
             field.disabled = True
         context["form"] = form
         context["profile"] = profile
+        context["role_badges"] = get_user_role_badges(target_user, size="badge-lg")
         return context

@@ -1,14 +1,16 @@
-from datetime import date
+from datetime import date, datetime
 from io import StringIO
 
+from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.admin_forms import GroupPermissionBundleAdminForm, UserPermissionBundleAdminForm
-from accounts.models import UserProfile
+from accounts.models import GroupProfile, UserProfile
 from accounts.services.permission_bundles import sync_group_permission_bundles, sync_user_permission_bundles
 from accounts.services.users import get_user_display_name, get_user_full_info
 from behaviors.models import ConductSummary
@@ -106,12 +108,18 @@ class UserListTableTemplateRegressionTest(TestCase):
 	def setUp(self):
 		self.admin = User.objects.create_superuser('table-admin', password='testpass123')
 		self.competitor_group, _ = Group.objects.get_or_create(name=GROUP_COMPETITOR)
+		User.objects.filter(pk=self.admin.pk).update(
+			date_joined=datetime(2026, 3, 31, 8, 0, tzinfo=timezone.get_current_timezone())
+		)
 
 		for index in range(1, 22):
 			user = User.objects.create_user(
 				username=f'competitor-{index:02d}',
 				password='testpass123',
 				first_name=f'选手{index:02d}',
+			)
+			User.objects.filter(pk=user.pk).update(
+				date_joined=datetime(2026, 4, index, 8, 0, tzinfo=timezone.get_current_timezone())
 			)
 			user.groups.add(self.competitor_group)
 			UserProfile.objects.create(
@@ -125,8 +133,149 @@ class UserListTableTemplateRegressionTest(TestCase):
 		response = self.client.get(reverse('accounts:user_list'))
 
 		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, '选手01')
+		self.assertContains(response, '选手21')
 		self.assertContains(response, '?page=2')
+
+
+class UserListRoleColumnTests(TestCase):
+	def setUp(self):
+		self.admin = User.objects.create_superuser('role-table-admin', password='testpass123')
+		self.coach_group = Group.objects.create(name='教练')
+		self.competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+
+		self.coach = User.objects.create_user(
+			username='a-coach',
+			password='testpass123',
+			first_name='教练',
+			last_name='李',
+		)
+		self.coach.groups.add(self.coach_group)
+		UserProfile.objects.create(user=self.coach)
+
+		self.multi_role_user = User.objects.create_user(
+			username='b-multi-role',
+			password='testpass123',
+			first_name='多角',
+			last_name='张',
+		)
+		self.multi_role_user.groups.add(self.coach_group, self.competitor_group)
+		UserProfile.objects.create(user=self.multi_role_user)
+
+		self.no_role_user = User.objects.create_user(
+			username='c-no-role',
+			password='testpass123',
+			first_name='未分配',
+			last_name='赵',
+			is_active=False,
+		)
+		UserProfile.objects.create(user=self.no_role_user)
+		User.objects.filter(pk=self.coach.pk).update(
+			date_joined=datetime(2026, 6, 1, 8, 0, tzinfo=timezone.get_current_timezone())
+		)
+		User.objects.filter(pk=self.multi_role_user.pk).update(
+			date_joined=datetime(2026, 6, 2, 8, 0, tzinfo=timezone.get_current_timezone())
+		)
+		User.objects.filter(pk=self.no_role_user.pk).update(
+			date_joined=datetime(2026, 6, 3, 8, 0, tzinfo=timezone.get_current_timezone())
+		)
+		User.objects.filter(pk=self.admin.pk).update(
+			date_joined=datetime(2026, 5, 31, 8, 0, tzinfo=timezone.get_current_timezone())
+		)
+		self.client.force_login(self.admin)
+
+	def test_user_list_shows_all_users_and_role_column_after_name(self):
+		response = self.client.get(reverse('accounts:user_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '李教练')
+		self.assertContains(response, '张多角')
+		self.assertContains(response, '赵未分配')
+		self.assertContains(response, '未分配')
+
+		soup = BeautifulSoup(response.content, 'html.parser')
+		headers = [th.get_text(strip=True) for th in soup.select('thead th')]
+		self.assertEqual(headers[1:3], ['姓名', '角色'])
+		roles_column_index = headers.index('角色')
+		activation_column_index = headers.index('激活')
+		self.assertLess(activation_column_index, headers.index('操作'))
+
+		name_cell = soup.find('td', string='李教练')
+		self.assertIsNotNone(name_cell)
+		self.assertIn('text-center', name_cell.get('class', []))
+		self.assertIn('align-middle', name_cell.get('class', []))
+
+		multi_role_row = soup.find('td', string='张多角').find_parent('tr')
+		multi_role_text = multi_role_row.get_text(' ', strip=True)
+		self.assertIn('教练', multi_role_text)
+		self.assertIn(GROUP_COMPETITOR, multi_role_text)
+		multi_role_cells = multi_role_row.find_all('td')
+		multi_role_cell = multi_role_cells[roles_column_index]
+		coach_badge = multi_role_cell.find('span', string='教练')
+		competitor_badge = multi_role_cell.find('span', string=GROUP_COMPETITOR)
+		self.assertIn('badge-soft', coach_badge.get('class', []))
+		self.assertIn('badge-primary', coach_badge.get('class', []))
+		self.assertIn('badge-soft', competitor_badge.get('class', []))
+		self.assertIn('badge-success', competitor_badge.get('class', []))
+		active_cell = multi_role_cells[activation_column_index]
+		self.assertIsNotNone(active_cell.select_one('.icon-\\[tabler--circle-check-filled\\].text-success'))
+
+		admin_row = next(
+			row for row in soup.select('tbody tr')
+			if 'role-table-admin' in row.get_text(' ', strip=True)
+		)
+		admin_text = admin_row.get_text(' ', strip=True)
+		self.assertNotIn('工作人员', admin_text)
+		self.assertIn('超级用户', admin_text)
+		admin_role_cell = admin_row.find_all('td')[roles_column_index]
+		self.assertIsNone(admin_role_cell.find('span', string='工作人员'))
+		admin_badge = admin_role_cell.find('span', string='超级用户')
+		self.assertIn('badge-soft', admin_badge.get('class', []))
+		self.assertIn('badge-error', admin_badge.get('class', []))
+
+		inactive_user_row = next(
+			row for row in soup.select('tbody tr')
+			if '赵未分配' in row.get_text(' ', strip=True)
+		)
+		inactive_user_text = inactive_user_row.get_text(' ', strip=True)
+		self.assertIn('未分配', inactive_user_text)
+		inactive_user_cells = inactive_user_row.find_all('td')
+		inactive_role_cell = inactive_user_cells[roles_column_index]
+		self.assertIn('badge-soft', inactive_role_cell.find('span', string='未分配').get('class', []))
+		inactive_cell = inactive_user_cells[activation_column_index]
+		self.assertIsNotNone(inactive_cell.select_one('.icon-\\[tabler--circle-x-filled\\].text-error'))
+
+	def test_user_list_orders_newest_user_first(self):
+		response = self.client.get(reverse('accounts:user_list'))
+
+		self.assertEqual(response.status_code, 200)
+		soup = BeautifulSoup(response.content, 'html.parser')
+		first_row_cells = [
+			cell.get_text(strip=True)
+			for cell in soup.select('tbody tr:first-child td')
+		]
+		self.assertIn('赵未分配', first_row_cells)
+
+	def test_user_detail_uses_soft_role_badges(self):
+		response = self.client.get(reverse('accounts:user_detail', args=[self.multi_role_user.pk]))
+
+		self.assertEqual(response.status_code, 200)
+		soup = BeautifulSoup(response.content, 'html.parser')
+		coach_badge = soup.find('span', string='教练')
+		competitor_badge = soup.find('span', string=GROUP_COMPETITOR)
+		self.assertIn('badge-soft', coach_badge.get('class', []))
+		self.assertIn('badge-primary', coach_badge.get('class', []))
+		self.assertIn('badge-soft', competitor_badge.get('class', []))
+		self.assertIn('badge-success', competitor_badge.get('class', []))
+
+		response = self.client.get(reverse('accounts:user_detail', args=[self.admin.pk]))
+
+		self.assertEqual(response.status_code, 200)
+		soup = BeautifulSoup(response.content, 'html.parser')
+		admin_badge = soup.find('span', string='超级用户')
+		self.assertIsNotNone(admin_badge)
+		self.assertIn('badge-soft', admin_badge.get('class', []))
+		self.assertIn('badge-error', admin_badge.get('class', []))
+		self.assertIsNone(soup.find('span', string='工作人员'))
 
 
 class AccountPermissionBundleAccessTests(TestCase):
@@ -139,6 +288,49 @@ class AccountPermissionBundleAccessTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '用户列表')
+
+	def test_role_list_allows_access_via_view_all_profiles_bundle(self):
+		user = User.objects.create_user('role-viewer', password='testpass123')
+		sync_user_permission_bundles(user, ['accounts.view_all_profiles'])
+		self.client.force_login(user)
+
+		response = self.client.get(reverse('accounts:role_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '角色列表')
+
+
+class RoleListViewTests(TestCase):
+	def setUp(self):
+		self.admin = User.objects.create_superuser('role-list-admin', password='testpass123')
+		self.role = Group.objects.create(name='教练')
+		GroupProfile.objects.create(
+			group=self.role,
+			codename='coach',
+			description='教练组',
+			selected_permission_bundles=['traininglogs.upload_traininglog'],
+		)
+		for index in range(2):
+			user = User.objects.create_user(
+				username=f'coach-{index}',
+				password='testpass123',
+			)
+			user.groups.add(self.role)
+		self.client.force_login(self.admin)
+
+	def test_role_list_shows_profile_user_count_and_permission_bundle_name(self):
+		response = self.client.get(reverse('accounts:role_list'))
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, '教练')
+		self.assertContains(response, 'coach')
+		self.assertContains(response, '教练组')
+		self.assertContains(response, '上传训练日志')
+
+		soup = BeautifulSoup(response.content, 'html.parser')
+		role_row = soup.find('td', string='教练').find_parent('tr')
+		role_text = role_row.get_text(' ', strip=True)
+		self.assertIn('2', role_text)
 
 
 class PermissionBundleSyncServiceTests(TestCase):

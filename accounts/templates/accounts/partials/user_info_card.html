@@ -28,17 +28,8 @@
       <div class="label">
         <span class="label-text">角色</span>
         <div class="flex flex-wrap gap-2">
-          {% if target_user.is_superuser %}
-            <span class="badge badge-lg badge-error">超级管理员</span>
-          {% elif target_user.is_staff %}
-            <span class="badge badge-lg badge-secondary">工作人员</span>
-          {% endif %}
-          {% for g in target_user.groups.all %}
-            <span class="badge badge-lg badge-primary">{{ g.name }}</span>
-          {% empty %}
-            {% if not target_user.is_superuser and not target_user.is_staff %}
-              <span class="badge badge-outline badge-lg">普通用户</span>
-            {% endif %}
+          {% for role_badge in role_badges %}
+            <span class="{{ role_badge.css_class }}">{{ role_badge.label }}</span>
           {% endfor %}
         </div>
       </div>

@@ -9,7 +9,7 @@ from .permission_bundles import (
     sync_group_permission_bundles,
     sync_user_permission_bundles,
 )
-from .users import get_user_display_name, get_user_full_info
+from .users import get_user_display_name, get_user_full_info, get_user_role_badges
 
 __all__ = [
     "ensure_group_profile",
@@ -21,6 +21,7 @@ __all__ = [
     "infer_permission_bundle_codes_from_permissions",
     "get_user_display_name",
     "get_user_full_info",
+    "get_user_role_badges",
     "sync_group_permission_bundles",
     "sync_user_permission_bundles",
 ]
