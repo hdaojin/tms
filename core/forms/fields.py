@@ -38,6 +38,12 @@ class MultipleFileField(forms.FileField):
 
         super().__init__(*args, **kwargs)
 
+    def _run_upload_spec_validation(self, files):
+        if self.upload_spec:
+            for file in files:
+                self.upload_spec.validate_file(file)
+        return files
+
     def clean(self, data, initial=None):
         single_file_clean = super().clean
 
@@ -47,11 +53,13 @@ class MultipleFileField(forms.FileField):
                 if self.required:
                     single_file_clean(None, initial)
                 return []
-            return [single_file_clean(file, initial) for file in files]
+            return self._run_upload_spec_validation(
+                [single_file_clean(file, initial) for file in files]
+            )
 
         if not data:
             if self.required:
                 single_file_clean(data, initial)
             return []
 
-        return [single_file_clean(data, initial)]
+        return self._run_upload_spec_validation([single_file_clean(data, initial)])
