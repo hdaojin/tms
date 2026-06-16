@@ -10,7 +10,7 @@ from .models import SambaOperation
 from .services import mark_stale_running_operations, process_operation
 
 
-@override_settings(SAMBA_ASYNC_OPERATIONS_ENABLED=False)
+@override_settings(SAMBA_INTEGRATION_ENABLED=True, SAMBA_ASYNC_OPERATIONS_ENABLED=False)
 class SambaAccountViewTests(TestCase):
 	def setUp(self):
 		self.user = User.objects.create_user(username='samba-user', password='testpass123')

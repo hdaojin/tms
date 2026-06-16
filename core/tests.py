@@ -28,6 +28,7 @@ from core.uploads import (
     TRAININGLOG_UPLOAD_SPEC,
     FileUploadMixin,
     PrivateMediaStorage,
+    UploadSignatureValidator,
     UploadSizeValidator,
     UploadSpec,
     format_file_size,
@@ -40,6 +41,10 @@ from core.utils.admin_deletion import discard_registered_delete_permissions, reg
 
 
 User = get_user_model()
+PDF_BYTES = b"%PDF-1.7\n% test pdf\n"
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+ZIP_BYTES = b"PK\x03\x04" + b"\x00" * 16
+JSON_BYTES = b'{"ok": true}'
 
 
 class DeletePermissionExemptionRegistryTests(TestCase):
@@ -260,6 +265,31 @@ class UploadSpecTests(TestCase):
 
         self.assertIn("上传文件大小不能超过 1MB。", context.exception.messages)
 
+    def test_upload_signature_validator_accepts_matching_common_file_headers(self):
+        validator = UploadSignatureValidator()
+
+        validator(SimpleUploadedFile("sample.pdf", PDF_BYTES))
+        validator(SimpleUploadedFile("sample.png", PNG_BYTES))
+        validator(SimpleUploadedFile("sample.xlsx", ZIP_BYTES))
+        validator(SimpleUploadedFile("sample.json", JSON_BYTES))
+
+    def test_upload_signature_validator_rejects_mismatched_file_header(self):
+        validator = UploadSignatureValidator()
+
+        with self.assertRaises(ValidationError) as context:
+            validator(SimpleUploadedFile("fake.pdf", b"not a pdf"))
+
+        self.assertIn("文件扩展名与实际文件类型不一致", context.exception.messages[0])
+
+    def test_upload_signature_validator_restores_file_pointer(self):
+        validator = UploadSignatureValidator()
+        upload = SimpleUploadedFile("sample.pdf", PDF_BYTES + b"body")
+        upload.seek(5)
+
+        validator(upload)
+
+        self.assertEqual(upload.tell(), 5)
+
     def test_private_media_storage_serializes_without_absolute_path(self):
         storage = PrivateMediaStorage("assessments")
 
@@ -282,7 +312,7 @@ class UploadSpecTests(TestCase):
 class UploadUtilityTests(TestCase):
     def test_validate_upload_file_uses_upload_spec_rules(self):
         validate_upload_file(
-            SimpleUploadedFile("ok.pdf", b"ok"),
+            SimpleUploadedFile("ok.pdf", PDF_BYTES),
             allowed_extensions=["pdf"],
             max_size_mb=1,
         )
@@ -294,13 +324,24 @@ class UploadUtilityTests(TestCase):
                 max_size_mb=1,
             )
 
+    def test_validate_upload_file_rejects_mismatched_signature(self):
+        with self.assertRaises(ValidationError) as context:
+            validate_upload_file(
+                SimpleUploadedFile("fake.pdf", b"plain text"),
+                allowed_extensions=["pdf"],
+                max_size_mb=1,
+            )
+
+        self.assertIn("文件扩展名与实际文件类型不一致", context.exception.messages[0])
+
     def test_file_upload_mixin_exposes_old_validation_method_name(self):
         mixin = FileUploadMixin()
         mixin.allowed_extensions = ["pdf"]
         mixin.max_size_mb = 1
 
-        self.assertEqual(mixin.validate_file(SimpleUploadedFile("ok.pdf", b"ok")), [])
+        self.assertEqual(mixin.validate_file(SimpleUploadedFile("ok.pdf", PDF_BYTES)), [])
         self.assertTrue(mixin.validate_file(SimpleUploadedFile("bad.txt", b"bad")))
+        self.assertTrue(mixin.validate_file(SimpleUploadedFile("fake.pdf", b"not pdf")))
 
     def test_file_display_helpers_live_in_core_uploads(self):
         self.assertEqual(get_file_icon_class("report.pdf"), "icon-[tabler--file-type-pdf]")
@@ -318,8 +359,8 @@ class MultipleFileFieldTests(TestCase):
             required=False,
         )
         files = [
-            SimpleUploadedFile("first.pdf", b"first"),
-            SimpleUploadedFile("second.pdf", b"second"),
+            SimpleUploadedFile("first.pdf", PDF_BYTES),
+            SimpleUploadedFile("second.pdf", PDF_BYTES),
         ]
 
         cleaned = field.clean(files)
@@ -329,7 +370,7 @@ class MultipleFileFieldTests(TestCase):
     def test_multiple_file_field_wraps_single_file_in_list(self):
         field = MultipleFileField(upload_spec=UploadSpec(["pdf"], 1), required=False)
 
-        cleaned = field.clean(SimpleUploadedFile("single.pdf", b"single"))
+        cleaned = field.clean(SimpleUploadedFile("single.pdf", PDF_BYTES))
 
         self.assertEqual(len(cleaned), 1)
         self.assertEqual(cleaned[0].name, "single.pdf")
@@ -351,6 +392,12 @@ class MultipleFileFieldTests(TestCase):
 
         with self.assertRaises(ValidationError):
             field.clean([upload])
+
+    def test_multiple_file_field_rejects_mismatched_file_signature(self):
+        field = MultipleFileField(upload_spec=UploadSpec(["pdf"], 1), required=False)
+
+        with self.assertRaises(ValidationError):
+            field.clean([SimpleUploadedFile("fake.pdf", b"not a pdf")])
 
 
 class UploadSpecAdoptionTests(TestCase):

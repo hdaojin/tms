@@ -62,8 +62,12 @@ db.sqlite3
 db.sqlite3-journal
 db.sqlite3*
 *.sqlite3
+*.sqlite3-journal
+*.sqlite3-shm
+*.sqlite3-wal
 
 # Local database backups
+backups/
 backups/*.sqlite3
 backups/**/*.sqlite3
 
@@ -321,9 +325,15 @@ dist
 # Uploads directory
 media/
 media-private/
+
+# collectstatic output
+staticfiles/
+
+# Local temporary reports and fixtures
 # .vscode/
 .VSCodeCounter/
 all_html_code.txt
 all_python_code.txt
 testsql-fixtures/
-
+*.bak
+*.tmp

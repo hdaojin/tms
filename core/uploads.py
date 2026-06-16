@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -39,12 +39,148 @@ from core.constants import (
 )
 
 
+SignatureMatcher = Callable[[bytes], bool]
+
+
+PDF_SIGNATURE = b"%PDF-"
+ZIP_SIGNATURES = (b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08")
+OLE_SIGNATURE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+GZIP_SIGNATURE = b"\x1f\x8b"
+BZIP2_SIGNATURE = b"BZh"
+RAR_SIGNATURES = (b"Rar!\x1a\x07\x00", b"Rar!\x1a\x07\x01\x00")
+SEVEN_Z_SIGNATURE = b"7z\xbc\xaf\x27\x1c"
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+JPEG_SIGNATURE = b"\xff\xd8\xff"
+GIF_SIGNATURES = (b"GIF87a", b"GIF89a")
+WEBP_RIFF_SIGNATURE = b"RIFF"
+WEBP_FORMAT_SIGNATURE = b"WEBP"
+BMP_SIGNATURE = b"BM"
+JSON_LEADING_BYTES = (b"{", b"[")
+
+
+def _html_safe_text(value: object) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#x27;")
+    )
+
+
+def _html_error_items(errors: Iterable[str]) -> str:
+    return "".join(f"<li>{_html_safe_text(error)}</li>" for error in errors)
+
+
 def _normalize_extensions(extensions: Iterable[str] | None) -> tuple[str, ...]:
     return tuple(
         str(ext).lower().lstrip(".")
         for ext in (extensions or ())
         if str(ext).strip(".")
     )
+
+
+def _read_file_header(file: UploadedFile, size: int = 512) -> bytes:
+    """读取文件头并尽量恢复文件指针。"""
+    position: int | None = None
+    try:
+        position = file.tell()
+    except (AttributeError, OSError):
+        position = None
+
+    try:
+        file.seek(0)
+        return file.read(size)
+    finally:
+        if position is not None:
+            try:
+                file.seek(position)
+            except (AttributeError, OSError):
+                pass
+
+
+def _starts_with_any(header: bytes, signatures: Iterable[bytes]) -> bool:
+    return any(header.startswith(signature) for signature in signatures)
+
+
+def _is_pdf(header: bytes) -> bool:
+    return header.startswith(PDF_SIGNATURE)
+
+
+def _is_zip_based(header: bytes) -> bool:
+    return _starts_with_any(header, ZIP_SIGNATURES)
+
+
+def _is_legacy_office(header: bytes) -> bool:
+    return header.startswith(OLE_SIGNATURE)
+
+
+def _is_ooxml_or_zip(header: bytes) -> bool:
+    return _is_zip_based(header)
+
+
+def _is_jpeg(header: bytes) -> bool:
+    return header.startswith(JPEG_SIGNATURE)
+
+
+def _is_png(header: bytes) -> bool:
+    return header.startswith(PNG_SIGNATURE)
+
+
+def _is_gif(header: bytes) -> bool:
+    return _starts_with_any(header, GIF_SIGNATURES)
+
+
+def _is_webp(header: bytes) -> bool:
+    return header.startswith(WEBP_RIFF_SIGNATURE) and header[8:12] == WEBP_FORMAT_SIGNATURE
+
+
+def _is_gzip(header: bytes) -> bool:
+    return header.startswith(GZIP_SIGNATURE)
+
+
+def _is_bzip2(header: bytes) -> bool:
+    return header.startswith(BZIP2_SIGNATURE)
+
+
+def _is_rar(header: bytes) -> bool:
+    return _starts_with_any(header, RAR_SIGNATURES)
+
+
+def _is_7z(header: bytes) -> bool:
+    return header.startswith(SEVEN_Z_SIGNATURE)
+
+
+def _is_bmp(header: bytes) -> bool:
+    return header.startswith(BMP_SIGNATURE)
+
+
+def _is_json(header: bytes) -> bool:
+    return header.lstrip().startswith(JSON_LEADING_BYTES)
+
+
+FILE_SIGNATURE_MATCHERS: dict[str, tuple[SignatureMatcher, ...]] = {
+    "pdf": (_is_pdf,),
+    "doc": (_is_legacy_office,),
+    "xls": (_is_legacy_office,),
+    "ppt": (_is_legacy_office,),
+    "docx": (_is_ooxml_or_zip,),
+    "xlsx": (_is_ooxml_or_zip,),
+    "pptx": (_is_ooxml_or_zip,),
+    "zip": (_is_zip_based,),
+    "gz": (_is_gzip,),
+    "bz2": (_is_bzip2,),
+    "rar": (_is_rar,),
+    "7z": (_is_7z,),
+    "jpg": (_is_jpeg,),
+    "jpeg": (_is_jpeg,),
+    "png": (_is_png,),
+    "gif": (_is_gif,),
+    "webp": (_is_webp,),
+    "bmp": (_is_bmp,),
+    "json": (_is_json,),
+}
 
 
 @deconstructible
@@ -64,6 +200,29 @@ class UploadSizeValidator:
             isinstance(other, UploadSizeValidator)
             and self.max_size_mb == other.max_size_mb
         )
+
+
+@deconstructible
+class UploadSignatureValidator:
+    """基于常见文件头的轻量内容签名校验器。"""
+
+    def __call__(self, file: UploadedFile) -> None:
+        ext = Path(file.name or "").suffix.lower().lstrip(".")
+        matchers = FILE_SIGNATURE_MATCHERS.get(ext)
+        if not matchers:
+            return
+
+        header = _read_file_header(file)
+        if not header:
+            return
+
+        if not any(matcher(header) for matcher in matchers):
+            raise ValidationError(
+                f"文件扩展名与实际文件类型不一致，请检查 {ext} 文件内容。"
+            )
+
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, UploadSignatureValidator)
 
 
 @deconstructible
@@ -135,6 +294,7 @@ class UploadSpec:
     def validate_file(self, file: UploadedFile) -> None:
         for validator in self.validators():
             validator(file)
+        UploadSignatureValidator()(file)
 
 
 class FileUploadMixin:
@@ -169,7 +329,7 @@ class FileUploadMixin:
 
     def get_error_response(self, errors: list[str], request) -> HttpResponse:
         if request.headers.get("HX-Request"):
-            error_html = "".join(f"<li>{error}</li>" for error in errors)
+            error_html = _html_error_items(errors)
             return HttpResponse(
                 '<div class="alert alert-error">'
                 '<span class="icon-[tabler--alert-circle] size-5"></span>'
