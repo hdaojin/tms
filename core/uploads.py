@@ -58,6 +58,21 @@ BMP_SIGNATURE = b"BM"
 JSON_LEADING_BYTES = (b"{", b"[")
 
 
+def _html_safe_text(value: object) -> str:
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#x27;")
+    )
+
+
+def _html_error_items(errors: Iterable[str]) -> str:
+    return "".join(f"<li>{_html_safe_text(error)}</li>" for error in errors)
+
+
 def _normalize_extensions(extensions: Iterable[str] | None) -> tuple[str, ...]:
     return tuple(
         str(ext).lower().lstrip(".")
@@ -314,7 +329,7 @@ class FileUploadMixin:
 
     def get_error_response(self, errors: list[str], request) -> HttpResponse:
         if request.headers.get("HX-Request"):
-            error_html = "".join(f"<li>{error}</li>" for error in errors)
+            error_html = _html_error_items(errors)
             return HttpResponse(
                 '<div class="alert alert-error">'
                 '<span class="icon-[tabler--alert-circle] size-5"></span>'
