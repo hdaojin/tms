@@ -254,7 +254,7 @@ class UploadSpecTests(TestCase):
         self.assertEqual(spec.accept, ".pdf,.docx")
         self.assertEqual(spec.help_text("上传资料"), "上传资料，支持 pdf, docx，大小不超过 12MB")
         self.assertEqual(spec.widget_attrs(type="file"), {"type": "file", "accept": ".pdf,.docx"})
-        self.assertEqual(len(spec.validators()), 3)
+        self.assertEqual(len(spec.validators()), 2)
 
     def test_upload_size_validator_reports_chinese_error(self):
         validator = UploadSizeValidator(1)
