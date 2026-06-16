@@ -58,11 +58,6 @@ BMP_SIGNATURE = b"BM"
 JSON_LEADING_BYTES = (b"{", b"[")
 
 
-OFFICE_LEGACY_EXTENSIONS = {"doc", "xls", "ppt"}
-OFFICE_OPENXML_EXTENSIONS = {"docx", "xlsx", "pptx"}
-ARCHIVE_ZIP_EXTENSIONS = {"zip"}
-
-
 def _normalize_extensions(extensions: Iterable[str] | None) -> tuple[str, ...]:
     return tuple(
         str(ext).lower().lstrip(".")
@@ -279,12 +274,12 @@ class UploadSpec:
                 )
             )
         validators.append(UploadSizeValidator(self.max_size_mb))
-        validators.append(UploadSignatureValidator())
         return validators
 
     def validate_file(self, file: UploadedFile) -> None:
         for validator in self.validators():
             validator(file)
+        UploadSignatureValidator()(file)
 
 
 class FileUploadMixin:
