@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+      - "chore/**"
+      - "feature/**"
+      - "fix/**"
+
+permissions:
+  contents: read
+
+jobs:
+  django:
+    name: Django checks and tests
+    runs-on: ubuntu-latest
+    env:
+      SECRET_KEY: ci-insecure-secret-key-not-for-production
+      DEBUG: "False"
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      CSRF_TRUSTED_ORIGINS: http://localhost,http://127.0.0.1
+      DATABASE_URL: sqlite:///db.sqlite3
+      PRIVATE_MEDIA_ROOT: media-private
+      SAMBA_INTEGRATION_ENABLED: "False"
+      SAMBA_ASYNC_OPERATIONS_ENABLED: "False"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install system build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends pkg-config default-libmysqlclient-dev libpq-dev
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Python dependencies
+        run: uv sync --frozen
+
+      - name: Run Django system checks
+        run: uv run manage.py check
+
+      - name: Verify migrations are up to date
+        run: uv run manage.py makemigrations --check --dry-run
+
+      - name: Apply migrations
+        run: uv run manage.py migrate --noinput
+
+      - name: Run tests
+        run: uv run manage.py test
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tailwind CSS
+        run: npm run build:css
