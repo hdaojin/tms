@@ -14,6 +14,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 from django.utils.csp import CSP
 
 from core.constants import (
@@ -30,18 +31,30 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 environ.Env.read_env(env_file=BASE_DIR / '.env')
 
 # Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
+# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-# SECRET_KEY = 'django-insecure-ervt8@=%%#n1vmzhs)$5^x%#bfk+*lnre8e)n=c243)mihbi@^'
-SECRET_KEY = env('SECRET_KEY', default='django-insecure-ervt8@=%%#n1vmzhs)$5^x%#bfk+*lnre8e)n=c243)mihbi@^') # type: ignore
+DEVELOPMENT_SECRET_KEY = 'django-insecure-development-only-key-do-not-use-in-production'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# DEBUG = True
-DEBUG = env.bool('DEBUG', default=True) # type: ignore
+# Local development should explicitly set DEBUG=True in .env.
+DEBUG = env.bool('DEBUG', default=False) # type: ignore
 
-# ALLOWED_HOSTS = []
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1']) # type: ignore
+SECRET_KEY = env(
+    'SECRET_KEY',
+    default=DEVELOPMENT_SECRET_KEY if DEBUG else '',
+) # type: ignore
+
+if not SECRET_KEY:
+    raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG=False.')
+
+if not DEBUG and SECRET_KEY.startswith(('django-insecure-', 'ChangeMe', 'change-me', 'replace-with')):
+    raise ImproperlyConfigured('SECRET_KEY must be replaced with a strong production value when DEBUG=False.')
+
+ALLOWED_HOSTS = env.list(
+    'ALLOWED_HOSTS',
+    default=['localhost', '127.0.0.1'] if DEBUG else [],
+) # type: ignore
 
 CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[]) # type: ignore
 
@@ -123,7 +136,7 @@ WSGI_APPLICATION = 'tmsproject.wsgi.application'
 
 
 # Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
+# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
 # DATABASES = {
 #     'default': {
@@ -138,7 +151,7 @@ DATABASES = {
 
 
 # Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
+# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -157,7 +170,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 
 # Internationalization
-# https://docs.djangoproject.com/en/5.1/topics/i18n/
+# https://docs.djangoproject.com/en/6.0/topics/i18n/
 
 LANGUAGE_CODE = 'zh-hans'
 
@@ -169,7 +182,7 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
+# https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 
 STATIC_URL = 'static/'
@@ -185,7 +198,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 PRIVATE_MEDIA_ROOT = env.path('PRIVATE_MEDIA_ROOT', default=BASE_DIR / 'media-private')  # type: ignore
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
+# https://docs.djangoproject.com/en/6.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -201,8 +214,8 @@ UPLOAD_MAX_SIZE_MB = env.int('UPLOAD_MAX_SIZE_MB', default=DEFAULT_UPLOAD_MAX_SI
 SECURE_CSP = {
     'frame-ancestors': [CSP.SELF],
 }
-SAMBA_INTEGRATION_ENABLED = env.bool('SAMBA_INTEGRATION_ENABLED', default=True)  # type: ignore
-SAMBA_ASYNC_OPERATIONS_ENABLED = env.bool('SAMBA_ASYNC_OPERATIONS_ENABLED', default=True)  # type: ignore
+SAMBA_INTEGRATION_ENABLED = env.bool('SAMBA_INTEGRATION_ENABLED', default=False)  # type: ignore
+SAMBA_ASYNC_OPERATIONS_ENABLED = env.bool('SAMBA_ASYNC_OPERATIONS_ENABLED', default=False)  # type: ignore
 SAMBA_COMMAND_TIMEOUT_SECONDS = env.int('SAMBA_COMMAND_TIMEOUT_SECONDS', default=15)  # type: ignore
 SAMBA_OPERATION_STALE_MINUTES = env.int('SAMBA_OPERATION_STALE_MINUTES', default=30)  # type: ignore
 SAMBA_TASK_ENCRYPTION_KEY = env('SAMBA_TASK_ENCRYPTION_KEY', default='')  # type: ignore
