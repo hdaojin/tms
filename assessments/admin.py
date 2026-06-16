@@ -8,7 +8,7 @@ from django.urls import path, reverse
 from competition_standards.models import StandardModule
 from core.constants import GROUP_COACH
 
-from .models import Assessment, Score, AssessmentModule, AssessmentAttachment
+from .models import Assessment, AssessmentModule, AssessmentAttachment
 
 
 User = get_user_model()
@@ -181,24 +181,6 @@ class AssessmentAdmin(admin.ModelAdmin):
     inlines = [AssessmentModuleInline]
     date_hierarchy = 'start_date'
 
-class ScoreInline(admin.TabularInline):
-    model = Score
-    extra = 0
-    # autocomplete_fields = ['user'] # 如果用户很多，可以开启这个
-    
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        # 尝试限制用户选择范围为本次考核的参与人员
-        if db_field.name == "user":
-            parent_obj = getattr(request, '_obj_', None)
-            if parent_obj and hasattr(parent_obj, 'assessment'): 
-                 kwargs["queryset"] = parent_obj.assessment.participants.all()
-            
-            form_field = super().formfield_for_foreignkey(db_field, request, **kwargs)
-            if form_field:
-                 form_field.label_from_instance = lambda obj: obj.full_info # type: ignore
-            return form_field
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
 @admin.register(AssessmentModule)
 class AssessmentModuleAdmin(admin.ModelAdmin):
     form = AssessmentModuleAdminForm
@@ -241,7 +223,7 @@ class AssessmentModuleAdmin(admin.ModelAdmin):
         'scoring_sheet_file',
         'scoring_script_file',
     )
-    inlines = [AssessmentAttachmentInline, ScoreInline]
+    inlines = [AssessmentAttachmentInline]
     ordering = ('assessment', 'sort_order', 'module__code', 'pk')
 
     class Media:

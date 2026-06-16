@@ -177,7 +177,7 @@ class AssessmentModule(models.Model):
         blank=True,
         related_name="responsible_assessment_modules",
         verbose_name="负责教练",
-        help_text="只有该教练可以上传资料和录入成绩",
+        help_text="只有该教练可以上传资料和管理评分归档",
         limit_choices_to={"groups__name": GROUP_COACH},
     )
     sort_order = models.PositiveIntegerField(
@@ -209,7 +209,7 @@ class AssessmentModule(models.Model):
     is_locked = models.BooleanField(
         "已锁定",
         default=False,
-        help_text="锁定后成绩不可修改",
+        help_text="锁定后评分归档不可修改",
     )
     locked_at = models.DateTimeField(
         "锁定时间",
@@ -341,65 +341,6 @@ class AssessmentAttachment(models.Model):
     
     def __str__(self):
         return f"{self.assessment_module} - {PurePosixPath(self.file.name).name}"
-
-class Score(models.Model):
-    assessment_module = models.ForeignKey(
-        AssessmentModule,
-        verbose_name="考核模块",
-        on_delete=models.CASCADE,
-        related_name="scores"
-    )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        verbose_name="选手",
-        on_delete=models.CASCADE,
-        related_name="assessment_scores"
-    )
-    score = models.DecimalField(
-        "得分",
-        max_digits=5,
-        decimal_places=2,
-        default=Decimal("0.00"),
-        validators=[MinValueValidator(Decimal("0.00"))]
-    )
-    remarks = models.TextField("备注", blank=True)
-    
-    created_at = models.DateTimeField("创建时间", auto_now_add=True)
-    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
-
-    class Meta:
-        verbose_name = "成绩"
-        verbose_name_plural = "成绩"
-        ordering = ["assessment_module", "user"]
-        constraints = [
-            models.UniqueConstraint(
-                fields=['assessment_module', 'user'],
-                name='uniq_score_assessmentmodule_user',
-            ),
-        ]
-
-    def clean(self):
-        # 验证分数不超过满分
-        # 注意：使用 self.assessment_module 可能会触发数据库查询，如果外键未设置会抛出异常
-        # 应该先检查是否有 assessment_module_id
-        if hasattr(self, 'assessment_module') and self.assessment_module:
-             if self.score > self.assessment_module.max_score:
-                raise ValidationError({'score': f"分数不能超过该模块的满分 ({self.assessment_module.max_score})"})
-        
-        # 验证用户是否在参考人员列表中
-        if hasattr(self, 'assessment_module') and self.assessment_module and self.user_id: # type: ignore
-            if not self.assessment_module.assessment.participants.filter(pk=self.user.pk).exists():
-                user_name = self.user.first_name if self.user.first_name else self.user.username
-                raise ValidationError({'user': f"用户 {user_name} 不是本次考核的参考人员"})
-
-    def save(self, *args, **kwargs):
-        self.clean()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        user_name = self.user.first_name if self.user.first_name else self.user.username
-        return f"{self.assessment_module} - {user_name}: {self.score}"
-
 
 # 注册文件清理信号 - 删除/更新模型时自动清理旧文件
 register_file_cleanup_signals(AssessmentModule, file_field="question_file")

@@ -1,11 +1,14 @@
 from datetime import date
 from decimal import Decimal
 from io import StringIO
+import importlib
 from pathlib import Path
-from tempfile import TemporaryDirectory
+import shutil
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib import admin
+from django.contrib.admin.models import ADDITION, LogEntry
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
@@ -13,6 +16,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.recorder import MigrationRecorder
+from django.utils import timezone
 from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.urls import reverse
 
@@ -20,11 +24,80 @@ from competition_standards.models import CompetitionType, Project, StandardModul
 from core.constants import GROUP_COACH
 from core.uploads import ASSESSMENT_TP_UPLOAD_SPEC
 
-from .models import Assessment, AssessmentAttachment, AssessmentModule, Score
+from marking.models import (
+    MarkingAspect,
+    MarkingParticipant,
+    MarkingResult,
+    MarkingScheme,
+    MarkingSchemeImport,
+    MarkingSubCriterion,
+)
+from marking.parser import PARSER_VERSION
+from marking.services import get_content_type_for_target
+
+from .models import Assessment, AssessmentAttachment, AssessmentModule
 from .selectors import build_assessment_list_context, build_assessment_score_table_context
 
 
 User = get_user_model()
+
+
+def create_marking_score(assessment_module, user, score):
+    content_type = get_content_type_for_target(assessment_module)
+    scheme = MarkingScheme.objects.filter(
+        target_content_type=content_type,
+        target_object_id=assessment_module.pk,
+    ).first()
+    if scheme is None:
+        source_import = MarkingSchemeImport.objects.create(
+            file=f"schemes/{assessment_module.pk}.xlsx",
+            original_filename=f"{assessment_module.module.code}.xlsx",
+            file_sha256="0" * 64,
+            parser_version=PARSER_VERSION,
+            parse_summary={},
+            target_content_type=content_type,
+            target_object_id=assessment_module.pk,
+        )
+        scheme = MarkingScheme.objects.create(
+            source_import=source_import,
+            standard_module=assessment_module.module,
+            target_content_type=content_type,
+            target_object_id=assessment_module.pk,
+            title=f"{assessment_module.module.code} 评分方案",
+            module_code=assessment_module.module.code,
+            module_name=assessment_module.module.name,
+            total_mark=assessment_module.max_score,
+            parser_version=PARSER_VERSION,
+        )
+        subcriterion = MarkingSubCriterion.objects.create(
+            scheme=scheme,
+            code=f"{assessment_module.module.code}1",
+            name="默认子项",
+            day_of_marking="1",
+        )
+        MarkingAspect.objects.create(
+            scheme=scheme,
+            subcriterion=subcriterion,
+            code=f"{assessment_module.module.code}1.1",
+            aspect_type=MarkingAspect.AspectType.MEASUREMENT,
+            description="默认评分点",
+            command="CMP 导入结果",
+            requirement="结果有效",
+            max_mark=assessment_module.max_score,
+            source_row_number=1,
+        )
+    aspect = scheme.aspects.first()
+    participant, _ = MarkingParticipant.objects.update_or_create(
+        scheme=scheme,
+        user=user,
+        defaults={"display_name": user.display_name, "sort_order": 0},
+    )
+    result, _ = MarkingResult.objects.update_or_create(
+        participant=participant,
+        aspect=aspect,
+        defaults={"score_awarded": score, "source": MarkingResult.Source.IMPORTED},
+    )
+    return result
 
 
 class AssessmentModuleOrderingTests(TestCase):
@@ -203,25 +276,25 @@ class AssessmentRankingConfigurationTests(TestCase):
             max_score=Decimal("10.00"),
             counts_towards_ranking=False,
         )
-        Score.objects.create(
-            assessment_module=self.ranking_assessment_module,
-            user=self.participant_a,
-            score=Decimal("20.00"),
+        create_marking_score(
+            self.ranking_assessment_module,
+            self.participant_a,
+            Decimal("20.00"),
         )
-        Score.objects.create(
-            assessment_module=self.non_ranking_assessment_module,
-            user=self.participant_a,
-            score=Decimal("8.00"),
+        create_marking_score(
+            self.non_ranking_assessment_module,
+            self.participant_a,
+            Decimal("8.00"),
         )
-        Score.objects.create(
-            assessment_module=self.ranking_assessment_module,
-            user=self.participant_b,
-            score=Decimal("22.00"),
+        create_marking_score(
+            self.ranking_assessment_module,
+            self.participant_b,
+            Decimal("22.00"),
         )
-        Score.objects.create(
-            assessment_module=self.non_ranking_assessment_module,
-            user=self.participant_b,
-            score=Decimal("5.00"),
+        create_marking_score(
+            self.non_ranking_assessment_module,
+            self.participant_b,
+            Decimal("5.00"),
         )
 
     def test_score_table_context_uses_explicit_ranking_flag(self):
@@ -392,6 +465,8 @@ class AssessmentCoachingWorkflowTests(TestCase):
         return SimpleUploadedFile(name, b"%PDF-1.4\nassessment test", content_type="application/pdf")
 
     def test_responsible_coach_can_view_assessment_detail(self):
+        permission = Permission.objects.get(codename="add_markingschemeimport")
+        self.coach.user_permissions.add(permission)
         self.client.force_login(self.coach)
 
         response = self.client.get(reverse("assessments:detail", args=[self.assessment.pk]))
@@ -399,9 +474,9 @@ class AssessmentCoachingWorkflowTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "考核资料")
         self.assertContains(response, "成绩管理")
-        self.assertContains(response, "录入成绩")
+        self.assertContains(response, "导入评分表")
         self.assertContains(response, "上传资料")
-        self.assertContains(response, "锁定成绩")
+        self.assertContains(response, "锁定归档")
         self.assertContains(response, "锁定资料")
         self.assertContains(response, self.coach.display_name)
 
@@ -423,7 +498,7 @@ class AssessmentCoachingWorkflowTests(TestCase):
         response = self.client.get(reverse("assessments:detail", args=[self.assessment.pk]))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "成绩已锁定")
+        self.assertContains(response, "归档已锁定")
         self.assertContains(response, "资料已锁定")
         self.assertNotContains(response, "解锁成绩")
         self.assertNotContains(response, "解锁资料")
@@ -435,34 +510,21 @@ class AssessmentCoachingWorkflowTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
-    def test_responsible_coach_can_submit_batch_scores(self):
-        """负责教练可以批量录入成绩"""
+    def test_responsible_coach_with_permission_gets_marking_import_link(self):
+        permission = Permission.objects.get(codename="add_markingschemeimport")
+        self.coach.user_permissions.add(permission)
         self.client.force_login(self.coach)
-        url = reverse("assessments:module_score_entry", args=[self.assessment_module.pk])
 
-        response = self.client.post(url, {
-            f"score_{self.participant_a.pk}": "18.50",
-            f"remarks_{self.participant_a.pk}": "发挥稳定",
-            f"score_{self.participant_b.pk}": "20.00",
-            f"remarks_{self.participant_b.pk}": "注意细节",
-        })
+        response = self.client.get(reverse("assessments:detail", args=[self.assessment.pk]))
 
-        self.assertEqual(response.status_code, 302)
-        participant_a_score = Score.objects.get(
-            assessment_module=self.assessment_module,
-            user=self.participant_a,
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f"{reverse('marking:scheme_import')}?target_type=assessment_module&assessment_module={self.assessment_module.pk}",
         )
-        participant_b_score = Score.objects.get(
-            assessment_module=self.assessment_module,
-            user=self.participant_b,
-        )
-        self.assertEqual(participant_a_score.score, Decimal("18.50"))
-        self.assertEqual(participant_a_score.remarks, "发挥稳定")
-        self.assertEqual(participant_b_score.score, Decimal("20.00"))
-        self.assertEqual(participant_b_score.remarks, "注意细节")
 
     def test_responsible_coach_can_lock_scores_from_detail_page(self):
-        """负责教练可以在详情页锁定成绩"""
+        """负责教练可以在详情页锁定评分归档"""
         self.client.force_login(self.coach)
         url = reverse("assessments:module_score_lock", args=[self.assessment_module.pk])
 
@@ -475,21 +537,19 @@ class AssessmentCoachingWorkflowTests(TestCase):
         self.assertTrue(self.assessment_module.is_locked)
         self.assertEqual(self.assessment_module.locked_by, self.coach)
 
-    def test_locked_module_rejects_score_submission(self):
-        """已锁定模块拒绝成绩提交"""
+    def test_locked_module_hides_marking_import_link(self):
         self.assessment_module.is_locked = True
         self.assessment_module.save(update_fields=["is_locked"])
+        permission = Permission.objects.get(codename="add_markingschemeimport")
+        self.coach.user_permissions.add(permission)
         self.client.force_login(self.coach)
-        url = reverse("assessments:module_score_entry", args=[self.assessment_module.pk])
 
-        response = self.client.post(url, {
-            "action": "save",
-            f"score_{self.participant_a.pk}": "10.00",
-        })
+        response = self.client.get(reverse("assessments:detail", args=[self.assessment.pk]))
 
-        self.assertEqual(response.status_code, 403)
-        self.assertFalse(
-            Score.objects.filter(assessment_module=self.assessment_module).exists()
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(
+            response,
+            f"{reverse('marking:scheme_import')}?target_type=assessment_module&amp;assessment_module={self.assessment_module.pk}",
         )
 
     def test_superuser_can_lock_and_unlock_scores_from_detail_page(self):
@@ -550,30 +610,6 @@ class AssessmentCoachingWorkflowTests(TestCase):
         self.assessment_module.refresh_from_db()
         self.assertEqual(unlock_response.status_code, 302)
         self.assertFalse(self.assessment_module.is_material_locked)
-
-    def test_unassigned_coach_cannot_access_module_score_entry(self):
-        """非负责教练无法访问成绩录入页面"""
-        self.client.force_login(self.unassigned_coach)
-        url = reverse("assessments:module_score_entry", args=[self.assessment_module.pk])
-
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, 403)
-
-    def test_module_score_entry_page_accessible_by_responsible_coach(self):
-        """负责教练可以访问成绩录入页面"""
-        self.client.force_login(self.coach)
-        url = reverse("assessments:module_score_entry", args=[self.assessment_module.pk])
-
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, self.participant_a.display_name)
-        self.assertContains(response, self.participant_b.display_name)
-        self.assertContains(response, "备注")
-        self.assertContains(response, "重置")
-        self.assertNotContains(response, "保存并锁定")
-        self.assertNotContains(response, "成绩锁定请返回考核详情页统一操作。")
 
     def test_other_coach_cannot_upload_files_for_unassigned_module(self):
         self.client.force_login(self.other_coach)
@@ -891,7 +927,6 @@ class AssessmentAdminSortOrderTests(TestCase):
             response.context['inline_admin_formsets'][0].opts.model,
             AssessmentAttachment,
         )
-        self.assertEqual(response.context['inline_admin_formsets'][1].opts.model, Score)
         form = response.context['adminform'].form
         self.assertIn('question_file', form.fields)
         self.assertIn('scoring_standard_file', form.fields)
@@ -944,10 +979,6 @@ class AssessmentAdminSortOrderTests(TestCase):
                 'attachments-INITIAL_FORMS': '0',
                 'attachments-MIN_NUM_FORMS': '0',
                 'attachments-MAX_NUM_FORMS': '1000',
-                'scores-TOTAL_FORMS': '0',
-                'scores-INITIAL_FORMS': '0',
-                'scores-MIN_NUM_FORMS': '0',
-                'scores-MAX_NUM_FORMS': '1000',
                 '_save': '保存',
             },
         )
@@ -966,17 +997,57 @@ class AssessmentAdminSortOrderTests(TestCase):
 class AssessmentCutoverCommandTests(TestCase):
     def test_cutover_command_is_noop_for_current_state(self):
         output = StringIO()
-
-        with TemporaryDirectory() as temp_dir:
-            upload_root = Path(temp_dir) / "assessments"
-            upload_root.mkdir()
+        media_root = Path(settings.BASE_DIR) / ".assessment-cutover-test-media"
+        upload_root = media_root / "assessments"
+        shutil.rmtree(media_root, ignore_errors=True)
+        upload_root.mkdir(parents=True)
+        try:
             with patch(
                 "core.management.commands.cutover_assessment_to_assessments.ASSESSMENT_UPLOAD_DIR",
                 upload_root,
             ):
                 call_command("cutover_assessment_to_assessments", stdout=output)
+        finally:
+            shutil.rmtree(media_root, ignore_errors=True)
 
         self.assertIn("无需切换", output.getvalue())
+
+
+class AssessmentMigrationRepairTests(TransactionTestCase):
+    def test_score_removal_migration_nulls_orphan_admin_log_content_types(self):
+        user = User.objects.create_superuser(
+            username="admin-log-repair",
+            password="testpass123",
+            email="admin-log-repair@example.com",
+        )
+        entry = LogEntry.objects.create(
+            action_time=timezone.now(),
+            user=user,
+            content_type=None,
+            object_id="broken",
+            object_repr="Broken content type",
+            action_flag=ADDITION,
+            change_message="",
+        )
+        missing_content_type_id = 987654
+        connection.disable_constraint_checking()
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE django_admin_log SET content_type_id = %s WHERE id = %s",
+                    [missing_content_type_id, entry.pk],
+                )
+        finally:
+            connection.enable_constraint_checking()
+
+        migration = importlib.import_module(
+            "assessments.migrations.0007_remove_score_uniq_score_assessmentmodule_user_and_more"
+        )
+        with connection.schema_editor() as schema_editor:
+            migration.clear_orphan_admin_log_content_types(None, schema_editor)
+
+        entry.refresh_from_db()
+        self.assertIsNone(entry.content_type_id)
 
 
 class AssessmentCutoverRecoveryTests(TransactionTestCase):

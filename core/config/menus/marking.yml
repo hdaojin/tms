@@ -1,0 +1,35 @@
+---
+menu_slug: "marking"
+app_name: "marking"
+items:
+  - name: "评分归档"
+    icon:
+      pic: "icon-[tabler--clipboard-list]"
+      size: 4
+    is_group_header: true
+    children:
+      - name: "评分方案"
+        named_url: "marking:scheme_list"
+        icon:
+          pic: "icon-[tabler--list-details]"
+          size: 4
+        is_visible: true
+        login_required: true
+      - name: "导入评分表"
+        named_url: "marking:scheme_import"
+        icon:
+          pic: "icon-[tabler--file-import]"
+          size: 4
+        is_visible: true
+        login_required: true
+        required_perms:
+          - "marking.add_markingschemeimport"
+      - name: "导入结果包"
+        named_url: "marking:result_import_any"
+        icon:
+          pic: "icon-[tabler--database-import]"
+          size: 4
+        is_visible: true
+        login_required: true
+        required_perms:
+          - "marking.add_markingresultimport"

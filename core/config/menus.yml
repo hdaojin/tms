@@ -39,7 +39,7 @@ sections:
     include:
       - "competition_standards"
       - "traininglogs"
-      - "skills"
+      - "skilltrees"
 
   - section: "assessments"
     label: "竞赛"
@@ -51,6 +51,7 @@ sections:
     include:
       - "competitions"
       - "assessments"
+      - "marking"
 
   - section: "meetings"
     label: "会议"

@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.views.decorators.http import require_POST
 
-from .forms import AssessmentFileUploadForm, ModuleScoreBatchForm
+from .forms import AssessmentFileUploadForm
 from .models import Assessment, AssessmentAttachment, AssessmentModule
 from .permissions import (
     can_access_assessment_detail,
@@ -24,7 +24,7 @@ def assessment_list(request):
     显示考核列表
     - 普通用户：显示参与的考核及自己的成绩（当前+历史）
     - 有权限用户：显示所有考核列表，点击进入详情查看所有人成绩
-    - 负责教练：显示自己负责模块所属的考核，点击进入详情录入成绩/管理资料
+    - 负责教练：显示自己负责模块所属的考核，点击进入详情管理资料/评分归档
     """
     context = {
         **build_assessment_list_context(request.user),
@@ -57,44 +57,6 @@ def assessment_detail(request, pk):
 
 
 @login_required
-def module_score_entry(request, module_id):
-    """
-    独立的模块分数录入页面
-    - 负责教练可以批量录入 / 修改所有参考人员的成绩
-    - 成绩锁定与解锁统一在考核详情页操作
-    """
-    assessment_module = get_object_or_404(
-        AssessmentModule.objects.select_related(
-            "assessment", "module", "responsible_coach",
-        ),
-        pk=module_id,
-    )
-    if not can_manage_assessment_module(request.user, assessment_module):
-        raise PermissionDenied("只有负责该模块的教练可以录入成绩")
-
-    if request.method == "POST":
-        if assessment_module.is_locked:
-            raise PermissionDenied("该模块成绩已锁定，无法修改")
-
-        form = ModuleScoreBatchForm(request.POST, assessment_module=assessment_module)
-        if form.is_valid():
-            saved = form.save()
-            messages.success(request, f"已保存 {len(saved)} 条成绩。")
-            return redirect("assessments:module_score_entry", module_id=module_id)
-    else:
-        form = ModuleScoreBatchForm(assessment_module=assessment_module)
-
-    context = {
-        "assessment_module": assessment_module,
-        "assessment": assessment_module.assessment,
-        "form": form,
-        "title": f"{assessment_module.module.code} - {assessment_module.module.name} 成绩录入",
-        "title_icon": "icon-[tabler--edit-circle]",
-    }
-    return render(request, "assessments/module_score_entry.html", context)
-
-
-@login_required
 @require_POST
 def module_score_lock(request, module_id):
     assessment_module = get_object_or_404(
@@ -105,12 +67,12 @@ def module_score_lock(request, module_id):
 
     if action == "lock":
         if not can_lock_assessment_module(request.user, assessment_module):
-            raise PermissionDenied("只有负责该模块的教练或管理员可以锁定成绩")
+            raise PermissionDenied("只有负责该模块的教练或管理员可以锁定评分归档")
         if assessment_module.is_locked:
             messages.info(request, "该模块成绩已经锁定。")
         else:
             set_score_lock_state(assessment_module, is_locked=True, user=request.user)
-            messages.success(request, f"{assessment_module.module.name} 成绩已锁定。")
+            messages.success(request, f"{assessment_module.module.name} 评分归档已锁定。")
     elif action == "unlock":
         if not can_unlock_assessment_module(request.user):
             raise PermissionDenied("只有管理员可以解锁成绩")
@@ -118,7 +80,7 @@ def module_score_lock(request, module_id):
             messages.info(request, "该模块成绩当前未锁定。")
         else:
             set_score_lock_state(assessment_module, is_locked=False)
-            messages.success(request, f"{assessment_module.module.name} 成绩已解锁。")
+            messages.success(request, f"{assessment_module.module.name} 评分归档已解锁。")
     else:
         raise PermissionDenied("无效的成绩锁定操作")
 

@@ -1,0 +1,16 @@
+<div class="rounded-md border border-base-300 bg-base-100 p-2 text-sm">
+  <div class="flex flex-wrap items-center gap-2">
+    <a href="{% url 'marking:scheme_detail' mapping.aspect.scheme_id %}" class="link link-hover font-mono">
+      {{ mapping.aspect.code }}
+    </a>
+    <span class="badge badge-outline badge-xs">{{ mapping.aspect.max_mark }} 分</span>
+    {% if mapping.is_primary %}
+      <span class="badge badge-primary badge-xs">主技能</span>
+    {% endif %}
+    <span class="badge badge-ghost badge-xs">权重 {{ mapping.weight }}</span>
+  </div>
+  <div class="mt-1">{{ mapping.aspect.description }}</div>
+  <div class="mt-1 text-xs text-base-content/60">
+    {{ mapping.aspect.scheme.title }} / {{ mapping.aspect.scheme.module_code }} - {{ mapping.aspect.scheme.module_name }}
+  </div>
+</div>

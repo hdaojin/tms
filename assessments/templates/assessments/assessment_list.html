@@ -88,8 +88,8 @@
                               <div class="badge badge-outline gap-1 {% if not am.counts_towards_ranking %}opacity-60 border-dashed{% endif %}">
                                 {{ am.module.name|truncatechars:10 }}
                                 <span class="font-bold border-l pl-1 ml-1 border-base-content/20">
-                                  {% if am.user_score %}
-                                    {{ am.user_score.0.score }}<span class="text-xs font-normal opacity-50">/{{ am.max_score|floatformat:0 }}</span>
+                                  {% if am.user_marking_score is not None %}
+                                    {{ am.user_marking_score }}<span class="text-xs font-normal opacity-50">/{{ am.max_score|floatformat:0 }}</span>
                                   {% else %}
                                     -
                                   {% endif %}

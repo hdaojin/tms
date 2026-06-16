@@ -1,7 +1,8 @@
+import shutil
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 
+from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -305,13 +306,18 @@ class CompetitionProjectLegacyCompatibilityTests(TestCase):
 
 class CompetitionUploadStorageTests(TestCase):
 	def test_competition_document_uses_private_media_storage_root(self):
-		with TemporaryDirectory() as tmpdir, override_settings(PRIVATE_MEDIA_ROOT=tmpdir):
-			field = CompetitionProject._meta.get_field('document')
+		tmpdir = Path(settings.BASE_DIR) / ".competition-upload-test-media"
+		shutil.rmtree(tmpdir, ignore_errors=True)
+		try:
+			with override_settings(PRIVATE_MEDIA_ROOT=tmpdir):
+				field = CompetitionProject._meta.get_field('document')
 
-			self.assertEqual(
-				field.storage.path('sample.pdf'),
-				str(Path(tmpdir) / 'competitions' / 'sample.pdf'),
-			)
+				self.assertEqual(
+					field.storage.path('sample.pdf'),
+					str(tmpdir / 'competitions' / 'sample.pdf'),
+				)
+		finally:
+			shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 class CompetitionModuleStandardModuleMapTests(TestCase):

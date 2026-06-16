@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from django.db.models import Prefetch, Sum
+from django.db.models import Prefetch
 from django.utils import timezone
 
-from .models import Assessment, AssessmentModule, Score
+from marking.services import get_assessment_marking_score_map, get_schemes_for_target
+
+from .models import Assessment, AssessmentModule
 from .permissions import (
     can_lock_assessment_module,
     can_manage_assessment_module,
@@ -46,16 +48,9 @@ def _get_managed_assessments_queryset(user):
 
 
 def _get_participant_assessments_queryset(user):
-    user_scores_prefetch = Prefetch(
-        "scores",
-        queryset=Score.objects.filter(user=user),
-        to_attr="user_score",
-    )
     modules_prefetch = Prefetch(
         "assessmentmodule_set",
-        queryset=AssessmentModule.objects.select_related("module").prefetch_related(
-            user_scores_prefetch
-        ).order_by("sort_order", "module__code", "pk"),
+        queryset=AssessmentModule.objects.select_related("module").order_by("sort_order", "module__code", "pk"),
         to_attr="user_modules_info",
     )
     return (
@@ -102,7 +97,7 @@ def build_assessment_list_context(user, today=None):
         today,
     )
     if not show_management_actions:
-        populate_user_assessment_history(past_assessments)
+        populate_user_assessment_history(past_assessments, user)
 
     return {
         "can_view_all": can_view_all,
@@ -113,8 +108,9 @@ def build_assessment_list_context(user, today=None):
     }
 
 
-def populate_user_assessment_history(past_assessments):
+def populate_user_assessment_history(past_assessments, user):
     for assessment in past_assessments:
+        score_map = get_assessment_marking_score_map(assessment)
         my_total = Decimal("0.00")
         my_grand_total = Decimal("0.00")
         assessment.max_ranking_score = Decimal("0.00")
@@ -123,16 +119,15 @@ def populate_user_assessment_history(past_assessments):
 
         if hasattr(assessment, "user_modules_info"):
             for assessment_module in assessment.user_modules_info:
-                score_val = Decimal("0.00")
-                if assessment_module.user_score:
-                    score_val = assessment_module.user_score[0].score
+                score_val = score_map.get((user.pk, assessment_module.pk))
+                assessment_module.user_marking_score = score_val
 
-                my_grand_total += score_val
+                my_grand_total += score_val or Decimal("0.00")
                 assessment.max_grand_total_score += assessment_module.max_score
 
                 if assessment_module_counts_towards_ranking(assessment_module):
                     ranking_module_ids.append(assessment_module.pk)
-                    my_total += score_val
+                    my_total += score_val or Decimal("0.00")
                     assessment.max_ranking_score += assessment_module.max_score
 
         assessment.my_total_score = my_total
@@ -140,15 +135,21 @@ def populate_user_assessment_history(past_assessments):
 
         my_rank = "-"
         if ranking_module_ids:
-            rank_data = (
-                Score.objects.filter(assessment_module_id__in=ranking_module_ids)
-                .values("user")
-                .annotate(total=Sum("score"))
-                .order_by("-total")
-            )
-            scores_list = [data["total"] for data in rank_data]
-            if my_total in scores_list:
-                my_rank = scores_list.index(my_total) + 1
+            totals = []
+            for participant in assessment.participants.all():
+                total = sum(
+                    (score_map.get((participant.pk, module_id)) or Decimal("0.00"))
+                    for module_id in ranking_module_ids
+                )
+                totals.append((participant.pk, total))
+            totals.sort(key=lambda item: item[1], reverse=True)
+            current_rank = 1
+            for index, (participant_id, total) in enumerate(totals):
+                if index > 0 and total < totals[index - 1][1]:
+                    current_rank = index + 1
+                if participant_id == user.pk:
+                    my_rank = current_rank
+                    break
 
         assessment.my_rank = my_rank
 
@@ -160,6 +161,8 @@ def build_assessment_score_table_context(assessment, sort_param, user=None):
     modules = list(_get_assessment_modules_queryset(assessment))
 
     for assessment_module in modules:
+        assessment_module.marking_schemes = list(get_schemes_for_target(assessment_module))
+        assessment_module.has_marking_scheme = bool(assessment_module.marking_schemes)
         attachments = list(assessment_module.attachments.all())
         assessment_module.attachment_count = len(attachments)
         assessment_module.has_attachments = bool(attachments)
@@ -188,12 +191,7 @@ def build_assessment_score_table_context(assessment, sort_param, user=None):
     participants = assessment.participants.all().order_by(
         "last_name", "first_name", "username"
     )
-    all_scores = Score.objects.filter(assessment_module__assessment=assessment).select_related(
-        "user", "assessment_module"
-    )
-    score_map = {
-        (score.user_id, score.assessment_module_id): score for score in all_scores
-    }
+    score_map = get_assessment_marking_score_map(assessment)
 
     table_rows = []
     for participant in participants:
@@ -201,21 +199,21 @@ def build_assessment_score_table_context(assessment, sort_param, user=None):
             "user": participant,
             "scores": [],
         }
-        total_score = 0
-        rank_score = 0
+        total_score = Decimal("0.00")
+        rank_score = Decimal("0.00")
 
         for assessment_module in modules:
-            score_obj = score_map.get((participant.pk, assessment_module.pk))
-            value = score_obj.score if score_obj else 0
+            has_score = (participant.pk, assessment_module.pk) in score_map
+            value = score_map.get((participant.pk, assessment_module.pk), Decimal("0.00"))
             row["scores"].append(
                 {
                     "module_id": assessment_module.pk,
                     "val": value,
-                    "obj": score_obj,
+                    "has_score": has_score,
                     "can_manage": assessment_module.can_manage,
                 }
             )
-            if score_obj:
+            if has_score:
                 total_score += value
                 if assessment_module_counts_towards_ranking(assessment_module):
                     rank_score += value

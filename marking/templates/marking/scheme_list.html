@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block right_sidebar %}{% endblock %}
+
+{% block content %}
+  <div class="mb-4 flex justify-end">
+    {% if perms.marking.add_markingschemeimport %}
+      <a href="{% url 'marking:scheme_import' %}" class="btn btn-primary btn-sm gap-1">
+        <span class="icon-[tabler--file-import] size-4"></span>
+        导入评分表
+      </a>
+    {% endif %}
+  </div>
+  <div class="overflow-x-auto rounded-lg border border-base-300 bg-base-100">
+    <table class="table table-zebra">
+      <thead>
+        <tr class="bg-base-200">
+          <th>评分方案</th>
+          <th>标准模块</th>
+          <th class="text-center">总分</th>
+          <th class="text-center">评分点</th>
+          <th>导入时间</th>
+          <th class="text-center">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for scheme in schemes %}
+          <tr>
+            <td>{{ scheme.module_code }} - {{ scheme.module_name }}</td>
+            <td>{{ scheme.standard_module.project.name }} / {{ scheme.standard_module.code }} - {{ scheme.standard_module.name }}</td>
+            <td class="text-center">{{ scheme.total_mark }}</td>
+            <td class="text-center">{{ scheme.aspects.count }}</td>
+            <td>{{ scheme.created_at|date:'Y-m-d H:i' }}</td>
+            <td class="text-center">
+              <a href="{% url 'marking:scheme_detail' scheme.pk %}" class="btn btn-ghost btn-xs">查看</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-base-content/60">暂无评分方案。</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

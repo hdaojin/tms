@@ -10,6 +10,7 @@ from django.views.generic import CreateView, DetailView, FormView
 from django_tables2 import SingleTableView
 
 from core.utils.mixins import TitleMixin
+from marking.services import get_schemes_for_target
 
 from .forms import (
 	CompetitionProjectMemberLinkForm,
@@ -119,7 +120,10 @@ class CompetitionProjectDetailView(TitleMixin, LoginRequiredMixin, DetailView):
 		competition_project = self.object
 		detail_url = reverse('competitions:competitionproject_detail', args=[competition_project.pk])
 
-		context['official_modules'] = get_competition_project_official_modules_queryset(competition_project)
+		official_modules = list(get_competition_project_official_modules_queryset(competition_project))
+		for official_module in official_modules:
+			official_module.marking_schemes = list(get_schemes_for_target(official_module))
+		context['official_modules'] = official_modules
 		context['competitors'] = get_competition_project_competitors_queryset(competition_project)
 		context['experts'] = get_competition_project_experts_queryset(competition_project)
 		context['skill_positions'] = get_competition_project_skill_positions_queryset(competition_project)

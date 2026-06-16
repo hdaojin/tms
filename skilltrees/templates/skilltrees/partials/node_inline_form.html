@@ -1,0 +1,123 @@
+<div id="skillnode-inline-form-panel" class="mb-4">
+  <div class="rounded-lg border border-base-300 bg-base-100 p-4">
+    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+      <h2 class="font-semibold">快速新增节点</h2>
+      <p class="text-xs text-base-content/60">说明等长文本可在保存后进入编辑页补充。</p>
+    </div>
+
+    {% if inline_success_message %}
+      <div role="alert" class="alert alert-success mb-3 py-2">
+        <span class="icon-[tabler--circle-check] size-5"></span>
+        <span>{{ inline_success_message }}</span>
+      </div>
+    {% endif %}
+
+    {% if node_form.non_field_errors %}
+      <div role="alert" class="alert alert-error mb-3 py-2">
+        <span class="icon-[tabler--alert-circle] size-5"></span>
+        <div>
+          {% for error in node_form.non_field_errors %}
+            <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+    <form
+      method="post"
+      action="{% url 'skilltrees:node_quick_create' skill_tree.pk %}{% if view_mode == 'tree' %}?view=tree{% endif %}"
+      hx-post="{% url 'skilltrees:node_quick_create' skill_tree.pk %}{% if view_mode == 'tree' %}?view=tree{% endif %}"
+      hx-target="#skillnode-inline-form-panel"
+      hx-swap="outerHTML"
+    >
+      {% csrf_token %}
+      <input type="hidden" name="view" value="{{ view_mode }}">
+      <div class="overflow-x-auto pb-1">
+        <div class="flex flex-nowrap items-start gap-3" data-testid="skillnode-inline-form-row">
+          <fieldset class="fieldset m-0 w-64 shrink-0">
+            <legend class="fieldset-legend py-0">
+              {{ node_form.parent.label }}
+            </legend>
+            {{ node_form.parent }}
+            {% if node_form.parent.errors %}
+              <p class="text-error mt-1 text-xs">{{ node_form.parent.errors|striptags }}</p>
+            {% endif %}
+          </fieldset>
+
+          <fieldset class="fieldset m-0 w-36 shrink-0">
+            <legend class="fieldset-legend py-0">
+              {% if node_form.code.field.required %}<span class="text-error">*</span>{% endif %}
+              {{ node_form.code.label }}
+            </legend>
+            {{ node_form.code }}
+            {% if node_form.code.errors %}
+              <p class="text-error mt-1 text-xs">{{ node_form.code.errors|striptags }}</p>
+            {% endif %}
+          </fieldset>
+
+          <fieldset class="fieldset m-0 w-56 shrink-0">
+            <legend class="fieldset-legend py-0">
+              {% if node_form.name.field.required %}<span class="text-error">*</span>{% endif %}
+              {{ node_form.name.label }}
+            </legend>
+            {{ node_form.name }}
+            {% if node_form.name.errors %}
+              <p class="text-error mt-1 text-xs">{{ node_form.name.errors|striptags }}</p>
+            {% endif %}
+          </fieldset>
+
+          <fieldset class="fieldset m-0 w-32 shrink-0">
+            <legend class="fieldset-legend py-0">
+              {% if node_form.node_type.field.required %}<span class="text-error">*</span>{% endif %}
+              {{ node_form.node_type.label }}
+            </legend>
+            {{ node_form.node_type }}
+            {% if node_form.node_type.errors %}
+              <p class="text-error mt-1 text-xs">{{ node_form.node_type.errors|striptags }}</p>
+            {% endif %}
+          </fieldset>
+
+          <fieldset class="fieldset m-0 w-24 shrink-0">
+            <legend class="fieldset-legend py-0">
+              {% if node_form.difficulty.field.required %}<span class="text-error">*</span>{% endif %}
+              {{ node_form.difficulty.label }}
+            </legend>
+            {{ node_form.difficulty }}
+            {% if node_form.difficulty.errors %}
+              <p class="text-error mt-1 text-xs">{{ node_form.difficulty.errors|striptags }}</p>
+            {% endif %}
+          </fieldset>
+
+          <fieldset class="fieldset m-0 w-24 shrink-0">
+            <legend class="fieldset-legend py-0">
+              {% if node_form.sort_order.field.required %}<span class="text-error">*</span>{% endif %}
+              {{ node_form.sort_order.label }}
+            </legend>
+            {{ node_form.sort_order }}
+            {% if node_form.sort_order.errors %}
+              <p class="text-error mt-1 text-xs">{{ node_form.sort_order.errors|striptags }}</p>
+            {% endif %}
+          </fieldset>
+
+          <fieldset class="fieldset m-0 w-24 shrink-0 pt-7">
+            <label class="flex h-10 items-center gap-2">
+              {{ node_form.is_active }}
+              <span class="whitespace-nowrap text-sm">{{ node_form.is_active.label }}</span>
+            </label>
+            {% if node_form.is_active.errors %}
+              <p class="text-error mt-1 text-xs">{{ node_form.is_active.errors|striptags }}</p>
+            {% endif %}
+          </fieldset>
+
+          <div class="flex w-40 shrink-0 items-start gap-2 pt-7">
+            <button type="reset" class="btn btn-ghost btn-sm">重置</button>
+            <button type="submit" class="btn btn-primary btn-sm gap-1">
+              <span class="icon-[tabler--plus] size-4"></span>
+              快速新增
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>

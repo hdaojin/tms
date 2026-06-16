@@ -87,7 +87,7 @@
             </td>
             {% for cell in row.scores %}
               <td>
-                {% if cell.obj %}
+                {% if cell.has_score %}
                   <span class="font-mono">{{ cell.val }}</span>
                 {% else %}
                   <span class="text-gray-300">-</span>

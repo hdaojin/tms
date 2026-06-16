@@ -7,7 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections, transaction
 
-from assessments.models import Assessment, AssessmentAttachment, AssessmentModule, Score
+from assessments.models import Assessment, AssessmentAttachment, AssessmentModule
 from core.constants import ASSESSMENT_UPLOAD_DIR
 
 
@@ -93,7 +93,6 @@ class Command(BaseCommand):
                 AssessmentAttachment._meta.db_table,
                 AssessmentAttachment,
             ),
-            TableRename("Score", "assessment_score", Score._meta.db_table, Score),
             TableRename(
                 "Assessment.participants",
                 "assessment_assessment_participants",

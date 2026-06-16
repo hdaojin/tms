@@ -38,10 +38,10 @@
                 <div class="flex flex-col gap-1">
                     <div class="flex justify-between text-sm font-medium">
                         <span>{{ am.module.name }}</span>
-                         {% with score=am.user_score.0 %}
-                            {% if score %}
-                                <span class="{% if score.score >= am.max_score|add:'-2' %}text-success{% elif score.score < am.max_score|add:'-5' %}text-warning{% endif %}">
-                                    {{ score.score }} <span class="text-xs text-gray-400">/ {{ am.max_score }}</span>
+                         {% with score=am.user_marking_score %}
+                            {% if score is not None %}
+                                <span class="{% if score >= am.max_score|add:'-2' %}text-success{% elif score < am.max_score|add:'-5' %}text-warning{% endif %}">
+                                    {{ score }} <span class="text-xs text-gray-400">/ {{ am.max_score }}</span>
                                 </span>
                             {% else %}
                                 <span class="text-gray-300 text-xs">暂无成绩</span>
@@ -49,9 +49,9 @@
                          {% endwith %}
                     </div>
                      {# 进度条 (视觉效果) #}
-                    {% with score=am.user_score.0 %}
+                    {% with score=am.user_marking_score %}
                     <progress class="progress progress-primary w-full h-1.5" 
-                              value="{{ score.score|default:0 }}" 
+                              value="{{ score|default:0 }}" 
                               max="{{ am.max_score }}"></progress>
                     {% endwith %}
                 </div>

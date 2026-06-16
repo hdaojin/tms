@@ -6,7 +6,6 @@ app_name = 'assessments'
 urlpatterns = [
     path('', views.assessment_list, name='list'),
     path('<int:pk>/', views.assessment_detail, name='detail'),
-    path('module/<int:module_id>/scores/', views.module_score_entry, name='module_score_entry'),
     path('module/<int:module_id>/score-lock/', views.module_score_lock, name='module_score_lock'),
     path('module/<int:module_id>/material-lock/', views.module_material_lock, name='module_material_lock'),
     path('file-upload/<int:module_id>/', views.assessment_file_upload, name='file_upload'),

@@ -81,7 +81,7 @@ PERMISSION_BUNDLE_SPECS = (
     PermissionBundleSpec(
         code="accounts.view_all_profiles",
         name="查看全部用户资料",
-        description="查看用户列表与用户详情。",
+        description="查看用户列表、用户详情与角色列表。",
         permissions=(
             ("view_all_profiles", "accounts", "userprofile"),
         ),

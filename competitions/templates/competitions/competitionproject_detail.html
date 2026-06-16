@@ -53,6 +53,7 @@
                   <th>编号</th>
                   <th>名称</th>
                   <th>映射标准模块</th>
+                  <th class="text-center">评分归档</th>
                 </tr>
               </thead>
               <tbody>
@@ -70,10 +71,29 @@
                         <span class="text-base-content/60">未设置映射</span>
                       {% endfor %}
                     </td>
+                    <td class="text-center">
+                      <div class="flex flex-wrap justify-center gap-2">
+                        {% if official_module.marking_schemes %}
+                          <a href="{% url 'marking:scheme_detail' official_module.marking_schemes.0.pk %}" class="btn btn-outline btn-xs">
+                            <span class="icon-[tabler--clipboard-list] size-4"></span>
+                            查看归档
+                          </a>
+                        {% endif %}
+                        {% if perms.marking.add_markingschemeimport %}
+                          <a href="{% url 'marking:scheme_import' %}?target_type=competition_module&competition_module={{ official_module.pk }}" class="btn btn-primary btn-xs">
+                            <span class="icon-[tabler--file-import] size-4"></span>
+                            导入评分表
+                          </a>
+                        {% endif %}
+                        {% if not official_module.marking_schemes and not perms.marking.add_markingschemeimport %}
+                          <span class="text-base-content/60">-</span>
+                        {% endif %}
+                      </div>
+                    </td>
                   </tr>
                 {% empty %}
                   <tr>
-                    <td colspan="3" class="text-center text-base-content/60">暂无本届官方模块。</td>
+                    <td colspan="4" class="text-center text-base-content/60">暂无本届官方模块。</td>
                   </tr>
                 {% endfor %}
               </tbody>

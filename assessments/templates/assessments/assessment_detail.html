@@ -108,33 +108,40 @@
               </td>
               <td class="print:hidden">
                 <div class="flex flex-wrap items-center justify-center gap-2">
-                  {% if am.can_manage_scores %}
-                    <a href="{% url 'assessments:module_score_entry' am.pk %}" class="btn {% if am.is_locked %}btn-outline{% else %}btn-primary{% endif %} btn-xs min-w-20 justify-center gap-1">
-                      <span class="icon-[tabler--edit-circle] size-4"></span>
-                      {% if am.is_locked %}查看成绩{% else %}录入成绩{% endif %}
+                  {% if am.has_marking_scheme %}
+                    <a href="{% url 'marking:scheme_detail' am.marking_schemes.0.pk %}" class="btn btn-outline btn-xs min-w-20 justify-center gap-1">
+                      <span class="icon-[tabler--clipboard-list] size-4"></span>
+                      查看评分归档
                     </a>
-                  {% else %}
+                  {% endif %}
+
+                  {% if am.can_manage_scores and perms.marking.add_markingschemeimport and not am.is_locked %}
+                    <a href="{% url 'marking:scheme_import' %}?target_type=assessment_module&assessment_module={{ am.pk }}" class="btn btn-primary btn-xs min-w-20 justify-center gap-1">
+                      <span class="icon-[tabler--file-import] size-4"></span>
+                      导入评分表
+                    </a>
+                  {% elif not am.has_marking_scheme %}
                     <span class="text-base-content/50">-</span>
                   {% endif %}
 
                   {% if am.is_locked %}
                     <button type="button" class="btn btn-outline btn-xs min-w-20 justify-center gap-1" disabled>
                       <span class="icon-[tabler--lock] size-3"></span>
-                      成绩已锁定
+                      归档已锁定
                     </button>
                   {% elif am.can_lock_scores %}
                     <form method="post" action="{% url 'assessments:module_score_lock' am.pk %}">
                       {% csrf_token %}
                       <input type="hidden" name="action" value="lock">
-                      <button type="submit" class="btn btn-warning btn-xs min-w-20 justify-center gap-1" onclick="return confirm('锁定后将无法继续修改该模块成绩，确定要锁定吗？')">
+                      <button type="submit" class="btn btn-warning btn-xs min-w-20 justify-center gap-1" onclick="return confirm('锁定后将无法继续修改该模块评分归档，确定要锁定吗？')">
                         <span class="icon-[tabler--lock] size-3"></span>
-                        锁定成绩
+                        锁定归档
                       </button>
                     </form>
                   {% else %}
                     <button type="button" class="btn btn-ghost btn-xs min-w-20 justify-center gap-1" disabled>
                       <span class="icon-[tabler--lock-open] size-3"></span>
-                      成绩未锁定
+                      归档未锁定
                     </button>
                   {% endif %}
                 </div>
