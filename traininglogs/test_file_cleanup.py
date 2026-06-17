@@ -79,10 +79,11 @@ class TrainingLogFileCleanupTests(TestCase):
         storage = training_log.file.storage
         self.assertTrue(storage.exists(old_file_name))
 
-        training_log.file = self._upload("new-log.pdf")
+        training_log.file = self._upload("new-log.docx")
         training_log.save()
 
         training_log.refresh_from_db()
+        self.assertNotEqual(training_log.file.name, old_file_name)
         self.assertFalse(storage.exists(old_file_name))
         self.assertTrue(training_log.file.storage.exists(training_log.file.name))
 
