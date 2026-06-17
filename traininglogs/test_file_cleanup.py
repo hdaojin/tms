@@ -60,6 +60,19 @@ class TrainingLogFileCleanupTests(TestCase):
             uploaded_by=self.user,
         )
 
+    def test_clearing_file_field_deletes_old_physical_file(self):
+        training_log = self._create_log("clear-log.pdf")
+        old_file_name = training_log.file.name
+        storage = training_log.file.storage
+        self.assertTrue(storage.exists(old_file_name))
+
+        training_log.file = ""
+        training_log.save()
+
+        training_log.refresh_from_db()
+        self.assertFalse(storage.exists(old_file_name))
+        self.assertFalse(training_log.file.name)
+
     def test_replacing_file_deletes_old_physical_file(self):
         training_log = self._create_log("old-log.pdf")
         old_file_name = training_log.file.name
