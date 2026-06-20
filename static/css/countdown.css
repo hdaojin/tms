@@ -1,0 +1,504 @@
+@font-face {
+  font-display: swap;
+  font-family: "YouSheBiaoTiHei";
+  font-style: normal;
+  font-weight: 400 900;
+  src: url("../fonts/countdown/YouSheBiaoTiHei.ttf") format("truetype");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "DSEG7Classic";
+  font-style: normal;
+  font-weight: 400 900;
+  src:
+    url("../fonts/countdown/DSEG7Classic-Bold.woff2") format("woff2"),
+    url("../fonts/countdown/DSEG7Classic-Bold.ttf") format("truetype");
+}
+
+.countdown-body {
+  --countdown-title-font: "Microsoft YaHei UI", "Microsoft YaHei", "DengXian", "Segoe UI", Arial, sans-serif;
+  --countdown-number-font: "DSEG7Classic", "Bahnschrift", "Arial Black", "Impact", "Cascadia Mono", "Consolas",
+    sans-serif;
+  --countdown-mono-font: "Cascadia Mono", "Consolas", "SFMono-Regular", monospace;
+}
+
+.countdown-stage {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  font-family: var(--countdown-title-font);
+  background-color: #020617;
+}
+
+.countdown-bg,
+.countdown-overlay,
+.countdown-grid,
+.countdown-scan,
+.signal-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.countdown-bg {
+  z-index: 0;
+  background-image: url("../images/countdown/network-command-center-bg.png");
+  background-position: center;
+  background-size: cover;
+  opacity: 1;
+}
+
+.countdown-overlay {
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 24%, rgb(14 165 233 / 0.12), transparent 38%),
+    linear-gradient(180deg, rgb(2 6 23 / 0.04), rgb(2 6 23 / 0.34) 88%),
+    linear-gradient(90deg, rgb(2 6 23 / 0.18), transparent 24%, transparent 76%, rgb(2 6 23 / 0.16));
+}
+
+.countdown-grid {
+  z-index: 2;
+  opacity: 0.42;
+  background-image:
+    linear-gradient(rgb(34 211 238 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(34 211 238 / 0.035) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 92%);
+}
+
+.countdown-scan {
+  z-index: 3;
+  height: 16vh;
+  background: linear-gradient(180deg, transparent, rgb(34 211 238 / 0.08), transparent);
+  animation: countdown-scan 11s linear infinite;
+}
+
+.signal-layer {
+  z-index: 4;
+  overflow: hidden;
+  mix-blend-mode: screen;
+}
+
+.signal-flow {
+  --angle: 0deg;
+  --travel-x: 18vw;
+  --travel-y: 8vh;
+  position: absolute;
+  display: block;
+  width: clamp(9rem, 18vw, 21rem);
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(56 189 248 / 0.18),
+    rgb(125 211 252 / 0.92),
+    rgb(255 255 255 / 0.86),
+    transparent
+  );
+  box-shadow:
+    0 0 10px rgb(34 211 238 / 0.62),
+    0 0 22px rgb(14 165 233 / 0.38);
+  opacity: 0;
+  transform: translate3d(0, 0, 0) rotate(var(--angle));
+  animation: signal-flow 6.5s linear infinite;
+}
+
+.signal-flow::after {
+  position: absolute;
+  top: 50%;
+  right: 12%;
+  width: 0.45rem;
+  height: 0.45rem;
+  content: "";
+  background: #e0f2fe;
+  border-radius: 999px;
+  box-shadow: 0 0 16px rgb(125 211 252 / 0.95);
+  transform: translateY(-50%);
+}
+
+.signal-flow-a {
+  --angle: 22deg;
+  --travel-x: 28vw;
+  --travel-y: 9vh;
+  top: 22%;
+  left: 8%;
+}
+
+.signal-flow-b {
+  --angle: -18deg;
+  --travel-x: -24vw;
+  --travel-y: 11vh;
+  top: 42%;
+  right: 19%;
+  animation-delay: -2.1s;
+  animation-duration: 7.2s;
+}
+
+.signal-flow-c {
+  --angle: -8deg;
+  --travel-x: 22vw;
+  --travel-y: -7vh;
+  bottom: 21%;
+  left: 31%;
+  animation-delay: -4.4s;
+  animation-duration: 8.1s;
+}
+
+.signal-flow-d {
+  --angle: 135deg;
+  --travel-x: -18vw;
+  --travel-y: 15vh;
+  top: 17%;
+  right: 10%;
+  animation-delay: -1.2s;
+  animation-duration: 6.9s;
+}
+
+.signal-node {
+  position: absolute;
+  width: 0.55rem;
+  height: 0.55rem;
+  background: #7dd3fc;
+  border-radius: 999px;
+  box-shadow:
+    0 0 12px rgb(125 211 252 / 0.96),
+    0 0 28px rgb(14 165 233 / 0.62);
+  animation: signal-pulse 2.8s ease-in-out infinite;
+}
+
+.signal-node-a {
+  top: 29%;
+  left: 18%;
+}
+
+.signal-node-b {
+  top: 48%;
+  right: 27%;
+  animation-delay: -0.9s;
+}
+
+.signal-node-c {
+  bottom: 22%;
+  left: 54%;
+  animation-delay: -1.8s;
+}
+
+.countdown-shell {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1.4vh, 1.25rem);
+  padding: clamp(0.75rem, 1.8vw, 1.75rem);
+}
+
+.hud-font {
+  font-family: var(--countdown-title-font);
+  letter-spacing: 0;
+}
+
+.mono-font {
+  font-family: var(--countdown-mono-font);
+}
+
+.project-english-line {
+  max-width: min(30rem, 44vw);
+}
+
+.project-english-name {
+  display: inline-block;
+  font-family: "Bahnschrift Condensed", "Arial Narrow", "Segoe UI Condensed", "Microsoft YaHei UI", Arial, sans-serif;
+  font-size: 0.68rem;
+  font-stretch: condensed;
+  line-height: 1;
+  text-transform: uppercase;
+  letter-spacing: 0.045em;
+  transform: scaleX(0.92);
+  transform-origin: left center;
+}
+
+.countdown-footer {
+  color: rgb(165 243 252 / 0.55);
+}
+
+.countdown-footer > div {
+  justify-content: center;
+  gap: 0.25rem 0.7rem;
+}
+
+.countdown-footer a {
+  color: rgb(186 230 253 / 0.72);
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.countdown-footer a:hover {
+  color: rgb(224 242 254 / 0.95);
+}
+
+.hud-panel {
+  background: linear-gradient(180deg, rgb(8 25 52 / 0.68), rgb(3 7 18 / 0.62));
+  border: 1px solid rgb(56 189 248 / 0.38);
+  box-shadow:
+    0 0 28px rgb(14 165 233 / 0.16),
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    inset 0 -20px 44px rgb(14 165 233 / 0.07);
+  backdrop-filter: blur(10px);
+}
+
+.hud-panel-solid {
+  background: rgb(2 8 23 / 0.74);
+  border: 1px solid rgb(56 189 248 / 0.32);
+  box-shadow: 0 0 20px rgb(14 165 233 / 0.12);
+}
+
+.top-line {
+  position: relative;
+  border-bottom: 1px solid rgb(14 165 233 / 0.45);
+}
+
+.top-line::after {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: min(32rem, 42vw);
+  height: 1px;
+  content: "";
+  background: linear-gradient(90deg, #38bdf8, transparent);
+  box-shadow: 0 0 16px rgb(56 189 248 / 0.7);
+}
+
+.hero-title {
+  font-family: "YouSheBiaoTiHei", var(--countdown-title-font);
+  text-shadow:
+    0 2px 0 rgb(15 23 42 / 0.92),
+    0 0 20px rgb(226 246 255 / 0.56),
+    0 0 34px rgb(125 211 252 / 0.5),
+    0 0 58px rgb(14 165 233 / 0.34);
+  -webkit-text-stroke: 1px rgb(224 242 254 / 0.2);
+  paint-order: stroke fill;
+}
+
+.hero-subtitle {
+  font-family: "YouSheBiaoTiHei", var(--countdown-title-font);
+  text-shadow:
+    0 1px 0 rgb(15 23 42 / 0.96),
+    0 0 18px rgb(186 230 253 / 0.46),
+    0 0 34px rgb(56 189 248 / 0.32);
+  -webkit-text-stroke: 1px rgb(186 230 253 / 0.18);
+  paint-order: stroke fill;
+}
+
+.countdown-card {
+  position: relative;
+  display: grid;
+  min-height: clamp(9.75rem, 19vh, 13.5rem);
+  overflow: hidden;
+  border-radius: 0.8rem;
+  place-items: center;
+}
+
+.countdown-card > .relative {
+  position: absolute;
+  inset: 0.55rem;
+  justify-content: center;
+  gap: clamp(0.45rem, 0.95vh, 0.75rem);
+}
+
+.countdown-card::before,
+.countdown-card::after {
+  position: absolute;
+  inset: 0.55rem;
+  content: "";
+  border-radius: 0.55rem;
+  pointer-events: none;
+}
+
+.countdown-card::before {
+  border: 1px solid rgb(125 211 252 / 0.46);
+  box-shadow:
+    inset 0 0 18px rgb(56 189 248 / 0.18),
+    0 0 20px rgb(56 189 248 / 0.16);
+}
+
+.countdown-card::after {
+  background:
+    linear-gradient(120deg, rgb(255 255 255 / 0.16), transparent 32%),
+    radial-gradient(circle at 30% 10%, rgb(125 211 252 / 0.16), transparent 32%);
+  opacity: 0.7;
+}
+
+.countdown-corner {
+  position: absolute;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-color: #38bdf8;
+  opacity: 0.9;
+}
+
+.countdown-number {
+  display: block;
+  font-family: var(--countdown-number-font);
+  font-size: clamp(3.05rem, min(6.35vw, 11.6vh), 6.55rem);
+  font-stretch: condensed;
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 900;
+  line-height: 0.84;
+  color: #dff8ff;
+  letter-spacing: 0;
+  text-shadow:
+    0 1px 0 rgb(15 23 42 / 0.9),
+    0 0 12px rgb(125 211 252 / 0.95),
+    0 0 26px rgb(14 165 233 / 0.78),
+    0 0 52px rgb(14 165 233 / 0.38);
+  transform: translateY(0.08em) scaleX(0.9);
+  transform-origin: center;
+}
+
+.countdown-label {
+  color: #a5f3fc;
+  font-size: clamp(0.95rem, min(1.65vw, 3.1vh), 1.65rem);
+  font-weight: 800;
+  text-shadow: 0 0 16px rgb(34 211 238 / 0.58);
+  letter-spacing: 0.08em;
+}
+
+.countdown-card-seconds::before {
+  border-color: rgb(251 191 36 / 0.5);
+  box-shadow:
+    inset 0 0 18px rgb(251 191 36 / 0.18),
+    0 0 20px rgb(251 191 36 / 0.14);
+}
+
+.countdown-card-seconds .countdown-corner {
+  border-color: #fbbf24;
+}
+
+.countdown-card-seconds .countdown-number {
+  color: #fff7d6;
+  text-shadow:
+    0 0 12px rgb(253 230 138 / 0.92),
+    0 0 26px rgb(251 191 36 / 0.64),
+    0 0 52px rgb(245 158 11 / 0.38);
+}
+
+.countdown-card-seconds .countdown-label {
+  color: #fde68a;
+}
+
+@keyframes countdown-scan {
+  0% {
+    opacity: 0;
+    transform: translateY(-120%);
+  }
+
+  14%,
+  82% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(720%);
+  }
+}
+
+@keyframes signal-flow {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(var(--angle));
+  }
+
+  14% {
+    opacity: 0.78;
+  }
+
+  62% {
+    opacity: 0.66;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--travel-x), var(--travel-y), 0) rotate(var(--angle));
+  }
+}
+
+@keyframes signal-pulse {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.82);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.42);
+  }
+}
+
+@keyframes cursor-blink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.terminal-cursor {
+  animation: cursor-blink 1s step-end infinite;
+}
+
+@media (max-width: 900px) {
+  .countdown-shell {
+    overflow-y: auto;
+  }
+
+  .countdown-bg {
+    background-position: 45% center;
+  }
+
+  .countdown-card {
+    min-height: 8.25rem;
+  }
+}
+
+@media (max-height: 820px) and (min-width: 900px) {
+  .countdown-shell {
+    gap: 0.55rem;
+    padding: clamp(0.7rem, 1.1vw, 1rem);
+  }
+
+  .compact-hide {
+    display: none;
+  }
+
+  .countdown-card {
+    min-height: 9.5rem;
+  }
+
+  .countdown-shell > section:last-of-type {
+    max-height: 10.5rem;
+    overflow: hidden;
+  }
+
+  .countdown-shell > footer {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .countdown-scan,
+  .signal-flow,
+  .signal-node,
+  .terminal-cursor {
+    animation: none;
+  }
+}

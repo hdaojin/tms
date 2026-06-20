@@ -1,0 +1,15 @@
+{% if messages %}
+  <div class="space-y-2">
+    {% for message in messages %}
+      {% if message.tags == "success" %}
+        {% include "components/alert.html" with message=message variant="success" icon="icon-[tabler--circle-check]" %}
+      {% elif message.tags == "error" %}
+        {% include "components/alert.html" with message=message variant="error" icon="icon-[tabler--alert-circle]" %}
+      {% elif message.tags == "warning" %}
+        {% include "components/alert.html" with message=message variant="warning" icon="icon-[tabler--alert-triangle]" %}
+      {% else %}
+        {% include "components/alert.html" with message=message variant="info" icon="icon-[tabler--info-circle]" %}
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endif %}

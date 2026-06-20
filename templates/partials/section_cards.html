@@ -1,0 +1,15 @@
+<div class="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+  {% for section in sections %}
+    <a href="{{ section.url }}" class="card card-border h-full min-h-56 border border-base-300 bg-base-100 shadow transition hover:border-primary/50 hover:shadow-lg">
+      <div class="card-body min-h-56 items-center justify-center text-center">
+        <div class="flex flex-col items-center gap-y-2">
+          {% if section.icon_class %}
+            <span class="{{ section.icon_class }} size-8 shrink-0"></span>
+          {% endif %}
+          <h2 class="card-title justify-center text-lg font-semibold">{{ section.label }}</h2>
+          <p class="max-w-64 text-sm text-base-content/70">{{ section.description }}</p>
+        </div>
+      </div>
+    </a>
+  {% endfor %}
+</div>

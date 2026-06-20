@@ -1,0 +1,37 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <div class="space-y-6">
+    <div class="tms-card-grid">
+      {% for card in cards %}
+        {% include "components/stat_card.html" with label=card.label value=card.value hint=card.hint icon=card.icon %}
+      {% endfor %}
+    </div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <a class="card border border-base-300 bg-base-100 shadow-sm" href="{% url 'demo:list' %}">
+        <div class="card-body">
+          <span class="icon-[tabler--list-details] size-7 text-primary"></span>
+          <h2 class="card-title text-base">普通列表页</h2>
+        </div>
+      </a>
+      <a class="card border border-base-300 bg-base-100 shadow-sm" href="{% url 'demo:form' %}">
+        <div class="card-body">
+          <span class="icon-[tabler--forms] size-7 text-secondary"></span>
+          <h2 class="card-title text-base">表单页</h2>
+        </div>
+      </a>
+      <a class="card border border-base-300 bg-base-100 shadow-sm" href="{% url 'demo:htmx' %}">
+        <div class="card-body">
+          <span class="icon-[tabler--refresh] size-7 text-accent"></span>
+          <h2 class="card-title text-base">HTMX 示例</h2>
+        </div>
+      </a>
+      <a class="card border border-base-300 bg-base-100 shadow-sm" href="{% url 'demo:states' %}">
+        <div class="card-body">
+          <span class="icon-[tabler--alert-square-rounded] size-7 text-warning"></span>
+          <h2 class="card-title text-base">状态与弹窗</h2>
+        </div>
+      </a>
+    </div>
+  </div>
+{% endblock %}

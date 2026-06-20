@@ -1,0 +1,18 @@
+{% load static django_htmx %}
+<!doctype html>
+<html lang="zh-hans" data-theme="light">
+  <head>
+    {% include "partials/head.html" %}
+    {% block extra_head %}{% endblock %}
+    {% block extra_css %}{% endblock %}
+  </head>
+  <body class="{% block body_class %}flex min-h-dvh flex-col overflow-x-hidden bg-base-100 text-base-content{% endblock %}" data-csrf-token="{{ csrf_token }}">
+    {% block body %}{% endblock %}
+    {% htmx_script %}
+    <script defer src="{% static 'js/alpine-components.js' %}"></script>
+    <script defer src="{% static 'js/alpinejs.min.js' %}"></script>
+    <script defer src="{% static 'js/htmx.js' %}"></script>
+    <script defer src="{% static 'js/app.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+  </body>
+</html>

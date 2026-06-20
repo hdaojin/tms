@@ -1,0 +1,13 @@
+{% extends "common/table_page.html" %}
+
+{% block content %}
+<div class="mb-3 flex justify-end">
+  {% if perms.scoring.add_scoringscheme %}
+    <a href="{% url 'scoring:scheme_import' %}" class="btn btn-primary btn-sm">
+      <span class="icon-[tabler--upload] size-4"></span>
+      导入评分表
+    </a>
+  {% endif %}
+</div>
+{{ block.super }}
+{% endblock %}

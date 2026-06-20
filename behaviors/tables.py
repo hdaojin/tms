@@ -1,6 +1,6 @@
 import django_tables2 as tables
 
-from core.utils.tables import BaseTable, BaseDateColumn, BaseDateTimeColumn
+from core.tables import BaseTable, BaseDateColumn, BaseDateTimeColumn
 from .models import ConductRecord, ConductSummary
 
 

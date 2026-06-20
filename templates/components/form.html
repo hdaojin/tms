@@ -1,0 +1,28 @@
+{% comment %}
+统一表单组件。
+参数: form, action, method, submit_label, reset_label, show_reset, use_fancy_upload,
+      form_class, grid_class, hx_attrs。
+hx_attrs 为后端构造的完整属性字符串，避免在模板中拼接复杂业务逻辑。
+{% endcomment %}
+<form action="{{ action|default:'' }}"
+      method="{{ method|default:'post' }}"
+      class="{{ form_class|default:'space-y-6' }}"
+      {% if form.is_multipart %}enctype="multipart/form-data"{% endif %}
+      {{ hx_attrs|safe }}>
+  {% csrf_token %}
+  {% for hidden in form.hidden_fields %}
+    {{ hidden }}
+  {% endfor %}
+  {% include "components/form_errors.html" with form=form %}
+  <div class="{{ grid_class|default:'grid gap-4 md:grid-cols-2' }}">
+    {% for field in form.visible_fields %}
+      {% include "components/field.html" with field=field use_fancy_upload=use_fancy_upload|default:True %}
+    {% endfor %}
+  </div>
+  <div class="flex flex-wrap justify-end gap-3">
+    {% if show_reset|default:True %}
+      <button type="reset" class="btn btn-ghost">{{ reset_label|default:"重置" }}</button>
+    {% endif %}
+    <button type="submit" class="btn btn-primary">{{ submit_label|default:"提交" }}</button>
+  </div>
+</form>

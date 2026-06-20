@@ -12,27 +12,8 @@
   {% if title or flatpage.title %}
     {% firstof title flatpage.title %} | {{ site_info.site_short_name }}
   {% else %}
-      {{ site_info.site_short_name }}
+    {{ site_info.site_short_name }}
   {% endif %}
 </title>
-<!-- 引入CSS文件 -->
+<script src="{% static 'js/theme.js' %}"></script>
 <link rel="stylesheet" href="{% static 'css/output.css' %}" />
-
-<!-- 主题初始化脚本 - 防止页面闪烁 -->
-<script>
-(function() {
-  const savedTheme = localStorage.getItem('theme');  // 从本地存储获取主题
-  let theme = 'light';  // 默认主题
-  
-  if (savedTheme) {
-    theme = savedTheme;  // 如果本地存储有主题则使用
-  } else {
-    // 检测系统主题偏好
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;  // 如果系统偏好为暗色模式
-    theme = prefersDark ? 'dark' : 'light';    // 就使用系统偏好，否则使用浅色模式
-  }
-  
-  // 立即设置主题
-  document.documentElement.setAttribute('data-theme', theme);
-})();
-</script>

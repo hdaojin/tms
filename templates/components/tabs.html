@@ -1,0 +1,14 @@
+{% comment %}
+标签页组件。
+参数: tabs，元素包含 label/href/active/icon。
+{% endcomment %}
+{% if tabs %}
+  <div class="tabs tabs-border">
+    {% for tab in tabs %}
+      <a class="tab {% if tab.active %}tab-active{% endif %}" href="{{ tab.href }}">
+        {% if tab.icon %}<span class="{{ tab.icon }} size-4" aria-hidden="true"></span>{% endif %}
+        {{ tab.label }}
+      </a>
+    {% endfor %}
+  </div>
+{% endif %}

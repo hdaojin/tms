@@ -1,0 +1,28 @@
+{% extends "common/table_page.html" %}
+
+{% block content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <form method="get" class="flex flex-wrap items-center gap-2">
+    <select name="year" class="select select-sm">
+      {% for month in months %}
+        <option value="{{ month.year }}" {% if month.year == selected_year and month.month == selected_month %}selected{% endif %}>{{ month.year }}</option>
+      {% endfor %}
+    </select>
+    <select name="month" class="select select-sm">
+      {% for month in months %}
+        <option value="{{ month.month }}" {% if month.year == selected_year and month.month == selected_month %}selected{% endif %}>{{ month.month|stringformat:"02d" }}月</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sm" type="submit">筛选</button>
+  </form>
+  <div class="flex gap-2">
+    {% if perms.training.export_traininglog_archive %}
+      <a href="{% url 'training:log_export' %}?year={{ selected_year }}&month={{ selected_month }}" class="btn btn-outline btn-sm">导出 ZIP</a>
+    {% endif %}
+    {% if perms.training.add_traininglog %}
+      <a href="{% url 'training:log_upload' %}" class="btn btn-primary btn-sm">上传日志</a>
+    {% endif %}
+  </div>
+</div>
+{{ block.super }}
+{% endblock %}

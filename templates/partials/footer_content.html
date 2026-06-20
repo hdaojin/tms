@@ -1,23 +1,20 @@
-{% load static %}
-<div class="flex flex-wrap text-xs">
-  <p>
-    {% now 'Y' as current_year %}
-    {% if site_info.created_at|date:'Y' == current_year %}
-      &copy; {{ current_year }} {{ site_info.site_copyright|default:'All Rights Reserved' }}.
+<div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+  {% if site_info.site_copyright %}
+    <span>&copy; {{ site_info.created_at|date:"Y" }} -{% now "Y" %} {{ site_info.site_copyright }}.</span>
+  {% else %}
+    <span>{{ site_info.site_name }}</span>
+  {% endif %}
+  {% if site_info.site_author %}
+    {% if site_info.site_author_link %}
+      <a href="{{ site_info.site_author_link }}" class="link-hover link">{{ site_info.site_author|upper }}</a>
     {% else %}
-      &copy; {{ site_info.created_at|date:'Y' }} -{{ current_year }} {{ site_info.site_copyright|default:'All Rights Reserved' }}.
+      <span>{{ site_info.site_author|upper }}</span>
     {% endif %}
-  </p>
-  
-  <p>Powered by <a href="{{ site_info.site_author_link|default:"/" }}">{{ site_info.site_author|upper|default:'TMS' }}</a>.</p>
-
-  {% if site_info.site_ism_beian %}
-    <div class="flex items-center space-x-1">
-      <img src="{% static 'images/gong_an_bu_bei_an.png' %}" alt="公安部备案图标" width="16" height="16" />
-      <a href="{{ site_info.site_ism_beian_link }}" rel="noreferrer" target="_blank">{{ site_info.site_ism_beian }}</a>
-    </div>
   {% endif %}
   {% if site_info.site_icp_beian %}
-    <a href="{{ site_info.site_icp_beian_link }}" rel="noreferrer" target="_blank">{{ site_info.site_icp_beian }}</a>
+    <a href="{{ site_info.site_icp_beian_link|default:'#' }}" class="link-hover link">{{ site_info.site_icp_beian }}</a>
+  {% endif %}
+  {% if site_info.site_ism_beian %}
+    <a href="{{ site_info.site_ism_beian_link|default:'#' }}" class="link-hover link">{{ site_info.site_ism_beian }}</a>
   {% endif %}
 </div>

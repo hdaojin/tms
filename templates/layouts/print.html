@@ -1,0 +1,9 @@
+{% extends "layouts/base.html" %}
+
+{% block body_class %}min-h-screen bg-base-100 text-base-content{% endblock %}
+
+{% block body %}
+  <main class="mx-auto max-w-5xl bg-base-100 p-6 print:max-w-none print:p-0">
+    {% block content %}{% block main %}{% endblock %}{% endblock %}
+  </main>
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="stats stats-vertical w-full shadow-sm md:stats-horizontal">
+  <div class="stat">
+    <div class="stat-title">节点</div>
+    <div class="stat-value text-2xl">{{ coverage_summary.node_count }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">技能点</div>
+    <div class="stat-value text-2xl">{{ coverage_summary.skill_count }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">已覆盖</div>
+    <div class="stat-value text-2xl">{{ coverage_summary.covered_skill_count }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">未覆盖</div>
+    <div class="stat-value text-2xl">{{ coverage_summary.uncovered_skill_count }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-title">折算分值</div>
+    <div class="stat-value text-2xl">{{ coverage_summary.weighted_mark }}</div>
+  </div>
+</div>
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="card-title">技能树版本信息</h2>
+        <p class="text-sm text-base-content/70">{{ tree.skill_project }}</p>
+      </div>
+      {% if perms.standards.add_skillnode %}
+        <a href="{% url 'standards:node_create' %}" class="btn btn-primary btn-sm">新增节点</a>
+      {% endif %}
+    </div>
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>节点</th>
+            <th>领域</th>
+            <th>类型</th>
+            <th>直接证据</th>
+            <th>下级技能</th>
+            <th>下级证据</th>
+            <th>折算分值</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in coverage_rows %}
+            <tr>
+              <td>{{ row.node.get_full_path }}</td>
+              <td>{{ row.node.capability_domain.name }}</td>
+              <td>{{ row.node.get_node_type_display }}</td>
+              <td>{{ row.direct_evidence_count }}</td>
+              <td>{{ row.subtree_skill_count }}</td>
+              <td>{{ row.subtree_evidence_count }}</td>
+              <td>{{ row.subtree_weighted_mark }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7">暂无节点</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

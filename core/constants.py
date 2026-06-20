@@ -84,43 +84,23 @@ INVITATION_CODE_TIMEOUT = 24 * 60 * 60  # 邀请码超时时间，单位秒
 DEFAULT_ALLOWED_EXTENSIONS = ['pdf']
 DEFAULT_UPLOAD_MAX_SIZE_MB = 100 
 
-# 考核试题文件允许的扩展名和大小
-ASSESSMENT_TP_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx']
-ASSESSMENT_TP_UPLOAD_MAX_SIZE_MB = 50  
-# 考核评分标准文件允许的扩展名
-ASSESSMENT_MC_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv']
-ASSESSMENT_MC_UPLOAD_MAX_SIZE_MB = 50
-# 考核评分表文件允许的扩展名
-ASSESSMENT_MT_ALLOWED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv']
-ASSESSMENT_MT_UPLOAD_MAX_SIZE_MB = 50
-# 考核评分脚本文件允许的扩展名
-ASSESSMENT_MS_ALLOWED_EXTENSIONS = ['py', 'sh', 'bat', 'exe', 'ps1', 'yml', 'yaml']
-ASSESSMENT_MS_UPLOAD_MAX_SIZE_MB = 50
-# 考核附件文件允许的扩展名
-ASSESSMENT_ATTACHMENT_ALLOWED_EXTENSIONS = [
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'md',
-    'jpg', 'jpeg', 'png', 'gif',
-    'zip', '7z', 'gz', 'bz2', 'rar', 'tar',
+# 新标准链路资料文件允许的扩展名和大小
+ARCHIVE_ALLOWED_EXTENSIONS = [
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'zip', 'gz', 'bz2', 'rar', '7z',
+    'json', 'txt', 'csv', 'png', 'jpg', 'jpeg',
 ]
-ASSESSMENT_ATTACHMENT_UPLOAD_MAX_SIZE_MB = 100
+ARCHIVE_UPLOAD_MAX_SIZE_MB = 100
 
-# 竞赛文件允许的扩展名和大小
-COMPETITION_ALLOWED_EXTENSIONS = [
-    'xls', 'xlsx', 'csv', 'pdf', 'doc', 'docx',
-    'jpg', 'jpeg', 'png',
-    'zip', '7z', 'gz', 'bz2', 'rar', 'tar',
-]
-COMPETITION_UPLOAD_MAX_SIZE_MB = 200
-
-# 评分归档文件允许的扩展名和大小
-MARKING_WORKBOOK_ALLOWED_EXTENSIONS = ['xlsx']
-MARKING_WORKBOOK_UPLOAD_MAX_SIZE_MB = 50
-MARKING_RESULT_PACKAGE_ALLOWED_EXTENSIONS = ['json']
-MARKING_RESULT_PACKAGE_UPLOAD_MAX_SIZE_MB = 20
+# 评分表与结果包允许的扩展名和大小
+SCORING_WORKBOOK_ALLOWED_EXTENSIONS = ['xlsx']
+SCORING_WORKBOOK_UPLOAD_MAX_SIZE_MB = 50
+SCORING_RESULT_PACKAGE_ALLOWED_EXTENSIONS = ['json', 'zip']
+SCORING_RESULT_PACKAGE_UPLOAD_MAX_SIZE_MB = 100
 
 # 训练日志允许的扩展名和大小
-TRAININGLOG_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf']
-TRAININGLOG_UPLOAD_MAX_SIZE_MB = 20
+TRAINING_LOG_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf', 'txt', 'md']
+TRAINING_LOG_UPLOAD_MAX_SIZE_MB = 20
 
 
 # 通知附件允许的扩展名和大小
@@ -140,20 +120,11 @@ CONDUCT_UPLOAD_MAX_SIZE_MB = 50
 # 笔记目录（私有，完整路径）
 NOTES_ROOT = PRIVATE_MEDIA_ROOT / "notes"
 
-# 考核文件上传目录（私有，完整路径）
-ASSESSMENT_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "assessments"
-
-# 竞赛文件上传目录（私有，完整路径）
-COMPETITION_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "competitions"
-
-# 评分归档上传目录（私有，完整路径）
-MARKING_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "marking"
+# 资料资产上传目录（私有，完整路径）
+ARCHIVE_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "archives"
 
 # 奖惩记录附件上传目录（公共，相对于 MEDIA_ROOT）
 BEHAVIORS_UPLOAD_DIR = Path("behaviors")
-
-# 训练日志上传目录（公共，相对于 MEDIA_ROOT）
-TRAININGLOG_UPLOAD_DIR = "traininglogs"
 
 # 会议记录上传目录（公共，相对于 MEDIA_ROOT）
 MEETINGS_UPLOAD_DIR = "meetings"

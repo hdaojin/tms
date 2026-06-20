@@ -1,0 +1,21 @@
+{% comment %}
+按钮组件。
+参数: label, href, type, icon, variant_class, size_class, disabled, extra_class。
+variant_class/size_class 必须由后端或调用方用白名单提供完整类名。
+{% endcomment %}
+{% with btn_class=variant_class|default:"btn-primary" btn_size=size_class|default:"btn-md" %}
+  {% if href and not disabled %}
+    <a class="btn {{ btn_class }} {{ btn_size }} {{ extra_class }}" href="{{ href }}">
+      {% if icon %}<span class="{{ icon }} size-4" aria-hidden="true"></span>{% endif %}
+      {% if label %}<span>{{ label }}</span>{% endif %}
+    </a>
+  {% else %}
+    <button class="btn {{ btn_class }} {{ btn_size }} {{ extra_class }}"
+            type="{{ type|default:'button' }}"
+            {% if disabled %}disabled{% endif %}
+            {{ attrs|safe }}>
+      {% if icon %}<span class="{{ icon }} size-4" aria-hidden="true"></span>{% endif %}
+      {% if label %}<span>{{ label }}</span>{% endif %}
+    </button>
+  {% endif %}
+{% endwith %}

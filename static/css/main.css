@@ -1,18 +1,109 @@
 @import "tailwindcss";
+@source "../..";
+@source not "../../.git";
 @source not "../../.github";
+@source not "../../.venv";
+@source not "../../node_modules";
+@source not "../../staticfiles";
 @plugin "@tailwindcss/typography";
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine, halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk, autumn, business, acid, lemonade, night, coffee, winter;
+  themes: light --default, dark --prefersdark, corporate, business, night;
   logs: false;
 }
 @plugin "@iconify/tailwind4";
 
 @layer components {
-  .btn {
+  .btn,
+  .badge {
     white-space: nowrap;
   }
 
-  .badge {
-    white-space: nowrap;
+  .menu {
+    --menu-active-bg: var(--color-base-200);
+    --menu-active-fg: var(--color-base-content);
+  }
+
+  .tms-page {
+    min-height: 0;
+  }
+
+  .tms-container {
+    width: 100%;
+    max-width: 88rem;
+    margin-inline: auto;
+    padding-inline: 1rem;
+  }
+
+  .tms-toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .tms-toolbar {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  .tms-card-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  }
+
+  .tms-home-hero {
+    background-image: url("../images/bg-bit.png");
+    background-position: center;
+    background-size: cover;
+  }
+
+  .tms-countdown-shell {
+    min-height: 100%;
+    background:
+      radial-gradient(circle at 20% 15%, color-mix(in oklab, var(--color-primary) 20%, transparent), transparent 32rem),
+      radial-gradient(circle at 80% 10%, color-mix(in oklab, var(--color-accent) 16%, transparent), transparent 26rem),
+      linear-gradient(135deg, var(--color-base-200), var(--color-base-100));
+  }
+
+  .countdown-theme-network .countdown-bg {
+    background-image: url("../images/countdown/network-command-center-bg.png");
+    background-position: center;
+    background-size: cover;
+  }
+
+  .countdown-number {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .print-code-wrap pre[class*="language-"],
+  .print-code-wrap code[class*="language-"],
+  .print-code-wrap .prose pre,
+  .print-code-wrap .prose code {
+    overflow-x: hidden !important;
+    text-shadow: none !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+  }
+
+  .tms-note-content,
+  .tms-note-content main {
+    min-width: 0;
+  }
+
+  .tms-note-content .prose pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+@layer utilities {
+  .menu .menu-active {
+    --menu-active-bg: var(--color-base-200);
+    --menu-active-fg: var(--color-base-content);
+    background-color: var(--color-base-200);
+    color: var(--color-base-content);
   }
 }

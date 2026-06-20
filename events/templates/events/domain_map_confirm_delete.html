@@ -1,0 +1,21 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="max-w-2xl">
+  <div class="alert alert-error mb-4">
+    <span class="icon-[tabler--alert-triangle] size-5"></span>
+    <span>确认删除事件模块与能力领域的映射关系。</span>
+  </div>
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">{{ object.event_module }} -> {{ object.capability_domain }}</h2>
+      <p>删除后不会删除事件模块或能力领域本身。</p>
+      <form method="post" class="flex gap-2">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-error">确认删除</button>
+        <a href="{% url 'events:module_detail' object.event_module_id %}" class="btn btn-ghost">取消</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

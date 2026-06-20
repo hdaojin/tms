@@ -1,0 +1,15 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <div class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      {% partial form_body %}
+    </div>
+  </div>
+
+  {% partialdef form_body %}
+    <div id="demo-form-body">
+      {% include "components/form.html" with form=form action=request.path submit_label="保存" hx_attrs='hx-post="" hx-target="#demo-form-body" hx-swap="outerHTML"' %}
+    </div>
+  {% endpartialdef %}
+{% endblock %}

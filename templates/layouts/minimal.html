@@ -1,0 +1,41 @@
+{% extends "layouts/base.html" %}
+{% load menu_tags %}
+
+{% block body %}
+  <div class="drawer flex min-h-dvh flex-col">
+    <input id="tms-app-drawer" type="checkbox" class="drawer-toggle" />
+
+    {% block header %}
+      {% include "partials/header.html" %}
+    {% endblock %}
+
+    <div class="drawer-content flex min-h-0 min-w-0 flex-1">
+      {% block public_sidebar %}
+        <aside class="hidden w-72 shrink-0 overflow-y-auto border-r border-base-300 bg-base-100 print:hidden lg:block">
+          <div class="p-4">
+            {% render_section_menu_auto %}
+          </div>
+        </aside>
+      {% endblock %}
+
+      <main class="tms-page min-w-0 flex-1">
+        <div class="tms-container py-4">
+          {% block content %}{% block main %}{% endblock %}{% endblock %}
+        </div>
+      </main>
+    </div>
+
+    {% block footer %}
+      {% include "partials/footer.html" %}
+    {% endblock %}
+
+    {% block mobile_nav %}
+      <div class="drawer-side z-30 lg:hidden" data-mobile-nav-panel>
+        <label for="tms-app-drawer" aria-label="关闭导航" class="drawer-overlay"></label>
+        <aside class="min-h-full w-80 bg-base-100 p-4 text-base-content">
+          {% render_mobile_navigation %}
+        </aside>
+      </div>
+    {% endblock %}
+  </div>
+{% endblock %}

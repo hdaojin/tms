@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends "layouts/app.html" %}
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
@@ -8,11 +8,8 @@
     <div class="border-b">
       <div class="flex items-center justify-between p-4">
         <div>
-          {% if notice.title %}
-            <h2 class="card-title text-lg">{{ notice.title }}</h2>
-          {% else %}
-            <h2 class="card-title text-lg text-base-content/70">无标题通知</h2>
-          {% endif %}
+          <h2 class="card-title text-lg">通知内容</h2>
+          {% if not notice.title %}<p class="text-sm text-base-content/70">无标题通知</p>{% endif %}
         </div>
 
         <!-- 操作按钮 -->

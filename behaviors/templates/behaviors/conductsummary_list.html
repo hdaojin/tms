@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
+{% extends "layouts/app.html" %}
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
-  {% include 'components/table_block.html' %}
+  {% include "components/table_wrapper.html" with table=table %}
 {% endblock %}

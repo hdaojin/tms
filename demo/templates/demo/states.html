@@ -1,0 +1,16 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <div class="space-y-6">
+    <div class="grid gap-4 md:grid-cols-2">
+      {% include "components/alert.html" with title="信息提示" message="这是统一 alert 组件。" variant_class="alert-info" icon="icon-[tabler--info-circle]" dismissible=True %}
+      {% include "components/alert.html" with title="危险操作" message="删除、归档、锁定等动作需要确认弹窗。" variant_class="alert-warning" icon="icon-[tabler--alert-triangle]" %}
+    </div>
+    {% include "components/empty_state.html" with title="暂无训练计划" message="后续新 TMS app 可直接复用该空状态。" icon="icon-[tabler--calendar-off]" action_label="返回 Demo 首页" action_href="/demo/" %}
+    <button type="button" class="btn btn-error" data-modal-target="demo-confirm-modal">
+      <span class="icon-[tabler--trash] size-4"></span>
+      打开确认弹窗
+    </button>
+    {% include "components/confirm_modal.html" with modal_id="demo-confirm-modal" title="确认删除示例" message="这是一个 CSP 友好的 DaisyUI dialog 示例。" action=request.path confirm_label="确认" %}
+  </div>
+{% endblock %}

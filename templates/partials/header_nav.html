@@ -1,0 +1,9 @@
+<ul class="menu menu-horizontal gap-1 font-semibold">
+  {% for section in sections %}
+    <li>
+      <a href="{{ section.url }}" class="{% if section.active %}menu-active{% endif %}">
+        {{ section.label }}
+      </a>
+    </li>
+  {% endfor %}
+</ul>

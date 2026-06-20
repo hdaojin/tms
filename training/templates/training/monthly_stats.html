@@ -1,0 +1,33 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <form method="get" class="mb-3 flex flex-wrap items-center gap-2">
+      <select name="year" class="select select-sm">
+        {% for month in months %}
+          <option value="{{ month.year }}" {% if month.year == selected_year and month.month == selected_month %}selected{% endif %}>{{ month.year }}</option>
+        {% endfor %}
+      </select>
+      <select name="month" class="select select-sm">
+        {% for month in months %}
+          <option value="{{ month.month }}" {% if month.year == selected_year and month.month == selected_month %}selected{% endif %}>{{ month.month|stringformat:"02d" }}月</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-sm" type="submit">筛选</button>
+    </form>
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead><tr><th>日期</th><th>已提交选手</th><th>未提交选手</th><th>已提交教练</th></tr></thead>
+        <tbody>
+          {% for row in rows %}
+            <tr><td>{{ row.date }}</td><td>{{ row.submitted_competitors }}</td><td>{{ row.unsubmitted_competitors }}</td><td>{{ row.submitted_coaches }}</td></tr>
+          {% empty %}
+            <tr><td colspan="4">暂无数据</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

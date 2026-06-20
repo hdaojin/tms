@@ -1,0 +1,29 @@
+{% for item in items %}
+  <li>
+    {% if item.children %}
+      <details {% if item.expanded %}open{% endif %}>
+        <summary class="gap-2">
+          {% if item.icon_class %}<span class="{{ item.icon_class }}"></span>{% endif %}
+          <span>{{ item.label }}</span>
+        </summary>
+        <ul>
+          {% if item.has_own_url and item.resolved_url and item.resolved_url != "#" %}
+            <li>
+              <a href="{{ item.resolved_url }}" class="{% if item.active %}menu-active{% endif %}"{% if item.external %} target="_blank" rel="noopener noreferrer"{% endif %}>
+                <span>概览</span>
+              </a>
+            </li>
+          {% endif %}
+          {% include "partials/sidebar_items.html" with items=item.children %}
+        </ul>
+      </details>
+    {% else %}
+      <a href="{{ item.resolved_url }}" class="{% if item.active %}menu-active{% endif %}"{% if item.external %} target="_blank" rel="noopener noreferrer"{% endif %}>
+        {% if item.icon_class %}<span class="{{ item.icon_class }}"></span>{% endif %}
+        <span>{{ item.label }}</span>
+      </a>
+    {% endif %}
+  </li>
+{% empty %}
+  <li class="menu-disabled"><span>暂无可用菜单</span></li>
+{% endfor %}

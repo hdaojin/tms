@@ -1,0 +1,8 @@
+{% comment %}
+徽章组件。
+参数: label, variant_class, size_class, icon, extra_class。
+{% endcomment %}
+<span class="badge {{ variant_class|default:'badge-soft' }} {{ size_class|default:'badge-md' }} {{ extra_class }}">
+  {% if icon %}<span class="{{ icon }} size-3.5" aria-hidden="true"></span>{% endif %}
+  {{ label }}
+</span>

@@ -1,6 +1,6 @@
 # meetings/tables.py
 import django_tables2 as tables
-from core.utils.tables import BaseTable, BaseDateColumn, BaseDateTimeColumn, ActionsColumn
+from core.tables import ActionsColumn, BaseDateColumn, BaseDateTimeColumn, BaseTable
 from .models import Meeting
 
 class MeetingTable(BaseTable):

@@ -21,3 +21,37 @@ dependencies = [
     "cryptography>=48.0.0",
     "openpyxl>=3.1.5",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.18",
+    "pytest>=9.1.0",
+    "pytest-django>=4.12.0",
+]
+
+[tool.pytest]
+DJANGO_SETTINGS_MODULE = "tmsproject.settings"
+python_files = ["tests.py", "test_*.py", "*_tests.py"]
+addopts = ["--reuse-db"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+extend-exclude = [
+    ".uv-cache",
+    ".venv",
+    "node_modules",
+    "media",
+    "media-private",
+    "backups",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/create_test_users.py" = ["E402"]
+"scripts/create_traininglogs_test_data.py" = ["E402"]
+
+[tool.ruff.format]
+quote-style = "preserve"

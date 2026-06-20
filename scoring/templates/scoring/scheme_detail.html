@@ -1,0 +1,32 @@
+{% extends "layouts/app.html" %}
+{% load django_tables2 %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <h2 class="card-title">评分方案信息</h2>
+    <div class="flex flex-wrap gap-2">
+      <span class="badge badge-outline">{{ scheme.event_module }}</span>
+      <span class="badge badge-outline">总分 {{ scheme.total_mark }}</span>
+      <span class="badge badge-outline">{{ scheme.parser_version }}</span>
+    </div>
+  </div>
+</div>
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <h3 class="font-semibold">评分点</h3>
+    {% render_table aspect_table %}
+  </div>
+</div>
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h3 class="font-semibold">参评对象</h3>
+      {% if perms.scoring.add_scoringparticipant %}
+        <a href="{% url 'scoring:participant_create' %}" class="btn btn-primary btn-sm">新增参评对象</a>
+      {% endif %}
+    </div>
+    {% render_table participant_table %}
+  </div>
+</div>
+{% endblock %}

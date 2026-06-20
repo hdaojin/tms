@@ -1,0 +1,13 @@
+{% extends "common/table_page.html" %}
+
+{% block content %}
+<div class="mb-3 flex justify-end">
+  {% if perms.training.add_trainingcycle %}
+    <a href="{% url 'training:cycle_create' %}" class="btn btn-primary btn-sm">
+      <span class="icon-[tabler--plus] size-4"></span>
+      新增训练周期
+    </a>
+  {% endif %}
+</div>
+{{ block.super }}
+{% endblock %}

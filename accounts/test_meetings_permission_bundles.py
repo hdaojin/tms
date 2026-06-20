@@ -11,12 +11,6 @@ class PermissionBundleCoverageTests(TestCase):
     def test_sync_group_permission_bundles_for_single_permission_business_actions(self):
         bundle_cases = {
             "accounts.view_all_profiles": "view_all_profiles",
-            "assessments.view_all_scores": "view_all_scores",
-            "competitions.create_competitor": "add_competitor",
-            "competitions.create_expert": "add_expert",
-            "competitions.create_skillposition": "add_skillposition",
-            "competitions.link_member": "add_member",
-            "competitions.record_competition_result": "add_competitionresult",
             "meetings.delete_meeting": "delete_meeting",
             "meetings.upload_meeting": "add_meeting",
             "notices.publish_notice": "add_notice",

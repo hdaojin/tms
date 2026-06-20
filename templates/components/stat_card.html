@@ -1,0 +1,10 @@
+{% comment %}
+统计卡片组件。
+参数: label, value, hint, icon, tone_class。
+{% endcomment %}
+<div class="stat rounded-box border border-base-300 bg-base-100">
+  {% if icon %}<div class="stat-figure {{ tone_class|default:'text-primary' }}"><span class="{{ icon }} size-7" aria-hidden="true"></span></div>{% endif %}
+  <div class="stat-title">{{ label }}</div>
+  <div class="stat-value text-2xl">{{ value }}</div>
+  {% if hint %}<div class="stat-desc">{{ hint }}</div>{% endif %}
+</div>

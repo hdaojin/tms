@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends "layouts/app.html" %}
 {% load static %}
 
 {% block left_sidebar %}
@@ -15,7 +15,7 @@
 {% endblock %}
 
 {% block content %}
-  <div class="w-full space-y-4">
+  <div class="tms-note-content w-full space-y-4">
     <div class="space-y-1">
       <div class="breadcrumbs text-sm text-base-content/80">
         <ul>
@@ -113,17 +113,6 @@
 {% block extra_css %}
   <!-- Prism.js styles (place actual static path as needed) -->
   <link rel="stylesheet" href="{% static 'css/prism.css' %}" />
-  <style>
-    /* Prevent flex item from growing beyond screen width */
-    main {
-      min-width: 0;
-    }
-    /* Ensure code blocks scroll horizontally */
-    .prose pre {
-      max-width: 100%;
-      overflow-x: auto;
-    }
-  </style>
 {% endblock %}
 
 {% block extra_js %}

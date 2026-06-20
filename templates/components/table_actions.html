@@ -1,0 +1,19 @@
+{% comment %}
+django-tables2 操作列按钮。
+参数: actions, confirm_actions。
+{% endcomment %}
+{% if actions or confirm_actions %}
+  <div class="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
+    {% for action in actions %}
+      <a class="btn {{ action.variant_class }} btn-xs whitespace-nowrap" href="{{ action.href }}">{{ action.label }}</a>
+    {% endfor %}
+    {% for action in confirm_actions %}
+      <button type="button" class="btn {{ action.variant_class }} btn-xs whitespace-nowrap" data-modal-target="{{ action.modal_id }}">
+        {{ action.label }}
+      </button>
+    {% endfor %}
+  </div>
+  {% for action in confirm_actions %}
+    {% include "components/confirm_modal.html" with modal_id=action.modal_id title=action.title message=action.message action=action.href confirm_label=action.confirm_label %}
+  {% endfor %}
+{% endif %}

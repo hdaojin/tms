@@ -1,13 +1,13 @@
-{% extends 'base.html' %}
+{% extends "layouts/auth.html" %}
 {% block left_sidebar %}{% endblock %}
 {% block right_sidebar %}{% endblock %}
 
 {% block title %}
 {% endblock %}
 
-{% block content %}
-  <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 w-fit max-w-lg mx-auto shadow-xl mb-6">
-    <legend class="fieldset-legend text-2xl font-bold text-center mb-4">{{ title }}</legend>
+{% block auth_content %}
+  <fieldset class="fieldset mx-auto mb-6 w-full max-w-lg rounded-box border border-base-300 bg-base-100 p-6 shadow-xl">
+    <legend class="fieldset-legend mb-4 text-center text-2xl font-bold">{{ title }}</legend>
     
     <form action="{% url 'accounts:signup' %}" method="post">
       {% csrf_token %}
@@ -70,7 +70,7 @@
     </form>
     
   </fieldset>
-  <div class="text-center mt-4">
+  <div class="mt-4 text-center">
     <p>
       已有账号? <a href="{% url 'accounts:login' %}" class="link link-accent">立即登录</a>
     </p>

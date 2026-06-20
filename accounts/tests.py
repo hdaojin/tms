@@ -75,6 +75,27 @@ class AccountHomeTestCase(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '奖惩')
 
+	def test_account_home_section_cards_use_three_column_centered_layout(self):
+		response = self.client.get(reverse('accounts:home'))
+
+		self.assertEqual(response.status_code, 200)
+		soup = BeautifulSoup(response.content, 'html.parser')
+		grid = soup.select_one('.grid.grid-cols-1.gap-6.md\\:grid-cols-2.xl\\:grid-cols-3')
+		self.assertIsNotNone(grid)
+		card = grid.select_one('a.card')
+		self.assertIsNotNone(card)
+		for class_name in ['card-border', 'h-full', 'min-h-56', 'border', 'border-base-300', 'shadow']:
+			self.assertIn(class_name, card.get('class', []))
+		card_body = card.select_one('.card-body')
+		for class_name in ['min-h-56', 'items-center', 'justify-center', 'text-center']:
+			self.assertIn(class_name, card_body.get('class', []))
+		icon = card_body.select_one('span[class*="icon-"]')
+		self.assertIsNotNone(icon)
+		self.assertIn('size-8', icon.get('class', []))
+		title = card_body.select_one('.card-title')
+		self.assertIsNotNone(title)
+		self.assertIn('text-lg', title.get('class', []))
+
 	def test_legacy_conduct_root_is_not_accessible(self):
 		response = self.client.get('/conduct/')
 
@@ -380,7 +401,7 @@ class RoleListViewTests(TestCase):
 			group=self.role,
 			codename='coach',
 			description='教练组',
-			selected_permission_bundles=['traininglogs.upload_traininglog'],
+			selected_permission_bundles=['training.maintain_training'],
 		)
 		for index in range(2):
 			user = User.objects.create_user(
@@ -397,7 +418,7 @@ class RoleListViewTests(TestCase):
 		self.assertContains(response, '教练')
 		self.assertContains(response, 'coach')
 		self.assertContains(response, '教练组')
-		self.assertContains(response, '上传训练日志')
+		self.assertContains(response, '维护训练')
 
 		soup = BeautifulSoup(response.content, 'html.parser')
 		role_row = soup.find('td', string='教练').find_parent('tr')
@@ -433,32 +454,42 @@ class PermissionBundleSyncServiceTests(TestCase):
 			content_type__model='group',
 		)
 
-		sync_user_permission_bundles(user, ['traininglogs.upload_traininglog'], [extra_permission])
+		sync_user_permission_bundles(user, ['training.maintain_training'], [extra_permission])
 
 		user.refresh_from_db()
-		self.assertEqual(user.profile.selected_permission_bundles, ['traininglogs.upload_traininglog'])
+		self.assertEqual(user.profile.selected_permission_bundles, ['training.maintain_training'])
 		self.assertSetEqual(
 			set(user.user_permissions.values_list('codename', flat=True)),
 			{
 				'add_traininglog',
+				'add_trainingcycle',
+				'change_trainingcycle',
+				'change_traininglog',
+				'export_traininglog_archive',
+				'view_all_traininglog',
+				'view_trainingcycle',
 				'view_traininglog',
 				'add_group',
 			},
 		)
 
-	def test_sync_group_permission_bundles_for_traininglog_view_all_grants_all_view_permissions(self):
-		group = Group.objects.create(name='训练日志全看组')
+	def test_sync_group_permission_bundles_for_training_maintenance_grants_training_permissions(self):
+		group = Group.objects.create(name='训练维护组')
 
-		sync_group_permission_bundles(group, ['traininglogs.view_all_traininglogs'])
+		sync_group_permission_bundles(group, ['training.maintain_training'])
 
 		group.refresh_from_db()
-		self.assertEqual(group.profile.selected_permission_bundles, ['traininglogs.view_all_traininglogs'])
+		self.assertEqual(group.profile.selected_permission_bundles, ['training.maintain_training'])
 		self.assertSetEqual(
 			set(group.permissions.values_list('codename', flat=True)),
 			{
+				'add_trainingcycle',
+				'add_traininglog',
+				'change_trainingcycle',
+				'change_traininglog',
+				'export_traininglog_archive',
 				'view_all_traininglog',
-				'view_coach_traininglog',
-				'view_competitor_traininglog',
+				'view_trainingcycle',
 				'view_traininglog',
 			},
 		)
@@ -486,11 +517,11 @@ class PermissionBundleAdminFormTests(TestCase):
 			content_type__app_label='auth',
 			content_type__model='group',
 		)
-		sync_user_permission_bundles(user, ['traininglogs.upload_traininglog'], [extra_permission])
+		sync_user_permission_bundles(user, ['training.maintain_training'], [extra_permission])
 
 		form = UserPermissionBundleAdminForm(instance=user)
 
-		self.assertEqual(form.initial['selected_permission_bundles'], ['traininglogs.upload_traininglog'])
+		self.assertEqual(form.initial['selected_permission_bundles'], ['training.maintain_training'])
 		self.assertQuerySetEqual(
 			form.fields['user_permissions'].initial.order_by('pk'),
 			Permission.objects.filter(pk=extra_permission.pk),
@@ -526,7 +557,13 @@ class PermissionBundleBackfillCommandTests(TestCase):
 	def test_command_preview_does_not_write_profiles(self):
 		group = Group.objects.create(name='预检查组')
 		group.permissions.add(
+			Permission.objects.get(codename='add_trainingcycle'),
 			Permission.objects.get(codename='add_traininglog'),
+			Permission.objects.get(codename='change_trainingcycle'),
+			Permission.objects.get(codename='change_traininglog'),
+			Permission.objects.get(codename='export_traininglog_archive'),
+			Permission.objects.get(codename='view_all_traininglog'),
+			Permission.objects.get(codename='view_trainingcycle'),
 			Permission.objects.get(codename='view_traininglog'),
 		)
 
@@ -534,13 +571,19 @@ class PermissionBundleBackfillCommandTests(TestCase):
 		call_command('backfill_permission_bundles', stdout=output)
 
 		self.assertFalse(hasattr(group, 'profile'))
-		self.assertIn('用户组 预检查组: 业务权限包 -> traininglogs.upload_traininglog', output.getvalue())
+		self.assertIn('用户组 预检查组: 业务权限包 -> training.maintain_training', output.getvalue())
 		self.assertIn('以上为预检查结果', output.getvalue())
 
 	def test_command_execute_backfills_group_and_user_bundles(self):
 		group = Group.objects.create(name='训练日志组')
 		group.permissions.add(
+			Permission.objects.get(codename='add_trainingcycle'),
 			Permission.objects.get(codename='add_traininglog'),
+			Permission.objects.get(codename='change_trainingcycle'),
+			Permission.objects.get(codename='change_traininglog'),
+			Permission.objects.get(codename='export_traininglog_archive'),
+			Permission.objects.get(codename='view_all_traininglog'),
+			Permission.objects.get(codename='view_trainingcycle'),
 			Permission.objects.get(codename='view_traininglog'),
 		)
 
@@ -558,7 +601,7 @@ class PermissionBundleBackfillCommandTests(TestCase):
 
 		group.refresh_from_db()
 		user.refresh_from_db()
-		self.assertEqual(group.profile.selected_permission_bundles, ['traininglogs.upload_traininglog'])
+		self.assertEqual(group.profile.selected_permission_bundles, ['training.maintain_training'])
 		self.assertEqual(
 			user.profile.selected_permission_bundles,
 			['behaviors.record_conduct', 'behaviors.review_conduct'],

@@ -7,14 +7,13 @@ from django.core.management.base import BaseCommand, CommandError
 
 
 CUTOVER_COMMANDS = [
-    "cutover_assessment_to_assessments",
     "cutover_conduct_to_behaviors",
     "cutover_meeting_to_meetings",
 ]
 
 
 class Command(BaseCommand):
-    help = "统一预检查或执行 assessments、behaviors、meetings 的内部标识切换收尾，并在执行模式下自动运行 migrate。"
+    help = "统一预检查或执行 behaviors、meetings 的内部标识切换收尾，并在执行模式下自动运行 migrate。"
 
     def _run_migrate_in_fresh_process(self, database):
         command = [

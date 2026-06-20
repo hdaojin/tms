@@ -46,13 +46,16 @@
         </div>
         {% if user == notice.published_by %}
           <div class="card-actions">
-            <form method="post" action="{% url 'notices:notice_delete' notice.id %}" onsubmit="return confirm('确认删除该通知？此操作不可恢复。');">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-ghost btn-sm flex items-center">
-                <span class="icon-[tabler--trash] size-4"></span>
-                <span>删除</span>
-              </button>
-            </form>
+            {% url 'notices:notice_delete' notice.id as delete_url %}
+            {% with notice_id=notice.id|stringformat:"s" %}
+              {% with delete_modal_id="notice-delete-"|add:notice_id %}
+                <button type="button" class="btn btn-ghost btn-sm flex items-center" data-modal-target="{{ delete_modal_id }}">
+                  <span class="icon-[tabler--trash] size-4"></span>
+                  <span>删除</span>
+                </button>
+                {% include "components/confirm_modal.html" with modal_id=delete_modal_id title="删除通知" message="确认删除该通知？此操作不可恢复。" action=delete_url confirm_label="删除" %}
+              {% endwith %}
+            {% endwith %}
           </div>
         {% endif %}
       </div>

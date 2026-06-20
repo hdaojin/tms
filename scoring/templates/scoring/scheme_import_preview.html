@@ -1,0 +1,148 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="grid gap-4 xl:grid-cols-3">
+  <section class="space-y-4 xl:col-span-2">
+    <div class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="card-title">{{ scheme_import.title }}</h2>
+            <p class="text-sm text-base-content/60">{{ scheme_import.event_module }}</p>
+          </div>
+          <span class="badge {% if scheme_import.status == 'confirmed' %}badge-success{% else %}badge-info{% endif %}">{{ scheme_import.get_status_display }}</span>
+        </div>
+        <div class="grid gap-3 md:grid-cols-4">
+          <div class="stat rounded-box border border-base-300 bg-base-100">
+            <div class="stat-title">模块</div>
+            <div class="stat-value text-xl">{{ scheme_import.module_code }}</div>
+            <div class="stat-desc">{{ scheme_import.module_name }}</div>
+          </div>
+          <div class="stat rounded-box border border-base-300 bg-base-100">
+            <div class="stat-title">Mark</div>
+            <div class="stat-value text-xl">{{ scheme_import.module_mark }}</div>
+          </div>
+          <div class="stat rounded-box border border-base-300 bg-base-100">
+            <div class="stat-title">Total Marks</div>
+            <div class="stat-value text-xl">{{ scheme_import.total_mark }}</div>
+          </div>
+          <div class="stat rounded-box border border-base-300 bg-base-100">
+            <div class="stat-title">评分点</div>
+            <div class="stat-value text-xl">{{ scheme_import.parsed_payload.aspects_count }}</div>
+            <div class="stat-desc">M {{ scheme_import.parsed_payload.measurement_count }} / J {{ scheme_import.parsed_payload.judgement_count }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% for subcriterion in scheme_import.parsed_payload.subcriteria %}
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 class="font-semibold">{{ subcriterion.code }} {{ subcriterion.name }}</h3>
+              {% if subcriterion.day_of_marking %}<p class="text-sm text-base-content/60">评分日：{{ subcriterion.day_of_marking }}</p>{% endif %}
+            </div>
+            <span class="badge badge-outline">{{ subcriterion.aspects|length }} 个评分点</span>
+          </div>
+          <div class="overflow-x-auto rounded-box border border-base-300">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>编号</th>
+                  <th>类型</th>
+                  <th>评分点</th>
+                  <th>命令或操作</th>
+                  <th>Requirement</th>
+                  <th>Calculation Row</th>
+                  <th>分值</th>
+                  <th>来源行</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for aspect in subcriterion.aspects %}
+                  <tr>
+                    <td>{{ aspect.code }}</td>
+                    <td><span class="badge badge-outline">{{ aspect.aspect_type }}</span></td>
+                    <td class="min-w-64 whitespace-pre-line">{{ aspect.description }}</td>
+                    <td class="min-w-64 whitespace-pre-line">{{ aspect.command }}</td>
+                    <td class="min-w-56 whitespace-pre-line">{{ aspect.requirement }}</td>
+                    <td>{{ aspect.calculation_row }}</td>
+                    <td>{{ aspect.max_mark }}</td>
+                    <td>{{ aspect.source_row_number }}</td>
+                  </tr>
+                  {% if aspect.judgement_options %}
+                    <tr>
+                      <td></td>
+                      <td colspan="7">
+                        <div class="grid gap-2 md:grid-cols-4">
+                          {% for option in aspect.judgement_options %}
+                            <div class="rounded-box border border-base-300 p-3">
+                              <div class="font-semibold">{{ option.score_value }} 分</div>
+                              <div class="whitespace-pre-line text-sm text-base-content/70">{{ option.description }}</div>
+                            </div>
+                          {% endfor %}
+                        </div>
+                      </td>
+                    </tr>
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+
+  <aside class="space-y-4">
+    <div class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title text-base">解析器</h2>
+        <div class="space-y-1 text-sm">
+          <p class="font-semibold">{{ scheme_import.parser_display_name }}</p>
+          {% if scheme_import.parser_alias %}<p class="text-base-content/60">{{ scheme_import.parser_alias }}</p>{% endif %}
+          {% if scheme_import.parser_description %}<p class="text-base-content/70">{{ scheme_import.parser_description }}</p>{% endif %}
+          <p class="text-base-content/60">{{ scheme_import.parser_key }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title text-base">源文件</h2>
+        <div class="space-y-1 text-sm text-base-content/70">
+          <p>{{ scheme_import.source_asset.filename }}</p>
+          <p>导入人：{{ scheme_import.imported_by|default:"-" }}</p>
+          <p>导入时间：{{ scheme_import.imported_at }}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title text-base">校验结果</h2>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between gap-3"><span>明细合计</span><span>{{ scheme_import.validation_report.checks.aspect_total }}</span></div>
+          <div class="flex justify-between gap-3"><span>Total Marks</span><span>{{ scheme_import.validation_report.checks.total_mark }}</span></div>
+          <div class="flex justify-between gap-3"><span>模块 Mark</span><span>{{ scheme_import.validation_report.checks.module_mark }}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        {% if scheme_import.status == 'confirmed' and scheme_import.scheme %}
+          <a class="btn btn-primary" href="{% url 'scoring:scheme_detail' scheme_import.scheme.pk %}">查看评分方案</a>
+        {% else %}
+          <form method="post">
+            {% csrf_token %}
+            <button class="btn btn-primary w-full" type="submit">确认生成评分方案</button>
+          </form>
+        {% endif %}
+        <a class="btn btn-ghost" href="{% url 'scoring:scheme_import' %}">重新上传</a>
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% comment %}
+分页组件。
+参数: page_obj 或 table.page，使用 Django 6 querystring 保留筛选条件。
+{% endcomment %}
+{% firstof page_obj table.page as current_page %}
+{% if current_page and current_page.paginator.num_pages > 1 %}
+  <nav class="join flex justify-center" aria-label="分页">
+    {% if current_page.has_previous %}
+      <a class="join-item btn btn-sm" href="{% querystring page=current_page.previous_page_number %}">上一页</a>
+    {% else %}
+      <button class="join-item btn btn-sm" type="button" disabled>上一页</button>
+    {% endif %}
+    <button class="join-item btn btn-sm btn-active" type="button">
+      {{ current_page.number }} / {{ current_page.paginator.num_pages }}
+    </button>
+    {% if current_page.has_next %}
+      <a class="join-item btn btn-sm" href="{% querystring page=current_page.next_page_number %}">下一页</a>
+    {% else %}
+      <button class="join-item btn btn-sm" type="button" disabled>下一页</button>
+    {% endif %}
+  </nav>
+{% endif %}

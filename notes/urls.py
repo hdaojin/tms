@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import note_detail_view, note_asset_view, note_print_view, notes_repo_list_view
+from .views import note_detail_view, note_print_view, notes_repo_list_view
 
 app_name = "notes"
 

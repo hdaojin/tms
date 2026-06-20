@@ -12,7 +12,7 @@ TMS 的基础方向是对的：Django 6、全站 `LoginRequiredMiddleware`、`co
 
 2. 收敛菜单系统  ok
 
-   当前活跃菜单来自 `core/config/menus/*.yml`，但 app 目录下还有 `menus.yml`，同时 [core/utils/menus_parse.py](E:/04-codes/tms/core/utils/menus_parse.py:10) 和 [core/templatetags/menus.py](E:/04-codes/tms/core/templatetags/menus.py:15) 像旧链路。建议只保留一种菜单来源。另外 [accounts.yml](E:/04-codes/tms/core/config/menus/accounts.yml:48) 里有 `accounts.add_ivitationcode` 拼写/权限疑似无效。
+   菜单来源已收敛到 `core/config/navigation.yml`，解析逻辑位于 `core/navigation.py`。旧 `core/config/menus*.yml` 和旧菜单加载器不再作为新 TMS 的入口。
 
 3. 重新划分 competitions 的边界 OK 
 

@@ -1,0 +1,63 @@
+{% load django_tables2 i18n l10n %}
+<table {% render_attrs table.attrs %}>
+  {% if table.show_header %}
+    <thead {{ table.attrs.thead.as_html }}>
+      <tr>
+        {% for column in table.columns %}
+          <th {{ column.attrs.th.as_html }}>
+            {% if column.orderable %}
+              <a class="link link-hover" href="{% querystring sort=column.order_by_alias.next %}">
+                {{ column.header }}
+              </a>
+            {% else %}
+              {{ column.header }}
+            {% endif %}
+          </th>
+        {% endfor %}
+      </tr>
+    </thead>
+  {% endif %}
+  <tbody {{ table.attrs.tbody.as_html }}>
+    {% for row in table.paginated_rows %}
+      <tr {{ row.attrs.as_html }}>
+        {% for column, cell in row.items %}
+          <td {{ column.attrs.td.as_html }}>{% if column.localize == None %}{{ cell }}{% else %}{% if column.localize %}{{ cell|localize }}{% else %}{{ cell|unlocalize }}{% endif %}{% endif %}</td>
+        {% endfor %}
+      </tr>
+    {% empty %}
+      {% if table.empty_text %}
+        <tr>
+          <td colspan="{{ table.columns|length }}">
+            {% include "components/empty_state.html" with title=table.empty_text icon="icon-[tabler--database-off]" %}
+          </td>
+        </tr>
+      {% endif %}
+    {% endfor %}
+  </tbody>
+  {% if table.has_footer %}
+    <tfoot {{ table.attrs.tfoot.as_html }}>
+      <tr>
+        {% for column in table.columns %}
+          <td {{ column.attrs.tf.as_html }}>{{ column.footer }}</td>
+        {% endfor %}
+      </tr>
+    </tfoot>
+  {% endif %}
+</table>
+{% if table.page and table.paginator.num_pages > 1 %}
+  <nav class="join my-4 flex justify-center" aria-label="分页">
+    {% if table.page.has_previous %}
+      <a class="join-item btn btn-sm" href="{% querystring page=table.page.previous_page_number %}">上一页</a>
+    {% else %}
+      <button class="join-item btn btn-sm" type="button" disabled>上一页</button>
+    {% endif %}
+    <button class="join-item btn btn-sm btn-active" type="button">
+      {{ table.page.number }} / {{ table.paginator.num_pages }}
+    </button>
+    {% if table.page.has_next %}
+      <a class="join-item btn btn-sm" href="{% querystring page=table.page.next_page_number %}">下一页</a>
+    {% else %}
+      <button class="join-item btn btn-sm" type="button" disabled>下一页</button>
+    {% endif %}
+  </nav>
+{% endif %}

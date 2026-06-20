@@ -1,0 +1,11 @@
+{% comment %}
+页面操作区组件。
+参数: actions，为包含 label/href/icon/variant_class/size_class 的对象列表。
+{% endcomment %}
+{% if actions %}
+  <div class="flex flex-wrap gap-2">
+    {% for action in actions %}
+      {% include "components/button.html" with label=action.label href=action.href icon=action.icon variant_class=action.variant_class size_class=action.size_class extra_class=action.extra_class %}
+    {% endfor %}
+  </div>
+{% endif %}

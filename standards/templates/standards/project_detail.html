@@ -1,0 +1,18 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="card-title">技能项目信息</h2>
+        <p class="text-sm text-base-content/70">{{ project.code }}{% if project.short_name %} / {{ project.short_name }}{% endif %}</p>
+      </div>
+      {% if perms.standards.change_skillproject %}
+        <a href="{% url 'standards:project_edit' project.pk %}" class="btn btn-outline btn-sm">编辑</a>
+      {% endif %}
+    </div>
+    <p class="whitespace-pre-line">{{ project.description|default:"暂无描述" }}</p>
+  </div>
+</div>
+{% endblock %}

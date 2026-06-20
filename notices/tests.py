@@ -1,5 +1,5 @@
 from pathlib import Path
-import tempfile
+import shutil
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -16,8 +16,9 @@ User = get_user_model()
 
 class NoticeAttachmentCleanupTests(TestCase):
 	def setUp(self):
-		self.temp_media = tempfile.TemporaryDirectory()
-		self.override = override_settings(MEDIA_ROOT=self.temp_media.name)
+		self.temp_media = Path.cwd() / ".tmp-test-notices-media"
+		shutil.rmtree(self.temp_media, ignore_errors=True)
+		self.override = override_settings(MEDIA_ROOT=self.temp_media)
 		self.override.enable()
 		self.notice = Notice.objects.create(title='测试通知', content='测试内容')
 
@@ -27,7 +28,7 @@ class NoticeAttachmentCleanupTests(TestCase):
 				attachment.file.delete(save=False)
 
 		self.override.disable()
-		self.temp_media.cleanup()
+		shutil.rmtree(self.temp_media, ignore_errors=True)
 		super().tearDown()
 
 	def _build_upload_file(self, name='notice-attachment.txt'):
@@ -85,8 +86,9 @@ class NoticeUrlTests(TestCase):
 
 class NoticeAttachmentUploadTests(TestCase):
 	def setUp(self):
-		self.temp_media = tempfile.TemporaryDirectory()
-		self.override = override_settings(MEDIA_ROOT=self.temp_media.name)
+		self.temp_media = Path.cwd() / ".tmp-test-notices-media"
+		shutil.rmtree(self.temp_media, ignore_errors=True)
+		self.override = override_settings(MEDIA_ROOT=self.temp_media)
 		self.override.enable()
 		self.user = User.objects.create_user(
 			username='notice-viewer',
@@ -104,7 +106,7 @@ class NoticeAttachmentUploadTests(TestCase):
 				attachment.file.delete(save=False)
 
 		self.override.disable()
-		self.temp_media.cleanup()
+		shutil.rmtree(self.temp_media, ignore_errors=True)
 		super().tearDown()
 
 	def _build_upload_file(self, name):

@@ -1,9 +1,6 @@
-{% extends 'base.html' %}
-{% load django_tables2 %}
+{% extends "layouts/app.html" %}
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
-<div class="overflow-x-auto">
-  {% render_table table %}
-</div>
+  {% include "components/table_wrapper.html" with table=table %}
 {% endblock %}

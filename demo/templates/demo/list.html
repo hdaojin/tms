@@ -1,0 +1,63 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <div class="space-y-4">
+    <form class="tms-toolbar"
+          hx-get="{{ request.path }}"
+          hx-target="#demo-results"
+          hx-push-url="true">
+      <label class="input input-bordered flex items-center gap-2">
+        <span class="icon-[tabler--search] size-4 text-base-content/50"></span>
+        <input type="search" name="q" value="{{ query }}" placeholder="搜索训练项" />
+      </label>
+      <select class="select select-bordered" name="status">
+        <option value="">全部状态</option>
+        {% for item in statuses %}
+          <option value="{{ item }}" {% if item == status %}selected{% endif %}>{{ item }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-primary" type="submit">筛选</button>
+    </form>
+    {% partial results %}
+  </div>
+
+  {% partialdef results %}
+    <section id="demo-results" class="space-y-4">
+      <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>编号</th>
+              <th>名称</th>
+              <th>负责人</th>
+              <th>状态</th>
+              <th class="text-right">得分</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for record in records %}
+              <tr>
+                <td>{{ record.code }}</td>
+                <td>{{ record.name }}</td>
+                <td>{{ record.owner }}</td>
+                <td><span class="badge badge-soft">{{ record.status }}</span></td>
+                <td class="text-right">{{ record.score }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5">
+                  {% include "components/empty_state.html" with title="暂无结果" message="调整筛选条件后重试。" icon="icon-[tabler--filter-off]" %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% partial pagination %}
+    </section>
+  {% endpartialdef %}
+
+  {% partialdef pagination %}
+    {% include "components/pagination.html" with page_obj=records %}
+  {% endpartialdef %}
+{% endblock %}

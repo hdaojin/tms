@@ -1,30 +1,19 @@
-{% extends 'base_minimal.html' %}
+{% extends "layouts/minimal.html" %}
 
 {% block content %}
-  <div class="container mx-auto p-8 text-center">
-    <!-- 404 图标和标题 -->
-    <div class="flex flex-col items-center justify-center min-h-[60vh]">
-      <div class="mb-8">
-        <span class="icon-[tabler--error-404] size-32 text-error opacity-60"></span>
-      </div>
-
-      <div class="max-w-md">
-        <h1 class="text-4xl font-bold text-base-content mb-4">404</h1>
-        <h2 class="text-xl font-semibold text-base-content/80 mb-4">页面未找到</h2>
-        <p class="text-base-content/60 mb-8">抱歉，您访问的页面不存在或已被删除。 可能是链接错误或页面已被移动。</p>
-
-        <!-- 操作按钮 -->
-        <div class="flex flex-col sm:flex-row gap-4 justify-center">
-          <a href="javascript:history.back()" class="btn btn-outline btn-primary">
-            <span class="icon-[tabler--arrow-left] size-4"></span>
-            返回上页
-          </a>
-          <a href="{% url 'home' %}" class="btn btn-primary">
-            <span class="icon-[tabler--home] size-4"></span>
-            返回首页
-          </a>
-        </div>
-      </div>
+  <div class="flex min-h-[70vh] flex-col items-center justify-center p-8 text-center">
+    <span class="icon-[tabler--error-404] mb-6 size-28 text-error" aria-hidden="true"></span>
+    <h1 class="text-4xl font-bold">404</h1>
+    <p class="mt-4 max-w-md text-base-content/60">您访问的页面不存在或已被移动。</p>
+    <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+      <button type="button" class="btn btn-outline btn-primary" data-history-back>
+        <span class="icon-[tabler--arrow-left] size-4" aria-hidden="true"></span>
+        返回上页
+      </button>
+      <a href="{% url 'home' %}" class="btn btn-primary">
+        <span class="icon-[tabler--home] size-4" aria-hidden="true"></span>
+        返回首页
+      </a>
     </div>
   </div>
 {% endblock %}

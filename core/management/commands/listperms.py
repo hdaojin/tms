@@ -10,7 +10,7 @@ class Command(BaseCommand):
             "app_label",
             nargs="?",
             type=str,
-            help="App 的标签（例如 traininglogs, meeting, docs）"
+            help="App 的标签（例如 training, meetings, notes）"
         )
 
     def handle(self, *args, **options):

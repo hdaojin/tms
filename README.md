@@ -81,44 +81,25 @@ Copy-Item .env.example .env
 uv run manage.py migrate
 ```
 
-如果当前环境是从旧的内部标识升级到新的 `assessments`、`behaviors` 或 `meetings`，请先执行对应切换命令，再继续 migrate。
+本版本已重构标准体系全链路，`migrate` 会自动清理旧标准链路表、contenttypes、permissions 和 migration records。升级已有环境前必须先备份数据库和上传文件目录。
 
-如果已经先执行了 `migrate`，后来才发现忘记运行某个 cutover 命令的 `--execute`，也不要手工改库。可以直接使用统一收尾命令自动检查并收敛半切换状态。
-
-如果当前环境已经存在旧的 `curriculum_*` 与 `trainingcycles_trainingcycle` 数据表，并准备升级到新的 `competition_standards` 结构，必须先执行 `cutover_competition_standards --execute`，再继续 `migrate`、`makemigrations` 等迁移相关命令。否则 `competition_standards.0001_initial` 会检测到旧表并中止，避免误建空表导致数据分叉。
-
-仅适用于已有旧数据的环境：
+仅适用于旧 `conduct` 或 `meeting` 内部标识切换的环境：
 
 ```bash
 uv run manage.py reconcile_internal_app_cutovers
 uv run manage.py reconcile_internal_app_cutovers --execute
-uv run manage.py cutover_competition_standards
-uv run manage.py cutover_competition_standards --execute
-uv run manage.py cutover_assessment_to_assessments
-uv run manage.py cutover_assessment_to_assessments --execute
 uv run manage.py cutover_conduct_to_behaviors
 uv run manage.py cutover_conduct_to_behaviors --execute
 uv run manage.py cutover_meeting_to_meetings
 uv run manage.py cutover_meeting_to_meetings --execute
 ```
 
-说明：
-
-- 全新初始化数据库时，不需要执行 `cutover_assessment_to_assessments`。
-- 全新初始化数据库时，不需要执行 `cutover_conduct_to_behaviors` 或 `cutover_meeting_to_meetings`。
-- 全新初始化数据库时，不需要执行 `cutover_competition_standards`。
-- 推荐优先使用 `reconcile_internal_app_cutovers` 统一预检查和执行收尾；在 `--execute` 模式下，该命令会在三个 app 收尾后自动执行 `migrate`。
-- 执行 `--execute` 前，先备份数据库，以及命令涉及的旧上传目录。
-- `cutover_competition_standards` 会把 `curriculum_*` 与 `trainingcycles_trainingcycle` 表重命名为 `competition_standards_*`，把训练周期上的旧主目标/参考赛项字段迁入 `competitions_competitiontrainingcycletarget`，删除旧字段，并迁移 `django_content_type`、`auth_permission`、`django_admin_log` 和迁移记录中的 app 标识。
-- 该命令会重命名旧的 `assessment_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识，并把私有资料目录迁到 `media-private/assessments/`。
-- `cutover_conduct_to_behaviors` 会重命名旧的 `conduct_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识，并在存在旧目录时把公共附件目录从 `media/conduct/` 迁到 `media/behaviors/`。
-- `cutover_meeting_to_meetings` 会重命名旧的 `meeting_*` 数据表、迁移 `django_migrations` 与 `django_content_type` 中的 app 标识；如存在遗留 `media/meeting/`，也会一并迁到 `media/meetings/`。
-- 如果生产环境已经出现“旧表和新表同时存在，但新表为空”的半切换状态，对应 cutover 命令会自动接管恢复；只有在检测到新表已有真实数据或新目录已有真实文件时才会拒绝执行。
+说明：全新初始化数据库时通常只需要执行 `migrate`；旧标准体系数据不做迁移。
 
 ### 5. 导入基础数据
 
 ```bash
-uv run manage.py loaddata core/default accounts/default competition_standards/default competitions/default behaviors/default
+uv run manage.py loaddata core/default accounts/default behaviors/default
 ```
 
 ### 6. 创建超级管理员
@@ -156,10 +137,8 @@ http://127.0.0.1:8000/
 ## 常用开发命令
 
 ```bash
-uv run manage.py test assessments
+uv run pytest standards events training archives scoring examcontent knowledge
 uv run manage.py reconcile_internal_app_cutovers
-uv run manage.py cutover_competition_standards
-uv run manage.py cutover_assessment_to_assessments
 uv run manage.py cutover_conduct_to_behaviors
 uv run manage.py cutover_meeting_to_meetings
 uv run manage.py check
@@ -205,7 +184,7 @@ npm run build:css
 git clone git@github.com:hdaojin/tms.git /srv/tms
 cd /srv/tms
 
-uv sync --frozen
+uv sync --frozen --no-dev
 ```
 
 部署到生产服务器前，请先在开发机或 CI 完成前端资源准备，并确保以下文件已经包含在本次部署内容中：
@@ -259,7 +238,7 @@ mkdir -p /srv/tms/media-private
 
 ```bash
 uv run manage.py migrate
-uv run manage.py loaddata core/default accounts/default competition_standards/default competitions/default behaviors/default
+uv run manage.py loaddata core/default accounts/default behaviors/default
 uv run manage.py createsuperuser
 ```
 
@@ -421,7 +400,8 @@ cp node_modules/alpinejs/dist/cdn.min.js static/js/alpinejs.min.js
 
 ```bash
 uv run manage.py check
-uv run manage.py test <受影响的 app>
+uv run ruff check .
+uv run pytest <受影响的 app 或测试路径>
 ```
 
 提交代码时，通常需要一并提交这些文件中的实际变更：
@@ -451,7 +431,7 @@ uv run manage.py loaddata core/default
 ```bash
 cd /srv/tms
 git pull
-uv sync --frozen
+uv sync --frozen --no-dev
 uv run manage.py migrate
 uv run manage.py collectstatic --noinput
 sudo systemctl restart tms

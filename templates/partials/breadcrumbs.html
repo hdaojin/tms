@@ -1,0 +1,15 @@
+{% if breadcrumbs %}
+  <div class="breadcrumbs max-w-full overflow-x-auto text-sm">
+    <ul>
+      {% for crumb in breadcrumbs %}
+        <li>
+          {% if crumb.url %}
+            <a href="{{ crumb.url }}">{{ crumb.label }}</a>
+          {% else %}
+            <span>{{ crumb.label }}</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}

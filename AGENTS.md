@@ -7,7 +7,7 @@ TMS is a Django 6 monolith for training logs, assessments, meetings, notices, no
 - Treat this `AGENTS.md` as the authoritative project instruction file.
 - Read `README.md` for setup, deployment, and command conventions.
 - For user-visible feature changes, inspect and update `docs/user-manual/`.
-- Check the target app's `models.py`, `forms.py`, `views.py`, `tables.py`, `urls.py`, templates, relevant `core/config/menus/*.yml`, tests, and migrations before editing.
+- Check the target app's `models.py`, `forms.py`, `views.py`, `tables.py`, `urls.py`, templates, `core/config/navigation.yml`, tests, and migrations before editing.
 
 ## Agent skills
 
@@ -29,9 +29,11 @@ Run all Django commands from the repository root because `.env` may use a relati
 - Install/sync Python deps: `uv sync`
 - Add Python deps: `uv add <package>`
 - Run checks: `uv run manage.py check`
+- Run lint: `uv run ruff check .`
 - Make migrations: `uv run manage.py makemigrations`
 - Apply migrations: `uv run manage.py migrate`
-- Run focused tests: `uv run manage.py test <app>`
+- Run tests: `uv run pytest`
+- Run focused tests: `uv run pytest <app-or-test-path>`
 - Build CSS: `npm run build:css`
 - Watch CSS: `npm run watch:css`
 
@@ -43,12 +45,12 @@ Prefer focused app tests over the full suite unless the change crosses app bound
 - Global login is enforced by `LoginRequiredMiddleware`; public views must explicitly use `login_not_required`.
 - Preserve middleware ordering in `tmsproject/settings.py`.
 - App URLs must be included from `tmsproject/urls.py` with `app_name` namespaces.
-- Menus live in `core/config/menus/*.yml` and are grouped by `core/config/menus.yml`.
+- Navigation lives in `core/config/navigation.yml`; templates render the parsed navigation from `core.navigation`.
 
 ## Code Patterns
 - Use `TitleMixin` for class-based views and set `title` plus `title_icon`.
 - Use `StyledFormMixin` for forms.
-- Use `BaseTable`, `BaseDateColumn`, and `ActionsColumn` for list/table pages.
+- Use `BaseTable`, `BaseDateColumn`, `BaseDateTimeColumn`, and `ActionsColumn` from `core.tables` for list/table pages.
 - Use `OwnerRequiredMixin`, `CrossGroupAccessMixin`, `PermissionRequiredMixin`, or `SuperuserRequiredMixin` for access control.
 - Templates and compatibility layers may display users as `user.display_name` or `user.full_info`; new Python logic should prefer `accounts.services.users.get_user_display_name()` or `get_user_full_info()`.
 - For file fields, use `core.uploads.UploadSpec`, `UploadSizeValidator`, `PrivateMediaStorage`, project upload constants, and cleanup signals.
@@ -56,10 +58,12 @@ Prefer focused app tests over the full suite unless the change crosses app bound
 - Keep edits scoped; do not refactor unrelated modules.
 
 ## Templates And Frontend
-- Extend `templates/base.html`.
-- Reuse components from `templates/components/`, especially `components/field.html`.
+- Extend `layouts/app.html`, `layouts/minimal.html`, `layouts/auth.html`, `layouts/print.html`, or `layouts/htmx.html`; `templates/base.html` is only a thin base entry.
+- Reuse components from `templates/components/`, especially `components/form.html`, `components/field.html`, and `components/table_wrapper.html`.
 - Use DaisyUI/Tailwind classes consistent with existing templates.
 - Use Iconify classes like `icon-[tabler--calendar]`.
+- Do not dynamically concatenate Tailwind/Iconify classes in templates.
+- Do not add inline scripts, inline event handlers, or `javascript:` links.
 - If templates introduce new Tailwind/Iconify classes, rebuild and commit `static/css/output.css`.
 - Do not put secrets or raw credentials into templates, context debug output, tests, logs, or docs.
 

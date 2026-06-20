@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 
 from accounts.models import GroupProfile, UserProfile

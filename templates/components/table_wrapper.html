@@ -1,0 +1,29 @@
+{% comment %}
+表格包装组件。
+参数: table_title, wrapper_title, description, table, empty_title, empty_message, htmx_target。
+toolbar/pagination 可由调用方通过上方块或上下文提供。
+{% endcomment %}
+{% load django_tables2 %}
+{% firstof table_title wrapper_title as resolved_table_title %}
+<section class="space-y-4" {% if htmx_target %}id="{{ htmx_target }}"{% endif %}>
+  {% if resolved_table_title or description or toolbar %}
+    <div class="tms-toolbar">
+      <div class="min-w-0">
+        {% if resolved_table_title %}<h2 class="text-base font-semibold">{{ resolved_table_title }}</h2>{% endif %}
+        {% if description %}<p class="text-sm text-base-content/60">{{ description }}</p>{% endif %}
+      </div>
+      {% if toolbar %}<div class="flex flex-wrap gap-2">{{ toolbar }}</div>{% endif %}
+    </div>
+  {% endif %}
+  <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+    {% if table %}
+      {% render_table table %}
+    {% else %}
+      {% include "components/empty_state.html" with title=empty_title message=empty_message %}
+    {% endif %}
+  </div>
+  {% firstof page_obj table.page as current_page %}
+  {% if current_page and current_page.paginator.num_pages > 1 %}
+    {% include "components/pagination.html" with page_obj=current_page table=table %}
+  {% endif %}
+</section>

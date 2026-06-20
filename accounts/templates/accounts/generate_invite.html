@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends "layouts/app.html" %}
 
 {% block content %}
   <!-- 邀请码内容 -->
@@ -16,7 +16,7 @@
           <span class="label">邀请码</span>
           <input type="text" readonly value="{{ code }}" id="inviteCode" class="font-mono text-sm" />
         </label>
-        <button id="copyBtn" class="btn btn-primary">
+        <button id="copyBtn" class="btn btn-primary" type="button" data-copy-target="#inviteCode" data-copied-label="已复制">
           <span class="icon-[tabler--copy]"></span>
           复制
         </button>
@@ -36,29 +36,6 @@
     </div>
   </div>
 
-  <script>
-    document.getElementById('copyBtn').addEventListener('click', function () {
-      navigator.clipboard
-        .writeText('{{ code }}')
-        .then(function () {
-          // 显示复制成功提示
-          const btn = document.getElementById('copyBtn')
-          const originalText = btn.innerHTML
-          btn.innerHTML = '<span class="icon-[tabler--check]"></span>已复制'
-          btn.classList.add('btn-success')
-          btn.classList.remove('btn-primary')
-    
-          setTimeout(function () {
-            btn.innerHTML = originalText
-            btn.classList.remove('btn-success')
-            btn.classList.add('btn-primary')
-          }, 2000)
-        })
-        .catch(function () {
-          alert('复制失败，请手动复制邀请码')
-        })
-    })
-  </script>
 {% endblock %}
 
 {% block right_sidebar %}

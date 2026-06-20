@@ -52,6 +52,9 @@ jobs:
       - name: Install Python dependencies
         run: uv sync --frozen
 
+      - name: Run Ruff lint
+        run: uv run ruff check .
+
       - name: Run Django system checks
         run: uv run manage.py check
 
@@ -64,14 +67,14 @@ jobs:
       - name: Run tests
         run: |
           set -o pipefail
-          uv run manage.py test 2>&1 | tee django-test.log
+          uv run pytest 2>&1 | tee pytest-test.log
 
-      - name: Upload Django test log
+      - name: Upload pytest test log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: django-test-log
-          path: django-test.log
+          name: pytest-test-log
+          path: pytest-test.log
           if-no-files-found: ignore
 
   frontend:

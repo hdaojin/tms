@@ -1,5 +1,5 @@
 from pathlib import Path
-from tempfile import TemporaryDirectory
+import shutil
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
@@ -63,14 +63,15 @@ class NoteAssetViewTests(TestCase):
 		self.note_repo = NoteRepo.objects.create(slug="private-repo", title="私有笔记")
 		self.note_repo.allowed_groups.add(self.allowed_group)
 
-		self.temp_dir = TemporaryDirectory()
-		self.addCleanup(self.temp_dir.cleanup)
+		self.temp_dir = Path.cwd() / ".tmp-test-notes"
+		shutil.rmtree(self.temp_dir, ignore_errors=True)
+		self.addCleanup(lambda: shutil.rmtree(self.temp_dir, ignore_errors=True))
 
-		repo_dir = Path(self.temp_dir.name) / "private-repo" / "assets"
+		repo_dir = self.temp_dir / "private-repo" / "assets"
 		repo_dir.mkdir(parents=True)
 		(repo_dir / "diagram.png").write_bytes(b"fake-image-bytes")
 
-		self.notes_root_patcher = patch("notes.views.NOTES_ROOT", Path(self.temp_dir.name))
+		self.notes_root_patcher = patch("notes.views.NOTES_ROOT", self.temp_dir)
 		self.notes_root_patcher.start()
 		self.addCleanup(self.notes_root_patcher.stop)
 

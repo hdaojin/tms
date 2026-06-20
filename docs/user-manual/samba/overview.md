@@ -31,8 +31,7 @@ uv run manage.py process_samba_operations
 
 菜单入口：
 
-- 顶部或侧边导航中的“开通Samba账户”
-- 子菜单“SMB账户”
+- 侧边栏：账户 -> 个人账户 -> Samba 账户
 
 ## 4. 常见任务
 

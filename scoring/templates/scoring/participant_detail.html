@@ -1,0 +1,35 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="card-title">参评对象信息</h2>
+        <p class="text-sm text-base-content/70">{{ participant.scheme }}</p>
+      </div>
+      <div class="flex gap-2">
+        {% if perms.scoring.add_scoringresult %}
+          <a href="{% url 'scoring:result_create' %}" class="btn btn-primary btn-sm">录入结果</a>
+        {% endif %}
+        {% if perms.scoring.change_scoringparticipant %}
+          <a href="{% url 'scoring:participant_edit' participant.pk %}" class="btn btn-outline btn-sm">编辑</a>
+        {% endif %}
+      </div>
+    </div>
+    <p>{{ participant.organization|default:"-" }}</p>
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead><tr><th>评分点</th><th>得分</th><th>来源</th></tr></thead>
+        <tbody>
+          {% for result in participant.results.all %}
+            <tr><td>{{ result.aspect }}</td><td>{{ result.score_awarded }}</td><td>{{ result.get_source_display }}</td></tr>
+          {% empty %}
+            <tr><td colspan="3">暂无评分结果</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

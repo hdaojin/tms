@@ -1,0 +1,19 @@
+{% comment %}
+提示组件。
+参数: title, message, variant_class, icon, dismissible, extra_class。
+variant_class 必须是完整 DaisyUI alert 类，例如 alert-info。
+{% endcomment %}
+<div class="alert {{ variant_class|default:'alert-info' }} {{ extra_class }}" role="alert">
+  {% if icon %}
+    <span class="{{ icon }} size-5" aria-hidden="true"></span>
+  {% endif %}
+  <div class="min-w-0">
+    {% if title %}<div class="font-semibold">{{ title }}</div>{% endif %}
+    {% if message %}<div class="text-sm">{{ message }}</div>{% endif %}
+  </div>
+  {% if dismissible %}
+    <button class="btn btn-ghost btn-xs" type="button" data-dismiss-alert aria-label="关闭">
+      <span class="icon-[tabler--x] size-4" aria-hidden="true"></span>
+    </button>
+  {% endif %}
+</div>

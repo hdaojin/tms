@@ -8,7 +8,7 @@ from django.utils.safestring import mark_safe
 
 from accounts.services.users import get_user_display_name, get_user_role_badges
 from core.permissions import get_permission_bundle_specs
-from core.utils.tables import BaseTable, BaseDateColumn, ActionsColumn
+from core.tables import BaseTable, BaseDateColumn, ActionsColumn
 
 User = get_user_model()
 PERMISSION_BUNDLE_NAMES = {

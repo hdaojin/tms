@@ -1,0 +1,22 @@
+{% extends "layouts/base.html" %}
+
+{% block body %}
+  <div class="flex min-h-dvh flex-col bg-base-200 text-base-content">
+    {% block header %}
+      {% include "partials/header.html" with hide_mobile_nav_trigger=True %}
+    {% endblock %}
+
+    <main class="flex min-h-0 flex-1 items-center justify-center px-4 py-8">
+      <div class="w-full max-w-lg">
+        {% block auth_content %}{% endblock %}
+      </div>
+    </main>
+
+    {% block footer %}
+      {% include "partials/footer.html" %}
+    {% endblock %}
+  </div>
+{% endblock %}
+
+{% block content %}
+{% endblock %}

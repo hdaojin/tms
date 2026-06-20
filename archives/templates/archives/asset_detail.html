@@ -1,0 +1,27 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="card-title">资料信息</h2>
+        <p class="text-sm text-base-content/70">{{ asset.get_asset_type_display }} / {{ asset.business_date }}</p>
+      </div>
+      <div class="flex gap-2">
+        <a href="{% url 'archives:asset_download' asset.pk %}" class="btn btn-primary btn-sm">下载</a>
+        {% if perms.archives.change_archiveasset %}
+          <a href="{% url 'archives:asset_edit' asset.pk %}" class="btn btn-outline btn-sm">编辑</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <p>文件：{{ asset.filename }}</p>
+      <p>SHA256：{{ asset.sha256_short }}</p>
+      <p>技能项目：{{ asset.skill_project|default:"-" }}</p>
+      <p>绑定对象：{{ asset.bound_object_label }}</p>
+    </div>
+    <p class="whitespace-pre-line">{{ asset.description|default:"暂无描述" }}</p>
+  </div>
+</div>
+{% endblock %}

@@ -1,48 +1,19 @@
-{% extends 'base.html' %} {% block title %}访问被拒绝 - {{ site_info.site_name
-}}{% endblock %} {% block content %}
-<div class="container mx-auto p-8 text-center">
-  <!-- 403 图标和标题 -->
-  <div class="flex min-h-[60vh] flex-col items-center justify-center">
-    <div class="mb-8">
-      <span
-        class="icon-[tabler--shield-x] size-32 text-warning opacity-60"
-      ></span>
-    </div>
+{% extends "layouts/minimal.html" %}
 
-    <div class="max-w-md">
-      <h1 class="mb-4 text-4xl font-bold text-base-content">403</h1>
-      <h2 class="mb-4 text-xl font-semibold text-base-content/80">
-        访问被拒绝
-      </h2>
-      <p class="mb-8 text-base-content/60">
-        抱歉，您没有权限访问此页面。 可能需要特定的权限或您不在指定的用户组中。
-      </p>
-
-      <!-- 操作按钮 -->
-      <div class="flex flex-col justify-center gap-4 sm:flex-row">
-        <a href="javascript:history.back()" class="btn btn-outline btn-warning">
-          <span class="icon-[tabler--arrow-left] size-4"></span>
-          返回上页
-        </a>
-        <a href="{% url 'home' %}" class="btn btn-primary">
-          <span class="icon-[tabler--home] size-4"></span>
-          返回首页
-        </a>
-      </div>
-    </div>
-
-    <!-- 建议操作 -->
-    <div class="mt-12 w-full max-w-lg">
-      <div class="alert alert-warning">
-        <span class="icon-[tabler--info-circle] size-5"></span>
-        <div>
-          <h3 class="font-semibold">需要帮助？</h3>
-          <div class="mt-1 text-sm">
-            如果您认为这是一个错误，请联系系统管理员获取相应权限。
-          </div>
-        </div>
-      </div>
+{% block content %}
+  <div class="flex min-h-[70vh] flex-col items-center justify-center p-8 text-center">
+    <span class="icon-[tabler--shield-x] mb-6 size-28 text-warning" aria-hidden="true"></span>
+    <h1 class="text-4xl font-bold">400</h1>
+    <p class="mt-4 max-w-md text-base-content/60">请求无效，请返回上一页或回到首页后重试。</p>
+    <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+      <button type="button" class="btn btn-outline btn-warning" data-history-back>
+        <span class="icon-[tabler--arrow-left] size-4" aria-hidden="true"></span>
+        返回上页
+      </button>
+      <a href="{% url 'home' %}" class="btn btn-primary">
+        <span class="icon-[tabler--home] size-4" aria-hidden="true"></span>
+        返回首页
+      </a>
     </div>
   </div>
-</div>
 {% endblock %}

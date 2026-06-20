@@ -1,0 +1,13 @@
+{% extends "common/table_page.html" %}
+
+{% block content %}
+<div class="mb-3 flex justify-end">
+  {% if perms.events.add_event %}
+    <a href="{% url 'events:event_create' %}" class="btn btn-primary btn-sm">
+      <span class="icon-[tabler--plus] size-4"></span>
+      新增事件
+    </a>
+  {% endif %}
+</div>
+{{ block.super }}
+{% endblock %}

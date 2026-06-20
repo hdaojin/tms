@@ -1,56 +1,19 @@
-{% extends 'base.html' %}
-{% block right_sidebar %}{% endblock %}
-
-{% block title %}
-    <div class="flex items-center gap-3">
-        <span class="icon-[tabler--shield-x] size-6 text-warning"></span>
-        <h1 class="text-2xl font-bold">访问被拒绝</h1>
-    </div>
-{% endblock %}
+{% extends "layouts/minimal.html" %}
 
 {% block content %}
-<div class="w-auto mx-auto p-8 text-center">
-    <!-- 403 图标和标题 -->
-    <div class="flex flex-col items-center justify-center min-h-[60vh]">
-        <div class="mb-8">
-            <span class="icon-[tabler--shield-x] size-32 text-warning opacity-60"></span>
-        </div>
-        
-        <div class="max-w-md">
-            <h2 class="text-4xl font-bold text-base-content mb-4">403</h1>
-            <h3 class="text-xl font-semibold text-base-content/80 mb-4">访问被拒绝</h2>
-            <p class="text-base-content/60 mb-8">
-                抱歉，您没有权限访问此页面。
-                可能需要特定的权限或您不在指定的用户组中。
-            </p>
-            
-            <!-- 操作按钮 -->
-            <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="javascript:history.back()" 
-                   class="btn btn-outline btn-warning">
-                    <span class="icon-[tabler--arrow-left] size-4"></span>
-                    返回上页
-                </a>
-                <a href="/" 
-                   class="btn btn-primary">
-                    <span class="icon-[tabler--home] size-4"></span>
-                    返回首页
-                </a>
-            </div>
-        </div>
-        
-        <!-- 建议操作 -->
-        <div class="mt-12 w-full max-w-lg">
-            <div class="alert alert-warning">
-                <span class="icon-[tabler--info-circle] size-5"></span>
-                <div>
-                    <h3 class="font-semibold">需要帮助？</h3>
-                    <div class="text-sm mt-1">
-                        如果您认为这是一个错误，请联系系统管理员获取相应权限。
-                    </div>
-                </div>
-            </div>
-        </div>
+  <div class="flex min-h-[70vh] flex-col items-center justify-center p-8 text-center">
+    <span class="icon-[tabler--shield-x] mb-6 size-28 text-warning" aria-hidden="true"></span>
+    <h1 class="text-4xl font-bold">403</h1>
+    <p class="mt-4 max-w-md text-base-content/60">您没有权限访问此页面。如需访问，请联系系统管理员。</p>
+    <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+      <button type="button" class="btn btn-outline btn-warning" data-history-back>
+        <span class="icon-[tabler--arrow-left] size-4" aria-hidden="true"></span>
+        返回上页
+      </button>
+      <a href="{% url 'home' %}" class="btn btn-primary">
+        <span class="icon-[tabler--home] size-4" aria-hidden="true"></span>
+        返回首页
+      </a>
     </div>
-</div>
+  </div>
 {% endblock %}

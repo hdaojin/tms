@@ -1,41 +1,37 @@
-{% extends 'base_minimal.html' %}
+{% extends "layouts/base.html" %}
 {% load static %}
 
-{% block main %}
+{% block body_class %}min-h-dvh overflow-x-hidden bg-slate-950 text-white{% endblock %}
 
-  <!-- 全屏背景图和登录框 -->
-  <div class="hero min-h-screen min-w-screen relative" style="background-image: url('{% static 'images/bg-bit.png' %}'); background-size: cover; background-position: center;">
-  {% comment %} <div class="hero min-h-screen min-w-screen relative bg-[url({% static 'images/bg-bit.png' %})] bg-cover bg-center"> {% endcomment %}
-    <div class="hero-overlay bg-opacity-60"></div>
-    <div class="hero-content flex-col md:flex-row-reverse w-full max-w-6xl">
-      <!-- 右侧：网站标题和简介 -->
-      <div class="text-center lg:text-left text-neutral-content flex-1">
-        <h1 class="text-5xl font-bold mb-6">{{ site_info.site_name }}</h1>
-        <p class="text-lg mb-6">{{ site_info.site_description }}</p>
-        <a href="/about/site/" class="btn btn-outline btn-lg text-neutral-content border-neutral-content hover:bg-neutral-content hover:text-base-100">
-            <span class="icon-[tabler--info-circle] text-lg"></span>
-            了解更多
-          </a>
-      </div>
+{% block body %}
+  <main class="hero tms-home-hero relative min-h-dvh overflow-hidden">
+    <div class="hero-overlay bg-slate-950/60"></div>
+    <div class="hero-content w-full max-w-6xl flex-col px-4 pb-24 md:flex-row-reverse">
+      <section class="flex-1 text-center text-white lg:text-left">
+        <h1 class="mb-6 text-5xl font-bold">{{ site_info.site_name }}</h1>
+        <p class="mb-6 text-lg text-white/85">{{ site_info.site_description }}</p>
+        <a href="/about/site/"
+           class="btn btn-outline btn-lg border-white/80 text-white hover:bg-white hover:text-base-content">
+          <span class="icon-[tabler--info-circle] text-lg" aria-hidden="true"></span>
+          了解更多
+        </a>
+      </section>
 
-      <!-- 左侧：登录框 -->
-      <div class="card bg-base-100/90 w-full max-w-sm shrink-0 shadow-2xl">
+      <section class="card w-full max-w-sm shrink-0 bg-base-100/92 text-base-content shadow-2xl backdrop-blur-sm">
         <div class="card-body">
-          <!-- 登录表单 -->
           {% include "accounts/login_form.html" with form=login_form %}
-          <!-- 注册链接 -->
-          <div class="text-center pt-4 border-t border-base-300">
+          <div class="border-t border-base-300 pt-4 text-center">
             <p class="text-sm text-base-content/70">
-              还没有账户? 
+              还没有账户?
               <a href="{% url 'accounts:signup' %}" class="link link-primary font-medium">立即注册</a>
             </p>
           </div>
-      </div>
+        </div>
+      </section>
     </div>
 
-    <!-- 底部信息 -->
-    <div class="footer footer-center sm:footer-horizontal bg-neutral/30 text-neutral-content absolute bottom-0 z-10 w-full p-4">
-      {% include 'partials/footer_content.html' %}
-    </div>
-  </div>
-{% endblock main %}
+    <footer class="home-floating-footer absolute inset-x-0 bottom-0 z-10 px-4 py-5 text-sm text-white/75 print:hidden [&_a]:text-white/80 [&_a:hover]:text-white">
+      {% include "partials/footer_content.html" %}
+    </footer>
+  </main>
+{% endblock %}

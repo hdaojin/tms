@@ -1,0 +1,12 @@
+{% comment %}
+空状态组件。
+参数: title, message, icon, action_label, action_href。
+{% endcomment %}
+<div class="flex min-h-52 flex-col items-center justify-center rounded-box border border-dashed border-base-300 bg-base-100 p-8 text-center">
+  <span class="{{ icon|default:'icon-[tabler--inbox]' }} mb-3 size-12 text-base-content/30" aria-hidden="true"></span>
+  <h3 class="text-base font-semibold">{{ title|default:"暂无数据" }}</h3>
+  {% if message %}<p class="mt-2 max-w-md text-sm text-base-content/60">{{ message }}</p>{% endif %}
+  {% if action_label and action_href %}
+    <a class="btn btn-primary btn-sm mt-5" href="{{ action_href }}">{{ action_label }}</a>
+  {% endif %}
+</div>

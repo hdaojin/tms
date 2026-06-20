@@ -1,9 +1,9 @@
-{% extends 'base.html' %}
+{% extends "layouts/app.html" %}
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
   <div class="text-right">
     <p class="text-sm text-info">*提示: 如果需要删除会议记录，请联系管理员。</p>
   </div>
-  {% include 'components/table_block.html' %}
+  {% include "components/table_wrapper.html" with table=table %}
 {% endblock %}

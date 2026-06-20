@@ -1,0 +1,37 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-4">
+  <section>
+    <div class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body">
+        {% include "components/form.html" with form=form action=request.path submit_label="解析并预览" %}
+      </div>
+    </div>
+  </section>
+
+  <section class="space-y-4">
+    {% for parser_config in parser_configs %}
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-3">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 class="card-title text-base">{{ parser_config.display_name }}</h2>
+              {% if parser_config.alias %}<p class="text-sm text-base-content/60">{{ parser_config.alias }}</p>{% endif %}
+            </div>
+            {% if parser_config.is_default %}<span class="badge badge-primary">默认</span>{% endif %}
+          </div>
+          {% if parser_config.description %}<p class="text-sm text-base-content/70">{{ parser_config.description }}</p>{% endif %}
+          <div class="card-actions justify-end">
+            <a class="btn btn-outline btn-sm" href="{% url 'scoring:parser_template' parser_config.parser_key %}">下载示例模板</a>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="alert alert-warning">
+        <span>当前没有启用的评分表解析器。</span>
+      </div>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

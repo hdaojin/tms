@@ -78,13 +78,14 @@ INSTALLED_APPS = [
     'core',
     'accounts',
     'samba',
-    'competition_standards.apps.CompetitionStandardsConfig',
-    'competitions',
-    'assessments.apps.AssessmentsConfig',
-    'marking.apps.MarkingConfig',
+    'standards.apps.StandardsConfig',
+    'archives.apps.ArchivesConfig',
+    'events.apps.EventsConfig',
+    'training.apps.TrainingConfig',
+    'scoring.apps.ScoringConfig',
+    'examcontent.apps.ExamcontentConfig',
+    'knowledge.apps.KnowledgeConfig',
     'notes',
-    'skilltrees.apps.SkilltreesConfig',
-    'traininglogs',
     'meetings.apps.MeetingsConfig',
     'notices',
     'behaviors.apps.BehaviorsConfig',
@@ -212,6 +213,16 @@ LOGIN_REDIRECT_URL = '/accounts/home/'  # 登录成功后跳转的页面
 CACHE_TIMEOUT = env.int('CACHE_TIMEOUT', default=DEFAULT_CACHE_TIMEOUT)  # type: ignore
 UPLOAD_MAX_SIZE_MB = env.int('UPLOAD_MAX_SIZE_MB', default=DEFAULT_UPLOAD_MAX_SIZE_MB)  # type: ignore
 SECURE_CSP = {
+    'default-src': [CSP.SELF],
+    'script-src': [CSP.SELF],
+    'style-src': [CSP.SELF],
+    'img-src': [CSP.SELF, 'data:'],
+    'font-src': [CSP.SELF],
+    'connect-src': [CSP.SELF],
+    'media-src': [CSP.SELF],
+    'object-src': [CSP.NONE],
+    'base-uri': [CSP.SELF],
+    'form-action': [CSP.SELF],
     'frame-ancestors': [CSP.SELF],
 }
 SAMBA_INTEGRATION_ENABLED = env.bool('SAMBA_INTEGRATION_ENABLED', default=False)  # type: ignore

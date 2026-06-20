@@ -1,0 +1,49 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 class="card-title">模块信息</h2>
+        <p class="text-sm text-base-content/70">{{ module.event }}</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        {% if perms.events.add_eventmodulecapabilitydomainmap %}
+          <a href="{% url 'events:module_domain_map_create' module.pk %}" class="btn btn-primary btn-sm">新增领域映射</a>
+        {% endif %}
+        {% if perms.events.change_eventmodule %}
+          <a href="{% url 'events:module_edit' module.pk %}" class="btn btn-outline btn-sm">编辑</a>
+        {% endif %}
+      </div>
+    </div>
+    <p>总分：{{ module.total_mark }} / 时长：{{ module.duration_minutes }} 分钟</p>
+    <p class="whitespace-pre-line">{{ module.description|default:"暂无描述" }}</p>
+    <div class="overflow-x-auto">
+      <table class="table table-sm">
+        <thead><tr><th>能力领域</th><th>主领域</th><th>权重</th><th>备注</th><th></th></tr></thead>
+        <tbody>
+          {% for mapping in module.domain_mappings.all %}
+            <tr>
+              <td>{{ mapping.capability_domain }}</td>
+              <td>{% if mapping.is_primary %}<span class="badge badge-primary">是</span>{% else %}否{% endif %}</td>
+              <td>{{ mapping.weight }}</td>
+              <td>{{ mapping.note }}</td>
+              <td class="text-right">
+                {% if perms.events.change_eventmodulecapabilitydomainmap %}
+                  <a href="{% url 'events:module_domain_map_edit' mapping.pk %}" class="btn btn-ghost btn-xs">编辑</a>
+                {% endif %}
+                {% if perms.events.delete_eventmodulecapabilitydomainmap %}
+                  <a href="{% url 'events:module_domain_map_delete' mapping.pk %}" class="btn btn-ghost btn-xs text-error">删除</a>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5">暂无能力领域映射</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% if title and show_title|default:True %}
+  <div class="flex flex-col gap-3 border-b border-base-300 pb-4 md:flex-row md:items-center md:justify-between">
+    <div class="flex min-w-0 items-center gap-3">
+      <span class="{{ title_icon|default:'icon-[tabler--info-square-rounded]' }} size-8 shrink-0 text-primary"></span>
+      <div class="min-w-0">
+        <h1 class="truncate text-2xl font-bold">{{ title }}</h1>
+        {% if subtitle %}<p class="text-sm text-base-content/70">{{ subtitle }}</p>{% endif %}
+      </div>
+    </div>
+    {% include "components/page_actions.html" with actions=page_actions %}
+  </div>
+{% endif %}

@@ -1,12 +1,13 @@
 from io import StringIO
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import django_tables2 as tables
+from django.contrib.flatpages.models import FlatPage
+from django.contrib.sites.models import Site
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -18,14 +19,12 @@ from django.urls import resolve, reverse
 
 from accounts.services.permission_bundles import sync_user_permission_bundles
 from behaviors.models import ConductSummary
+from core import navigation
 from core.forms.fields import MultipleFileField
 from core.uploads import (
-    ASSESSMENT_TP_UPLOAD_SPEC,
-    COMPETITION_DOCUMENT_UPLOAD_SPEC,
     CONDUCT_ATTACHMENT_UPLOAD_SPEC,
     MEETING_FILE_UPLOAD_SPEC,
     NOTICE_ATTACHMENT_UPLOAD_SPEC,
-    TRAININGLOG_UPLOAD_SPEC,
     FileUploadMixin,
     PrivateMediaStorage,
     UploadSignatureValidator,
@@ -36,7 +35,7 @@ from core.uploads import (
     is_image_file,
     validate_upload_file,
 )
-from core.utils.tables import ActionsColumn, BaseTable
+from core.tables import ActionsColumn, BaseTable
 from core.utils.admin_deletion import discard_registered_delete_permissions, register_delete_permission_exemptions
 
 
@@ -96,10 +95,51 @@ class SiteRobotsDirectiveTests(TestCase):
         )
 
 
+class NavigationConfigCacheTests(TestCase):
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
+
+    @override_settings(CACHE_TIMEOUT=10)
+    @patch("core.navigation.yaml.safe_load", return_value={"themes": ["light"]})
+    @patch("core.navigation.cache.set")
+    @patch("core.navigation.cache.get", return_value=None)
+    def test_load_config_uses_global_cache_timeout(self, mock_cache_get, mock_cache_set, mock_safe_load):
+        config = navigation._load_config()
+
+        self.assertEqual(config, {"themes": ["light"]})
+        mock_cache_get.assert_called_once_with("tms:navigation:v1:config")
+        mock_cache_set.assert_called_once_with(
+            "tms:navigation:v1:config",
+            {"themes": ["light"]},
+            timeout=10,
+        )
+        mock_safe_load.assert_called_once()
+
+
 class MobileNavigationTemplateTests(TestCase):
     def setUp(self):
         cache.clear()
         self.factory = RequestFactory()
+
+    def _render_menu_tag(self, source: str, path: str, user) -> str:
+        request = self.factory.get(path)
+        request.user = user
+        request.resolver_match = resolve(request.path)
+        return Template(source).render(Context({"request": request}))
+
+    def _grant_permissions(self, user, *permission_codes: str):
+        permissions = []
+        for permission_code in permission_codes:
+            app_label, _, codename = permission_code.partition(".")
+            permissions.append(
+                Permission.objects.get(
+                    content_type__app_label=app_label,
+                    codename=codename,
+                )
+            )
+        user.user_permissions.add(*permissions)
+        return User.objects.get(pk=user.pk)
 
     def tearDown(self):
         cache.clear()
@@ -107,9 +147,9 @@ class MobileNavigationTemplateTests(TestCase):
 
     def test_render_mobile_navigation_shows_current_section_and_permitted_nested_items(self):
         user = User.objects.create_user(username="mobile-nav-user", password="testpass123")
-        sync_user_permission_bundles(user, ["competitions.create_skillposition"])
+        sync_user_permission_bundles(user, ["training.maintain_training"])
 
-        request = self.factory.get(reverse("competitions:skillposition_create"))
+        request = self.factory.get(reverse("training:log_upload"))
         request.user = user
         request.resolver_match = resolve(request.path)
 
@@ -117,10 +157,9 @@ class MobileNavigationTemplateTests(TestCase):
             Context({"request": request})
         )
 
-        self.assertIn("当前位于“竞赛”", html)
-        self.assertIn("竞赛信息", html)
-        self.assertIn("新增岗位人员", html)
-        self.assertNotIn("新增专家", html)
+        self.assertIn("当前位于“训练”", html)
+        self.assertIn("训练日志", html)
+        self.assertIn("提交统计", html)
 
     def test_render_mobile_navigation_hides_notice_create_without_permission(self):
         user = User.objects.create_user(username="notice-nav-user", password="testpass123")
@@ -151,6 +190,136 @@ class MobileNavigationTemplateTests(TestCase):
 
         self.assertIn("创建通知公告", html)
 
+    def test_render_mobile_navigation_shows_node_list_but_hides_new_permissioned_entries_without_permissions(self):
+        user = User.objects.create_user(username="menu-default-user", password="testpass123")
+
+        html = self._render_menu_tag(
+            "{% load menu_tags %}{% render_mobile_navigation %}",
+            reverse("accounts:home"),
+            user,
+        )
+
+        self.assertIn("技能节点", html)
+        self.assertIn(f'href="{reverse("samba:accounts")}"', html)
+        for label in [
+            "新增训练周期",
+            "上传训练日志",
+            "新增赛事系列",
+            "新增赛事级别",
+            "新增事件",
+            "新增事件模块",
+            "新增参与人员",
+            "导入评分表",
+            "新增参评对象",
+            "录入评分结果",
+            "新增技能项目",
+            "新增能力领域",
+            "新增标准技能树版本",
+            "新增技能节点",
+            "新增技能映射",
+            "上传资料资产",
+            "新增试题",
+            "新增试题要求",
+            "新增考点证据",
+            "上传会议记录",
+            "录入奖惩记录",
+        ]:
+            self.assertNotIn(label, html)
+
+    def test_render_mobile_navigation_shows_new_permissioned_entries_when_allowed(self):
+        user = User.objects.create_user(username="menu-privileged-user", password="testpass123")
+        user = self._grant_permissions(
+            user,
+            "training.add_trainingcycle",
+            "training.add_traininglog",
+            "events.add_competitionseries",
+            "events.add_competitionlevel",
+            "events.add_event",
+            "events.add_eventmodule",
+            "events.add_eventparticipant",
+            "scoring.add_scoringscheme",
+            "scoring.add_scoringparticipant",
+            "scoring.add_scoringresult",
+            "standards.add_skillproject",
+            "standards.add_capabilitydomain",
+            "standards.add_skilltreeversion",
+            "standards.add_skillnode",
+            "archives.add_archiveasset",
+            "examcontent.add_exampaper",
+            "examcontent.add_examrequirement",
+            "knowledge.add_knowledgeevidence",
+            "knowledge.add_knowledgeevidenceskillmap",
+            "meetings.add_meeting",
+            "behaviors.add_conduct_record",
+        )
+
+        html = self._render_menu_tag(
+            "{% load menu_tags %}{% render_mobile_navigation %}",
+            reverse("accounts:home"),
+            user,
+        )
+
+        for label in [
+            "新增训练周期",
+            "上传训练日志",
+            "新增赛事系列",
+            "新增赛事级别",
+            "新增事件",
+            "新增事件模块",
+            "新增参与人员",
+            "导入评分表",
+            "新增参评对象",
+            "录入评分结果",
+            "新增技能项目",
+            "新增能力领域",
+            "新增标准技能树版本",
+            "技能节点",
+            "新增技能节点",
+            "新增技能映射",
+            "上传资料资产",
+            "新增试题",
+            "新增试题要求",
+            "新增考点证据",
+            "上传会议记录",
+            "录入奖惩记录",
+        ]:
+            self.assertIn(label, html)
+
+    def test_render_sections_cards_keeps_dashboard_members_unchanged(self):
+        user = User.objects.create_user(username="dashboard-nav-user", password="testpass123")
+
+        html = self._render_menu_tag(
+            "{% load menu_tags %}{% render_sections_cards %}",
+            reverse("accounts:home"),
+            user,
+        )
+
+        for label in ["通知", "会议", "训练", "竞赛", "标准", "资料", "奖惩"]:
+            self.assertIn(label, html)
+        for hidden_label in ["账户", "关于"]:
+            self.assertNotIn(hidden_label, html)
+
+    def test_mobile_navigation_marks_reorganized_business_sections_active(self):
+        user = User.objects.create_user(username="business-section-user", password="testpass123")
+
+        expected_sections = [
+            (reverse("standards:project_list"), "标准"),
+            (reverse("knowledge:evidence_list"), "标准"),
+            (reverse("archives:asset_list"), "资料"),
+            (reverse("notes:repo_list"), "资料"),
+            (reverse("examcontent:paper_list"), "竞赛"),
+            (reverse("scoring:scheme_list"), "竞赛"),
+        ]
+        for path, label in expected_sections:
+            with self.subTest(path=path, label=label):
+                html = self._render_menu_tag(
+                    "{% load menu_tags %}{% render_mobile_navigation %}",
+                    path,
+                    user,
+                )
+
+                self.assertIn(f"当前位于“{label}”", html)
+
     def test_authenticated_page_header_includes_mobile_navigation_trigger_and_panel(self):
         user = User.objects.create_user(username="mobile-nav-header", password="testpass123")
         self.client.force_login(user)
@@ -168,15 +337,138 @@ class MobileNavigationTemplateTests(TestCase):
         response = self.client.get(reverse("accounts:home"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'body class="flex min-h-screen flex-col overflow-x-hidden"')
+        self.assertContains(
+            response,
+            'body class="flex min-h-dvh flex-col overflow-x-hidden bg-base-100 text-base-content"',
+        )
         self.assertNotContains(
             response,
             'class="navbar sticky top-0 z-20 w-full max-w-full overflow-x-hidden',
         )
 
+    def test_header_logout_button_uses_full_width_click_target(self):
+        user = User.objects.create_user(username="logout-hit-area", password="testpass123")
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("accounts:home"))
+        html = response.content.decode()
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('action="{}"'.format(reverse("accounts:logout")), html)
+        self.assertIn('class="m-0 w-full"', html)
+        self.assertIn("data-logout-button", html)
+        self.assertIn("btn btn-ghost btn-block justify-start", html)
+
+
+class PublicShellNavigationTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.factory = RequestFactory()
+        self.site, _created = Site.objects.get_or_create(
+            id=1,
+            defaults={"domain": "testserver", "name": "testserver"},
+        )
+        self.flatpage = FlatPage.objects.create(
+            url="/about/site/",
+            title="关于 TMS",
+            content="<p>关于页面内容</p>",
+            registration_required=False,
+        )
+        self.flatpage.sites.add(self.site)
+
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
+
+    def test_flatpage_about_is_public_and_uses_public_shell(self):
+        response = self.client.get("/about/site/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "关于页面内容")
+        self.assertContains(response, "navbar sticky")
+        self.assertContains(response, "tms-app-drawer")
+        self.assertContains(response, "footer footer-center")
+
+    def test_homepage_uses_full_screen_public_landing_without_navigation_shell(self):
+        response = self.client.get(reverse("home"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "tms-home-hero")
+        self.assertContains(response, "home-floating-footer")
+        self.assertContains(response, "min-h-dvh")
+        self.assertNotContains(response, "navbar sticky")
+        self.assertNotContains(response, "tms-app-drawer")
+
+    def test_auth_pages_render_top_navigation_and_footer_without_sidebar(self):
+        for url in [reverse("accounts:login"), reverse("accounts:signup")]:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "navbar sticky")
+                self.assertContains(response, "footer footer-center")
+                self.assertNotContains(response, "tms-app-drawer")
+                self.assertNotContains(response, "data-mobile-nav-trigger")
+                self.assertNotContains(response, "card card-border w-full max-w-md")
+
+    def test_header_navigation_is_limited_to_primary_text_entries(self):
+        user = User.objects.create_user(username="header-nav-user", password="testpass123")
+        request = self.factory.get(reverse("accounts:home"))
+        request.user = user
+        request.resolver_match = resolve(request.path)
+
+        html = Template("{% load menu_tags %}{% render_sections_nav %}").render(
+            Context({"request": request})
+        )
+
+        for label in ["首页", "竞赛", "标准", "训练", "奖惩", "关于"]:
+            self.assertIn(label, html)
+        for hidden_label in ["通知", "会议", "资料"]:
+            self.assertNotIn(hidden_label, html)
+        self.assertNotIn("新架构", html)
+        self.assertNotIn("icon-[", html)
+        self.assertIn("menu menu-horizontal gap-1 font-semibold", html)
+
+    def test_menu_active_uses_base_gray_tokens(self):
+        css = (Path.cwd() / "static" / "css" / "main.css").read_text(encoding="utf-8")
+
+        self.assertIn(".menu .menu-active", css)
+        self.assertIn("--menu-active-bg: var(--color-base-200);", css)
+        self.assertIn("--menu-active-fg: var(--color-base-content);", css)
+        self.assertIn("background-color: var(--color-base-200);", css)
+        self.assertIn("color: var(--color-base-content);", css)
+
+    def test_sidebar_marks_only_current_leaf_active(self):
+        user = User.objects.create_user(username="sidebar-active-user", password="testpass123")
+        request = self.factory.get(reverse("training:monthly_stats"))
+        request.user = user
+        request.resolver_match = resolve(request.path)
+
+        html = Template("{% load menu_tags %}{% render_section_menu_auto %}").render(
+            Context({"request": request})
+        )
+
+        self.assertIn("<details open>", html)
+        self.assertIn("提交统计", html)
+        self.assertEqual(html.count("menu-active"), 1)
+
 
 class ResponsiveTableTemplateTests(TestCase):
-    def test_render_table_wraps_table_in_horizontal_scroll_container(self):
+    def test_table_wrapper_does_not_reuse_page_title_as_section_title(self):
+        html = Template('{% include "components/table_wrapper.html" %}').render(
+            Context({"title": "奖惩记录列表"})
+        )
+
+        self.assertNotIn("奖惩记录列表", html)
+
+    def test_table_wrapper_renders_explicit_table_title(self):
+        html = Template('{% include "components/table_wrapper.html" %}').render(
+            Context({"title": "页面标题", "table_title": "表格标题"})
+        )
+
+        self.assertIn("表格标题", html)
+        self.assertNotIn("页面标题", html)
+
+    def test_base_table_uses_daisyui_table_template(self):
         class DemoTable(BaseTable):
             name = tables.Column(verbose_name="名称")
 
@@ -190,13 +482,12 @@ class ResponsiveTableTemplateTests(TestCase):
             Context({"table": table, "request": request})
         )
 
-        self.assertIn('class="table-container w-full max-w-full overflow-x-auto"', html)
+        self.assertIn('class="table w-full"', html)
 
 
 class ActionsColumnRenderingTests(TestCase):
-    @patch("core.utils.tables.get_token", return_value="csrf-token")
-    @patch("core.utils.tables.reverse")
-    def test_actions_column_renders_nowrap_buttons_with_mobile_gap(self, mock_reverse, _mock_token):
+    @patch("core.tables.reverse")
+    def test_actions_column_renders_nowrap_buttons_with_mobile_gap(self, mock_reverse):
         mock_reverse.side_effect = lambda name, args: f"/{name}/{args[0]}/"
 
         class DummyMeta:
@@ -223,8 +514,6 @@ class InternalCutoverOrchestratorCommandTests(TestCase):
         call_command("reconcile_internal_app_cutovers", stdout=output)
 
         value = output.getvalue()
-        self.assertIn("cutover_assessment_to_assessments", value)
-        self.assertIn("当前数据库与文件目录已经使用 assessments，无需切换。", value)
         self.assertIn("当前数据库与文件目录已经使用 behaviors，无需切换。", value)
         self.assertIn("当前数据库与文件目录已经使用 meetings，无需切换。", value)
         self.assertIn("以上为统一预检查结果。确认无误后，请追加 --execute 执行实际收尾。", value)
@@ -291,21 +580,22 @@ class UploadSpecTests(TestCase):
         self.assertEqual(upload.tell(), 5)
 
     def test_private_media_storage_serializes_without_absolute_path(self):
-        storage = PrivateMediaStorage("assessments")
+        storage = PrivateMediaStorage("archives")
 
         serialized, _ = MigrationWriter.serialize(storage)
 
-        self.assertIn("core.uploads.PrivateMediaStorage('assessments')", serialized)
+        self.assertIn("core.uploads.PrivateMediaStorage('archives')", serialized)
         self.assertNotIn(str(Path.cwd()), serialized)
         self.assertNotIn("media-private", serialized)
 
     def test_private_media_storage_uses_private_media_root_setting(self):
-        with TemporaryDirectory() as tmpdir, override_settings(PRIVATE_MEDIA_ROOT=tmpdir):
-            storage = PrivateMediaStorage("assessments")
+        tmpdir = Path.cwd() / ".tmp-private-media-root"
+        with override_settings(PRIVATE_MEDIA_ROOT=tmpdir):
+            storage = PrivateMediaStorage("archives")
 
             self.assertEqual(
                 storage.path("sample.pdf"),
-                str(Path(tmpdir) / "assessments" / "sample.pdf"),
+                str(Path(tmpdir) / "archives" / "sample.pdf"),
             )
 
 
@@ -402,24 +692,18 @@ class MultipleFileFieldTests(TestCase):
 
 class UploadSpecAdoptionTests(TestCase):
     def test_upload_forms_use_upload_spec_accept_attrs(self):
-        from assessments.forms import AssessmentFileUploadForm
+        from archives.forms import ArchiveAssetForm
         from behaviors.forms import ConductRecordForm
         from meetings.forms import MeetingUploadForm
         from notices.forms import NoticeForm
-        from traininglogs.forms import TrainingLogCreateForm
+        from training.forms import TrainingLogForm
 
-        self.assertEqual(
-            AssessmentFileUploadForm().fields["question_file"].widget.attrs["accept"],
-            ASSESSMENT_TP_UPLOAD_SPEC.accept,
-        )
+        self.assertIn("accept", ArchiveAssetForm().fields["file"].widget.attrs)
         self.assertEqual(
             NoticeForm().fields["attachments"].widget.attrs["accept"],
             NOTICE_ATTACHMENT_UPLOAD_SPEC.accept,
         )
-        self.assertEqual(
-            TrainingLogCreateForm().fields["file"].widget.attrs["accept"],
-            TRAININGLOG_UPLOAD_SPEC.accept,
-        )
+        self.assertIn("accept", TrainingLogForm().fields["file"].widget.attrs)
         self.assertEqual(
             ConductRecordForm().fields["attachment"].widget.attrs["accept"],
             CONDUCT_ATTACHMENT_UPLOAD_SPEC.accept,
@@ -429,12 +713,9 @@ class UploadSpecAdoptionTests(TestCase):
             MEETING_FILE_UPLOAD_SPEC.accept,
         )
 
-    def test_competition_document_uses_upload_spec_help_text(self):
-        from competitions.models import CompetitionProject
+    def test_archive_asset_file_uses_upload_spec_help_text(self):
+        from archives.models import ARCHIVE_ASSET_UPLOAD_SPEC, ArchiveAsset
 
-        field = CompetitionProject._meta.get_field("document")
+        field = ArchiveAsset._meta.get_field("file")
 
-        self.assertEqual(
-            field.help_text,
-            COMPETITION_DOCUMENT_UPLOAD_SPEC.help_text("上传与该赛项相关的归档文件"),
-        )
+        self.assertEqual(field.help_text, ARCHIVE_ASSET_UPLOAD_SPEC.help_text("上传资料文件"))

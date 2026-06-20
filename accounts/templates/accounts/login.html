@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends "layouts/auth.html" %}
 {% load static %}
 {% block left_sidebar %}{% endblock %}
 {% block right_sidebar %}{% endblock %}
@@ -7,32 +7,28 @@
 
 {% endblock %}
 
-{% block content %}
-  <div class="flex items-center justify-center p-4">
-    <div class="w-full max-w-md">
-      <fieldset class="fieldset bg-base-100 border-base-300 rounded-box border p-6 max-lg mx-auto shadow-xl mb-6">
-        <legend class="fieldset-legend text-2xl font-bold text-center mb-4">{{ title }}</legend>
-        {% include 'accounts/login_form.html' %}
-      </fieldset>
-      <div class="text-center mt-4">
-        <p>
-          还没有账户? <a href="{% url 'accounts:signup' %}" class="link link-accent">立即注册</a>
-        </p>
-      </div>
-
-      {% if next %}
-        {% if user.is_authenticated %}
-          <div class="alert alert-warning mt-4" role="alert">
-            <span class="icon-[tabler--alert-triangle] shrink-0"></span>
-            <span>你的账户没有访问此页面的权限。请登录具有访问权限的账户。</span>
-          </div>
-        {% else %}
-          <div class="alert alert-warning mt-4" role="alert">
-            <span class="icon-[tabler--alert-triangle] shrink-0"></span>
-            <span>请登录以查看此页面。</span>
-          </div>
-        {% endif %}
-      {% endif %}
-    </div>
+{% block auth_content %}
+  <fieldset class="fieldset mx-auto mb-6 w-full max-w-md rounded-box border border-base-300 bg-base-100 p-6 shadow-xl">
+    <legend class="fieldset-legend mb-4 text-center text-2xl font-bold">{{ title }}</legend>
+    {% include 'accounts/login_form.html' %}
+  </fieldset>
+  <div class="mt-4 text-center">
+    <p>
+      还没有账户? <a href="{% url 'accounts:signup' %}" class="link link-accent">立即注册</a>
+    </p>
   </div>
+
+  {% if next %}
+    {% if user.is_authenticated %}
+      <div class="alert alert-warning mt-4" role="alert">
+        <span class="icon-[tabler--alert-triangle] shrink-0"></span>
+        <span>你的账户没有访问此页面的权限。请登录具有访问权限的账户。</span>
+      </div>
+    {% else %}
+      <div class="alert alert-warning mt-4" role="alert">
+        <span class="icon-[tabler--alert-triangle] shrink-0"></span>
+        <span>请登录以查看此页面。</span>
+      </div>
+    {% endif %}
+  {% endif %}
 {% endblock %}

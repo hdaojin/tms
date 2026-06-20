@@ -1,0 +1,11 @@
+{% comment %}
+工具栏组件。
+参数: title, description, actions。
+{% endcomment %}
+<div class="tms-toolbar">
+  <div class="min-w-0">
+    {% if title %}<h2 class="text-base font-semibold">{{ title }}</h2>{% endif %}
+    {% if description %}<p class="text-sm text-base-content/60">{{ description }}</p>{% endif %}
+  </div>
+  {% include "components/page_actions.html" with actions=actions %}
+</div>

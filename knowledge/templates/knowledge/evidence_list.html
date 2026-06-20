@@ -1,0 +1,14 @@
+{% extends "common/table_page.html" %}
+
+{% block content %}
+<div class="mb-3 flex justify-end gap-2">
+  <a href="{% url 'knowledge:unmapped' %}" class="btn btn-outline btn-sm">未映射考点</a>
+  {% if perms.knowledge.add_knowledgeevidence %}
+    <a href="{% url 'knowledge:evidence_create' %}" class="btn btn-primary btn-sm">
+      <span class="icon-[tabler--plus] size-4"></span>
+      新增证据
+    </a>
+  {% endif %}
+</div>
+{{ block.super }}
+{% endblock %}

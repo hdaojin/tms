@@ -5,9 +5,14 @@
   fields:
     name: "教练"
     permissions:
-      - ["add_traininglog", "traininglogs", "traininglog"]
-      - ["view_traininglog", "traininglogs", "traininglog"]
-      - ["view_competitor_traininglog", "traininglogs", "traininglog"]
+      - ["view_trainingcycle", "training", "trainingcycle"]
+      - ["add_trainingcycle", "training", "trainingcycle"]
+      - ["change_trainingcycle", "training", "trainingcycle"]
+      - ["view_traininglog", "training", "traininglog"]
+      - ["add_traininglog", "training", "traininglog"]
+      - ["change_traininglog", "training", "traininglog"]
+      - ["view_all_traininglog", "training", "traininglog"]
+      - ["export_traininglog_archive", "training", "traininglog"]
 
 - model: accounts.groupprofile
   pk: 1
@@ -16,17 +21,21 @@
     codename: "coach"
     description: "教练组"
     selected_permission_bundles:
-      - "traininglogs.upload_traininglog"
-      - "traininglogs.view_competitor_traininglogs"
+      - "training.maintain_training"
 
 - model: auth.group
   pk: 2
   fields:
     name: "选手"
     permissions:
-      - ["add_traininglog", "traininglogs", "traininglog"]
-      - ["view_traininglog", "traininglogs", "traininglog"]
-      - ["view_coach_traininglog", "traininglogs", "traininglog"]
+      - ["view_trainingcycle", "training", "trainingcycle"]
+      - ["add_trainingcycle", "training", "trainingcycle"]
+      - ["change_trainingcycle", "training", "trainingcycle"]
+      - ["view_traininglog", "training", "traininglog"]
+      - ["add_traininglog", "training", "traininglog"]
+      - ["change_traininglog", "training", "traininglog"]
+      - ["view_all_traininglog", "training", "traininglog"]
+      - ["export_traininglog_archive", "training", "traininglog"]
 
 - model: accounts.groupprofile
   pk: 2
@@ -35,8 +44,7 @@
     codename: "competitor"
     description: "选手组"
     selected_permission_bundles:
-      - "traininglogs.upload_traininglog"
-      - "traininglogs.view_coach_traininglogs"
+      - "training.maintain_training"
 
 - model: auth.group
   pk: 3

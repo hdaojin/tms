@@ -1,77 +1,61 @@
-{% load static %}
-{% load menu_tags %}
-
-<nav
-  x-data="{ mobileNavOpen: false }"
-  x-effect="document.body.classList.toggle('overflow-hidden', mobileNavOpen)"
-  @keydown.escape.window="mobileNavOpen = false"
-  class="navbar sticky top-0 z-20 w-full max-w-full bg-base-100 px-2 shadow-lg md:px-8 print:hidden"
->
-  <div class="navbar-start">
-    <div>
-      <button
-        type="button"
-        class="btn btn-ghost md:hidden"
-        aria-label="打开导航菜单"
-        data-mobile-nav-trigger
-        @click="mobileNavOpen = true"
-      >
+{% load static menu_tags %}
+<header class="navbar sticky top-0 z-20 border-b border-base-300 bg-base-100 px-2 shadow-lg print:hidden md:px-6">
+  <div class="navbar-start min-w-0 gap-2">
+    {% if not hide_mobile_nav_trigger %}
+      <label for="tms-app-drawer" class="btn btn-ghost btn-square lg:hidden" aria-label="打开导航" data-mobile-nav-trigger>
         <span class="icon-[tabler--menu-2] size-6"></span>
-      </button>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="btn btn-ghost normal-case p-0">
-        <img src="{% static 'images/logo.png' %}" alt="Logo" class="w-8 h-8" />
-        <a class="text-xl font-bold" href="/">{{ site_info.site_short_name }}</a>
-      </div>
-    </div>
+      </label>
+    {% endif %}
+    <a href="/" class="btn btn-ghost min-w-0 gap-2 px-2">
+      <img src="{% static 'images/logo.png' %}" alt="TMS" class="size-8" />
+      <span class="hidden truncate text-lg font-bold sm:inline">{{ site_info.site_short_name }}</span>
+    </a>
   </div>
 
-  <div class="navbar-center hidden md:flex">
+  <nav class="navbar-center hidden min-w-0 lg:flex">
     {% render_sections_nav %}
-  </div>
+  </nav>
 
   <div class="navbar-end gap-2">
-    {% include 'partials/theme_selector.html' %}
-
+    {% include "partials/theme_controller.html" %}
     {% if user.is_authenticated %}
       <div class="dropdown dropdown-end">
-        <div tabindex="0" role="button" class="btn btn-ghost gap-2">
+        <button type="button" tabindex="0" class="btn btn-ghost gap-2">
           <div class="avatar">
-            <div class="w-10 rounded-full">
+            <div class="size-9 rounded-full">
               <img src="{% static 'images/avatar.png' %}" alt="avatar" />
             </div>
           </div>
-          <span class="hidden text-primary font-medium sm:inline">
-            {{ user.display_name }}
-          </span>
-        </div>
-        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-2 shadow-lg border border-base-300">
-          <li>
-            <a href="{% url 'accounts:home' %}" class="flex items-center gap-3">
-              <span class="icon-[tabler--user] size-5 text-primary"></span>
-              <span>用户中心</span>
-            </a>
-          </li>
+          <span class="hidden font-medium text-primary sm:inline">{{ user.display_name }}</span>
+        </button>
+        <div tabindex="0"
+             class="dropdown-content z-30 mt-2 w-52 rounded-box border border-base-300 bg-base-100 p-2 shadow"
+             role="menu">
+          <a href="{% url 'accounts:home' %}"
+             class="btn btn-ghost btn-block justify-start gap-2"
+             role="menuitem">
+            <span class="icon-[tabler--user] size-5 text-primary"></span>
+            用户中心
+          </a>
           {% if user.is_staff %}
-            <li>
-              <a href="{% url 'admin:index' %}" class="flex items-center gap-3">
-                <span class="icon-[tabler--settings] size-5 text-primary"></span>
-                <span>管理后台</span>
-              </a>
-            </li>
-          {% endif %}
-          <div class="divider my-1"></div>
-          <li>
-            <a href="#" onclick="document.getElementById('logout-form').submit(); return false;" class="text-error hover:bg-error hover:text-error-content">
-              <span class="icon-[tabler--logout] size-5"></span>
-              <span>注销</span>
+            <a href="{% url 'admin:index' %}"
+               class="btn btn-ghost btn-block justify-start gap-2"
+               role="menuitem">
+              <span class="icon-[tabler--settings] size-5 text-neutral"></span>
+              管理后台
             </a>
-          </li>
-        </ul>
-        <form id="logout-form" method="post" action="{% url 'accounts:logout' %}" style="display: none;">
-          {% csrf_token %}
-        </form>
+          {% endif %}
+          <form method="post" action="{% url 'accounts:logout' %}" class="m-0 w-full">
+            {% csrf_token %}
+            <button type="submit"
+                    class="btn btn-ghost btn-block justify-start gap-2 text-error"
+                    data-logout-button
+                    role="menuitem">
+              <span class="icon-[tabler--logout] size-5"></span>
+              注销
+            </button>
+          </form>
+        </div>
       </div>
     {% else %}
       <a href="{% url 'accounts:login' %}" class="btn btn-primary">
@@ -80,31 +64,4 @@
       </a>
     {% endif %}
   </div>
-
-  <div
-    x-show="mobileNavOpen"
-    x-transition.opacity
-    class="fixed inset-0 z-40 md:hidden"
-    style="display: none;"
-  >
-    <div
-      class="absolute inset-0 bg-base-content/35 backdrop-blur-sm"
-      aria-hidden="true"
-      @click="mobileNavOpen = false"
-    ></div>
-    <div
-      x-show="mobileNavOpen"
-      x-transition:enter="transform transition ease-out duration-200"
-      x-transition:enter-start="-translate-x-full"
-      x-transition:enter-end="translate-x-0"
-      x-transition:leave="transform transition ease-in duration-150"
-      x-transition:leave-start="translate-x-0"
-      x-transition:leave-end="-translate-x-full"
-      class="absolute inset-y-0 left-0 w-[min(92vw,24rem)] max-w-full shadow-2xl"
-      style="display: none;"
-      data-mobile-nav-panel
-    >
-      {% render_mobile_navigation %}
-    </div>
-  </div>
-</nav>
+</header>

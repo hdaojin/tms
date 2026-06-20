@@ -1,8 +1,0 @@
-{# 通用侧边栏菜单渲染模板 #}
-<nav class="{% if container_class %}{{ container_class }}{% else %}w-fit mx-auto{% endif %}">
-  <ul class="menu menu-vertical {% if menu_class %}{{ menu_class }}{% else %}gap-y-1{% endif %}">
-    {% for item in items %}
-      {% include 'core/partials/sidebar_menu_item.html' with item=item %}
-    {% endfor %}
-  </ul>
-</nav>

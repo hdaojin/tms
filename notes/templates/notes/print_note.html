@@ -1,4 +1,4 @@
-{% extends 'base_minimal.html' %}
+{% extends "layouts/print.html" %}
 {% load static %}
 
 {% block title %}
@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block content %}
-  <button onclick="window.print()" class="fixed top-8 right-8 bg-blue-600 text-white px-4 py-2 rounded shadow print:hidden z-50">
+  <button type="button" data-print class="btn btn-primary fixed top-8 right-8 z-50 print:hidden">
     打印
   </button>
   <div class="w-4xl max-w-none mx-auto text-base print:text-black p-6">
@@ -145,15 +145,6 @@
 {% block extra_css %}
   <!-- Prism.js styles (place actual static path as needed) -->
   <link rel="stylesheet" href="{% static 'css/prism.css' %}" />
-  <style>
-    /* Force code wrapping for print */
-    pre[class*="language-"], code[class*="language-"], .prose pre, .prose code {
-      text-shadow: none !important;
-      white-space: pre-wrap !important;
-      word-break: break-word !important;
-      overflow-x: hidden !important;
-    }
-  </style>
 {% endblock %}
 
 {% block extra_js %}

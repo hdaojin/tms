@@ -1,0 +1,16 @@
+<div class="min-h-full bg-base-100 p-4">
+  {% for section in sections %}
+    {% if section.active %}
+      <div class="alert alert-info mb-4 py-2 text-sm">当前位于“{{ section.label }}”</div>
+    {% endif %}
+  {% endfor %}
+  {% for section in sections %}
+    <div class="mb-3">
+      <div class="menu-title flex items-center gap-2">
+        {% if section.icon_class %}<span class="{{ section.icon_class }}"></span>{% endif %}
+        {{ section.label }}
+      </div>
+      {% include "partials/sidebar.html" with items=section.items %}
+    </div>
+  {% endfor %}
+</div>

@@ -1,0 +1,21 @@
+{% extends "layouts/print.html" %}
+
+{% block content %}
+  <button type="button" class="btn btn-primary fixed right-8 top-8 print:hidden" data-print>打印</button>
+  <article class="mx-auto max-w-4xl space-y-6 bg-base-100 p-10 text-base-content print:p-0">
+    <header class="border-b border-base-300 pb-4">
+      <p class="text-sm text-base-content/60">TMS UI Demo</p>
+      <h1 class="text-3xl font-bold">训练记录打印样式</h1>
+    </header>
+    <table class="table border border-base-300">
+      <tbody>
+        <tr><th class="w-32">训练项目</th><td>Linux 基础训练</td><th class="w-32">负责人</th><td>教练组 A</td></tr>
+        <tr><th>日期</th><td>2026-06-17</td><th>状态</th><td>进行中</td></tr>
+      </tbody>
+    </table>
+    <section class="prose max-w-none">
+      <h2>过程记录</h2>
+      <p>用于验证打印布局默认隐藏导航、保留正文和表格。</p>
+    </section>
+  </article>
+{% endblock %}
