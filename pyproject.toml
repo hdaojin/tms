@@ -29,6 +29,9 @@ dev = [
     "pytest-django>=4.12.0",
 ]
 
+[tool.uv]
+cache-dir = ".uv-cache"
+
 [tool.pytest]
 DJANGO_SETTINGS_MODULE = "tmsproject.settings"
 python_files = ["tests.py", "test_*.py", "*_tests.py"]

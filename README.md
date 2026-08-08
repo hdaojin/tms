@@ -52,6 +52,8 @@ git clone git@github.com:hdaojin/tms.git
 cd tms
 ```
 
+本项目已在 `pyproject.toml` 中把 uv 缓存固定到仓库内的 `.uv-cache/`，用于避开 Windows 上全局 uv 缓存目录权限不稳定的问题。平时仍然直接使用 `uv sync`、`uv run ...` 等命令即可，不需要手工设置 `UV_CACHE_DIR`。
+
 ### 2. 安装依赖
 
 ```bash

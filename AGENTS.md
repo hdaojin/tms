@@ -37,6 +37,8 @@ Run all Django commands from the repository root because `.env` may use a relati
 - Build CSS: `npm run build:css`
 - Watch CSS: `npm run watch:css`
 
+The project-level uv cache is configured as `.uv-cache/` in `pyproject.toml` to avoid Windows global-cache permission issues; run uv commands normally from the repository root.
+
 Prefer focused app tests over the full suite unless the change crosses app boundaries.
 
 ## Architecture Rules
