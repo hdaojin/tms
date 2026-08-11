@@ -89,6 +89,50 @@ sections:
             label: 提交统计
             url_name: training:monthly_stats
             icon_class: icon-[tabler--chart-bar] size-5 text-info
+      - key: glossary_learning_group
+        label: 专业词汇学习
+        icon_class: icon-[tabler--language] size-5 text-accent
+        children:
+          - key: glossary
+            label: 词条浏览
+            url_name: glossary:browse
+            icon_class: icon-[tabler--list-letters] size-5 text-accent
+          - key: glossary_study
+            label: 开始学习
+            url_name: glossary:study_start
+            icon_class: icon-[tabler--brain] size-5 text-success
+          - key: glossary_my_stats
+            label: 我的统计
+            url_name: glossary:my_stats
+            icon_class: icon-[tabler--chart-bar] size-5 text-info
+          - key: glossary_proposals
+            label: 词条提案
+            url_name: glossary:proposal_list
+            icon_class: icon-[tabler--message-plus] size-5 text-warning
+            permissions:
+              - glossary.view_glossaryentryproposal
+      - key: glossary_manage_group
+        label: 专业词库管理
+        icon_class: icon-[tabler--books] size-5 text-warning
+        children:
+          - key: glossary_manage
+            label: 词库管理
+            url_name: glossary:glossary_list
+            icon_class: icon-[tabler--books] size-5 text-warning
+            permissions:
+              - glossary.change_professionalglossary
+          - key: glossary_imports
+            label: 导入记录
+            url_name: glossary:import_list
+            icon_class: icon-[tabler--file-spreadsheet] size-5 text-success
+            permissions:
+              - glossary.view_glossaryimport
+          - key: glossary_all_stats
+            label: 全部学习统计
+            url_name: glossary:all_stats
+            icon_class: icon-[tabler--chart-histogram] size-5 text-info
+            permissions:
+              - glossary.view_all_study_statistics
 
   - key: events
     label: 竞赛

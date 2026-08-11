@@ -1,0 +1,38 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-4">
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div><h2 class="card-title">{{ glossary_import.original_filename }}</h2><p class="text-sm text-base-content/60">{{ glossary_import.glossary }}</p></div>
+        <span class="badge {% if glossary_import.status == 'confirmed' %}badge-success{% elif glossary_import.status == 'stale' %}badge-error{% else %}badge-info{% endif %}">{{ glossary_import.get_status_display }}</span>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-3">
+        <div class="stat rounded-box bg-base-200"><div class="stat-title">新增</div><div class="stat-value text-xl">{{ glossary_import.result_summary.created|default:0 }}</div></div>
+        <div class="stat rounded-box bg-base-200"><div class="stat-title">覆盖</div><div class="stat-value text-xl">{{ glossary_import.result_summary.overwritten|default:0 }}</div></div>
+        <div class="stat rounded-box bg-base-200"><div class="stat-title">跳过</div><div class="stat-value text-xl">{{ glossary_import.result_summary.skipped|default:0 }}</div></div>
+      </div>
+      <dl class="grid gap-2 text-sm md:grid-cols-2">
+        <div><dt class="text-base-content/60">SHA256</dt><dd class="break-all font-mono">{{ glossary_import.sha256 }}</dd></div>
+        <div><dt class="text-base-content/60">导入人 / 时间</dt><dd>{{ glossary_import.imported_by }} / {{ glossary_import.created_at }}</dd></div>
+      </dl>
+      <div class="card-actions justify-end">
+        <a class="btn btn-outline" href="{% url 'glossary:import_download' glossary_import.pk %}">下载源 XLSX</a>
+        {% if glossary_import.status == 'preview' %}<a class="btn btn-primary" href="{% url 'glossary:import_preview' glossary_import.pk %}">继续确认</a>{% endif %}
+      </div>
+    </div>
+  </section>
+  {% if glossary_import.result_summary.rows %}
+    <section class="space-y-2">
+      <h2 class="text-lg font-semibold">行级审计</h2>
+      {% for row in glossary_import.result_summary.rows %}
+        <article class="rounded-box border border-base-300 bg-base-100 p-3 text-sm">
+          <div class="flex flex-wrap justify-between gap-2"><span class="font-medium">{{ row.source.english_term }}</span><span class="badge badge-outline">{{ row.action }}</span></div>
+          <div class="mt-1 text-base-content/70">{{ row.source.chinese_translation }}</div>
+        </article>
+      {% endfor %}
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

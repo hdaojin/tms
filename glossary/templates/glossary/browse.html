@@ -1,0 +1,37 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-4">
+  <form method="get" class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body grid gap-3 md:grid-cols-4">
+      <label class="form-control md:col-span-2">
+        <span class="label-text mb-1">搜索词条</span>
+        <input class="input w-full" type="search" name="q" value="{{ query }}" placeholder="英文、中文或 Acronym">
+      </label>
+      <label class="form-control">
+        <span class="label-text mb-1">技能项目</span>
+        <select class="select w-full" name="skill_project">
+          <option value="">全部技能项目</option>
+          {% for project in skill_projects %}
+            <option value="{{ project.pk }}" {% if selected_skill_project == project.pk|stringformat:'s' %}selected{% endif %}>{{ project }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="form-control">
+        <span class="label-text mb-1">专业词库</span>
+        <select class="select w-full" name="glossary">
+          <option value="">全部专业词库</option>
+          {% for glossary in glossaries %}
+            <option value="{{ glossary.pk }}" {% if selected_glossary == glossary.pk|stringformat:'s' %}selected{% endif %}>{{ glossary }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="flex flex-wrap justify-end gap-2 md:col-span-4">
+        <a class="btn btn-ghost" href="{% url 'glossary:browse' %}">清除</a>
+        <button class="btn btn-primary" type="submit">筛选</button>
+      </div>
+    </div>
+  </form>
+  {% include "components/table_wrapper.html" with table=table empty_title="暂无词条" empty_message="当前筛选范围内没有可浏览的正式词条。" %}
+</div>
+{% endblock %}

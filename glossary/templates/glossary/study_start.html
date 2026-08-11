@@ -1,0 +1,22 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+{% if active_session %}
+  <section class="mx-auto max-w-2xl card border border-warning/40 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title"><span class="icon-[tabler--player-pause] size-6" aria-hidden="true"></span>发现未结束的学习会话</h2>
+      <p>{{ active_session.glossary }} · {{ active_session.get_mode_display }} · 已答 {{ active_session.answered_count }} 题</p>
+      <div class="card-actions justify-end">
+        <form method="post" action="{% url 'glossary:study_stop' active_session.pk %}">{% csrf_token %}<button class="btn btn-ghost" type="submit">结束并查看统计</button></form>
+        <a class="btn btn-primary" href="{% url 'glossary:study_session' active_session.pk %}">继续学习</a>
+      </div>
+    </div>
+  </section>
+{% else %}
+  <section class="mx-auto max-w-3xl card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      {% include "components/form.html" with form=form submit_label="开始学习" %}
+    </div>
+  </section>
+{% endif %}
+{% endblock %}

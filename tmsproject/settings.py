@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     'scoring.apps.ScoringConfig',
     'examcontent.apps.ExamcontentConfig',
     'knowledge.apps.KnowledgeConfig',
+    'glossary.apps.GlossaryConfig',
     'notes',
     'meetings.apps.MeetingsConfig',
     'notices',

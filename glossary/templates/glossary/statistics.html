@@ -1,0 +1,27 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-4">
+  <section class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body"><form method="get" class="space-y-4"><div class="grid gap-3 md:grid-cols-3">{% for field in filter_form.visible_fields %}{% include "components/field.html" with field=field %}{% endfor %}</div><div class="flex justify-end gap-2"><a class="btn btn-ghost" href="{{ request.path }}">清除</a><button class="btn btn-primary" type="submit">筛选</button></div></form></div></section>
+  <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">累计作答</div><div class="stat-value text-2xl">{{ total }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">正确</div><div class="stat-value text-2xl text-success">{{ correct }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">错误</div><div class="stat-value text-2xl text-error">{{ wrong }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">正确率</div><div class="stat-value text-2xl">{{ accuracy }}%</div></div>
+  </section>
+  {% include "components/table_wrapper.html" with table=session_table table_title="学习会话" %}
+  <section class="space-y-3">
+    <h2 class="text-lg font-semibold">词条累计统计</h2>
+    <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+      <table class="table table-sm">
+        <thead><tr><th>词条</th><th>词库</th><th>总计</th><th>正确 / 错误 / 正确率</th><th>英译中（对 / 错 / 正确率）</th><th>中译英（对 / 错 / 正确率）</th><th>最近学习</th></tr></thead>
+        <tbody>
+          {% for row in entry_rows %}
+            <tr><td class="text-left"><div class="font-medium">{{ row.entry__english_term }}</div><div class="text-xs text-base-content/60">{{ row.entry__chinese_translation }}</div></td><td>{{ row.entry__glossary__skill_project__code }} / {{ row.entry__glossary__name }}</td><td>{{ row.total }}</td><td><span class="text-success">{{ row.correct }}</span> / <span class="text-error">{{ row.wrong }}</span> / {{ row.accuracy }}%</td><td>{{ row.en_to_zh_correct }} / {{ row.en_to_zh_wrong }} / {{ row.en_to_zh_accuracy }}%</td><td>{{ row.zh_to_en_correct }} / {{ row.zh_to_en_wrong }} / {{ row.zh_to_en_accuracy }}%</td><td>{{ row.last_studied|date:'Y-m-d H:i' }}</td></tr>
+          {% empty %}<tr><td colspan="7" class="py-8 text-center text-base-content/60">当前筛选范围内暂无作答记录。</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

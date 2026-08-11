@@ -1,0 +1,83 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-4">
+  <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">数据工作表</div><div class="stat-value text-xl">{{ glossary_import.parsed_payload.sheet_name }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">源数据行</div><div class="stat-value text-xl">{{ glossary_import.parsed_payload.counts.source_rows }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">唯一英文</div><div class="stat-value text-xl">{{ glossary_import.parsed_payload.counts.unique_terms }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">文件内冲突组</div><div class="stat-value text-xl">{{ glossary_import.parsed_payload.counts.conflicting_duplicates }}</div></div>
+  </section>
+
+  {% for warning in glossary_import.parsed_payload.warnings %}
+    <div class="alert alert-warning"><span class="icon-[tabler--alert-triangle] size-5" aria-hidden="true"></span><span>{{ warning }}</span></div>
+  {% endfor %}
+
+  {% for error in glossary_import.parsed_payload.errors %}
+    <div class="alert alert-error"><span class="icon-[tabler--circle-x] size-5" aria-hidden="true"></span><span>{{ error }}</span></div>
+  {% endfor %}
+
+  {% if glossary_import.status == 'preview' %}
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    {% include "components/form_errors.html" with form=form %}
+    <section class="space-y-3">
+      {% for group in glossary_import.parsed_payload.groups %}
+        <article class="card border border-base-300 bg-base-100 shadow-sm">
+          <div class="card-body gap-3 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2 class="font-semibold">{{ group.options.0.english_term }}</h2>
+              <div class="flex flex-wrap gap-2">
+                {% if group.options|length > 1 %}<span class="badge badge-warning">文件内冲突</span>{% endif %}
+                {% if group.existing %}<span class="badge badge-info">库内重复</span>{% else %}<span class="badge badge-success">新增</span>{% endif %}
+                {% if group.pending_proposals %}<span class="badge badge-error">待审提案冲突</span>{% endif %}
+              </div>
+            </div>
+            {% if group.existing %}
+              <div class="rounded-box bg-base-200 p-3 text-sm">
+                <div class="font-medium">当前：{{ group.existing.chinese_translation }}</div>
+                {% if group.existing.acronym %}<div class="text-base-content/60">Acronym：{{ group.existing.acronym }}</div>{% endif %}
+              </div>
+            {% endif %}
+            <div class="grid gap-2 md:grid-cols-2">
+              {% for option in group.options %}
+                <div class="rounded-box border border-base-300 p-3 text-sm">
+                  <div class="font-medium">第 {{ option.row_number }} 行</div>
+                  <div>{{ option.chinese_translation }}</div>
+                  {% if option.acronym %}<div class="text-base-content/60">Acronym：{{ option.acronym }}</div>{% endif %}
+                </div>
+              {% endfor %}
+            </div>
+            {% if group.pending_proposals %}
+              <p class="text-sm text-error">已有待审核提案，该词条本次只能跳过，请先完成审核。</p>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+    <section class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title text-base">冲突决策</h2>
+        <div class="grid gap-4 md:grid-cols-2">
+          {% for field in form.visible_fields %}
+            {% include "components/field.html" with field=field %}
+          {% endfor %}
+        </div>
+        <div class="card-actions justify-end">
+          <a class="btn btn-ghost" href="{% url 'glossary:import_create' %}">重新上传</a>
+          <button class="btn btn-primary" type="submit">确认导入</button>
+        </div>
+      </div>
+    </section>
+  </form>
+  {% else %}
+    <div class="card border border-error/40 bg-base-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title text-base">本批数据不能确认</h2>
+        <p>请修正上方问题后重新上传；原文件与校验结果已留档。</p>
+        <div class="card-actions justify-end"><a class="btn btn-primary" href="{% url 'glossary:import_create' %}">重新上传</a></div>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

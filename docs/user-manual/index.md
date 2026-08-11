@@ -21,6 +21,7 @@
 - [event_countdown/overview.md](event_countdown/overview.md): 通用竞赛倒计时大屏说明。
 - [events/overview.md](events/overview.md): 事件、事件模块、参与人员和结果汇总说明。
 - [examcontent/overview.md](examcontent/overview.md): 试题结构化与试题要求说明。
+- [glossary/overview.md](glossary/overview.md): 专业词库导入、词条提案、学习模式与统计说明。
 - [knowledge/overview.md](knowledge/overview.md): 考点证据、技能映射、未映射工作台和覆盖统计说明。
 - [meetings/overview.md](meetings/overview.md): 会议记录与常见任务。
 - [notes/overview.md](notes/overview.md): 笔记仓库与附件访问规则。

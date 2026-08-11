@@ -1,0 +1,22 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="grid gap-4 lg:grid-cols-3">
+  <section class="card border border-base-300 bg-base-100 shadow-sm lg:col-span-2">
+    <div class="card-body">
+      {% include "components/form.html" with form=form submit_label="解析并预览" %}
+    </div>
+  </section>
+  <aside class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title text-base">Smartcat 格式要求</h2>
+      <ul class="list-disc space-y-2 pl-5 text-sm text-base-content/70">
+        <li>第 1 行必须包含 Term 和 Translation (used for Smartcat - mandatory)。</li>
+        <li>Acronym 可选，序号和其他列不会导入。</li>
+        <li>公式、缺少必填值或超过 20,000 条数据行会阻止确认。</li>
+        <li>源文件与确认决策会保存到私有导入留档。</li>
+      </ul>
+    </div>
+  </aside>
+</div>
+{% endblock %}

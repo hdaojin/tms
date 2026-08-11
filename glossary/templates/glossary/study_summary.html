@@ -1,0 +1,24 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-4">
+  <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">已答</div><div class="stat-value text-2xl">{{ attempts|length }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">正确</div><div class="stat-value text-2xl text-success">{{ correct }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">错误</div><div class="stat-value text-2xl text-error">{{ wrong }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">正确率</div><div class="stat-value text-2xl">{{ accuracy }}%</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">学习时长</div><div class="stat-value text-xl">{{ duration_text }}</div></div>
+  </section>
+  <div class="flex flex-wrap justify-end gap-2"><a class="btn btn-outline" href="{% url 'glossary:my_stats' %}">查看历史统计</a><a class="btn btn-primary" href="{% url 'glossary:study_start' %}">开始新会话</a></div>
+  <section class="space-y-2">
+    {% for attempt in attempts %}
+      <article class="rounded-box border border-base-300 bg-base-100 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2"><span class="font-semibold">{{ attempt.sequence }}. {{ attempt.prompt_snapshot }}</span><span class="badge {% if attempt.is_correct %}badge-success{% else %}badge-error{% endif %}">{% if attempt.is_correct %}正确{% else %}错误{% endif %}</span></div>
+        <div class="mt-2 grid gap-2 text-sm md:grid-cols-2"><p><span class="text-base-content/60">提交：</span>{{ attempt.submitted_answer|default:'不会' }}</p><p><span class="text-base-content/60">答案：</span>{{ attempt.expected_answers_snapshot|join:'；' }}</p></div>
+      </article>
+    {% empty %}
+      {% include "components/empty_state.html" with title="本次尚未作答" message="停止前没有提交任何答案。" %}
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="space-y-4">
+  {% if subtitle %}<p class="text-sm text-base-content/70">{{ subtitle }}</p>{% endif %}
+  {% if create_url %}
+    <div class="flex justify-end">
+      <a class="btn btn-primary" href="{{ create_url }}">
+        <span class="icon-[tabler--plus] size-5" aria-hidden="true"></span>
+        {{ create_label }}
+      </a>
+    </div>
+  {% endif %}
+  {% include "components/table_wrapper.html" with table=table %}
+</div>
+{% endblock %}

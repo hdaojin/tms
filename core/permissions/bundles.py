@@ -195,6 +195,35 @@ PERMISSION_BUNDLE_SPECS = (
             ("delete_knowledgeevidenceskillmap", "knowledge", "knowledgeevidenceskillmap"),
         ),
     ),
+    PermissionBundleSpec(
+        code="glossary.contribute_entries",
+        name="贡献专业词条",
+        description="提交专业词条提案，并维护本人待审核或已驳回的提案。",
+        permissions=(
+            ("view_glossaryentryproposal", "glossary", "glossaryentryproposal"),
+            ("add_glossaryentryproposal", "glossary", "glossaryentryproposal"),
+            ("change_glossaryentryproposal", "glossary", "glossaryentryproposal"),
+        ),
+    ),
+    PermissionBundleSpec(
+        code="glossary.manage_glossaries",
+        name="管理专业词库",
+        description="管理词库与正式词条、执行导入和审核，并查看全体学习统计。",
+        permissions=(
+            ("view_professionalglossary", "glossary", "professionalglossary"),
+            ("add_professionalglossary", "glossary", "professionalglossary"),
+            ("change_professionalglossary", "glossary", "professionalglossary"),
+            ("view_glossaryentry", "glossary", "glossaryentry"),
+            ("add_glossaryentry", "glossary", "glossaryentry"),
+            ("change_glossaryentry", "glossary", "glossaryentry"),
+            ("view_glossaryentryproposal", "glossary", "glossaryentryproposal"),
+            ("change_glossaryentryproposal", "glossary", "glossaryentryproposal"),
+            ("view_glossaryimport", "glossary", "glossaryimport"),
+            ("add_glossaryimport", "glossary", "glossaryimport"),
+            ("change_glossaryimport", "glossary", "glossaryimport"),
+            ("view_all_study_statistics", "glossary", "studysession"),
+        ),
+    ),
 )
 
 

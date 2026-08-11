@@ -1,0 +1,31 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<div class="grid gap-4 lg:grid-cols-3">
+  <section class="card border border-base-300 bg-base-100 shadow-sm lg:col-span-2">
+    <div class="card-body">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div><h2 class="card-title">{{ proposal.english_term }}</h2>{% if proposal.acronym %}<p class="text-base-content/60">{{ proposal.acronym }}</p>{% endif %}</div>
+        <span class="badge {% if proposal.status == 'approved' %}badge-success{% elif proposal.status == 'rejected' %}badge-error{% else %}badge-warning{% endif %}">{{ proposal.get_status_display }}</span>
+      </div>
+      <div class="rounded-box bg-base-200 p-4 text-lg">{{ proposal.chinese_translation }}</div>
+      {% if proposal.english_aliases %}<p class="text-sm"><span class="font-medium">英文别名：</span>{{ proposal.english_aliases|join:'、' }}</p>{% endif %}
+      {% if proposal.chinese_aliases %}<p class="text-sm"><span class="font-medium">中文别名：</span>{{ proposal.chinese_aliases|join:'、' }}</p>{% endif %}
+      {% if proposal.review_note %}<div class="alert {% if proposal.status == 'rejected' %}alert-error{% else %}alert-info{% endif %}"><span>{{ proposal.review_note }}</span></div>{% endif %}
+    </div>
+  </section>
+  <aside class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body text-sm">
+      <h2 class="card-title text-base">提案信息</h2>
+      <p>词库：{{ proposal.glossary }}</p><p>提交人：{{ proposal.submitted_by }}</p><p>提交时间：{{ proposal.created_at }}</p>
+      <div class="card-actions mt-3">
+        {% if proposal.status != 'approved' and proposal.submitted_by == request.user %}<a class="btn btn-outline btn-sm" href="{% url 'glossary:proposal_edit' proposal.pk %}">修改并重提</a>{% endif %}
+        {% if perms.glossary.change_professionalglossary and proposal.status == 'pending' %}
+          <form method="post" action="{% url 'glossary:proposal_approve' proposal.pk %}">{% csrf_token %}<button class="btn btn-success btn-sm" type="submit">通过</button></form>
+          <a class="btn btn-error btn-sm" href="{% url 'glossary:proposal_reject' proposal.pk %}">驳回</a>
+        {% endif %}
+      </div>
+    </div>
+  </aside>
+</div>
+{% endblock %}

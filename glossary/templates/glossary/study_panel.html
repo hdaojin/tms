@@ -1,0 +1,42 @@
+<section id="study-panel" class="mx-auto max-w-3xl space-y-4">
+  <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-base-content/60">
+    <span>{{ session.glossary }} · {{ session.get_mode_display }}</span>
+    <span>第 {{ attempt.sequence }} 题{% if session.target_count %} / {{ session.target_count }}{% endif %}</span>
+  </div>
+  <article class="card min-h-80 border border-base-300 bg-base-100 shadow-lg">
+    <div class="card-body items-stretch justify-center gap-6 p-5 sm:p-8">
+      <div class="text-center">
+        <div class="badge badge-outline mb-3">{{ attempt.get_direction_display }}</div>
+        <h2 class="break-words text-2xl font-semibold sm:text-4xl">{{ attempt.prompt_snapshot }}</h2>
+      </div>
+      {% if feedback %}
+        <div class="rounded-box border p-4 {% if attempt.is_correct %}border-success bg-success/10{% else %}border-error bg-error/10{% endif %}">
+          <div class="flex items-center gap-2 font-semibold {% if attempt.is_correct %}text-success{% else %}text-error{% endif %}">
+            <span class="{% if attempt.is_correct %}icon-[tabler--circle-check]{% else %}icon-[tabler--circle-x]{% endif %} size-6" aria-hidden="true"></span>
+            {% if attempt.is_correct %}回答正确{% else %}回答错误{% endif %}
+          </div>
+          <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <div><dt class="text-base-content/60">你的答案</dt><dd class="break-words">{{ attempt.submitted_answer|default:'不会' }}</dd></div>
+            <div><dt class="text-base-content/60">可接受答案</dt><dd class="break-words">{{ attempt.expected_answers_snapshot|join:'；' }}</dd></div>
+          </dl>
+        </div>
+        <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+          <form method="post" action="{% url 'glossary:study_stop' session.pk %}">{% csrf_token %}<button class="btn btn-ghost w-full sm:w-auto" type="submit">停止学习</button></form>
+          <a class="btn btn-primary w-full sm:w-auto" href="{% url 'glossary:study_session' session.pk %}">下一题</a>
+        </div>
+      {% else %}
+        <form method="post" action="{% url 'glossary:study_answer' session.pk %}" class="space-y-4" hx-post="{% url 'glossary:study_answer' session.pk %}" hx-target="#study-panel" hx-swap="outerHTML">
+          {% csrf_token %}
+          <input type="hidden" name="attempt_id" value="{{ attempt.pk }}">
+          {% include "components/form_errors.html" with form=form %}
+          {% include "components/field.html" with field=form.answer %}
+          <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <button class="btn btn-ghost" type="submit" name="unknown" value="1" formnovalidate>不会</button>
+            <button class="btn btn-primary" type="submit">提交答案</button>
+          </div>
+        </form>
+        <form method="post" action="{% url 'glossary:study_stop' session.pk %}" class="text-center">{% csrf_token %}<button class="btn btn-link text-error" type="submit">停止学习</button></form>
+      {% endif %}
+    </div>
+  </article>
+</section>
