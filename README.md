@@ -156,6 +156,7 @@ npm run build:css
 - `static/css/output.css`：由 `npm run build:css` 在开发机或 CI 生成，并随代码或发布制品一起部署到服务器。
 - `static/js/alpinejs.min.js`：作为仓库内静态文件维护；升级 Alpine.js 时同步替换该文件。
 - `static/css/prism.css` 与 `static/js/prism.js`：从 Prism 官网直接下载后纳入仓库；升级 Prism 时同步替换这两个文件。
+- `static/js/mermaid.min.js`：从 `package.json` 锁定版本的 Mermaid npm 包复制并随仓库分发，仅供 notes 阅读页和打印页离线渲染图形；升级依赖时同步替换该文件与许可证文件。
 - HTMX 运行时脚本由 `django-htmx` 模板标签提供，并在 `collectstatic` 时一并收集；生产环境不需要通过 npm 安装或手工复制 HTMX 脚本文件。
 
 ## 生产环境部署（TMS App）
@@ -195,6 +196,9 @@ uv sync --frozen --no-dev
 - `static/js/alpinejs.min.js`
 - `static/css/prism.css`
 - `static/js/prism.js`
+- `static/js/mermaid.min.js`
+- `static/js/mermaid.LICENSE.txt`
+- `static/js/notes-mermaid.js`
 
 ### 3. 配置生产环境变量
 

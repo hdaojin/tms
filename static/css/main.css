@@ -98,6 +98,39 @@
     overflow-x: auto;
   }
 
+  .tms-note-content .mermaid-pre,
+  [data-note-print-page] .mermaid-pre {
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: normal;
+  }
+
+  .tms-note-content .mermaid svg,
+  [data-note-print-page] .mermaid svg {
+    height: auto;
+    max-width: 100%;
+  }
+
+  .mermaid-render-error {
+    white-space: normal;
+  }
+
+  @media print {
+    details.note-details {
+      grid-template-rows: max-content 1fr !important;
+    }
+
+    details.note-details:not([open]) > .collapse-content {
+      display: block !important;
+      visibility: visible !important;
+    }
+
+    .mermaid-pre {
+      background: white !important;
+      color: black !important;
+    }
+  }
+
   .notes-nav ul,
   .notes-nav ol {
     margin-block: 0.25rem;

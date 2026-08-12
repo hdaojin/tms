@@ -9,7 +9,7 @@
   <button type="button" data-print class="btn btn-primary fixed top-8 right-8 z-50 print:hidden">
     打印
   </button>
-  <div class="w-4xl max-w-none mx-auto text-base print:text-black p-6">
+  <div class="w-4xl max-w-none mx-auto text-base print:text-black p-6" data-note-print-page>
     <div class="flex items-center justify-between mb-4">
       <img src="{% static 'images/gm-logo.png' %}" alt="GM Logo" class="h-14 w-auto" />
       <img src="{% static 'images/world-skills-china.png' %}" alt="World Skills China" class="h-20 w-auto" />
@@ -150,4 +150,6 @@
 {% block extra_js %}
   <!-- Prism.js script (place actual static path as needed) -->
   <script src="{% static 'js/prism.js' %}"></script>
+  <script src="{% static 'js/mermaid.min.js' %}"></script>
+  <script src="{% static 'js/notes-mermaid.js' %}"></script>
 {% endblock %}

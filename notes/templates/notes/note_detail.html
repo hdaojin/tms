@@ -15,7 +15,7 @@
 {% endblock %}
 
 {% block content %}
-  <div class="space-y-4">
+  <div class="space-y-4" data-note-page>
     <details class="collapse collapse-arrow border border-base-300 bg-base-100 print:hidden lg:hidden">
       <summary class="collapse-title font-semibold">课程目录</summary>
       <nav class="notes-nav collapse-content prose prose-sm max-w-none" aria-label="移动端课程目录">
@@ -27,7 +27,7 @@
       </nav>
     </details>
 
-    <details class="collapse collapse-arrow border border-base-300 bg-base-100 print:hidden xl:hidden">
+    <details class="collapse collapse-arrow border border-base-300 bg-base-100 print:hidden lg:hidden">
       <summary class="collapse-title font-semibold">本文大纲</summary>
       <nav class="notes-nav collapse-content prose prose-sm max-w-none" aria-label="移动端本文大纲">
         {% if toc_html %}
@@ -38,7 +38,7 @@
       </nav>
     </details>
 
-    <div class="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_16rem]">
+    <div class="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_16rem]">
       <div class="tms-note-content min-w-0 space-y-4">
         <div class="space-y-1">
           <div class="breadcrumbs text-sm text-base-content/80">
@@ -102,7 +102,7 @@
         </div>
       </div>
 
-      <aside class="sticky top-20 hidden max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border border-base-300 bg-base-200 p-4 print:hidden xl:block">
+      <aside class="sticky top-20 hidden max-h-[calc(100vh-6rem)] overflow-y-auto rounded-lg border border-base-300 bg-base-200 p-4 print:hidden lg:block">
         <div class="mb-2 font-semibold text-base-content">本文大纲</div>
         <nav class="notes-nav prose prose-sm max-w-none" aria-label="本文大纲">
           {% if toc_html %}
@@ -122,4 +122,6 @@
 
 {% block extra_js %}
   <script src="{% static 'js/prism.js' %}"></script>
+  <script src="{% static 'js/mermaid.min.js' %}"></script>
+  <script src="{% static 'js/notes-mermaid.js' %}"></script>
 {% endblock %}

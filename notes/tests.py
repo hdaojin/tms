@@ -2,6 +2,7 @@ from pathlib import Path
 import shutil
 from unittest.mock import patch
 
+from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
@@ -251,6 +252,115 @@ class NoteViewTests(TestCase):
         self.assertIn("第一小节", note.toc_tokens)
         self.assertNotIn("第四级标题", note.toc_tokens)
 
+    def test_details_body_markdown_stays_inside_collapsible_content(self):
+        (self.repo_root / "one.md").write_text(
+            """# 练习
+
+<details>
+<summary>参考答案</summary>
+
+1. 第一项答案
+2. 第二项答案
+
+```console
+$ pwd
+```
+
+[查看附件](assets/diagram.png)
+</details>
+""",
+            encoding="utf-8",
+        )
+
+        note = render_note_markdown(self.repo_root / "one.md", "course", self.repo_root, "one")
+        soup = BeautifulSoup(note.html, "lxml")
+        details = soup.find("details", class_="note-details")
+
+        self.assertIsNotNone(details)
+        self.assertFalse(details.has_attr("open"))
+        self.assertEqual(details.summary.get_text(strip=True), "参考答案")
+        self.assertIn("第一项答案", details.select_one(".collapse-content").get_text(" ", strip=True))
+        self.assertIsNotNone(details.select_one("pre code.language-console"))
+        self.assertEqual(
+            details.select_one("a")["href"],
+            "/notes-files/course/assets/diagram.png",
+        )
+
+    def test_details_preserves_open_and_ignores_examples_in_fenced_code(self):
+        (self.repo_root / "one.md").write_text(
+            """<details open>
+<summary>默认展开</summary>
+
+答案正文
+</details>
+
+```html
+<details>
+<summary>示例</summary>
+</details>
+```
+""",
+            encoding="utf-8",
+        )
+
+        note = render_note_markdown(self.repo_root / "one.md", "course", self.repo_root, "one")
+        soup = BeautifulSoup(note.html, "lxml")
+
+        self.assertTrue(soup.find("details", class_="note-details").has_attr("open"))
+        self.assertEqual(len(soup.find_all("details")), 1)
+        self.assertIn("&lt;details&gt;", note.html)
+
+    def test_nested_details_returns_safe_parse_error(self):
+        source = """<details>
+<summary>外层</summary>
+<details>
+<summary>内层</summary>
+答案
+</details>
+</details>
+"""
+        (self.repo_root / "one.md").write_text(source, encoding="utf-8")
+
+        note = render_note_markdown(self.repo_root / "one.md", "course", self.repo_root, "one")
+
+        self.assertTrue(note.meta["_parse_error"])
+        self.assertIn("不支持嵌套", note.meta["_parse_error_message"])
+        self.assertIn("折叠内容解析失败", note.html)
+        self.assertIn("&lt;details&gt;", note.html)
+        self.assertNotIn('<details class="note-details', note.html)
+
+    def test_incomplete_details_returns_safe_parse_error(self):
+        (self.repo_root / "one.md").write_text(
+            "<details>\n<summary>参考答案</summary>\n\n答案正文\n",
+            encoding="utf-8",
+        )
+
+        note = render_note_markdown(self.repo_root / "one.md", "course", self.repo_root, "one")
+
+        self.assertTrue(note.meta["_parse_error"])
+        self.assertIn("缺少结束标签", note.meta["_parse_error_message"])
+        self.assertIn("&lt;details&gt;", note.html)
+
+    def test_mermaid_fence_emits_render_target_instead_of_code_block(self):
+        (self.repo_root / "one.md").write_text(
+            """# 流程
+
+```mermaid
+flowchart TD
+    A --> B
+```
+""",
+            encoding="utf-8",
+        )
+
+        note = render_note_markdown(self.repo_root / "one.md", "course", self.repo_root, "one")
+        soup = BeautifulSoup(note.html, "lxml")
+
+        diagram = soup.select_one("pre.mermaid-pre > .mermaid[data-mermaid-diagram]")
+        self.assertIsNotNone(diagram)
+        self.assertIn("flowchart TD", diagram.get_text())
+        self.assertIsNone(soup.select_one("code.language-mermaid"))
+
     def test_detail_uses_depth_first_previous_next_and_responsive_navigation(self):
         self.client.force_login(self.allowed_user)
         response = self.client.get(
@@ -261,7 +371,21 @@ class NoteViewTests(TestCase):
         self.assertEqual(response.context["next_note"]["title"], "第三课")
         self.assertContains(response, "移动端课程目录")
         self.assertContains(response, "移动端本文大纲")
-        self.assertContains(response, "xl:grid-cols-[minmax(0,1fr)_16rem]")
+        self.assertContains(response, "lg:grid-cols-[minmax(0,1fr)_16rem]")
+        self.assertNotContains(response, "xl:grid-cols-[minmax(0,1fr)_16rem]")
+        self.assertContains(response, "js/mermaid.min.js")
+        self.assertContains(response, "js/notes-mermaid.js")
+
+    def test_print_page_loads_mermaid_and_marks_light_theme_rendering_scope(self):
+        self.client.force_login(self.allowed_user)
+        response = self.client.get(
+            reverse("notes:note_print", kwargs={"repo": "course", "slug": "one"})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "data-note-print-page")
+        self.assertContains(response, "js/mermaid.min.js")
+        self.assertContains(response, "js/notes-mermaid.js")
 
     def test_superuser_stats_treat_registered_subdirectory_as_covering_top_level(self):
         self.client.force_login(self.superuser)

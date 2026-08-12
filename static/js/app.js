@@ -63,8 +63,21 @@
 
   function initPrint(root) {
     root.querySelectorAll("[data-print]").forEach(function (button) {
-      button.addEventListener("click", function () {
-        window.print();
+      if (button.dataset.printBound === "true") return;
+      button.dataset.printBound = "true";
+      button.addEventListener("click", async function () {
+        if (button.dataset.printing === "true") return;
+        button.dataset.printing = "true";
+        button.disabled = true;
+        try {
+          if (typeof window.tmsPreparePrint === "function") {
+            await window.tmsPreparePrint();
+          }
+          window.print();
+        } finally {
+          button.disabled = false;
+          delete button.dataset.printing;
+        }
       });
     });
   }

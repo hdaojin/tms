@@ -338,3 +338,4 @@ all_python_code.txt
 testsql-fixtures/
 *.bak
 *.tmp
+.npm-cache/
