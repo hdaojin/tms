@@ -10,12 +10,14 @@ layouts:
   header:
     - home
     - events
+    - worldskills_forum
     - standards
     - training
     - behaviors
     - about
   dashboard:
     - notice
+    - worldskills_forum
     - standards
     - training
     - events
@@ -55,6 +57,42 @@ sections:
             icon_class: icon-[tabler--send] size-5 text-primary
             permissions:
               - notices.add_notice
+
+  - key: worldskills_forum
+    label: 世赛论坛
+    description: 世界技能论坛翻译与讨论信息
+    icon_class: icon-[tabler--messages] size-5 text-info
+    items:
+      - key: worldskills_forum_group
+        label: 世赛论坛
+        icon_class: icon-[tabler--messages] size-5 text-info
+        children:
+          - key: worldskills_forum
+            label: 最新动态
+            url_name: worldskills_forum:feed
+            icon_class: icon-[tabler--news] size-5 text-info
+          - key: worldskills_forum_topics
+            label: 主题
+            url_name: worldskills_forum:topic_list
+            icon_class: icon-[tabler--message-circle] size-5 text-primary
+          - key: worldskills_forum_important
+            label: 重要信息
+            url_name: worldskills_forum:important_feed
+            icon_class: icon-[tabler--alert-triangle] size-5 text-warning
+          - key: worldskills_forum_official
+            label: 官方信息
+            url_name: worldskills_forum:official_feed
+            icon_class: icon-[tabler--rosette] size-5 text-info
+          - key: worldskills_forum_unread
+            label: 未读信息
+            url_name: worldskills_forum:unread_feed
+            icon_class: icon-[tabler--mail] size-5 text-secondary
+          - key: worldskills_forum_workbench
+            label: 翻译工作台
+            url_name: worldskills_forum:workbench
+            icon_class: icon-[tabler--language] size-5 text-accent
+            permissions:
+              - worldskills_forum.add_forumpost
 
   - key: training
     label: 训练

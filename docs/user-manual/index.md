@@ -30,6 +30,7 @@
 - [scoring/overview.md](scoring/overview.md): 评分表导入、评分点和结果导入说明。
 - [standards/overview.md](standards/overview.md): 技能项目、能力领域、技能树版本和技能节点说明。
 - [training/overview.md](training/overview.md): 训练周期、训练日志、月度统计和 zip 导出说明。
+- [worldskills_forum/overview.md](worldskills_forum/overview.md): 世赛论坛主题、翻译、未读信息和私有附件归档说明。
 
 ## 编写约定
 

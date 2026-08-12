@@ -1,0 +1,8 @@
+{% load worldskills_forum_tags %}
+{% if is_paginated %}
+<div class="join flex justify-center">
+  {% if page_obj.has_previous %}<a class="join-item btn" href="?{% query_replace page=page_obj.previous_page_number %}">上一页</a>{% endif %}
+  <span class="join-item btn btn-disabled">第 {{ page_obj.number }} / {{ page_obj.paginator.num_pages }} 页</span>
+  {% if page_obj.has_next %}<a class="join-item btn" href="?{% query_replace page=page_obj.next_page_number %}">下一页</a>{% endif %}
+</div>
+{% endif %}

@@ -58,6 +58,7 @@ urlpatterns = [
     path("examcontent/", include("examcontent.urls", namespace="examcontent")),
     path("knowledge/", include("knowledge.urls", namespace="knowledge")),
     path("glossary/", include("glossary.urls", namespace="glossary")),
+    path("worldskills-forum/", include("worldskills_forum.urls", namespace="worldskills_forum")),
     path("notes-files/<str:repo>/<path:asset_path>", note_asset_view, name="note_asset"),
     path("", login_not_required(HomeView.as_view()), name="home"),
 ]

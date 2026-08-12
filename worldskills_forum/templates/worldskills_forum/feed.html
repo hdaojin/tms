@@ -1,0 +1,9 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="space-y-5">
+  <div class="flex flex-wrap gap-2"><a class="btn btn-sm {% if not filters.view or filters.view == 'all' %}btn-primary{% else %}btn-ghost{% endif %}" href="{% url 'worldskills_forum:feed' %}">全部</a><a class="btn btn-sm {% if filters.view == 'important' %}btn-warning{% else %}btn-ghost{% endif %}" href="?view=important">重要信息</a><a class="btn btn-sm {% if filters.view == 'official' %}btn-info{% else %}btn-ghost{% endif %}" href="?view=official">官方信息</a><a class="btn btn-sm {% if filters.view == 'unread' %}btn-secondary{% else %}btn-ghost{% endif %}" href="?view=unread">未读信息</a></div>
+  {% include "worldskills_forum/_filters.html" %}
+  <div class="space-y-4">{% for post in posts %}<a class="link link-hover text-lg font-semibold" href="{% url 'worldskills_forum:topic_detail' post.topic_id %}">{{ post.topic.translated_title }}</a>{% include "worldskills_forum/_post_card.html" with show_attachments=False show_actions=False %}{% empty %}<div class="alert">当前筛选范围内暂无论坛信息。</div>{% endfor %}</div>
+  {% include "worldskills_forum/_pagination.html" %}
+</div>
+{% endblock %}

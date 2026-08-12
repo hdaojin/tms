@@ -86,6 +86,7 @@ INSTALLED_APPS = [
     'examcontent.apps.ExamcontentConfig',
     'knowledge.apps.KnowledgeConfig',
     'glossary.apps.GlossaryConfig',
+    'worldskills_forum.apps.WorldskillsForumConfig',
     'notes',
     'meetings.apps.MeetingsConfig',
     'notices',

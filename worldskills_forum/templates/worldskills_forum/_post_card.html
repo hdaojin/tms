@@ -1,0 +1,28 @@
+<article class="card border border-base-300 bg-base-100 shadow-sm" id="post-{{ post.pk }}">
+  <div class="card-body gap-4">
+    <div class="flex flex-wrap items-center gap-2">
+      {% if post.post_type == 'official_reply' or post.post_type == 'official_notice' or post.post_type == 'rule_change' %}<span class="badge badge-info">{{ post.get_post_type_display }}</span>{% else %}<span class="badge badge-ghost">{{ post.get_post_type_display }}</span>{% endif %}
+      {% if post.importance == 'urgent' %}<span class="badge badge-error">紧急</span>{% elif post.importance == 'important' %}<span class="badge badge-warning">重要</span>{% endif %}
+      {% if post.source_role == 'worldskills_official' %}<span class="badge badge-primary">世界技能组织官方</span>{% else %}<span class="badge badge-outline">{{ post.get_source_role_display }}{% if post.source_role_detail %} · {{ post.source_role_detail }}{% endif %}</span>{% endif %}
+    </div>
+    <div class="whitespace-pre-wrap break-words text-base leading-7">{{ post.translation.translated_content|urlize }}</div>
+    {% if show_attachments and post.attachments.all %}
+      <div class="space-y-3 border-t border-base-200 pt-3">
+        {% for attachment in post.attachments.all %}
+          {% if attachment.is_safe_image %}
+            <figure class="items-start"><img class="max-h-96 rounded-lg border border-base-300 object-contain" src="{% url 'worldskills_forum:attachment_content' attachment.pk %}" alt="{{ attachment.caption_zh|default:attachment.original_filename }}"><figcaption class="mt-2 text-sm text-base-content/70">{{ attachment.caption_zh|default:attachment.original_filename }}{% if attachment.source_url %} · <a class="link" href="{{ attachment.source_url }}" target="_blank" rel="noopener noreferrer">论坛来源</a>{% endif %}</figcaption></figure>
+          {% else %}
+            <div class="flex flex-wrap items-center gap-2 text-sm"><span class="icon-[tabler--paperclip] size-4"></span><span>{{ attachment.original_filename }}</span>{% if attachment.file %}<a class="link link-primary" href="{% url 'worldskills_forum:attachment_content' attachment.pk %}">下载附件</a>{% endif %}{% if attachment.source_url %}<a class="link" href="{{ attachment.source_url }}" target="_blank" rel="noopener noreferrer">论坛来源</a>{% endif %}{% if attachment.caption_zh %}<span class="text-base-content/70">{{ attachment.caption_zh }}</span>{% endif %}</div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% elif post.attachment_count %}
+      <div class="text-sm text-base-content/60"><span class="icon-[tabler--paperclip] size-4"></span> {{ post.attachment_count }} 个图片/附件</div>
+    {% endif %}
+    <details class="rounded-lg bg-base-200 p-3"><summary class="cursor-pointer font-medium">查看英文原文</summary><div class="mt-3 whitespace-pre-wrap break-words">{{ post.original_content|urlize }}</div><a class="link link-primary mt-3 inline-block" href="{{ post.source_url|default:post.topic.source_url }}" target="_blank" rel="noopener noreferrer">查看论坛原帖 →</a></details>
+    <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-base-content/65">
+      <span>{{ post.author_name }} · 论坛发布 {{ post.posted_at|date:'Y-m-d H:i' }} · 归档发布 {{ post.translation.published_at|date:'Y-m-d H:i' }}</span>
+      {% if show_actions %}<span class="flex gap-2">{% if post.can_edit %}<a class="btn btn-ghost btn-xs" href="{% url 'worldskills_forum:post_edit' post.pk %}">编辑</a><a class="btn btn-ghost btn-xs" href="{% url 'worldskills_forum:attachment_manage' post.pk %}">管理附件</a>{% endif %}{% if perms.worldskills_forum.delete_forumpost %}<a class="btn btn-error btn-outline btn-xs" href="{% url 'worldskills_forum:post_delete' post.pk %}">删除</a>{% endif %}</span>{% endif %}
+    </div>
+  </div>
+</article>

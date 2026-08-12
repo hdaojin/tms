@@ -103,6 +103,17 @@ GLOSSARY_WORKBOOK_ALLOWED_EXTENSIONS = ['xlsx']
 GLOSSARY_WORKBOOK_UPLOAD_MAX_SIZE_MB = 50
 GLOSSARY_WORKBOOK_MAX_ROWS = 20_000
 
+# 世赛论坛附件
+WORLDSKILLS_FORUM_ATTACHMENT_ALLOWED_EXTENSIONS = [
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+    "md", "txt", "csv", "json", "yaml", "yml", "conf", "log",
+    "jpg", "jpeg", "png", "gif", "webp",
+    "zip", "rar", "7z", "tar", "gz", "bz2",
+]
+WORLDSKILLS_FORUM_ATTACHMENT_UPLOAD_MAX_SIZE_MB = 50
+WORLDSKILLS_FORUM_ATTACHMENT_MAX_COUNT = 10
+WORLDSKILLS_FORUM_ATTACHMENT_MAX_TOTAL_SIZE_MB = 100
+
 # 训练日志允许的扩展名和大小
 TRAINING_LOG_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf', 'txt', 'md']
 TRAINING_LOG_UPLOAD_MAX_SIZE_MB = 20
