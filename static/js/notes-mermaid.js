@@ -1,8 +1,12 @@
 (function () {
   const diagramSelector = "[data-mermaid-diagram]";
+  const cspNonce = document.currentScript
+    ? document.currentScript.dataset.cspNonce
+    : "";
   const diagramFontFamily =
     'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif';
   let renderQueue = Promise.resolve();
+  let renderSequence = 0;
 
   function diagramSource(diagram) {
     if (!diagram.dataset.mermaidSource) {
@@ -50,6 +54,25 @@
     svg.style.removeProperty("max-width");
     if (!svg.getAttribute("style")) svg.removeAttribute("style");
     svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  }
+
+  function insertRenderedSvg(diagram, svgMarkup) {
+    if (!cspNonce) {
+      throw new Error("页面未提供 Mermaid 样式所需的 CSP nonce");
+    }
+
+    const template = document.createElement("template");
+    template.innerHTML = svgMarkup.trim();
+    const svg = template.content.querySelector("svg");
+    if (!svg) {
+      throw new Error("Mermaid 返回了无效的 SVG");
+    }
+
+    svg.querySelectorAll("style").forEach(function (style) {
+      style.nonce = cspNonce;
+      style.setAttribute("nonce", cspNonce);
+    });
+    diagram.replaceChildren(svg);
   }
 
   async function renderAll() {
@@ -110,7 +133,10 @@
       diagram.textContent = source;
       try {
         await window.mermaid.parse(source);
-        await window.mermaid.run({ nodes: [diagram] });
+        const renderId = `note-mermaid-${renderSequence++}`;
+        const rendered = await window.mermaid.render(renderId, source);
+        insertRenderedSvg(diagram, rendered.svg);
+        if (rendered.bindFunctions) rendered.bindFunctions(diagram);
         restoreIntrinsicSvgSize(diagram);
       } catch (error) {
         showRenderError(diagram, source, error);

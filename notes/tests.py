@@ -394,6 +394,17 @@ flowchart TD
         self.assertIsNotNone(right_sidebar)
         self.assertIsNone(right_sidebar.find_parent("main"))
         self.assertIsNotNone(right_sidebar.select_one('nav[aria-label="本文大纲"]'))
+        mermaid_script = page.find(
+            "script",
+            src=lambda value: value and value.endswith("/js/notes-mermaid.js"),
+        )
+        self.assertIsNotNone(mermaid_script)
+        csp_nonce = mermaid_script.get("data-csp-nonce")
+        self.assertTrue(csp_nonce)
+        self.assertIn(
+            f"'nonce-{csp_nonce}'",
+            response.headers["Content-Security-Policy"],
+        )
         for sidebar in (left_sidebar, right_sidebar):
             self.assertIn("w-72", sidebar["class"])
             self.assertIn("xl:w-80", sidebar["class"])
@@ -415,6 +426,11 @@ flowchart TD
         self.assertIn("htmlLabels: false", script)
         self.assertIn("width: 200", script)
         self.assertIn("wrap: true", script)
+        self.assertIn("window.mermaid.render", script)
+        self.assertIn('document.createElement("template")', script)
+        self.assertIn("style.nonce = cspNonce", script)
+        self.assertIn('style.setAttribute("nonce", cspNonce)', script)
+        self.assertNotIn("window.mermaid.run", script)
         self.assertNotIn('"tms:theme-changed"', script)
 
     def test_print_page_loads_mermaid_and_marks_light_theme_rendering_scope(self):
@@ -427,6 +443,12 @@ flowchart TD
         self.assertContains(response, "data-note-print-page")
         self.assertContains(response, "js/mermaid.min.js")
         self.assertContains(response, "js/notes-mermaid.js")
+        page = BeautifulSoup(response.content, "lxml")
+        mermaid_script = page.find(
+            "script",
+            src=lambda value: value and value.endswith("/js/notes-mermaid.js"),
+        )
+        self.assertTrue(mermaid_script.get("data-csp-nonce"))
 
     def test_superuser_stats_treat_registered_subdirectory_as_covering_top_level(self):
         self.client.force_login(self.superuser)

@@ -128,6 +128,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.csp',
                 'core.utils.context_processors.custom_context',     # 自定义上下文处理器
             ],
         },
@@ -217,7 +218,7 @@ UPLOAD_MAX_SIZE_MB = env.int('UPLOAD_MAX_SIZE_MB', default=DEFAULT_UPLOAD_MAX_SI
 SECURE_CSP = {
     'default-src': [CSP.SELF],
     'script-src': [CSP.SELF],
-    'style-src': [CSP.SELF],
+    'style-src': [CSP.SELF, CSP.NONCE],
     'img-src': [CSP.SELF, 'data:'],
     'font-src': [CSP.SELF],
     'connect-src': [CSP.SELF],

@@ -151,5 +151,5 @@
   <!-- Prism.js script (place actual static path as needed) -->
   <script src="{% static 'js/prism.js' %}"></script>
   <script src="{% static 'js/mermaid.min.js' %}"></script>
-  <script src="{% static 'js/notes-mermaid.js' %}"></script>
+  <script src="{% static 'js/notes-mermaid.js' %}" data-csp-nonce="{{ csp_nonce }}"></script>
 {% endblock %}
