@@ -25,7 +25,7 @@ class ForumServiceTests(ForumTestCase):
 
     def post_data(self):
         return {
-            "author_name": "WorldSkills Secretariat", "source_role": "worldskills_official",
+            "author_name": "WorldSkills Secretariat", "source_role": self.official_role,
             "source_role_detail": "", "posted_at": timezone.now(), "source_url": "https://forum.example.com/p/1",
             "source_post_id": "p-1", "post_type": "official_reply", "importance": "important",
             "original_content": "Official reply",

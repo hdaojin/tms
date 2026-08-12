@@ -4,7 +4,7 @@ from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
 from worldskills_forum.forms import ForumPostTranslationForm, ForumTopicForm
-from worldskills_forum.models import ForumPost, ForumPostAttachment, ForumTag, ForumTopicReadState
+from worldskills_forum.models import ForumPost, ForumPostAttachment, ForumSourceRole, ForumTag, ForumTopicReadState
 
 from .base import ForumTestCase
 
@@ -68,6 +68,44 @@ class ForumModelTests(ForumTestCase):
         earlier = self.make_post(topic=topic, posted_at=later.posted_at.replace(year=2025), source_url="https://forum.example.com/p/1")
         self.assertEqual(list(topic.posts.values_list("pk", flat=True)), [earlier.pk, later.pk])
         self.assertEqual(later.translation.post, later)
+
+    def test_post_form_uses_editable_active_source_roles_and_keeps_current_inactive_role(self):
+        custom_role = ForumSourceRole.objects.create(
+            name="技术代表",
+            slug="technical-delegate",
+            sort_order=10,
+        )
+        create_form = ForumPostTranslationForm(topic=self.make_topic())
+        self.assertIn(custom_role, create_form.fields["source_role"].queryset)
+
+        post = self.make_post(source_role=custom_role)
+        custom_role.is_active = False
+        custom_role.save(update_fields=["is_active"])
+        self.assertNotIn(
+            custom_role,
+            ForumPostTranslationForm(topic=post.topic).fields["source_role"].queryset,
+        )
+        self.assertIn(
+            custom_role,
+            ForumPostTranslationForm(post=post).fields["source_role"].queryset,
+        )
+
+    def test_source_role_controls_whether_detail_is_kept(self):
+        detail_role = ForumSourceRole.objects.create(
+            name="自定义身份",
+            slug="custom-role",
+            allows_detail=True,
+        )
+        post = self.make_post(
+            source_role=detail_role,
+            source_role_detail="区域技术顾问",
+        )
+        post.full_clean()
+        self.assertEqual(post.source_role_detail, "区域技术顾问")
+
+        post.source_role = self.expert_role
+        post.full_clean()
+        self.assertEqual(post.source_role_detail, "")
 
     def test_source_ids_are_validated_without_conditional_constraints(self):
         topic = self.make_topic(source_topic_id="topic-1")

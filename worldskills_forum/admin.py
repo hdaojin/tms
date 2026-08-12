@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from core.utils.mixins import CreatedUpdatedAdminMixin
 
-from .models import ForumCategory, ForumModule, ForumPost, ForumPostAttachment, ForumTag, ForumTopic, ForumTopicReadState, ForumTranslation
+from .models import ForumCategory, ForumModule, ForumPost, ForumPostAttachment, ForumSourceRole, ForumTag, ForumTopic, ForumTopicReadState, ForumTranslation
 
 
 @admin.register(ForumCategory)
@@ -22,6 +22,13 @@ class ForumTagAdmin(admin.ModelAdmin):
 class ForumModuleAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "sort_order", "is_active")
     list_editable = ("sort_order", "is_active")
+    search_fields = ("name", "slug")
+
+
+@admin.register(ForumSourceRole)
+class ForumSourceRoleAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "sort_order", "is_active", "is_official", "allows_detail")
+    list_editable = ("sort_order", "is_active", "is_official", "allows_detail")
     search_fields = ("name", "slug")
 
 

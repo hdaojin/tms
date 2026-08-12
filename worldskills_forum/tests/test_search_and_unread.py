@@ -3,7 +3,7 @@ from datetime import timedelta
 from django.urls import reverse
 from django.utils import timezone
 
-from worldskills_forum.models import ForumTopicReadState
+from worldskills_forum.models import ForumSourceRole, ForumTopicReadState
 
 from .base import ForumTestCase
 
@@ -44,3 +44,17 @@ class SearchAndUnreadTests(ForumTestCase):
         response = self.client.get(reverse("worldskills_forum:topic_detail", args=[post.topic_id]))
         self.assertNotContains(response, "你上次看到这里")
         self.assertTrue(ForumTopicReadState.objects.filter(user=self.reader, topic=post.topic).exists())
+
+    def test_official_feed_uses_source_role_configuration(self):
+        configured_official = ForumSourceRole.objects.create(
+            name="赛事官方代表",
+            slug="event-official",
+            is_official=True,
+        )
+        post = self.make_post(source_role=configured_official)
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("worldskills_forum:feed"), {"view": "official"})
+
+        self.assertContains(response, post.topic.translated_title)
+        self.assertContains(response, "赛事官方代表")

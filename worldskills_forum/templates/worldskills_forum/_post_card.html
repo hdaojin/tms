@@ -3,7 +3,7 @@
     <div class="flex flex-wrap items-center gap-2">
       {% if post.post_type == 'official_reply' or post.post_type == 'official_notice' or post.post_type == 'rule_change' %}<span class="badge badge-info">{{ post.get_post_type_display }}</span>{% else %}<span class="badge badge-ghost">{{ post.get_post_type_display }}</span>{% endif %}
       {% if post.importance == 'urgent' %}<span class="badge badge-error">紧急</span>{% elif post.importance == 'important' %}<span class="badge badge-warning">重要</span>{% endif %}
-      {% if post.source_role == 'worldskills_official' %}<span class="badge badge-primary">世界技能组织官方</span>{% else %}<span class="badge badge-outline">{{ post.get_source_role_display }}{% if post.source_role_detail %} · {{ post.source_role_detail }}{% endif %}</span>{% endif %}
+      {% if post.source_role.is_official %}<span class="badge badge-primary">{{ post.source_role }}</span>{% else %}<span class="badge badge-outline">{{ post.source_role }}{% if post.source_role_detail %} · {{ post.source_role_detail }}{% endif %}</span>{% endif %}
     </div>
     <div class="whitespace-pre-wrap break-words text-base leading-7">{{ post.translation.translated_content|urlize }}</div>
     {% if show_attachments and post.attachments.all %}

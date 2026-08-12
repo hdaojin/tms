@@ -42,15 +42,6 @@ class TopicStatus(models.TextChoices):
     ARCHIVED = "archived", "已归档"
 
 
-class SourceRole(models.TextChoices):
-    WORLDSKILLS_OFFICIAL = "worldskills_official", "世界技能组织官方"
-    CHIEF_EXPERT = "chief_expert", "首席专家"
-    DEPUTY_CHIEF_EXPERT = "deputy_chief_expert", "副首席专家"
-    EXPERT = "expert", "专家"
-    ORGANIZER = "organizer", "竞赛组织方"
-    OTHER = "other", "其他"
-
-
 class PostType(models.TextChoices):
     DISCUSSION = "discussion", "专家讨论"
     OFFICIAL_REPLY = "official_reply", "官方回复"
@@ -115,6 +106,18 @@ class ForumModule(SluggedNameModel):
         verbose_name_plural = "论坛模块"
 
 
+class ForumSourceRole(SluggedNameModel):
+    sort_order = models.PositiveIntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+    is_official = models.BooleanField("官方来源", default=False)
+    allows_detail = models.BooleanField("允许填写身份补充说明", default=False)
+
+    class Meta:
+        ordering = ["sort_order", "name", "pk"]
+        verbose_name = "论坛来源身份"
+        verbose_name_plural = "论坛来源身份"
+
+
 class ForumTag(SluggedNameModel):
     class Meta:
         ordering = ["name", "pk"]
@@ -159,8 +162,13 @@ class ForumTopic(models.Model):
 class ForumPost(models.Model):
     topic = models.ForeignKey(ForumTopic, models.CASCADE, related_name="posts", verbose_name="主题")
     author_name = models.CharField("原作者", max_length=200)
-    source_role = models.CharField("来源身份", max_length=40, choices=SourceRole)
-    source_role_detail = models.CharField("其他身份说明", max_length=200, blank=True)
+    source_role = models.ForeignKey(
+        ForumSourceRole,
+        models.PROTECT,
+        related_name="posts",
+        verbose_name="来源身份",
+    )
+    source_role_detail = models.CharField("身份补充说明", max_length=200, blank=True)
     posted_at = models.DateTimeField("论坛原始发布时间", default=timezone.now)
     source_url = models.URLField("原帖链接", max_length=1000, blank=True, validators=[http_url_validator])
     source_post_id = models.CharField("论坛帖子 ID", max_length=120, blank=True, db_index=True)
@@ -180,7 +188,7 @@ class ForumPost(models.Model):
 
     def clean(self):
         super().clean()
-        if self.source_role != SourceRole.OTHER:
+        if self.source_role_id and not self.source_role.allows_detail:
             self.source_role_detail = ""
         if self.source_post_id and self.topic_id and ForumPost.objects.exclude(pk=self.pk).filter(topic_id=self.topic_id, source_post_id=self.source_post_id).exists():
             raise ValidationError({"source_post_id": "该主题内已存在相同的论坛帖子 ID。"})

@@ -5,7 +5,7 @@ from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.utils import timezone
 
-from worldskills_forum.models import ForumCategory, ForumModule, ForumPost, ForumTag, ForumTopic, ForumTranslation
+from worldskills_forum.models import ForumCategory, ForumModule, ForumPost, ForumSourceRole, ForumTag, ForumTopic, ForumTranslation
 
 
 class ForumTestCase(TestCase):
@@ -18,6 +18,8 @@ class ForumTestCase(TestCase):
         self.superuser = user_model.objects.create_superuser(username="root", password="test", email="root@example.com")
         self.category = ForumCategory.objects.create(name="评分测试", slug="marking-test")
         self.module = ForumModule.objects.get(slug="module-d")
+        self.expert_role = ForumSourceRole.objects.get(slug="expert")
+        self.official_role = ForumSourceRole.objects.get(slug="worldskills_official")
         self.tag = ForumTag.objects.create(name="Linux", slug="linux")
         self.grant(self.translator_a, "add_forumtopic", "add_forumpost", "add_forumtranslation")
         self.grant(self.translator_b, "add_forumtopic", "add_forumpost", "add_forumtranslation")
@@ -53,7 +55,7 @@ class ForumTestCase(TestCase):
         data = {
             "topic": topic,
             "author_name": "Expert A",
-            "source_role": "expert",
+            "source_role": self.expert_role,
             "posted_at": posted_at or timezone.now() - timedelta(days=2),
             "source_url": "https://forum.example.com/p/101",
             "post_type": "discussion",

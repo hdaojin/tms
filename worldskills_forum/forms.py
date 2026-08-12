@@ -25,10 +25,10 @@ from .models import (
     ForumModule,
     ForumPost,
     ForumPostAttachment,
+    ForumSourceRole,
     ForumTag,
     ForumTopic,
     SAFE_IMAGE_EXTENSIONS,
-    SourceRole,
     http_url_validator,
 )
 
@@ -179,8 +179,11 @@ class ForumTopicForm(StyledFormMixin, forms.ModelForm):
 
 class ForumPostTranslationForm(StyledFormMixin, forms.Form):
     author_name = forms.CharField(label="原作者", max_length=200)
-    source_role = forms.ChoiceField(label="来源身份", choices=ForumPost._meta.get_field("source_role").choices)
-    source_role_detail = forms.CharField(label="其他身份说明", max_length=200, required=False)
+    source_role = forms.ModelChoiceField(
+        label="来源身份",
+        queryset=ForumSourceRole.objects.none(),
+    )
+    source_role_detail = forms.CharField(label="身份补充说明", max_length=200, required=False)
     posted_at = forms.DateTimeField(label="论坛原始发布时间", widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"), input_formats=["%Y-%m-%dT%H:%M"])
     source_url = forms.URLField(label="原帖链接", max_length=1000, required=False, validators=[http_url_validator], help_text="没有单条帖子链接时可留空，详情页将使用论坛主题链接。")
     source_post_id = forms.CharField(label="论坛帖子 ID", max_length=120, required=False)
@@ -195,6 +198,10 @@ class ForumPostTranslationForm(StyledFormMixin, forms.Form):
         self.post = post
         self.topic = topic or getattr(post, "topic", None)
         super().__init__(*args, **kwargs)
+        role_filter = Q(is_active=True)
+        if post:
+            role_filter |= Q(pk=post.source_role_id)
+        self.fields["source_role"].queryset = ForumSourceRole.objects.filter(role_filter)
         if post and not self.is_bound:
             for name in ["author_name", "source_role", "source_role_detail", "posted_at", "source_url", "source_post_id", "post_type", "importance", "original_content"]:
                 self.fields[name].initial = getattr(post, name)
@@ -207,7 +214,8 @@ class ForumPostTranslationForm(StyledFormMixin, forms.Form):
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get("source_role") != SourceRole.OTHER:
+        source_role = cleaned.get("source_role")
+        if not source_role or not source_role.allows_detail:
             cleaned["source_role_detail"] = ""
         source_post_id = cleaned.get("source_post_id")
         if source_post_id and self.topic:
