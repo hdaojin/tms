@@ -20,7 +20,7 @@
 
 ### 翻译人员
 
-通常需要以下权限：
+管理员可在后台进入“认证和授权 → 组”，为翻译人员所属用户组勾选“翻译世赛论坛”业务权限包。该权限包自动授予：
 
 - `worldskills_forum.add_forumtopic`
 - `worldskills_forum.add_forumpost`

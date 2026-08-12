@@ -196,6 +196,16 @@ PERMISSION_BUNDLE_SPECS = (
         ),
     ),
     PermissionBundleSpec(
+        code="worldskills_forum.translate_forum",
+        name="翻译世赛论坛",
+        description="创建论坛主题、发布论坛帖子及其中文翻译，并维护本人创建的内容。",
+        permissions=(
+            ("add_forumtopic", "worldskills_forum", "forumtopic"),
+            ("add_forumpost", "worldskills_forum", "forumpost"),
+            ("add_forumtranslation", "worldskills_forum", "forumtranslation"),
+        ),
+    ),
+    PermissionBundleSpec(
         code="glossary.contribute_entries",
         name="贡献专业词条",
         description="提交专业词条提案，并维护本人待审核或已驳回的提案。",
