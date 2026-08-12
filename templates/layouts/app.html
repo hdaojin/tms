@@ -10,8 +10,16 @@
     {% endblock %}
 
     <div class="drawer-content flex min-h-0 min-w-0 flex-1">
-      <aside class="hidden w-72 shrink-0 overflow-y-auto border-r border-base-300 bg-base-100 print:hidden lg:block">
-        <div class="p-4">
+      <aside
+        class="{% if wide_sidebars %}xl:w-80{% else %}overflow-y-auto{% endif %} hidden w-72 shrink-0 border-r border-base-300 bg-base-100 lg:block print:hidden"
+        data-app-left-sidebar
+      >
+        <div
+          class="{% if wide_sidebars %}
+            sticky top-16 max-h-[calc(100dvh_-_4rem)] overflow-y-auto
+          {% endif %} p-4"
+          data-app-left-sidebar-content
+        >
           {% block sidebar %}
             {% render_section_menu_auto %}
           {% endblock %}
@@ -27,9 +35,23 @@
           {% block page_header %}
             {% include "partials/page_header.html" %}
           {% endblock %}
-          {% block content %}{% endblock %}
+          {% block content %}
+          {% endblock %}
         </div>
       </main>
+
+      {% if show_right_sidebar %}
+        <aside
+          class="{% if wide_sidebars %}w-72 xl:w-80{% else %}w-64{% endif %} hidden shrink-0 border-l border-base-300 bg-base-100 lg:block print:hidden"
+          data-app-right-sidebar
+        >
+          <div
+            class="sticky top-16 max-h-[calc(100dvh_-_4rem)] overflow-y-auto p-4"
+          >
+            {% block right_sidebar %}{% endblock %}
+          </div>
+        </aside>
+      {% endif %}
     </div>
 
     {% block footer %}
@@ -38,7 +60,11 @@
 
     {% block mobile_nav %}
       <div class="drawer-side z-30 lg:hidden" data-mobile-nav-panel>
-        <label for="tms-app-drawer" aria-label="关闭导航" class="drawer-overlay"></label>
+        <label
+          for="tms-app-drawer"
+          aria-label="关闭导航"
+          class="drawer-overlay"
+        ></label>
         <aside class="min-h-full w-80 bg-base-100 p-4 text-base-content">
           {% render_mobile_navigation %}
         </aside>

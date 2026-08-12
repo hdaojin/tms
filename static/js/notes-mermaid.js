@@ -1,14 +1,8 @@
 (function () {
   const diagramSelector = "[data-mermaid-diagram]";
-  const darkThemes = ["dark", "business", "night"];
-  const isPrintPage = Boolean(document.querySelector("[data-note-print-page]"));
+  const diagramFontFamily =
+    'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif';
   let renderQueue = Promise.resolve();
-
-  function activeMermaidTheme() {
-    if (isPrintPage) return "default";
-    const state = window.tmsTheme ? window.tmsTheme.currentState() : null;
-    return state && darkThemes.includes(state.theme) ? "dark" : "default";
-  }
 
   function diagramSource(diagram) {
     if (!diagram.dataset.mermaidSource) {
@@ -39,7 +33,26 @@
     diagram.append(message, detail, sourceBlock);
   }
 
-  async function renderAll(theme) {
+  function restoreIntrinsicSvgSize(diagram) {
+    const svg = diagram.querySelector("svg");
+    if (!svg) return;
+
+    const viewBox = (svg.getAttribute("viewBox") || "")
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
+    if (viewBox.length === 4 && viewBox.every(Number.isFinite)) {
+      const width = Math.max(1, viewBox[2]);
+      const height = Math.max(1, viewBox[3]);
+      svg.setAttribute("width", String(width));
+      svg.setAttribute("height", String(height));
+    }
+    svg.style.removeProperty("max-width");
+    if (!svg.getAttribute("style")) svg.removeAttribute("style");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  }
+
+  async function renderAll() {
     const diagrams = Array.from(document.querySelectorAll(diagramSelector));
     if (!diagrams.length) return;
     if (!window.mermaid) {
@@ -53,7 +66,40 @@
     window.mermaid.initialize({
       startOnLoad: false,
       securityLevel: "strict",
-      theme,
+      theme: "default",
+      darkMode: false,
+      htmlLabels: false,
+      wrap: true,
+      markdownAutoWrap: true,
+      fontFamily: diagramFontFamily,
+      themeVariables: {
+        background: "#ffffff",
+        darkMode: false,
+        fontFamily: diagramFontFamily,
+        fontSize: "16px",
+        textColor: "#111827",
+        primaryTextColor: "#111827",
+        lineColor: "#374151",
+      },
+      flowchart: {
+        useMaxWidth: false,
+      },
+      sequence: {
+        useMaxWidth: false,
+        width: 200,
+        height: 65,
+        actorMargin: 80,
+        wrap: true,
+        wrapPadding: 12,
+        actorFontFamily: diagramFontFamily,
+        actorFontSize: 16,
+        noteFontFamily: diagramFontFamily,
+        noteFontSize: 16,
+        noteAlign: "center",
+        messageFontFamily: diagramFontFamily,
+        messageFontSize: 16,
+        messageAlign: "center",
+      },
       suppressErrorRendering: true,
     });
 
@@ -65,35 +111,26 @@
       try {
         await window.mermaid.parse(source);
         await window.mermaid.run({ nodes: [diagram] });
+        restoreIntrinsicSvgSize(diagram);
       } catch (error) {
         showRenderError(diagram, source, error);
       }
     }
   }
 
-  function queueRender(theme) {
+  function queueRender() {
     renderQueue = renderQueue
       .catch(function () {})
       .then(function () {
-        return renderAll(theme);
+        return renderAll();
       });
     window.tmsMermaidReady = renderQueue;
     return renderQueue;
   }
 
   window.tmsPreparePrint = function () {
-    return queueRender("default");
+    return queueRender();
   };
 
-  window.addEventListener("tms:theme-changed", function () {
-    if (!isPrintPage) queueRender(activeMermaidTheme());
-  });
-  window.addEventListener("beforeprint", function () {
-    if (!isPrintPage) queueRender("default");
-  });
-  window.addEventListener("afterprint", function () {
-    if (!isPrintPage) queueRender(activeMermaidTheme());
-  });
-
-  queueRender(activeMermaidTheme());
+  queueRender();
 })();

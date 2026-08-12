@@ -194,6 +194,58 @@ def limit_navigation_depth(html: str | None, max_depth: int = 3) -> str:
     return root.decode_contents() if root is soup.body else str(root)
 
 
+def build_note_outline(rendered_html: str, min_level: int = 2, max_level: int = 4) -> str:
+    """从正文的 H2-H4 标题生成最多三级的层级大纲。"""
+
+    if not rendered_html or min_level > max_level:
+        return ""
+    try:
+        from bs4 import BeautifulSoup
+    except Exception:  # pragma: no cover
+        return ""
+
+    soup = BeautifulSoup(rendered_html, "lxml")
+    root = soup.body or soup
+    heading_names = [f"h{level}" for level in range(min_level, max_level + 1)]
+    outline: list[dict[str, Any]] = []
+    ancestors: list[tuple[int, dict[str, Any]]] = []
+
+    for heading in root.find_all(heading_names):
+        anchor_id = heading.get("id")
+        title = heading.get_text(" ", strip=True)
+        if not isinstance(anchor_id, str) or not anchor_id or not title:
+            continue
+
+        level = int(heading.name[1:])
+        node: dict[str, Any] = {
+            "anchor_id": anchor_id,
+            "title": title,
+            "children": [],
+        }
+        while ancestors and ancestors[-1][0] >= level:
+            ancestors.pop()
+        if ancestors:
+            ancestors[-1][1]["children"].append(node)
+        else:
+            outline.append(node)
+        ancestors.append((level, node))
+
+    def render_items(items: list[dict[str, Any]]) -> str:
+        if not items:
+            return ""
+        parts = ["<ul>"]
+        for item in items:
+            anchor_id = html.escape(item["anchor_id"], quote=True)
+            title = html.escape(item["title"])
+            parts.append(f'<li><a href="#{anchor_id}">{title}</a>')
+            parts.append(render_items(item["children"]))
+            parts.append("</li>")
+        parts.append("</ul>")
+        return "".join(parts)
+
+    return render_items(outline)
+
+
 _TOC_START_RE = re.compile(r"^\s*<!--\s*(?:TOC|TOC_START)\s*-->\s*$", re.IGNORECASE)
 _TOC_END_RE = re.compile(r"^\s*<!--\s*(?:/TOC|TOC_END)\s*-->\s*$", re.IGNORECASE)
 
@@ -439,7 +491,7 @@ def _render_details_parse_error(content: str, error: NoteDetailsParseError) -> s
 
 
 def render_note_markdown(path: Path, repo: str, repo_root: Path, slug: str) -> NoteContent:
-    """读取 Markdown，生成正文和最多三级的相对标题大纲。"""
+    """读取 Markdown，生成正文和 H2-H4 三级标题大纲。"""
 
     try:
         current_dir = path.parent.relative_to(repo_root).as_posix()
@@ -473,7 +525,7 @@ def render_note_markdown(path: Path, repo: str, repo_root: Path, slug: str) -> N
             )
             rendered_html = rendered.html
             meta = rendered.meta
-            toc_html = limit_navigation_depth(rendered.toc, max_depth=3)
+            toc_html = build_note_outline(rendered_html)
 
     return NoteContent(
         repo=repo,
@@ -503,6 +555,7 @@ __all__ = [
     "render_note_markdown",
     "rewrite_relative_urls",
     "limit_navigation_depth",
+    "build_note_outline",
     "get_readme_navigation",
     "check_note_permission",
 ]

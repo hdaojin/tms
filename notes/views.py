@@ -227,6 +227,8 @@ def note_detail_view(
         "title_icon": "icon-[tabler--book]",
         "toc_html": note.toc_tokens,
         "readme_toc_html": readme_navigation.html,
+        "show_right_sidebar": True,
+        "wide_sidebars": True,
     }
     return render(request, "notes/note_detail.html", context)
 

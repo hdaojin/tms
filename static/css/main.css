@@ -100,19 +100,53 @@
 
   .tms-note-content .mermaid-pre,
   [data-note-print-page] .mermaid-pre {
+    color-scheme: light;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    background: #ffffff !important;
+    color: #111827 !important;
     max-width: 100%;
     overflow-x: auto;
+    padding: 1rem;
     white-space: normal;
+  }
+
+  .tms-note-content .mermaid:not(.mermaid-render-error),
+  [data-note-print-page] .mermaid:not(.mermaid-render-error) {
+    display: flex;
+    width: max-content;
+    min-width: 100%;
+    justify-content: center;
   }
 
   .tms-note-content .mermaid svg,
   [data-note-print-page] .mermaid svg {
+    flex: none;
+    display: block;
     height: auto;
-    max-width: 100%;
+    margin-inline: auto;
+    max-width: none;
+  }
+
+  .tms-note-content .mermaid svg text.actor,
+  .tms-note-content .mermaid svg text.actor tspan,
+  [data-note-print-page] .mermaid svg text.actor,
+  [data-note-print-page] .mermaid svg text.actor tspan {
+    text-anchor: middle !important;
+  }
+
+  .tms-note-content .mermaid svg text,
+  [data-note-print-page] .mermaid svg text {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif !important;
   }
 
   .mermaid-render-error {
     white-space: normal;
+  }
+
+  .mermaid-render-error pre {
+    background: #f3f4f6 !important;
+    color: #111827 !important;
   }
 
   @media print {

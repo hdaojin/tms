@@ -188,7 +188,7 @@ class NoteViewTests(TestCase):
             encoding="utf-8",
         )
         (self.repo_root / "one.md").write_text(
-            "## 第一章\n\n### 第一节\n\n#### 第一小节\n\n##### 第四级标题\n",
+            "# 文档标题\n\n## 第二级标题\n\n### 第三级标题\n\n#### 第四级标题\n\n##### 第五级标题\n",
             encoding="utf-8",
         )
         for name in ("two", "three", "four"):
@@ -245,12 +245,21 @@ class NoteViewTests(TestCase):
         navigation = get_readme_navigation(self.repo_root, "course")
         self.assertEqual(navigation.items, [{"slug": "one", "title": "第一课"}])
 
-    def test_outline_uses_relative_three_heading_levels(self):
+    def test_outline_includes_only_h2_through_h4(self):
         note = render_note_markdown(self.repo_root / "one.md", "course", self.repo_root, "one")
-        self.assertIn("第一章", note.toc_tokens)
-        self.assertIn("第一节", note.toc_tokens)
-        self.assertIn("第一小节", note.toc_tokens)
-        self.assertNotIn("第四级标题", note.toc_tokens)
+        outline = BeautifulSoup(note.toc_tokens, "lxml")
+
+        self.assertNotIn("文档标题", note.toc_tokens)
+        self.assertIn("第二级标题", note.toc_tokens)
+        self.assertIn("第三级标题", note.toc_tokens)
+        self.assertIn("第四级标题", note.toc_tokens)
+        self.assertNotIn("第五级标题", note.toc_tokens)
+        links = outline.find_all("a")
+        self.assertEqual(
+            [link.get_text(strip=True) for link in links],
+            ["第二级标题", "第三级标题", "第四级标题"],
+        )
+        self.assertEqual([len(link.find_parents("ul")) for link in links], [1, 2, 3])
 
     def test_details_body_markdown_stays_inside_collapsible_content(self):
         (self.repo_root / "one.md").write_text(
@@ -369,12 +378,44 @@ flowchart TD
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["prev_note"]["title"], "第一课")
         self.assertEqual(response.context["next_note"]["title"], "第三课")
+        self.assertTrue(response.context["show_right_sidebar"])
+        self.assertTrue(response.context["wide_sidebars"])
         self.assertContains(response, "移动端课程目录")
         self.assertContains(response, "移动端本文大纲")
-        self.assertContains(response, "lg:grid-cols-[minmax(0,1fr)_16rem]")
-        self.assertNotContains(response, "xl:grid-cols-[minmax(0,1fr)_16rem]")
+        self.assertContains(response, "data-app-right-sidebar")
+        self.assertNotContains(response, "lg:grid-cols-[minmax(0,1fr)_16rem]")
         self.assertContains(response, "js/mermaid.min.js")
         self.assertContains(response, "js/notes-mermaid.js")
+
+        page = BeautifulSoup(response.content, "lxml")
+        left_sidebar = page.select_one("aside[data-app-left-sidebar]")
+        right_sidebar = page.select_one("aside[data-app-right-sidebar]")
+        self.assertIsNotNone(left_sidebar)
+        self.assertIsNotNone(right_sidebar)
+        self.assertIsNone(right_sidebar.find_parent("main"))
+        self.assertIsNotNone(right_sidebar.select_one('nav[aria-label="本文大纲"]'))
+        for sidebar in (left_sidebar, right_sidebar):
+            self.assertIn("w-72", sidebar["class"])
+            self.assertIn("xl:w-80", sidebar["class"])
+        left_sidebar_content = left_sidebar.select_one("[data-app-left-sidebar-content]")
+        right_sidebar_content = right_sidebar.select_one(":scope > div")
+        for sidebar_content in (left_sidebar_content, right_sidebar_content):
+            self.assertIn("sticky", sidebar_content["class"])
+            self.assertIn("top-16", sidebar_content["class"])
+            self.assertIn("max-h-[calc(100dvh_-_4rem)]", sidebar_content["class"])
+            self.assertIn("overflow-y-auto", sidebar_content["class"])
+        self.assertIn("text-center", left_sidebar.select_one(".font-semibold")["class"])
+        self.assertIn("text-center", right_sidebar.select_one(".font-semibold")["class"])
+
+    def test_mermaid_client_uses_fixed_light_intrinsic_sequence_layout(self):
+        script = (Path.cwd() / "static" / "js" / "notes-mermaid.js").read_text(encoding="utf-8")
+
+        self.assertIn('theme: "default"', script)
+        self.assertIn("darkMode: false", script)
+        self.assertIn("htmlLabels: false", script)
+        self.assertIn("width: 200", script)
+        self.assertIn("wrap: true", script)
+        self.assertNotIn('"tms:theme-changed"', script)
 
     def test_print_page_loads_mermaid_and_marks_light_theme_rendering_scope(self):
         self.client.force_login(self.allowed_user)
