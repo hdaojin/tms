@@ -37,6 +37,21 @@ class AttachmentTests(ForumTestCase):
         form = AttachmentAddForm(data={"add-attachment_source_urls": ""}, files={"add-attachments": files}, post=self.make_post(), prefix="add")
         self.assertFalse(form.is_valid())
 
+    def test_translator_can_submit_external_attachment(self):
+        post = self.make_post(user=self.translator_a)
+        self.client.force_login(self.translator_a)
+
+        response = self.client.post(
+            reverse("worldskills_forum:attachment_manage", args=[post.pk]),
+            {
+                "action": "add",
+                "add-attachment_source_urls": "https://forum.example.com/files/guide.pdf",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(post.attachments.filter(source_url="https://forum.example.com/files/guide.pdf").exists())
+
     def test_private_inline_image_and_forced_attachment_download(self):
         post = self.make_post()
         image = ForumPostAttachment.objects.create(post=post, file=SimpleUploadedFile("shot.png", b"\x89PNG\r\n\x1a\nrest", content_type="image/png"), original_filename="shot.png", created_by=self.translator_a)

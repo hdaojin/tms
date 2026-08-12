@@ -3,6 +3,7 @@
     "@alpinejs/csp": "^3.15.12",
     "@tailwindcss/cli": "^4.1.12",
     "@upstash/context7-mcp": "^2.2.1",
+    "mermaid": "11.16.1",
     "tailwindcss": "^4.1.12"
   },
   "devDependencies": {

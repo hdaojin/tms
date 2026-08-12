@@ -61,6 +61,33 @@ class ForumPermissionTests(ForumTestCase):
         self.assertEqual(self.client.get(reverse("worldskills_forum:post_edit", args=[other.pk])).status_code, 404)
         self.assertEqual(self.client.get(reverse("worldskills_forum:post_delete", args=[own.pk])).status_code, 403)
 
+    def test_translator_can_submit_post_edit(self):
+        post = self.make_post(user=self.translator_a)
+        self.client.force_login(self.translator_a)
+
+        response = self.client.post(
+            reverse("worldskills_forum:post_edit", args=[post.pk]),
+            {
+                "author_name": "Expert B",
+                "source_role": post.source_role_id,
+                "source_role_detail": "",
+                "posted_at": "2026-08-12T10:30",
+                "source_url": "https://forum.example.com/p/101",
+                "source_post_id": "101",
+                "post_type": "discussion",
+                "importance": "important",
+                "original_content": "Updated original guidance",
+                "translated_content": "更新后的中文说明",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        post.refresh_from_db()
+        post.translation.refresh_from_db()
+        self.assertEqual(post.author_name, "Expert B")
+        self.assertEqual(post.original_content, "Updated original guidance")
+        self.assertEqual(post.translation.translated_content, "更新后的中文说明")
+
     def test_empty_topic_is_hidden_and_owner_can_delete_it(self):
         empty = self.make_topic(user=self.translator_a)
         self.client.force_login(self.reader)

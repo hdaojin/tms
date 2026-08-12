@@ -236,21 +236,21 @@ class ForumPostTranslationUpdateView(TitleMixin, LoginRequiredMixin, FormView):
     title_icon = "icon-[tabler--edit]"
 
     def dispatch(self, request, *args, **kwargs):
-        self.post = get_object_or_404(ForumPost.objects.select_related("topic", "translation"), pk=kwargs["pk"])
-        if not can_edit_post(request.user, self.post):
+        self.forum_post = get_object_or_404(ForumPost.objects.select_related("topic", "translation"), pk=kwargs["pk"])
+        if not can_edit_post(request.user, self.forum_post):
             raise Http404
         return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
-        return {**super().get_form_kwargs(), "post": self.post, "include_attachments": False}
+        return {**super().get_form_kwargs(), "post": self.forum_post, "include_attachments": False}
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(topic=self.post.topic, post=self.post, glossary_url=reverse("glossary:browse"), **kwargs)
+        return super().get_context_data(topic=self.forum_post.topic, post=self.forum_post, glossary_url=reverse("glossary:browse"), **kwargs)
 
     def form_valid(self, form):
-        update_published_post(post=self.post, post_data=form.post_data(), translation_data=form.translation_data(), user=self.request.user)
+        update_published_post(post=self.forum_post, post_data=form.post_data(), translation_data=form.translation_data(), user=self.request.user)
         messages.success(self.request, "论坛翻译信息已更新。")
-        return redirect("worldskills_forum:topic_detail", pk=self.post.topic_id)
+        return redirect("worldskills_forum:topic_detail", pk=self.forum_post.topic_id)
 
 
 class ForumPostDeleteView(TitleMixin, PermissionRequiredMixin, DeleteView):
@@ -271,33 +271,33 @@ class ForumPostAttachmentManageView(TitleMixin, LoginRequiredMixin, TemplateView
     title_icon = "icon-[tabler--paperclip]"
 
     def dispatch(self, request, *args, **kwargs):
-        self.post = get_object_or_404(ForumPost.objects.select_related("topic", "translation"), pk=kwargs["post_pk"])
-        if not can_edit_post(request.user, self.post):
+        self.forum_post = get_object_or_404(ForumPost.objects.select_related("topic", "translation"), pk=kwargs["post_pk"])
+        if not can_edit_post(request.user, self.forum_post):
             raise Http404
         return super().dispatch(request, *args, **kwargs)
 
     def _forms(self, data=None, files=None):
-        queryset = self.post.attachments.all()
-        return AttachmentAddForm(data, files, post=self.post, prefix="add"), AttachmentMetadataFormSet(data, queryset=queryset, prefix="meta")
+        queryset = self.forum_post.attachments.all()
+        return AttachmentAddForm(data, files, post=self.forum_post, prefix="add"), AttachmentMetadataFormSet(data, queryset=queryset, prefix="meta")
 
     def get_context_data(self, **kwargs):
         if "add_form" not in kwargs or "metadata_formset" not in kwargs:
             add_form, metadata_formset = self._forms()
             kwargs.setdefault("add_form", add_form)
             kwargs.setdefault("metadata_formset", metadata_formset)
-        return super().get_context_data(post=self.post, **kwargs)
+        return super().get_context_data(post=self.forum_post, **kwargs)
 
     def post(self, request, *args, **kwargs):
         add_form, metadata_formset = self._forms(request.POST, request.FILES)
         action = request.POST.get("action")
         if action == "add" and add_form.is_valid():
-            add_post_attachments(post=self.post, user=request.user, uploaded_attachments=add_form.cleaned_data["attachments"], external_attachment_urls=add_form.cleaned_data["external_attachment_urls"])
+            add_post_attachments(post=self.forum_post, user=request.user, uploaded_attachments=add_form.cleaned_data["attachments"], external_attachment_urls=add_form.cleaned_data["external_attachment_urls"])
             messages.success(request, "附件已添加。")
-            return redirect("worldskills_forum:attachment_manage", post_pk=self.post.pk)
+            return redirect("worldskills_forum:attachment_manage", post_pk=self.forum_post.pk)
         if action == "metadata" and metadata_formset.is_valid():
             metadata_formset.save()
             messages.success(request, "附件信息已更新。")
-            return redirect("worldskills_forum:attachment_manage", post_pk=self.post.pk)
+            return redirect("worldskills_forum:attachment_manage", post_pk=self.forum_post.pk)
         return self.render_to_response(self.get_context_data(add_form=add_form, metadata_formset=metadata_formset))
 
 
