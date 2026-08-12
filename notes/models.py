@@ -1,12 +1,21 @@
+from django.core.exceptions import ValidationError
 from django.db import models
+
+from .paths import InvalidNotePathError, normalize_note_relative_path
 
 
 class NoteRepo(models.Model):
 	slug = models.SlugField(
-		"目录名",
+		"访问标识",
 		max_length=100,
 		unique=True,
-		help_text="与 NOTES_ROOT 下的目录名一一对应，例如 teaching-notes-Debian",
+		help_text="用于 URL、权限和缓存，例如 teaching-notes-Debian；不能包含斜杠",
+	)
+	relative_path = models.CharField(
+		"相对路径",
+		max_length=500,
+		unique=True,
+		help_text="相对于 NOTES_ROOT 的目录路径，例如 teaching-notes-debian/debian-basics",
 	)
 	title = models.CharField("显示名称", max_length=200)
 	description = models.TextField("简介", blank=True)
@@ -34,3 +43,17 @@ class NoteRepo(models.Model):
 
 	def __str__(self) -> str:  # pragma: no cover - simple display
 		return self.title or self.slug
+
+	def clean(self) -> None:
+		super().clean()
+		try:
+			self.relative_path = normalize_note_relative_path(self.relative_path)
+		except InvalidNotePathError as exc:
+			raise ValidationError({"relative_path": str(exc)}) from exc
+
+	def save(self, *args, **kwargs) -> None:
+		try:
+			self.relative_path = normalize_note_relative_path(self.relative_path)
+		except InvalidNotePathError as exc:
+			raise ValidationError({"relative_path": str(exc)}) from exc
+		super().save(*args, **kwargs)

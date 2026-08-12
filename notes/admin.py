@@ -5,9 +5,17 @@ from .models import NoteRepo
 
 @admin.register(NoteRepo)
 class NoteRepoAdmin(admin.ModelAdmin):
-	list_display = ("slug", "title", "is_visible", "order", "allowed_groups_display", "tags")
+	list_display = (
+		"slug",
+		"relative_path",
+		"title",
+		"is_visible",
+		"order",
+		"allowed_groups_display",
+		"tags",
+	)
 	list_filter = ("is_visible",)
-	search_fields = ("slug", "title", "description", "tags")
+	search_fields = ("slug", "relative_path", "title", "description", "tags")
 	filter_horizontal = ("allowed_groups",)
 
 	@admin.display(description="允许访问的用户组")
