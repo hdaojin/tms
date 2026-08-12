@@ -41,6 +41,11 @@ The project-level uv cache is configured as `.uv-cache/` in `pyproject.toml` to 
 
 Prefer focused app tests over the full suite unless the change crosses app boundaries.
 
+## Pre-Push Requirement
+
+- Before every `git push`, run `npm run build:css` from the repository root.
+- Do not push if the CSS build fails. After a successful build, check `static/css/output.css` and include the generated change in the intended commit when it differs.
+
 ## Architecture Rules
 - Use Django's default `auth.User`; do not introduce a custom User model.
 - Keep role/group names, upload limits, paths, and shared constants in `core/constants.py`; keep reusable upload behavior, upload specs, and private storage helpers in `core/uploads.py`.
