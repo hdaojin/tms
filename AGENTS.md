@@ -1,92 +1,193 @@
 # AGENTS.md
 
-## Project Overview
-TMS is a Django 6 monolith for training logs, assessments, meetings, notices, notes, behaviors, competitions, skills, Samba integration, articles, and account management. Use Chinese (`zh-hans`) for user-facing model names, form labels, validation errors, messages, and documentation. The default timezone is `Asia/Shanghai`.
+## 作用与权威边界
 
-## First Reads
-- Treat this `AGENTS.md` as the authoritative project instruction file.
-- Read `README.md` for setup, deployment, and command conventions.
-- For user-visible feature changes, inspect and update `docs/user-manual/`.
-- Check the target app's `models.py`, `forms.py`, `views.py`, `tables.py`, `urls.py`, templates, `core/config/navigation.yml`, tests, and migrations before editing.
+本文件是 TMS 仓库的**长期工程约束与架构边界**，是 Codex、Copilot 和其他编码 Agent 的项目级权威来源。
 
-## Agent skills
+- `AGENTS.md`：规定稳定的工程规则、分层边界、验证要求和安全约束。
+- `CONTEXT.md`：规定稳定的业务术语、领域语义和核心业务不变量。
+- `docs/adr/`：记录已经做出的重要架构决策；涉及对应领域时必须遵循。
+- `.codex/skills/*`：只描述某类任务的**执行工作流**，不得复制一份项目规范与本文件竞争。
+- `.github/copilot-instructions.md`：只做入口提示，不维护第二套规则。
 
-### Issue tracker
+如果文档与当前代码明显漂移，先以实际代码、迁移和测试确认现状，再在同一变更中修正文档；不要继续传播过时约定。
 
-Issues and PRDs are tracked in GitHub Issues for `hdaojin/tms`. See `docs/agents/issue-tracker.md`.
+所有面向用户的模型名、表单标签、校验错误、消息、页面文案和用户文档使用中文（`zh-hans`）。默认时区为 `Asia/Shanghai`。
 
-### Triage labels
+## 当前项目形态
 
-Use the default five-label triage vocabulary. See `docs/agents/triage-labels.md`.
+TMS 是基于 Django 6 / Python 3.13 的单体应用。主要前端与交互技术为 django-htmx、django-tables2、Tailwind CSS 4、DaisyUI 5、Alpine.js CSP build 和 Iconify Tailwind 4 插件。
 
-### Domain docs
+当前 APP 按职责大致分为：
 
-This is a single-context repo. See `docs/agents/domain.md`.
+- 平台基础：`core`、`accounts`、`samba`。
+- 领域主链路：`standards`、`events`、`archives`、`training`、`examcontent`、`scoring`、`knowledge`。
+- 业务扩展：`glossary`、`worldskills_forum`、`notes`、`meetings`、`notices`、`behaviors`、`event_countdown`。
+- `demo` 仅在 `DEBUG=True` 时加载。
 
-## Commands
-Run all Django commands from the repository root because `.env` may use a relative SQLite URL.
+领域主链路应保持为：
 
-- Install/sync Python deps: `uv sync`
-- Add Python deps: `uv add <package>`
-- Run checks: `uv run manage.py check`
-- Run lint: `uv run ruff check .`
-- Make migrations: `uv run manage.py makemigrations`
-- Apply migrations: `uv run manage.py migrate`
-- Run tests: `uv run pytest`
-- Run focused tests: `uv run pytest <app-or-test-path>`
-- Build CSS: `npm run build:css`
-- Watch CSS: `npm run watch:css`
+`技能项目/标准技能树 -> 赛事或考核 -> 试题/评分方案 -> 考点证据 -> 技能点映射 -> 评分结果 -> 训练分析与反馈`
 
-The project-level uv cache is configured as `.uv-cache/` in `pyproject.toml` to avoid Windows global-cache permission issues; run uv commands normally from the repository root.
+具体业务术语和不变量以 `CONTEXT.md` 为准。不要重新引入已经被替换的旧 APP/旧术语（例如旧 `assessments`、`competitions`、`skills`、`traininglogs` 链路）。
 
-Prefer focused app tests over the full suite unless the change crosses app boundaries.
+## 开始修改前
 
-## Pre-Push Requirement
+1. 先阅读本文件。
+2. 涉及领域模型、跨 APP 流程、统计口径或业务术语时，再读 `CONTEXT.md`；有相关 ADR 时一并阅读。
+3. 阅读目标 APP 的实际垂直链路：`models.py`、`forms.py`、`services.py`、`selectors.py`、`views.py`、`tables.py`、`urls.py`、templates、tests 和 migrations；不存在的文件跳过。
+4. 页面入口或导航变化时检查 `core/config/navigation.yml`。
+5. 用户可见行为变化时检查并更新 `docs/user-manual/` 对应文档。
+6. 环境、安装、部署和命令细节以 `README.md` 为准。
 
-- Before every `git push`, run `npm run build:css` from the repository root.
-- Do not push if the CSS build fails. After a successful build, check `static/css/output.css` and include the generated change in the intended commit when it differs.
+不要仅凭相邻 APP 的旧写法复制实现；先确认目标 APP 当前是否已经采用 service / selector / 新 layouts / 新导航体系。
 
-## Architecture Rules
-- Use Django's default `auth.User`; do not introduce a custom User model.
-- Keep role/group names, upload limits, paths, and shared constants in `core/constants.py`; keep reusable upload behavior, upload specs, and private storage helpers in `core/uploads.py`.
-- Global login is enforced by `LoginRequiredMiddleware`; public views must explicitly use `login_not_required`.
-- Preserve middleware ordering in `tmsproject/settings.py`.
-- App URLs must be included from `tmsproject/urls.py` with `app_name` namespaces.
-- Navigation lives in `core/config/navigation.yml`; templates render the parsed navigation from `core.navigation`.
+## 分层与业务逻辑边界
 
-## Code Patterns
-- Use `TitleMixin` for class-based views and set `title` plus `title_icon`.
-- Use `StyledFormMixin` for forms.
-- Use `BaseTable`, `BaseDateColumn`, `BaseDateTimeColumn`, and `ActionsColumn` from `core.tables` for list/table pages.
-- Use `OwnerRequiredMixin`, `CrossGroupAccessMixin`, `PermissionRequiredMixin`, or `SuperuserRequiredMixin` for access control.
-- Templates and compatibility layers may display users as `user.display_name` or `user.full_info`; new Python logic should prefer `accounts.services.users.get_user_display_name()` or `get_user_full_info()`.
-- For file fields, use `core.uploads.UploadSpec`, `UploadSizeValidator`, `PrivateMediaStorage`, project upload constants, and cleanup signals.
-- For multiple file form inputs, use `core.forms.fields.MultipleFileField` and `MultipleFileInput`.
-- Keep edits scoped; do not refactor unrelated modules.
+TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但复杂业务必须保持清晰职责。
 
-## Templates And Frontend
-- Extend `layouts/app.html`, `layouts/minimal.html`, `layouts/auth.html`, `layouts/print.html`, or `layouts/htmx.html`; `templates/base.html` is only a thin base entry.
-- Reuse components from `templates/components/`, especially `components/form.html`, `components/field.html`, and `components/table_wrapper.html`.
-- Use DaisyUI/Tailwind classes consistent with existing templates.
-- Use Iconify classes like `icon-[tabler--calendar]`.
-- Do not dynamically concatenate Tailwind/Iconify classes in templates.
-- Do not add inline scripts, inline event handlers, or `javascript:` links.
-- If templates introduce new Tailwind/Iconify classes, rebuild and commit `static/css/output.css`.
-- Do not put secrets or raw credentials into templates, context debug output, tests, logs, or docs.
+### Models
 
-## Security And Sensitive Data
-- Never read, print, or commit `.env` secrets unless explicitly required and safe.
-- `.env` is ignored; `.env.example` documents required variables.
-- Public uploads live in `media/`; private/sensitive uploads live under `settings.PRIVATE_MEDIA_ROOT` (default `media-private/`) and must not be served directly.
-- AI API keys are encrypted through `accounts.services.ai_crypto`.
-- `UserAIModelCredential` must not be registered in Django admin.
-- Shared AI credentials may be callable through backend helpers but must never reveal raw API keys.
-- Production must set `AI_API_KEY_ENCRYPTION_KEY`.
+模型负责持久化结构和**单个实体自身**的业务不变量。
 
-## Documentation
-When changing user-visible behavior, update the matching user manual under `docs/user-manual/`. Include entry paths, roles, permissions, field meanings, workflows, and important limitations.
+- 能由数据库可靠表达的唯一性、条件唯一性和完整性优先使用 `UniqueConstraint`、`CheckConstraint`、字段约束等数据库机制。
+- `Model.clean()` 适合实体内的跨字段校验以及需要被 ModelForm 展示的业务错误。
+- 不要把跨多个模型的工作流、导入编排、外部副作用或复杂统计塞进 `save()`。
+- 不要为新模型机械复制 `save() -> clean()`。Django 的 `save()` 不会自动执行 `full_clean()`；在非 ModelForm 写入边界需要完整模型校验时，应由调用方显式校验，或由 service 提供明确入口。保留既有模式时不要无关重构，触碰时必须用测试保护。
+- 对并发下必须成立的业务唯一性，不能只依赖 `clean()` 中的 `.exists()` 检查；应尽可能有数据库约束兜底。
 
-## Git And Workspace Safety
-- The working tree may contain user changes. Do not revert or overwrite changes you did not make.
-- Avoid destructive commands such as `git reset --hard` or `git checkout --` unless explicitly requested.
-- Treat generated files such as migrations, `uv.lock`, `package-lock.json`, and `static/css/output.css` as intentional when the related source change requires them.
+### Services
+
+跨模型写操作、导入确认、状态迁移、文件归档联动和跨 APP 业务流程优先放到 `<app>/services.py` 或清晰命名的 service 模块。
+
+- 多模型写操作需要原子性时使用 `transaction.atomic()`。
+- service 应表达业务动作，例如“确认评分表导入”“从评分点生成考点证据”，而不是成为通用工具杂物箱。
+- 复杂导入建议采用“解析/预览 -> 校验 -> 确认落库”的两阶段模式；保留原始快照和校验报告，避免解析器直接隐式修改正式数据。
+- 需要幂等的导入/同步入口必须显式设计幂等键、覆盖策略和重复执行行为。
+
+`scoring/services.py` 当前的评分表导入/确认流程可作为跨模型事务工作流的主要参考。
+
+### Selectors / Query Logic
+
+可复用的复杂读取、统计、报表和跨关系查询优先放在 `<app>/selectors.py`；简单 queryset 可以留在 view/model manager。
+
+- 使用 `select_related()` / `prefetch_related()` 控制查询数。
+- 对树、递归关系和统计汇总特别关注 N+1 与重复遍历；不要为了代码简短在循环中递归发查询。
+- 统计口径必须复用统一 selector，而不是在多个页面分别重写。
+
+`knowledge/selectors.py` 可作为读取层拆分的参考，但新增统计仍需检查查询复杂度。
+
+### Forms / Views / Templates
+
+- Form 负责输入规范化和面向用户的校验反馈，复用 `StyledFormMixin`。
+- View 负责 HTTP、权限、service/selector 调用和响应选择；尽量保持薄，不复制核心业务逻辑。
+- 类视图复用 `TitleMixin`，设置 `title` 和 `title_icon`。
+- 列表页优先复用 `BaseTable`、`BaseDateColumn`、`BaseDateTimeColumn`、`ActionsColumn` 和 django-tables2 `SingleTableView`/现有封装。
+- 通用 CRUD 页面优先复用 `templates/common/` 与 `templates/components/` 现有组件，而不是复制整页模板。
+
+## 用户、角色与权限
+
+- 保持 Django 默认 `auth.User`；不要引入自定义 User 模型。
+- 全局登录由 `LoginRequiredMiddleware` 强制；公开 view 必须显式使用 `login_not_required`。
+- 新业务授权优先使用 Django permission 与 `core.permissions` 中的业务权限包，不要通过页面隐藏代替后端授权。
+- 需要表达稳定“角色身份”时优先使用 `GroupProfile.codename` 或统一权限/角色 helper；**不要在新业务逻辑中依赖可修改的 `Group.name` 显示名称**。
+- `CrossGroupAccessMixin` 中基于组显示名称的判断视为兼容逻辑；不要继续扩散这一模式。
+- 对对象级访问复用 `OwnerRequiredMixin`、`CrossGroupAccessMixin`、`PermissionRequiredMixin`、`SuperuserRequiredMixin`，或在 service/view 中实现更明确的权限入口。
+- 模板与兼容层可显示 `user.display_name` / `user.full_info`；新增 Python 逻辑优先使用 `accounts.services.users.get_user_display_name()` / `get_user_full_info()`。
+
+## 文件、归档与敏感数据
+
+- 共享上传限制、扩展名、路径和存储规则集中在 `core/constants.py` 与 `core/uploads.py`；不要在各 APP 重写一套临时 validator/storage。
+- 私有或敏感文件使用 `PrivateMediaStorage` / `settings.PRIVATE_MEDIA_ROOT`，必须经过有权限检查的 Django view 提供，不得由 Web 服务器直接暴露。
+- 领域主链路中的原始试题、评分表、结果包、训练资料等应优先登记为 `ArchiveAsset`，业务对象保存结构化关系，不重复保存另一份“文件主记录”。
+- 多文件表单复用 `core.forms.fields.MultipleFileField` / `MultipleFileInput`。
+- 文件模型按项目既有机制注册清理 signal；删除/替换行为必须有测试。
+- `GenericForeignKey` 不能提供数据库外键完整性；新增泛型绑定时必须明确允许的目标类型，并在 service/model 校验业务归属一致性。
+- 不读取、打印、记录或提交 `.env` 中的密钥和原始凭据；测试、日志、模板、异常信息和文档中也不得泄漏。
+
+## URL、导航与模板布局
+
+- APP URL 使用 `app_name` namespace，并由 `tmsproject/urls.py` `include()`。
+- 导航的唯一配置入口是 `core/config/navigation.yml`；不要恢复旧 `core/config/menus/*.yml` / `menus.yml` 体系。
+- 页面按用途扩展：`templates/layouts/app.html`、`minimal.html`、`auth.html`、`print.html`、`htmx.html`；`templates/base.html` 仅作为兼容/薄入口，不应成为新页面首选布局。
+- 优先复用 `templates/components/`，尤其是表单、字段和表格包装组件。
+
+## HTMX
+
+- 使用 `django_htmx.middleware.HtmxMiddleware` 提供的 `request.htmx` 判断 HTMX 请求。
+- 同一 URL 同时支持完整页和 fragment 时，明确区分模板响应，不在 view 中复制两套业务查询。
+- 若响应内容因 `HX-Request` 不同而不同且经过缓存，必须把 `HX-Request` 纳入 `Vary`/缓存键。
+- 复用项目现有 CSRF/HTMX 基础模板配置，不要为局部页面重复注入运行时脚本。
+- HTMX 只是传输与局部刷新机制；权限、校验和业务不变量必须在服务器端同样执行。
+
+## Tailwind CSS / DaisyUI / Alpine.js / Iconify
+
+当前项目使用 Tailwind CSS 4 的 CSS-first 配置，入口为 `static/css/main.css`：
+
+- 保持 `@import "tailwindcss"`、`@source`、`@plugin "daisyui"`、`@plugin "@iconify/tailwind4"` 的现有体系；不要回退到 Tailwind 3 风格配置来解决普通页面问题。
+- Tailwind 4 按源码文本检测完整 class；模板/JS 中不要通过字符串拼接动态生成 Tailwind class。需要变体时映射到**完整静态 class 字符串**，必要时使用 `@source inline()` 等 Tailwind 4 机制。
+- DaisyUI 组件优先使用语义化组件 class，再用 Tailwind utility 做局部布局和微调；保持现有主题体系。
+- Iconify 使用完整静态形式，例如 `icon-[tabler--calendar]`；不要拼接 icon 名称。
+- 项目依赖 `@alpinejs/csp`。不要添加原生内联 `<script>`、`onclick=` 或 `javascript:` URL；Alpine 指令必须保持 CSP build 可执行，复杂逻辑放入仓库静态 JS。
+- 新模板引入新的 Tailwind/Iconify class 后必须重新构建 CSS，并提交 `static/css/output.css` 的实际变化。
+
+框架行为不确定时优先查当前上游官方文档：Django 6、django-htmx、django-tables2、Tailwind CSS 4、DaisyUI 5、Alpine.js CSP 与 Iconify Tailwind 4，而不是依据旧版本经验猜测。
+
+## 常用命令
+
+所有 Django/uv 命令从仓库根目录运行，因为 `.env` 可能使用相对 SQLite URL。
+
+- 安装/同步 Python 依赖：`uv sync`
+- 新增 Python 依赖：`uv add <package>`
+- Django system check：`uv run manage.py check`
+- Ruff：`uv run ruff check .`
+- 创建迁移：`uv run manage.py makemigrations`
+- 检查是否遗漏迁移：`uv run manage.py makemigrations --check --dry-run`
+- 应用迁移：`uv run manage.py migrate`
+- 全量测试：`uv run pytest`
+- 聚焦测试：`uv run pytest <app-or-test-path>`
+- 构建 CSS：`npm run build:css`
+- 监听 CSS：`npm run watch:css`
+
+项目 uv cache 固定在 `.uv-cache/`；正常从仓库根目录运行 uv 即可。
+
+## 验证策略
+
+不要只以“页面能打开”作为完成标准。
+
+- 小范围 Python 改动：至少运行受影响测试 + `uv run ruff check <affected-paths>`。
+- Model/迁移改动：增加或修改测试，并运行 `makemigrations --check --dry-run`；确需 schema 变化时生成并检查 migration。
+- 跨 APP service、权限、核心组件或统计口径改动：优先运行相关 APP 测试，最终运行全量 `uv run pytest`。
+- 模板/CSS/Iconify class 改动：运行 `npm run build:css`。
+- 提交前至少运行 `uv run manage.py check`。
+- 每次 `git push` 前必须运行 `npm run build:css`；构建失败不得 push。构建后检查 `static/css/output.css`，有实际变化时与源码一起提交。
+
+CI 的基准流程为 Ruff -> Django check -> migration drift check -> migrate -> pytest，以及独立的前端 `npm ci` -> `npm run build:css`。本地验证应尽量与之对齐。
+
+## 性能与可维护性检查
+
+功能完成前检查：
+
+- 列表/详情页是否出现可预见的 N+1。
+- 树形/递归统计是否在循环中反复查询或重复遍历。
+- 大文件是否在无文件变化的普通 `save()` 中被重复读取/哈希。
+- 导入是否能安全重复执行，失败是否完整回滚。
+- GenericForeignKey 是否出现“对象存在但业务归属不一致”的悬空关系。
+- 权限是否只在模板隐藏而没有后端校验。
+- 同一业务规则是否被复制到 model/form/view/service 多处并开始漂移。
+
+先做有证据的优化；不要顺手重构与当前任务无关的模块。
+
+## 文档同步
+
+- 用户可见功能变化：更新 `docs/user-manual/`。
+- 核心领域术语、统计口径或业务不变量变化：更新 `CONTEXT.md`。
+- 重要架构决策或长期权衡变化：新增/更新 `docs/adr/`。
+- APP、导航、布局或标准开发路径发生变化：同步本文件及必要的 skill reference；不要在多个 agent 配置中复制整套规范。
+
+## Git 与工作区安全
+
+- 工作区可能存在用户尚未提交的修改；不要回滚或覆盖不是你创建的变更。
+- 除非用户明确要求，不使用 `git reset --hard`、`git checkout --` 等破坏性命令。
+- migrations、`uv.lock`、`package-lock.json`、`static/css/output.css` 等生成文件在相关源码变化需要它们时视为有意变更。
+- 修改范围保持聚焦；不要为了“统一风格”顺便重构无关 APP。
