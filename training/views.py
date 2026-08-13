@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.views.generic import CreateView, DetailView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
 
-from core.constants import GROUP_COACH, GROUP_COMPETITOR
+from core.permissions.roles import ROLE_COACH, ROLE_COMPETITOR
 from core.utils.mixins import TitleMixin
 
 from .forms import TrainingCycleForm, TrainingLogForm, TrainingLogUpdateForm
@@ -156,12 +156,12 @@ class TrainingLogMonthlyStatView(MonthFilterMixin, TitleMixin, LoginRequiredMixi
     title = "训练日志提交统计"
     title_icon = "icon-[tabler--chart-bar]"
 
-    def _get_add_perm_users(self, group_name):
+    def _get_add_perm_users(self, role_codename):
         from django.contrib.auth import get_user_model
 
         User = get_user_model()
         return (
-            User.objects.filter(is_active=True, groups__name=group_name)
+            User.objects.filter(is_active=True, groups__profile__codename=role_codename)
             .filter(
                 Q(user_permissions__codename="add_traininglog", user_permissions__content_type__app_label="training")
                 | Q(groups__permissions__codename="add_traininglog", groups__permissions__content_type__app_label="training")
@@ -175,8 +175,8 @@ class TrainingLogMonthlyStatView(MonthFilterMixin, TitleMixin, LoginRequiredMixi
         today = timezone.localdate()
         if start.year == today.year and start.month == today.month:
             end = min(end, today)
-        comp_qs = self._get_add_perm_users(GROUP_COMPETITOR)
-        coach_qs = self._get_add_perm_users(GROUP_COACH)
+        comp_qs = self._get_add_perm_users(ROLE_COMPETITOR)
+        coach_qs = self._get_add_perm_users(ROLE_COACH)
         comp_names = {u.id: u.display_name for u in comp_qs}
         coach_names = {u.id: u.display_name for u in coach_qs}
         user_ids = set(comp_names) | set(coach_names)

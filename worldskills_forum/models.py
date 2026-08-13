@@ -129,8 +129,8 @@ class ForumTopic(models.Model):
     competition_year = models.PositiveSmallIntegerField("世赛年份", db_index=True)
     translated_title = models.CharField("主题中文标题", max_length=300)
     original_title = models.CharField("论坛原始标题", max_length=500)
-    source_url = models.URLField("论坛主题链接", max_length=1000, validators=[http_url_validator])
-    source_topic_id = models.CharField("论坛主题 ID", max_length=120, blank=True)
+    source_url = models.URLField("论坛主题链接", max_length=1000, unique=True, validators=[http_url_validator])
+    source_topic_id = models.CharField("论坛主题 ID", max_length=120, blank=True, null=True, unique=True)
     summary = models.TextField("中文摘要", blank=True)
     module = models.ForeignKey(ForumModule, models.PROTECT, related_name="topics", verbose_name="模块")
     category = models.ForeignKey(ForumCategory, models.PROTECT, related_name="topics", verbose_name="分类")
@@ -150,10 +150,17 @@ class ForumTopic(models.Model):
 
     def clean(self):
         super().clean()
+        if not self.source_topic_id:
+            self.source_topic_id = None
         if self.source_topic_id and ForumTopic.objects.exclude(pk=self.pk).filter(source_topic_id=self.source_topic_id).exists():
             raise ValidationError({"source_topic_id": "该论坛主题 ID 已存在。"})
         if self.source_url and ForumTopic.objects.exclude(pk=self.pk).filter(source_url=self.source_url).exists():
             raise ValidationError({"source_url": "该论坛主题链接已存在。"})
+
+    def save(self, *args, **kwargs):
+        if not self.source_topic_id:
+            self.source_topic_id = None
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.translated_title
@@ -171,7 +178,7 @@ class ForumPost(models.Model):
     source_role_detail = models.CharField("身份补充说明", max_length=200, blank=True)
     posted_at = models.DateTimeField("论坛原始发布时间", default=timezone.now)
     source_url = models.URLField("原帖链接", max_length=1000, blank=True, validators=[http_url_validator])
-    source_post_id = models.CharField("论坛帖子 ID", max_length=120, blank=True, db_index=True)
+    source_post_id = models.CharField("论坛帖子 ID", max_length=120, blank=True, null=True, db_index=True)
     post_type = models.CharField("信息类型", max_length=30, choices=PostType, db_index=True)
     importance = models.CharField("重要程度", max_length=20, choices=Importance, default=Importance.NORMAL, db_index=True)
     original_content = models.TextField("英文原文")
@@ -185,13 +192,26 @@ class ForumPost(models.Model):
         verbose_name = "论坛帖子"
         verbose_name_plural = "论坛帖子"
         indexes = [models.Index(fields=["topic", "posted_at"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["topic", "source_post_id"],
+                name="uniq_forumpost_topic_source_post_id",
+            ),
+        ]
 
     def clean(self):
         super().clean()
+        if not self.source_post_id:
+            self.source_post_id = None
         if self.source_role_id and not self.source_role.allows_detail:
             self.source_role_detail = ""
         if self.source_post_id and self.topic_id and ForumPost.objects.exclude(pk=self.pk).filter(topic_id=self.topic_id, source_post_id=self.source_post_id).exists():
             raise ValidationError({"source_post_id": "该主题内已存在相同的论坛帖子 ID。"})
+
+    def save(self, *args, **kwargs):
+        if not self.source_post_id:
+            self.source_post_id = None
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.topic} - {self.author_name}"

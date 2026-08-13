@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django import forms
+from django.core.exceptions import ValidationError
 
 from archives.models import ARCHIVE_ASSET_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
@@ -58,6 +59,38 @@ class ScoringImportForm(StyledFormMixin, forms.Form):
             default_config = default_parser_config()
             if default_config:
                 self.fields["parser_config"].initial = default_config.pk
+
+
+class ScoringParserConfigAdminForm(forms.ModelForm):
+    class Meta:
+        model = ScoringParserConfig
+        fields = [
+            "parser_key",
+            "display_name",
+            "alias",
+            "description",
+            "is_enabled",
+            "is_default",
+            "order",
+        ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("is_default") and not cleaned_data.get("is_enabled"):
+            raise ValidationError({"is_default": "默认解析器必须处于启用状态。"})
+        return cleaned_data
+
+    def _post_clean(self):
+        requested_default = self.cleaned_data.get("is_default")
+        if requested_default:
+            self.cleaned_data["is_default"] = False
+            self.instance.is_default = False
+        try:
+            super()._post_clean()
+        finally:
+            if requested_default:
+                self.cleaned_data["is_default"] = True
+                self.instance.is_default = True
 
 
 class ScoringParticipantForm(StyledFormMixin, forms.ModelForm):

@@ -1,4 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.db import transaction
+from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.views.generic import CreateView, DetailView, UpdateView
 from django_tables2 import SingleTableView
@@ -9,6 +11,7 @@ from knowledge.selectors import get_skill_tree_coverage_rows, get_skill_tree_cov
 from .forms import CapabilityDomainForm, SkillNodeForm, SkillProjectForm, SkillTreeVersionForm
 from .models import CapabilityDomain, SkillNode, SkillProject, SkillTreeVersion
 from .tables import CapabilityDomainTable, SkillNodeTable, SkillProjectTable, SkillTreeVersionTable
+from .services import set_current_skill_tree_version
 
 
 MAINTAIN_PERM = "standards.add_skillproject"
@@ -116,7 +119,20 @@ class SkillTreeVersionDetailView(TitleMixin, LoginRequiredMixin, DetailView):
         return context
 
 
-class SkillTreeVersionCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
+class SkillTreeVersionStateMixin:
+    def form_valid(self, form):
+        requested_current = form.cleaned_data.get("is_current", False)
+        with transaction.atomic():
+            self.object = form.save(commit=False)
+            if requested_current:
+                self.object.is_current = False
+            self.object.save()
+            if requested_current:
+                self.object = set_current_skill_tree_version(self.object)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class SkillTreeVersionCreateView(SkillTreeVersionStateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
     model = SkillTreeVersion
     form_class = SkillTreeVersionForm
     template_name = "common/form.html"
@@ -128,7 +144,7 @@ class SkillTreeVersionCreateView(TitleMixin, PermissionRequiredMixin, CreateView
         return reverse("standards:tree_detail", args=[self.object.pk])
 
 
-class SkillTreeVersionUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
+class SkillTreeVersionUpdateView(SkillTreeVersionStateMixin, TitleMixin, PermissionRequiredMixin, UpdateView):
     model = SkillTreeVersion
     form_class = SkillTreeVersionForm
     template_name = "common/form.html"

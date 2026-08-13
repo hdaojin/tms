@@ -27,6 +27,18 @@ class SkillTreeVersionForm(StyledFormMixin, forms.ModelForm):
         fields = ["skill_project", "version", "name", "description", "is_current"]
         widgets = {"description": forms.Textarea(attrs={"rows": 4})}
 
+    def _post_clean(self):
+        requested_current = self.cleaned_data.get("is_current")
+        if requested_current:
+            self.cleaned_data["is_current"] = False
+            self.instance.is_current = False
+        try:
+            super()._post_clean()
+        finally:
+            if requested_current:
+                self.cleaned_data["is_current"] = True
+                self.instance.is_current = True
+
 
 class SkillNodeForm(StyledFormMixin, forms.ModelForm):
     tags_text = forms.CharField(label="标签", required=False, widget=forms.Textarea(attrs={"rows": 2}))

@@ -18,6 +18,7 @@ from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve, reverse
 
 from accounts.services.permission_bundles import sync_user_permission_bundles
+from accounts.models import GroupProfile
 from behaviors.models import ConductSummary
 from core import navigation
 from core.forms.fields import MultipleFileField
@@ -37,6 +38,8 @@ from core.uploads import (
 )
 from core.tables import ActionsColumn, BaseTable
 from core.utils.admin_deletion import discard_registered_delete_permissions, register_delete_permission_exemptions
+from core.permissions.roles import ROLE_COACH, ROLE_COMPETITOR, get_user_role_codenames
+from core.utils.mixins import CrossGroupAccessMixin
 
 
 User = get_user_model()
@@ -44,6 +47,47 @@ PDF_BYTES = b"%PDF-1.7\n% test pdf\n"
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 ZIP_BYTES = b"PK\x03\x04" + b"\x00" * 16
 JSON_BYTES = b'{"ok": true}'
+
+
+class RoleCodenameAccessTests(TestCase):
+    def setUp(self):
+        self.coach_group = Group.objects.create(name="教练显示名")
+        GroupProfile.objects.create(group=self.coach_group, codename=ROLE_COACH)
+        self.competitor_group = Group.objects.create(name="选手显示名")
+        GroupProfile.objects.create(group=self.competitor_group, codename=ROLE_COMPETITOR)
+        self.coach = User.objects.create_user(username="role-coach", password="testpass123")
+        self.coach.groups.add(self.coach_group)
+        self.competitor = User.objects.create_user(username="role-competitor", password="testpass123")
+        self.competitor.groups.add(self.competitor_group)
+
+    def test_role_lookup_uses_profile_codename_and_is_one_query(self):
+        with self.assertNumQueries(1):
+            roles = get_user_role_codenames(self.coach)
+
+        self.assertSetEqual(roles, {ROLE_COACH})
+
+        self.coach_group.name = "任意新的教练显示名称"
+        self.coach_group.save(update_fields=["name"])
+        self.assertSetEqual(get_user_role_codenames(self.coach), {ROLE_COACH})
+
+    def test_cross_group_access_uses_stable_codenames_and_handles_missing_profile(self):
+        class AccessProbe(CrossGroupAccessMixin):
+            pass
+
+        probe = AccessProbe()
+        probe.request = SimpleNamespace(user=self.competitor)
+        obj = SimpleNamespace(uploaded_by=self.coach)
+        self.assertTrue(probe.check_cross_group_access(obj))
+
+        self.competitor_group.name = "选手的新显示名称"
+        self.competitor_group.save(update_fields=["name"])
+        self.assertTrue(probe.check_cross_group_access(obj))
+
+        unprofiled_group = Group.objects.create(name="没有 profile 的历史组")
+        unprofiled_user = User.objects.create_user(username="unprofiled-user", password="testpass123")
+        unprofiled_user.groups.add(unprofiled_group)
+        probe.request = SimpleNamespace(user=unprofiled_user)
+        self.assertFalse(probe.check_cross_group_access(obj))
 
 
 class DeletePermissionExemptionRegistryTests(TestCase):

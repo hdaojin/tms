@@ -8,7 +8,6 @@ from pathlib import Path
 from decimal import Decimal
 
 from core.constants import (
-    GROUP_COMPETITOR,
     BEHAVIORS_UPLOAD_DIR,
     CONDUCT_NATURE_REWARD,
     CONDUCT_NATURE_PENALTY,
@@ -20,6 +19,7 @@ from core.constants import (
     CONDUCT_PENALTY_SEVERITY_NAMES,
 )
 from core.models import AuditedModel
+from core.permissions.roles import ROLE_COMPETITOR, user_has_role
 from core.uploads import CONDUCT_ATTACHMENT_UPLOAD_SPEC
 from core.utils.validators import validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
@@ -243,7 +243,7 @@ class ConductRecord(models.Model):
         on_delete=models.CASCADE,
         related_name='conduct_records',
         verbose_name='学生',
-        limit_choices_to={'groups__name': GROUP_COMPETITOR}
+        limit_choices_to={'groups__profile__codename': ROLE_COMPETITOR}
     )
     item = models.ForeignKey(
         ConductItem,
@@ -339,7 +339,7 @@ class ConductRecord(models.Model):
         """验证学生范围与审核状态流。"""
         errors = {}
 
-        if self.student and not self.student.groups.filter(name=GROUP_COMPETITOR).exists():
+        if self.student and not user_has_role(self.student, ROLE_COMPETITOR):
             errors['student'] = '只能为选手组用户录入奖惩记录。'
 
         if self.item and self.severity:
@@ -430,7 +430,7 @@ class ConductSummary(models.Model):
         on_delete=models.CASCADE,
         related_name='conduct_summary',
         verbose_name='学生',
-        limit_choices_to={'groups__name': GROUP_COMPETITOR}
+        limit_choices_to={'groups__profile__codename': ROLE_COMPETITOR}
     )
     total_score = models.DecimalField(
         '总分',

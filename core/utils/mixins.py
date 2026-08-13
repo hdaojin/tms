@@ -5,14 +5,14 @@
 """
 from __future__ import annotations
 
-from typing import Any, Set
+from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404
 from django.urls import reverse
 
-from core.constants import GROUP_COACH, GROUP_COMPETITOR
+from core.permissions.roles import ROLE_COACH, ROLE_COMPETITOR, get_user_role_codenames
 
 
 class SuperuserRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -45,14 +45,9 @@ class CrossGroupAccessMixin:
     """
     owner_field: str = "uploaded_by"  # 所有者字段名，子类可覆盖
     
-    def get_user_groups(self, user: Any) -> Set[str]:
-        """获取用户所属的组名集合"""
-        if not user or not getattr(user, 'pk', None):
-            return set()
-        groups = getattr(user, 'groups', None)
-        if groups is None:
-            return set()
-        return set(groups.values_list('name', flat=True))
+    def get_user_role_codenames(self, user: Any) -> set[str]:
+        """获取用户稳定的角色 codename 集合。"""
+        return get_user_role_codenames(user)
     
     def check_cross_group_access(self, obj: Any) -> bool:
         """
@@ -79,15 +74,15 @@ class CrossGroupAccessMixin:
             return True
         
         # 检查跨组访问权限
-        user_groups = self.get_user_groups(user)
+        user_roles = self.get_user_role_codenames(user)
         owner_user = owner if owner else None
-        owner_groups = self.get_user_groups(owner_user) if owner_user else set()
+        owner_roles = self.get_user_role_codenames(owner_user) if owner_user else set()
         
         # 选手可以查看教练，教练可以查看选手
-        is_user_competitor = GROUP_COMPETITOR in user_groups
-        is_user_coach = GROUP_COACH in user_groups
-        is_owner_competitor = GROUP_COMPETITOR in owner_groups
-        is_owner_coach = GROUP_COACH in owner_groups
+        is_user_competitor = ROLE_COMPETITOR in user_roles
+        is_user_coach = ROLE_COACH in user_roles
+        is_owner_competitor = ROLE_COMPETITOR in owner_roles
+        is_owner_coach = ROLE_COACH in owner_roles
         
         return (is_user_competitor and is_owner_coach) or (is_user_coach and is_owner_competitor)
     

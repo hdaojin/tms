@@ -153,11 +153,31 @@ class ArchiveAsset(models.Model):
             return "-"
         return str(self.target_object)
 
+    def _should_recalculate_hash(self, update_fields=None):
+        if not self.file:
+            return False
+        if self._state.adding or not self.file_sha256:
+            return True
+        if update_fields is not None and "file" not in update_fields:
+            return False
+        return not getattr(self.file, "_committed", True)
+
     def save(self, *args, **kwargs):
+        update_fields = kwargs.get("update_fields")
+        missing_original_filename = bool(self.file and not self.original_filename)
         if self.file:
             if not self.original_filename:
                 self.original_filename = PurePosixPath(self.file.name).name
+        should_recalculate_hash = self._should_recalculate_hash(update_fields)
+        if should_recalculate_hash:
             self.file_sha256 = calculate_file_sha256(self.file)
+        if update_fields is not None and (should_recalculate_hash or missing_original_filename):
+            fields = set(update_fields)
+            if should_recalculate_hash:
+                fields.add("file_sha256")
+            if missing_original_filename:
+                fields.add("original_filename")
+            kwargs["update_fields"] = fields
         super().save(*args, **kwargs)
 
     def __str__(self):

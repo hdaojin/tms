@@ -7,14 +7,14 @@ from .models import ConductRecord, ConductSummary
 class ConductRecordTable(BaseTable):
     student = tables.Column(
         verbose_name="学生",
-        accessor="student.display_name",
+        accessor="student__display_name",
     )
     nature = tables.Column(
         verbose_name="奖惩性质",
-        accessor="item.category.nature",
+        accessor="item__category__nature",
         order_by=("item__category__nature",),
     )
-    item = tables.Column(verbose_name="奖惩事项", accessor="item.name")
+    item = tables.Column(verbose_name="奖惩事项", accessor="item__name")
     reason = tables.Column(verbose_name="具体原因/描述")
     severity_label = tables.Column(verbose_name="程度", orderable=False)
     occurred_date = BaseDateColumn(verbose_name="发生日期")
@@ -52,7 +52,7 @@ class ConductRecordTable(BaseTable):
 class ConductSummaryTable(BaseTable):
     student = tables.Column(
         verbose_name="学生",
-        accessor="student.display_name",
+        accessor="student__display_name",
     )
     total_score = tables.Column(verbose_name="总分")
     reward_count = tables.Column(verbose_name="奖励次数")

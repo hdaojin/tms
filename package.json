@@ -1,23 +1,23 @@
 {
-  "dependencies": {
-    "@alpinejs/csp": "^3.15.12",
-    "@tailwindcss/cli": "^4.1.12",
-    "@upstash/context7-mcp": "^2.2.1",
-    "mermaid": "11.16.1",
-    "tailwindcss": "^4.1.12"
-  },
   "devDependencies": {
+    "@alpinejs/csp": "^3.15.12",
     "@iconify/json": "^2.2.428",
     "@iconify/tailwind4": "^1.0.6",
+    "@tailwindcss/cli": "^4.1.12",
     "@tailwindcss/typography": "^0.5.19",
     "daisyui": "^5.0.50",
+    "mermaid": "11.16.1",
     "prettier": "^3.6.2",
     "prettier-plugin-jinja-template": "^2.1.0",
-    "prettier-plugin-tailwindcss": "^0.7.1"
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "tailwindcss": "^4.1.12"
   },
   "scripts": {
     "build:css": "tailwindcss --input static/css/main.css --output static/css/output.css --minify",
-    "watch:css": "tailwindcss --input static/css/main.css --output static/css/output.css --watch"
+    "watch:css": "tailwindcss --input static/css/main.css --output static/css/output.css --watch",
+    "copy:mermaid": "node -e \"require('fs').cpSync('node_modules/mermaid/dist/mermaid.min.js', 'static/js/mermaid.min.js')\"",
+    "copy:alpine": "node -e \"require('fs').cpSync('node_modules/@alpinejs/csp/dist/cdn.min.js', 'static/js/alpinejs.min.js')\"",
+    "copy:static": "npm run copy:mermaid && npm run copy:alpine"
   },
   "prettier": {
     "plugins": [

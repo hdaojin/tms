@@ -4,7 +4,9 @@ from django.test import TestCase
 from knowledge.models import KnowledgeEvidence, KnowledgeEvidenceSkillMap
 from knowledge.selectors import get_skill_tree_coverage_summary
 
+from .forms import SkillTreeVersionForm
 from .models import CapabilityDomain, SkillNode, SkillProject, SkillTreeVersion
+from .services import set_current_skill_tree_version
 
 
 class SkillTreeModelTests(TestCase):
@@ -15,16 +17,16 @@ class SkillTreeModelTests(TestCase):
             skill_project=self.project,
             version="v1",
             name="标准技能树 v1",
-            is_current=True,
         )
+        self.tree = set_current_skill_tree_version(self.tree)
 
     def test_project_is_not_duplicated_by_competition_level(self):
-        SkillTreeVersion.objects.create(
+        replacement = SkillTreeVersion.objects.create(
             skill_project=self.project,
             version="v2",
             name="标准技能树 v2",
-            is_current=True,
         )
+        set_current_skill_tree_version(replacement)
 
         self.tree.refresh_from_db()
         self.assertEqual(SkillProject.objects.count(), 1)
@@ -63,13 +65,70 @@ class SkillTreeModelTests(TestCase):
         self.assertEqual(category.get_descendants(), [topic, skill])
 
         with self.assertRaises(ValidationError):
-            SkillNode.objects.create(
+            SkillNode(
                 tree_version=self.tree,
                 capability_domain=self.linux,
                 node_type=SkillNode.NodeType.TOPIC,
                 code="BAD",
                 name="错误根节点",
-            )
+            ).full_clean()
+
+    def test_current_version_switch_is_atomic_and_project_scoped(self):
+        other_project = SkillProject.objects.create(code="WIN", name="Windows")
+        other_domain = CapabilityDomain.objects.create(skill_project=other_project, code="WIN", name="Windows")
+        other_tree = SkillTreeVersion.objects.create(
+            skill_project=other_project,
+            version="v1",
+            name="Windows v1",
+        )
+        set_current_skill_tree_version(self.tree)
+        set_current_skill_tree_version(other_tree)
+
+        replacement = SkillTreeVersion.objects.create(
+            skill_project=self.project,
+            version="v2",
+            name="标准技能树 v2",
+        )
+        set_current_skill_tree_version(replacement)
+
+        self.assertFalse(SkillTreeVersion.objects.get(pk=self.tree.pk).is_current)
+        self.assertTrue(SkillTreeVersion.objects.get(pk=replacement.pk).is_current)
+        self.assertTrue(SkillTreeVersion.objects.get(pk=other_tree.pk).is_current)
+        self.assertEqual(other_domain.skill_project_id, other_project.pk)
+
+    def test_current_version_switch_rolls_back_when_target_save_fails(self):
+        from unittest.mock import patch
+
+        set_current_skill_tree_version(self.tree)
+        replacement = SkillTreeVersion.objects.create(
+            skill_project=self.project,
+            version="v2",
+            name="标准技能树 v2",
+        )
+        with patch.object(SkillTreeVersion, "save", side_effect=RuntimeError("保存失败")):
+            with self.assertRaises(RuntimeError):
+                set_current_skill_tree_version(replacement)
+
+        self.assertTrue(SkillTreeVersion.objects.get(pk=self.tree.pk).is_current)
+        self.assertFalse(SkillTreeVersion.objects.get(pk=replacement.pk).is_current)
+
+    def test_normal_version_save_does_not_change_other_current_state(self):
+        set_current_skill_tree_version(self.tree)
+        self.tree.name = "更新名称"
+        self.tree.save(update_fields=["name"])
+        self.assertTrue(SkillTreeVersion.objects.get(pk=self.tree.pk).is_current)
+
+    def test_form_allows_explicit_current_transition_for_service(self):
+        form = SkillTreeVersionForm(
+            data={
+                "skill_project": self.project.pk,
+                "version": "v2",
+                "name": "标准技能树 v2",
+                "description": "",
+                "is_current": "on",
+            }
+        )
+        self.assertTrue(form.is_valid(), form.errors)
 
     def test_coverage_summary_counts_only_approved_evidence_and_mapping(self):
         category = SkillNode.objects.create(

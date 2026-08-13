@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.db import transaction
 
 from .models import (
     JudgementOption,
@@ -11,6 +12,8 @@ from .models import (
     ScoringSchemeImport,
     ScoringSubCriterion,
 )
+from .forms import ScoringParserConfigAdminForm
+from .services import set_default_parser_config
 
 
 class ScoringSubCriterionInline(admin.TabularInline):
@@ -35,6 +38,7 @@ class ScoringAspectAdmin(admin.ModelAdmin):
 
 @admin.register(ScoringParserConfig)
 class ScoringParserConfigAdmin(admin.ModelAdmin):
+    form = ScoringParserConfigAdminForm
     list_display = ("parser_key", "display_name", "alias", "is_enabled", "is_default", "order", "updated_at")
     list_filter = ("is_enabled", "is_default")
     search_fields = ("parser_key", "display_name", "alias", "description")
@@ -56,6 +60,15 @@ class ScoringParserConfigAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    def save_model(self, request, obj, form, change):
+        requested_default = obj.is_default
+        if requested_default:
+            obj.is_default = False
+        with transaction.atomic():
+            super().save_model(request, obj, form, change)
+            if requested_default:
+                set_default_parser_config(obj)
 
 
 @admin.register(ScoringSchemeImport)

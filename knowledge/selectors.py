@@ -61,34 +61,69 @@ def get_skill_tree_coverage_rows(tree_version):
     rows = []
     nodes = list(
         tree_version.nodes.select_related("capability_domain", "parent")
-        .prefetch_related("children")
         .order_by("capability_domain__order", "parent_id", "order", "code", "pk")
     )
     node_by_id = {node.pk: node for node in nodes}
-    skill_nodes_by_domain = {}
+    children_by_parent_id = {}
     for node in nodes:
-        if node.is_active and node.is_skill():
-            skill_nodes_by_domain.setdefault(node.capability_domain_id, []).append(node)
+        children_by_parent_id.setdefault(node.parent_id, []).append(node)
+    for children in children_by_parent_id.values():
+        children.sort(key=lambda node: (node.order, node.code, node.name, node.pk))
+
+    subtree_stats_by_id = {}
+    zero_stats = (0, 0, Decimal("0.00"))
+
+    def get_subtree_stats(node_id, visiting=None):
+        if node_id in subtree_stats_by_id:
+            return subtree_stats_by_id[node_id]
+        if visiting is None:
+            visiting = set()
+        if node_id in visiting:
+            return zero_stats
+
+        node = node_by_id.get(node_id)
+        if node is None:
+            return zero_stats
+
+        visiting.add(node_id)
+        if node.is_skill():
+            if node.is_active:
+                node_stats = direct.get(node.pk, {})
+                result = (
+                    1,
+                    node_stats.get("evidence_count", 0),
+                    node_stats.get("weighted_mark", Decimal("0.00")),
+                )
+            else:
+                result = zero_stats
+        else:
+            skill_count = 0
+            evidence_count = 0
+            weighted_mark = Decimal("0.00")
+            for child in children_by_parent_id.get(node_id, []):
+                if not child.is_active:
+                    continue
+                child_skill_count, child_evidence_count, child_weighted_mark = get_subtree_stats(
+                    child.pk,
+                    visiting,
+                )
+                skill_count += child_skill_count
+                evidence_count += child_evidence_count
+                weighted_mark += child_weighted_mark
+            result = (skill_count, evidence_count, weighted_mark)
+        visiting.remove(node_id)
+        subtree_stats_by_id[node_id] = result
+        return result
 
     for node in nodes:
         node_direct = direct.get(node.pk, {"evidence_count": 0, "weighted_mark": Decimal("0.00")})
-        if node.is_skill():
-            subtree_skill_ids = [node.pk] if node.is_active else []
-        else:
-            descendants = node.get_descendants(active_only=True)
-            subtree_skill_ids = [child.pk for child in descendants if child.is_skill()]
-        subtree_evidence = 0
-        subtree_mark = Decimal("0.00")
-        for skill_id in subtree_skill_ids:
-            skill_stats = direct.get(skill_id, {"evidence_count": 0, "weighted_mark": Decimal("0.00")})
-            subtree_evidence += skill_stats["evidence_count"]
-            subtree_mark += skill_stats["weighted_mark"]
+        subtree_skill_count, subtree_evidence, subtree_mark = get_subtree_stats(node.pk)
         rows.append(
             {
                 "node": node,
                 "direct_evidence_count": node_direct["evidence_count"],
                 "direct_weighted_mark": node_direct["weighted_mark"],
-                "subtree_skill_count": len(subtree_skill_ids),
+                "subtree_skill_count": subtree_skill_count,
                 "subtree_evidence_count": subtree_evidence,
                 "subtree_weighted_mark": subtree_mark,
                 "is_covered": subtree_evidence > 0,

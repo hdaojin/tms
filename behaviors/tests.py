@@ -16,6 +16,7 @@ from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from accounts.models import GroupProfile
 from core.constants import (
     CONDUCT_NATURE_PENALTY,
     CONDUCT_NATURE_REWARD,
@@ -25,12 +26,19 @@ from core.constants import (
     CONDUCT_SEVERITY_SEVERE,
     GROUP_COMPETITOR,
 )
+from core.permissions.roles import ROLE_COMPETITOR
 from behaviors.admin import ConductCategoryAdmin, ConductItemAdmin, ConductRecordAdmin, ConductSeverityRuleAdmin, ConductSummaryAdmin
 from behaviors.models import ConductCategory, ConductItem, ConductRecord, ConductSeverityRule, ConductSummary
 from behaviors.services import prepare_conduct_record_for_save
 
 
 User = get_user_model()
+
+
+def create_competitor_group():
+    group = Group.objects.create(name=GROUP_COMPETITOR)
+    GroupProfile.objects.create(group=group, codename=ROLE_COMPETITOR)
+    return group
 
 
 class ConductItemValidationTestCase(TestCase):
@@ -150,7 +158,7 @@ class ConductRecordValidationTestCase(TestCase):
     """奖惩记录应遵守选手范围与审核状态流。"""
 
     def setUp(self):
-        self.competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        self.competitor_group = create_competitor_group()
         self.student = User.objects.create_user(username='student', password='testpass123')
         self.student.groups.add(self.competitor_group)
         self.outsider = User.objects.create_user(username='outsider', password='testpass123')
@@ -291,7 +299,7 @@ class ConductSummarySynchronizationTestCase(TestCase):
     """默认分值与严重程度系数变更后，汇总应自动重算。"""
 
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_competitor_group()
         self.student = User.objects.create_user(username='summary-student', password='testpass123')
         self.student.groups.add(competitor_group)
         self.recorder = User.objects.create_user(username='summary-recorder', password='testpass123')
@@ -351,7 +359,7 @@ class ConductSummaryZeroScoreCountTestCase(TestCase):
     """零分惩罚仍应计入惩罚次数。"""
 
     def test_warning_style_penalty_counts_but_does_not_reduce_total(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_competitor_group()
         student = User.objects.create_user(username='warning-student', password='testpass123')
         student.groups.add(competitor_group)
         recorder = User.objects.create_user(username='warning-recorder', password='testpass123')
@@ -402,7 +410,7 @@ class ConductRecordAdminTestCase(TestCase):
     """仅保留后台时，admin 仍需区分录入与审核权限。"""
 
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_competitor_group()
         self.student = User.objects.create_user(username='admin-student', password='testpass123')
         self.student.groups.add(competitor_group)
 
@@ -608,7 +616,7 @@ class ConductRecordAdminTestCase(TestCase):
 
 class ConductWorkflowServiceTests(TestCase):
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_competitor_group()
         self.student = User.objects.create_user(username='workflow-student', password='testpass123')
         self.student.groups.add(competitor_group)
         self.recorder = User.objects.create_user(username='workflow-recorder', password='testpass123')
@@ -669,7 +677,7 @@ class ConductRecordListViewTests(TestCase):
     """奖惩记录列表应展示核心字段并隐藏录入元数据。"""
 
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_competitor_group()
         self.student = User.objects.create_user(username='list-student', password='testpass123')
         self.student.groups.add(competitor_group)
         self.other_student = User.objects.create_user(username='list-other-student', password='testpass123')
@@ -755,7 +763,7 @@ class ConductRecordListViewTests(TestCase):
 
 class ConductRecordCreateViewTests(TestCase):
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_competitor_group()
         self.student = User.objects.create_user(username='create-student', password='testpass123')
         self.student.groups.add(competitor_group)
         self.recorder = User.objects.create_user(username='create-recorder', password='testpass123')

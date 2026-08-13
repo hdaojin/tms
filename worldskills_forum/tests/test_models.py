@@ -1,10 +1,11 @@
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.db.models.deletion import ProtectedError
 
 from django.utils import timezone
 
 from worldskills_forum.forms import ForumPostTranslationForm, ForumTopicForm
-from worldskills_forum.models import ForumPost, ForumPostAttachment, ForumSourceRole, ForumTag, ForumTopicReadState
+from worldskills_forum.models import ForumPost, ForumPostAttachment, ForumSourceRole, ForumTag, ForumTopic, ForumTopicReadState
 
 from .base import ForumTestCase
 
@@ -75,10 +76,11 @@ class ForumModelTests(ForumTestCase):
             slug="technical-delegate",
             sort_order=10,
         )
-        create_form = ForumPostTranslationForm(topic=self.make_topic())
+        topic = self.make_topic()
+        create_form = ForumPostTranslationForm(topic=topic)
         self.assertIn(custom_role, create_form.fields["source_role"].queryset)
 
-        post = self.make_post(source_role=custom_role)
+        post = self.make_post(topic=topic, source_role=custom_role)
         custom_role.is_active = False
         custom_role.save(update_fields=["is_active"])
         self.assertNotIn(
@@ -109,13 +111,81 @@ class ForumModelTests(ForumTestCase):
 
     def test_source_ids_are_validated_without_conditional_constraints(self):
         topic = self.make_topic(source_topic_id="topic-1")
-        duplicate = self.make_topic(source_url="https://forum.example.com/t/other", source_topic_id="topic-1")
+        duplicate = ForumTopic(
+            competition_year=2026,
+            translated_title="重复来源主题",
+            original_title="Duplicate source topic",
+            source_url="https://forum.example.com/t/other",
+            source_topic_id="topic-1",
+            module=self.module,
+            category=self.category,
+        )
         with self.assertRaises(ValidationError):
             duplicate.full_clean()
         self.make_post(topic=topic, source_post_id="post-1")
         duplicate_post = ForumPost(topic=topic, source_post_id="post-1")
         with self.assertRaises(ValidationError):
             duplicate_post.full_clean(exclude=["author_name", "source_role", "posted_at", "post_type", "original_content", "created_by", "updated_by"])
+
+    def test_empty_source_ids_are_normalized_to_null_and_can_repeat(self):
+        first = self.make_topic()
+        second = self.make_topic(source_url="https://forum.example.com/t/other")
+        self.assertIsNone(first.source_topic_id)
+        self.assertIsNone(second.source_topic_id)
+
+        first_post = self.make_post(topic=first)
+        second_post = self.make_post(topic=first, source_url="https://forum.example.com/p/102")
+        self.assertIsNone(first_post.source_post_id)
+        self.assertIsNone(second_post.source_post_id)
+
+        other_topic_post = self.make_post(topic=second, source_url="https://forum.example.com/p/103")
+        first_post.source_post_id = "shared-post-id"
+        first_post.save(update_fields=["source_post_id"])
+        other_topic_post.source_post_id = "shared-post-id"
+        other_topic_post.save(update_fields=["source_post_id"])
+
+    def test_database_constraints_reject_duplicate_forum_sources(self):
+        topic = self.make_topic(source_topic_id="topic-1")
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ForumTopic.objects.create(
+                    competition_year=2026,
+                    translated_title="重复来源主题",
+                    original_title="Duplicate source topic",
+                    source_url="https://forum.example.com/t/duplicate",
+                    source_topic_id="topic-1",
+                    module=self.module,
+                    category=self.category,
+                )
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ForumTopic.objects.create(
+                    competition_year=2026,
+                    translated_title="重复链接主题",
+                    original_title="Duplicate source URL",
+                    source_url=topic.source_url,
+                    module=self.module,
+                    category=self.category,
+                )
+
+        post = self.make_post(topic=topic, source_post_id="post-1")
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                ForumPost.objects.create(
+                    topic=topic,
+                    author_name="Expert B",
+                    source_role=self.expert_role,
+                    source_url="https://forum.example.com/p/duplicate",
+                    source_post_id="post-1",
+                    post_type="discussion",
+                    importance="normal",
+                    original_content="Duplicate post",
+                )
+
+        other_topic = self.make_topic(source_url="https://forum.example.com/t/other-topic")
+        other_post = self.make_post(topic=other_topic, source_url="https://forum.example.com/p/other-topic", source_post_id="post-1")
+        self.assertEqual(other_post.source_post_id, post.source_post_id)
 
     def test_category_is_protected_and_read_state_is_unique(self):
         topic = self.make_topic()

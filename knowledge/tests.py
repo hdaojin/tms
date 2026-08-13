@@ -5,7 +5,8 @@ from standards.models import CapabilityDomain, SkillNode, SkillProject, SkillTre
 
 from .forms import KnowledgeEvidenceForm, KnowledgeEvidenceSkillMapForm
 from .models import KnowledgeEvidence, KnowledgeEvidenceSkillMap
-from .selectors import get_evidence_mapping_summary, get_unmapped_evidences
+from .selectors import get_evidence_mapping_summary, get_skill_tree_coverage_rows, get_unmapped_evidences
+from standards.services import set_current_skill_tree_version
 
 
 class KnowledgeMappingTests(TestCase):
@@ -16,8 +17,8 @@ class KnowledgeMappingTests(TestCase):
             skill_project=self.project,
             version="v1",
             name="v1",
-            is_current=True,
         )
+        self.tree = set_current_skill_tree_version(self.tree)
         self.old_tree = SkillTreeVersion.objects.create(
             skill_project=self.project,
             version="v0",
@@ -137,6 +138,87 @@ class KnowledgeMappingTests(TestCase):
         self.assertEqual(summary["mapped_evidence_count"], 1)
         self.assertEqual(summary["unmapped_evidence_count"], 2)
         self.assertEqual(summary["weighted_mark"], 5)
+
+    def test_skill_tree_coverage_uses_fixed_queries_and_respects_active_branches(self):
+        topic = SkillNode.objects.create(
+            tree_version=self.tree,
+            capability_domain=self.linux,
+            parent=self.category,
+            node_type=SkillNode.NodeType.TOPIC,
+            code="ACCESS",
+            name="访问控制",
+        )
+        topic_skill = SkillNode.objects.create(
+            tree_version=self.tree,
+            capability_domain=self.linux,
+            parent=topic,
+            node_type=SkillNode.NodeType.SKILL,
+            code="ACCESS-SSH",
+            name="SSH 访问控制",
+        )
+        inactive_topic = SkillNode.objects.create(
+            tree_version=self.tree,
+            capability_domain=self.linux,
+            parent=self.category,
+            node_type=SkillNode.NodeType.TOPIC,
+            code="LEGACY",
+            name="旧访问控制",
+            is_active=False,
+        )
+        legacy_skill = SkillNode.objects.create(
+            tree_version=self.tree,
+            capability_domain=self.linux,
+            parent=inactive_topic,
+            node_type=SkillNode.NodeType.SKILL,
+            code="LEGACY-SSH",
+            name="旧 SSH 访问控制",
+        )
+        topic_evidence = KnowledgeEvidence.objects.create(
+            skill_project=self.project,
+            capability_domain=self.linux,
+            source_type=KnowledgeEvidence.SourceType.MANUAL,
+            title="限制 SSH 访问",
+            estimated_mark="6.00",
+            review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
+        )
+        KnowledgeEvidenceSkillMap.objects.create(
+            evidence=topic_evidence,
+            skill_node=topic_skill,
+            weight="0.50",
+            review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
+        )
+        legacy_evidence = KnowledgeEvidence.objects.create(
+            skill_project=self.project,
+            capability_domain=self.linux,
+            source_type=KnowledgeEvidence.SourceType.MANUAL,
+            title="旧 SSH 规则",
+            estimated_mark="3.00",
+            review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
+        )
+        KnowledgeEvidenceSkillMap.objects.create(
+            evidence=legacy_evidence,
+            skill_node=legacy_skill,
+            weight="1.00",
+            review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
+        )
+        KnowledgeEvidenceSkillMap.objects.create(
+            evidence=self.evidence,
+            skill_node=self.skill,
+            weight="0.50",
+            review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
+        )
+
+        with self.assertNumQueries(2):
+            rows = get_skill_tree_coverage_rows(self.tree)
+
+        by_code = {row["node"].code: row for row in rows}
+        self.assertEqual(by_code["LINUX"]["subtree_skill_count"], 2)
+        self.assertEqual(by_code["LINUX"]["subtree_evidence_count"], 2)
+        self.assertEqual(by_code["ACCESS"]["subtree_skill_count"], 1)
+        self.assertEqual(by_code["ACCESS"]["subtree_weighted_mark"], 3)
+        self.assertEqual(by_code["LEGACY"]["subtree_skill_count"], 1)
+        self.assertEqual(by_code["LEGACY"]["subtree_evidence_count"], 1)
+        self.assertEqual(by_code["FTP"]["subtree_skill_count"], 0)
 
     def test_reject_requires_note(self):
         with self.assertRaises(ValidationError):

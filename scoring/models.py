@@ -70,10 +70,6 @@ class ScoringScheme(models.Model):
         if self.event_module_id and self.module_code and self.event_module.code != self.module_code:
             raise ValidationError({"module_code": f"评分表模块代码必须与事件模块一致：{self.event_module.code}。"})
 
-    def save(self, *args, **kwargs):
-        self.clean()
-        super().save(*args, **kwargs)
-
     def __str__(self):
         return f"{self.module_code} - {self.module_name}"
 
@@ -109,9 +105,8 @@ class ScoringParserConfig(models.Model):
             raise ValidationError({"is_default": "默认解析器必须处于启用状态。"})
 
     def save(self, *args, **kwargs):
-        self.clean()
-        if self.is_default:
-            type(self).objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+        if self.is_default and not self.is_enabled:
+            raise ValidationError({"is_default": "默认解析器必须处于启用状态。"})
         super().save(*args, **kwargs)
 
     def __str__(self):

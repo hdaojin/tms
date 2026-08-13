@@ -100,14 +100,6 @@ class SkillTreeVersion(models.Model):
             ),
         ]
 
-    def save(self, *args, **kwargs):
-        if self.is_current and self.skill_project_id:
-            type(self).objects.filter(
-                skill_project_id=self.skill_project_id,
-                is_current=True,
-            ).exclude(pk=self.pk).update(is_current=False)
-        super().save(*args, **kwargs)
-
     def __str__(self):
         suffix = "（当前）" if self.is_current else ""
         return f"{self.skill_project.code} / {self.name} {self.version}{suffix}"
@@ -203,10 +195,6 @@ class SkillNode(models.Model):
                 raise ValidationError({"parent": "标准技能点下不能再创建子节点。"})
         if self.pk and self.node_type == self.NodeType.SKILL and self.children.exists():
             raise ValidationError({"node_type": "已有子节点的节点不能改为标准技能点。"})
-
-    def save(self, *args, **kwargs):
-        self.clean()
-        super().save(*args, **kwargs)
 
     def is_skill(self):
         return self.node_type == self.NodeType.SKILL

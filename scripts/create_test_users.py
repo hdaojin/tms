@@ -27,6 +27,7 @@ from django.utils import timezone
 from accounts.models import GroupProfile, UserProfile
 from accounts.services.permission_bundles import sync_group_permission_bundles
 from core.constants import GROUP_COACH, GROUP_COMPETITOR
+from core.permissions.roles import ROLE_COMPETITOR
 
 
 PermissionSpec = tuple[str, str, str]
@@ -191,20 +192,21 @@ def next_sequence(username_prefix: str) -> int:
     return max_sequence + 1
 
 
-def build_student_id(user, group: Group) -> str | None:
-    if group.name != GROUP_COMPETITOR:
+def build_student_id(user, group_profile: GroupProfile) -> str | None:
+    if group_profile.codename != ROLE_COMPETITOR:
         return None
-    return f"S{group.pk:02d}{user.pk:08d}"
+    return f"S{group_profile.group_id:02d}{user.pk:08d}"
 
 
-def create_profile(user, group: Group, sequence: int) -> None:
+def create_profile(user, group: Group, group_profile: GroupProfile, sequence: int) -> None:
+    is_competitor = group_profile.codename == ROLE_COMPETITOR
     profile = UserProfile(
         user=user,
-        student_id=build_student_id(user, group),
+        student_id=build_student_id(user, group_profile),
         name_pronunciation=user.username,
         gender=UserProfile.Gender.MALE if sequence % 2 else UserProfile.Gender.FEMALE,
-        join_date=timezone.localdate() if group.name == GROUP_COMPETITOR else None,
-        original_class=f"{group.name}测试班" if group.name == GROUP_COMPETITOR else None,
+        join_date=timezone.localdate() if is_competitor else None,
+        original_class=f"{group.name}测试班" if is_competitor else None,
         notes=f"由 create_test_users.py 创建的{group.name}测试用户",
     )
     profile.full_clean()
@@ -231,7 +233,7 @@ def create_users_for_group(group: Group, count: int, prefix: str, password: str)
                 is_active=True,
             )
             user.groups.add(group)
-            create_profile(user, group, sequence)
+            create_profile(user, group, group_profile, sequence)
         created_usernames.append(username)
 
     return created_usernames

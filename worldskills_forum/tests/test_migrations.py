@@ -21,12 +21,16 @@ class EditableSourceRoleMigrationTests(TransactionTestCase):
         topic_model = old_apps.get_model("worldskills_forum", "ForumTopic")
         post_model = old_apps.get_model("worldskills_forum", "ForumPost")
         category = category_model.objects.create(name="迁移测试", slug="migration-test")
+        module, _created = module_model.objects.get_or_create(
+            slug="module-d",
+            defaults={"name": "模块 D", "sort_order": 4},
+        )
         topic = topic_model.objects.create(
             competition_year=2026,
             translated_title="来源身份迁移",
             original_title="Source role migration",
             source_url="https://forum.example.com/t/migration",
-            module=module_model.objects.get(slug="module-d"),
+            module=module,
             category=category,
             importance="normal",
         )

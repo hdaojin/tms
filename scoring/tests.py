@@ -20,7 +20,7 @@ from events.models import Event, EventModule
 from knowledge.models import KnowledgeEvidence
 from standards.models import SkillProject
 
-from .forms import ScoringImportForm
+from .forms import ScoringImportForm, ScoringParserConfigAdminForm
 from .models import (
     JudgementOption,
     ScoringAspect,
@@ -31,7 +31,13 @@ from .models import (
     ScoringSchemeImport,
 )
 from .parser import WorkbookParseError, parse_marking_workbook
-from .services import confirm_scheme_import, default_parser_config, parse_scheme_upload, sync_parser_configs
+from .services import (
+    confirm_scheme_import,
+    default_parser_config,
+    parse_scheme_upload,
+    set_default_parser_config,
+    sync_parser_configs,
+)
 
 
 @contextmanager
@@ -214,6 +220,27 @@ class ScoringImportTests(TestCase):
             3,
         )
 
+    def test_confirm_import_refreshes_stale_import_before_returning_confirmed_scheme(self):
+        with archive_in_memory_storage():
+            scheme_import = parse_scheme_upload(
+                self.module,
+                self._cmp_workbook_upload(),
+                self.parser_config,
+                user=self.user,
+            )
+
+        stale_import = ScoringSchemeImport.objects.get(pk=scheme_import.pk)
+        scheme = confirm_scheme_import(scheme_import, user=self.user)
+        original_aspect_ids = list(scheme.aspects.order_by("pk").values_list("pk", flat=True))
+
+        confirmed_scheme = confirm_scheme_import(stale_import, user=self.user)
+
+        self.assertEqual(confirmed_scheme.pk, scheme.pk)
+        self.assertEqual(
+            list(scheme.aspects.order_by("pk").values_list("pk", flat=True)),
+            original_aspect_ids,
+        )
+
     def test_confirm_import_overwrites_existing_scheme_only_without_results(self):
         with archive_in_memory_storage():
             first_import = parse_scheme_upload(self.module, self._cmp_workbook_upload(), self.parser_config, user=self.user)
@@ -264,6 +291,72 @@ class ScoringImportTests(TestCase):
         self.assertEqual(form.fields["parser_config"].initial, config.pk)
         self.assertIn(config, list(form.fields["parser_config"].queryset))
         self.assertEqual(form.fields["parser_config"].label_from_instance(config), "自定义 CMP 名称")
+
+    def test_default_parser_switch_is_explicit_and_idempotent(self):
+        configs = list(ScoringParserConfig.objects.order_by("pk"))
+        self.assertGreaterEqual(len(configs), 1)
+        first = configs[0]
+        set_default_parser_config(first)
+        set_default_parser_config(first)
+        self.assertEqual(ScoringParserConfig.objects.filter(is_default=True).count(), 1)
+        self.assertEqual(ScoringParserConfig.objects.get(is_default=True).pk, first.pk)
+
+        if len(configs) > 1:
+            second = configs[1]
+            second.display_name = "普通编辑"
+            second.save(update_fields=["display_name"])
+            self.assertTrue(ScoringParserConfig.objects.get(pk=first.pk).is_default)
+            set_default_parser_config(second)
+            self.assertFalse(ScoringParserConfig.objects.get(pk=first.pk).is_default)
+            self.assertTrue(ScoringParserConfig.objects.get(pk=second.pk).is_default)
+
+    def test_default_parser_can_be_restored_when_no_config_is_default(self):
+        ScoringParserConfig.objects.update(is_default=False)
+        target = ScoringParserConfig.objects.order_by("pk").first()
+
+        set_default_parser_config(target)
+
+        self.assertEqual(ScoringParserConfig.objects.filter(is_default=True).count(), 1)
+        self.assertTrue(ScoringParserConfig.objects.get(pk=target.pk).is_default)
+
+    def test_disabled_parser_cannot_become_default(self):
+        config = ScoringParserConfig.objects.get(parser_key="cmp_single_module_v1")
+        config.is_default = False
+        config.save(update_fields=["is_default"])
+        config.is_enabled = False
+        config.save(update_fields=["is_enabled"])
+        with self.assertRaises(ValidationError):
+            set_default_parser_config(config)
+
+    def test_parser_admin_form_keeps_friendly_default_validation(self):
+        config = ScoringParserConfig.objects.get(parser_key="cmp_single_module_v1")
+        valid_form = ScoringParserConfigAdminForm(
+            instance=config,
+            data={
+                "parser_key": config.parser_key,
+                "display_name": config.display_name,
+                "alias": config.alias,
+                "description": config.description,
+                "is_enabled": "on",
+                "is_default": "on",
+                "order": config.order,
+            },
+        )
+        self.assertTrue(valid_form.is_valid(), valid_form.errors)
+
+        invalid_form = ScoringParserConfigAdminForm(
+            instance=config,
+            data={
+                "parser_key": config.parser_key,
+                "display_name": config.display_name,
+                "alias": config.alias,
+                "description": config.description,
+                "is_default": "on",
+                "order": config.order,
+            },
+        )
+        self.assertFalse(invalid_form.is_valid())
+        self.assertIn("is_default", invalid_form.errors)
 
     def test_import_form_orders_event_modules_and_uses_event_name_labels(self):
         old_event = Event.objects.create(

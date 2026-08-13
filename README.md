@@ -15,13 +15,15 @@ TMS（Training Management System）是一个基于 Django 的培训与竞赛管�
 
 ## 功能概览
 
-- 用户与角色管理
-- 通知公告管理
-- 训练日志管理
-- 会议记录管理
-- 考核与成绩管理
-- 资料上传与权限控制
-- 平台公共内容与站点配置
+- 用户、稳定角色与权限包管理
+- 技能项目、能力领域与标准技能树版本
+- 赛事、训练考核、试题与评分方案
+- 评分结果、考点证据与技能映射覆盖统计
+- 训练周期与训练日志
+- 统一资料资产归档
+- 通知公告、会议记录与笔记
+- WorldSkills Forum 主题、翻译与附件归档
+- Samba 集成、文章和站点公共内容
 
 ## 环境要求
 
@@ -29,19 +31,28 @@ TMS（Training Management System）是一个基于 Django 的培训与竞赛管�
 - uv
 - Node.js 20+（仅开发环境或前端资源预构建时需要）
 - npm（仅开发环境或前端资源预构建时需要）
+- SQLite（开发环境）
+- PostgreSQL 17（生产环境）
 
 ## 目录说明
 
 - `static/`：项目静态资源目录，包含前端构建产物和随仓库分发的第三方静态文件
 - `staticfiles/`：`collectstatic` 输出目录，供生产环境 Web 服务器直接提供
-- `media/`：公共上传目录，例如训练日志、通知附件等
-- `media-private/`：私有资料目录，例如考核、竞赛、操行、笔记等敏感文件，可通过 `PRIVATE_MEDIA_ROOT` 覆盖
+- `media/`：仅用于确实需要公开提供的上传文件
+- `media-private/`：私有资料根目录，可通过 `PRIVATE_MEDIA_ROOT` 覆盖；`ArchiveAsset` 登记的训练日志附件、试题、评分表、评分脚本、结果包和其他归档资料，以及 Forum 私有附件，都使用私有存储
 
 注意：
 
 - 所有 Django 命令都必须在项目根目录执行。
 - 如果 `.env` 中使用相对路径的 `DATABASE_URL=sqlite:///db.sqlite3`，从子目录运行脚本会连到错误的 SQLite 文件。
+- `media-private/` 不得由 Nginx 直接暴露；私有资料必须通过带权限检查的 Django 下载 view 提供。
 - `demo` 应用只在 `DEBUG=True` 时启用，生产环境不会加载。
+
+## 开发约定
+
+- 工程规则：`AGENTS.md`
+- 领域语义：`CONTEXT.md`
+- 架构决策：`docs/adr/`
 
 ## 开发环境快速开始
 
@@ -59,6 +70,12 @@ cd tms
 ```bash
 uv sync
 npm install
+```
+
+CI 或需要可重复安装前端依赖时使用：
+
+```bash
+npm ci
 ```
 
 ### 3. 配置环境变量
@@ -139,15 +156,33 @@ http://127.0.0.1:8000/
 ## 常用开发命令
 
 ```bash
-uv run pytest standards events training archives scoring examcontent knowledge
+uv run ruff check .
+uv run manage.py check
+uv run manage.py makemigrations --check --dry-run
+uv run pytest
+npm ci
+npm run build:css
+```
+
+受影响范围较小时，优先运行聚焦测试：
+
+```bash
+uv run pytest knowledge
+uv run pytest worldskills_forum
+uv run pytest accounts core
+uv run pytest archives
+uv run pytest standards scoring
+```
+
+数据库与历史内部标识维护命令：
+
+```bash
+uv run manage.py makemigrations
+uv run manage.py migrate
 uv run manage.py reconcile_internal_app_cutovers
 uv run manage.py cutover_conduct_to_behaviors
 uv run manage.py cutover_meeting_to_meetings
-uv run manage.py check
-uv run manage.py makemigrations
-uv run manage.py migrate
 npm run watch:css
-npm run build:css
 ```
 
 ## 前端静态资源交付规则
@@ -167,10 +202,10 @@ npm run build:css
 
 - Web 服务器：Nginx
 - Python 应用服务：Gunicorn
-- 数据库：PostgreSQL 或 MySQL
+- 数据库：PostgreSQL 17
 - 静态文件：Nginx 直接提供 `staticfiles/`
-- 公共上传文件：Nginx 直接提供 `media/`
-- 私有资料目录：应用进程可读写 `media-private/`，不要直接公开映射
+- 明确公开的上传文件：Nginx 可按部署需要提供 `media/`
+- 私有资料目录：应用进程可读写 `media-private/`，不要直接公开映射；私有下载由 Django 鉴权
 
 ### 1. 准备服务器环境
 
@@ -179,7 +214,7 @@ npm run build:css
 - Python 3.13+
 - uv
 - Nginx
-- PostgreSQL（推荐） 或 MySQL
+- PostgreSQL 17
 
 ### 2. 拉取代码并安装 Python 依赖
 
@@ -224,8 +259,8 @@ PRIVATE_MEDIA_ROOT=/srv/tms/media-private
 
 - 生产环境必须把 `DEBUG` 设为 `False`
 - `ALLOWED_HOSTS` 填写真实域名或 IP
-- 推荐生产环境使用 PostgreSQL 或 MySQL，不建议继续使用 SQLite
-- 如果必须使用 SQLite，所有管理命令仍然必须在项目根目录执行
+- 生产环境使用 PostgreSQL 17，不使用 SQLite
+- 开发环境使用 SQLite；所有管理命令仍然必须在项目根目录执行，避免相对数据库路径指向错误文件
 - `PRIVATE_MEDIA_ROOT` 指向私有上传文件根目录，不要在 Nginx 中直接暴露
 
 ### 4. 创建运行目录
@@ -363,8 +398,8 @@ server {
 - 后台可正常登录
 - `uv run manage.py check --deploy` 无阻塞性问题
 - 静态资源样式加载正常
-- 公共上传文件能够访问
-- 私有资料上传目录可由应用正常读写
+- 明确公开的上传文件能够访问
+- 私有资料上传目录可由应用正常读写，且不能绕过 Django 权限直接访问
 
 ## 发布更新流程
 
@@ -393,12 +428,12 @@ npm run build:css
 
 升级完成后，请同步检查和更新仓库内维护的静态文件：
 
-- 如果升级了 Alpine.js，请将 `node_modules/alpinejs/dist/cdn.min.js` 覆盖到 `static/js/alpinejs.min.js`
+- 如果升级了 `@alpinejs/csp`，请运行 `npm run copy:alpine` 同步 `static/js/alpinejs.min.js`
 - 如果升级了 Prism，请从 Prism 官网重新下载并覆盖 `static/css/prism.css` 和 `static/js/prism.js`
 - 如果升级了 Tailwind CSS、DaisyUI 或其他会影响样式输出的前端依赖，请重新生成 `static/css/output.css`
 
 ```bash
-cp node_modules/alpinejs/dist/cdn.min.js static/js/alpinejs.min.js
+npm run copy:alpine
 ```
 
 
@@ -453,8 +488,8 @@ uv run manage.py loaddata core/default
 
 - 本项目默认时区为 `Asia/Shanghai`
 - 本项目默认语言为 `zh-hans`
-- 考核、竞赛、操行、笔记等敏感文件位于 `media-private/`
-- 训练日志、通知等公共上传文件位于 `media/`
+- 训练日志、试题、评分表、结果包等主链路资料由 `ArchiveAsset` 统一登记并保存在 `media-private/`
+- `media/` 只承载确实公开的上传文件，私有资料不得直接暴露
 - 生产服务器默认不安装 npm；前端资源由开发机或 CI 预先构建或同步后随版本发布
 
 
