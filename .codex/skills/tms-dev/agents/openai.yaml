@@ -1,4 +1,0 @@
-interface:
-  display_name: "TMS Dev"
-  short_description: "TMS feature delivery workflow from domain trace to verification"
-  default_prompt: "Use $tms-dev to trace the current TMS vertical slice, place logic in the right layer, implement the feature, and complete permission, UI, test, and documentation verification while following AGENTS.md."
