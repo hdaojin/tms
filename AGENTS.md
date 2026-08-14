@@ -7,7 +7,7 @@
 - `AGENTS.md`：规定稳定的工程规则、分层边界、验证要求和安全约束。
 - `CONTEXT.md`：规定稳定的业务术语、领域语义和核心业务不变量。
 - `docs/adr/`：记录已经做出的重要架构决策；涉及对应领域时必须遵循。
-- `.codex/skills/*`：只描述某类任务的**执行工作流**，不得复制一份项目规范与本文件竞争。
+- `.codex/skills/*`：只描述某类任务的**专用、可复用执行工作流**，不得承载通用 TMS 开发规范，也不得复制本文件形成第二套项目规则。
 - `.github/copilot-instructions.md`：只做入口提示，不维护第二套规则。
 
 如果文档与当前代码明显漂移，先以实际代码、迁移和测试确认现状，再在同一变更中修正文档；不要继续传播过时约定。
@@ -31,13 +31,26 @@ TMS 是基于 Django 6 / Python 3.13 的单体应用。主要前端与交互技�
 
 具体业务术语和不变量以 `CONTEXT.md` 为准。不要重新引入已经被替换的旧 APP/旧术语（例如旧 `assessments`、`competitions`、`skills`、`traininglogs` 链路）。
 
+## 任务规模与最小修改原则
+
+优先完成用户要求的**最小必要修改**。不要因为发现相邻问题、潜在重构机会、完整业务链路或 CI 中存在更多检查，就自行扩大实现、检查或验证范围。
+
+- 简单任务保持简单：文案、注释、局部模板、单个样式或明确的小型 bug 修复，不执行完整 feature workflow，不机械追踪无关 APP，也不顺手重构邻近代码。
+- 只有当修改实际跨越模型、权限、事务、多个 APP、公共组件、统计口径或外部数据流程时，才扩大到完整纵向切片分析。
+- 不为“可能以后有用”预先增加抽象、service、selector、配置层或文档结构；先解决当前明确需求。
+- 不因为看到旧写法或风格不一致，就在当前任务中统一重构；无关问题可在交付说明中指出，但默认不修改。
+- 除非用户明确要求 review、审计或全面优化，不主动把局部修改升级为全仓 review。
+- 输出说明与任务规模匹配。小修改用简洁结果说明，不重复复述整套架构、测试体系或项目规范。
+
+`.codex/skills/` 仅用于真正独立、重复且多步骤的专用工作流。普通 TMS 编码、修 bug、模板调整、字段修改和常规 CRUD 不需要额外 skill；遵循本文件即可。
+
 ## 开始修改前
 
 1. 先阅读本文件。
 2. 涉及领域模型、跨 APP 流程、统计口径或业务术语时，再读 `CONTEXT.md`；有相关 ADR 时一并阅读。
-3. 阅读目标 APP 的实际垂直链路：`models.py`、`forms.py`、`services.py`、`selectors.py`、`views.py`、`tables.py`、`urls.py`、templates、tests 和 migrations；不存在的文件跳过。
+3. 只检查与任务直接相关的实际代码链路。需要理解完整业务流程时，再按 `models.py`、`forms.py`、`services.py`、`selectors.py`、`views.py`、`tables.py`、`urls.py`、templates、tests 和 migrations 扩大范围；不存在的文件跳过。
 4. 页面入口或导航变化时检查 `core/config/navigation.yml`。
-5. 用户可见行为变化时检查并更新 `docs/user-manual/` 对应文档。
+5. 用户可见行为变化且现有用户文档确实需要同步时，更新 `docs/user-manual/` 对应文档；纯内部修改、小型修复或现有文档不受影响时无需机械更新。
 6. 环境、安装、部署和命令细节以 `README.md` 为准。
 
 不要仅凭相邻 APP 的旧写法复制实现；先确认目标 APP 当前是否已经采用 service / selector / 新 layouts / 新导航体系。
@@ -153,20 +166,24 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 
 ## 验证策略
 
-不要只以“页面能打开”作为完成标准。
+验证必须与改动风险和实际影响范围成比例。**不要因为仓库存在完整 CI 流程，就在每个小修改后机械执行完整 CI。** 优先选择能直接证明本次修改正确的最小验证集合；只有风险升高或局部验证无法建立足够信心时才扩大范围。
 
-- 小范围 Python 改动：至少运行受影响测试 + `uv run ruff check <affected-paths>`。
-- Model/迁移改动：增加或修改测试，并运行 `makemigrations --check --dry-run`；确需 schema 变化时生成并检查 migration。
-- 跨 APP service、权限、核心组件或统计口径改动：优先运行相关 APP 测试，最终运行全量 `uv run pytest`。
-- 模板/CSS/Iconify class 改动：运行 `npm run build:css`。
-- 提交前至少运行 `uv run manage.py check`。
-- 每次 `git push` 前必须运行 `npm run build:css`；构建失败不得 push。构建后检查 `static/css/output.css`，有实际变化时与源码一起提交。
+- 纯文案、注释、Markdown 文档修改：通常无需运行 pytest、Django check 或全量 Ruff；只检查内容本身和必要的格式/链接。
+- 单个模板的纯展示修改：优先做模板相关的最小检查；没有 Python 行为变化时不默认运行 pytest。若新增或修改 Tailwind/Iconify class，则运行 `npm run build:css`。
+- 小范围 Python 改动：运行受影响测试 + `uv run ruff check <affected-paths>`；不默认运行全量 pytest。
+- Form/View/局部业务行为修改：运行目标 APP 或相关测试；只有需要时再运行 `uv run manage.py check`。
+- Model/迁移改动：增加或修改相关测试，并运行 `uv run manage.py makemigrations --check --dry-run`；确需 schema 变化时生成并检查 migration。
+- 跨 APP service、权限、公共核心组件、关键统计口径或高风险数据流程改动：运行相关 APP 测试，并根据影响范围决定是否运行全量 `uv run pytest`。只有确有跨仓回归风险时才默认升级为全量测试。
+- 仅当修改涉及 Django 项目配置、URL 装配、AppConfig、中间件或 system check 可发现的问题，或准备提交重要改动时，才需要 `uv run manage.py check`；普通局部修改不机械执行。
+- 每次 `git push` 前仍运行 `npm run build:css`，用于确保已提交的 `static/css/output.css` 与前端源码一致；如果本次任务不 push，则不因这一规则提前执行。
 
-CI 的基准流程为 Ruff -> Django check -> migration drift check -> migrate -> pytest，以及独立的前端 `npm ci` -> `npm run build:css`。本地验证应尽量与之对齐。
+验证失败时先判断失败是否由本次修改引起。不要为了让无关历史失败通过而扩大修改范围。
+
+CI 的基准流程仍为 Ruff -> Django check -> migration drift check -> migrate -> pytest，以及独立的前端 `npm ci` -> `npm run build:css`。CI 是合并级安全网，不等于每次本地小修改都必须完整重放。
 
 ## 性能与可维护性检查
 
-功能完成前检查：
+仅在改动涉及对应读取/写入路径，或任务本身要求 review/优化时进行以下检查；不要把它机械应用到纯文案、样式或无关的小修改。
 
 - 列表/详情页是否出现可预见的 N+1。
 - 树形/递归统计是否在循环中反复查询或重复遍历。
@@ -180,10 +197,11 @@ CI 的基准流程为 Ruff -> Django check -> migration drift check -> migrate -
 
 ## 文档同步
 
-- 用户可见功能变化：更新 `docs/user-manual/`。
+- 用户可见功能变化且已有用户文档受影响：更新 `docs/user-manual/`。
+- 纯内部重构、小型 bug 修复、文案或样式调整，如果用户文档没有因此失真，无需为了“流程完整”机械更新文档。
 - 核心领域术语、统计口径或业务不变量变化：更新 `CONTEXT.md`。
 - 重要架构决策或长期权衡变化：新增/更新 `docs/adr/`。
-- APP、导航、布局或标准开发路径发生变化：同步本文件及必要的 skill reference；不要在多个 agent 配置中复制整套规范。
+- APP、导航、布局或标准开发路径发生变化：同步本文件；只有存在对应专用 skill 时才同步其 reference，不创建通用开发 skill 的重复副本。
 
 ## Git 与工作区安全
 
