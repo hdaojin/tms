@@ -175,7 +175,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - Model/迁移改动：增加或修改相关测试，并运行 `uv run manage.py makemigrations --check --dry-run`；确需 schema 变化时生成并检查 migration。
 - 跨 APP service、权限、公共核心组件、关键统计口径或高风险数据流程改动：运行相关 APP 测试，并根据影响范围决定是否运行全量 `uv run pytest`。只有确有跨仓回归风险时才默认升级为全量测试。
 - 仅当修改涉及 Django 项目配置、URL 装配、AppConfig、中间件或 system check 可发现的问题，或准备提交重要改动时，才需要 `uv run manage.py check`；普通局部修改不机械执行。
-- 每次 `git push` 前仍运行 `npm run build:css`，用于确保已提交的 `static/css/output.css` 与前端源码一致；如果本次任务不 push，则不因这一规则提前执行。
+- 当本次变更涉及模板中的 Tailwind/Iconify class、CSS 源码、Alpine 前端代码、Tailwind/DaisyUI/Iconify 配置或前端依赖时，运行 `npm run build:css` 并检查 `static/css/output.css`；纯 Python、后端配置或文档修改不为 push 机械执行 CSS 构建。
 
 验证失败时先判断失败是否由本次修改引起。不要为了让无关历史失败通过而扩大修改范围。
 
