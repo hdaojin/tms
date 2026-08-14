@@ -6,7 +6,10 @@ from django.utils.translation import gettext_lazy as _
 from core.utils.admin_deletion import discard_registered_delete_permissions
 from .admin_forms import GroupPermissionBundleAdminForm, UserPermissionBundleAdminForm
 from .models import UserProfile, GroupProfile
-from .services.permission_bundles import sync_group_permission_bundles, sync_user_permission_bundles
+from .services.permission_assignments import (
+    sync_group_permission_assignments,
+    sync_user_permission_assignments,
+)
 from .services.users import fill_leave_date_on_deactivation
 
 class UserProfileInline(admin.StackedInline):
@@ -15,7 +18,7 @@ class UserProfileInline(admin.StackedInline):
     verbose_name = '用户信息'
     verbose_name_plural = '用户信息'
     extra = 1
-    exclude = ('selected_permission_bundles',)
+    exclude = ('selected_permission_bundles', 'explicit_permissions')
 
 
 class CustomUserAdmin(DefaultUserAdmin):
@@ -26,7 +29,8 @@ class CustomUserAdmin(DefaultUserAdmin):
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         (_('Personal info'), {'fields': ('first_name', 'last_name', 'email')}),
-        (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'selected_permission_bundles', 'user_permissions')}),
+        (_('Permissions'), {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'selected_permission_bundles')}),
+        ('高级：额外原生 Django 权限', {'fields': ('explicit_permissions',), 'classes': ('collapse',)}),
         (_('Important dates'), {'fields': ('last_login', 'date_joined')}),
     )
     
@@ -60,10 +64,10 @@ class CustomUserAdmin(DefaultUserAdmin):
             )
         if 'selected_permission_bundles' not in form.cleaned_data:
             return
-        sync_user_permission_bundles(
+        sync_user_permission_assignments(
             form.instance,
             form.cleaned_data.get('selected_permission_bundles'),
-            form.cleaned_data.get('user_permissions'),
+            form.cleaned_data.get('explicit_permissions'),
         )
 
 
@@ -73,7 +77,7 @@ class GroupProfileInline(admin.StackedInline):
     verbose_name = '组信息'
     verbose_name_plural = '组信息'
     extra = 1
-    exclude = ('selected_permission_bundles',)
+    exclude = ('selected_permission_bundles', 'explicit_permissions')
 
 
 class CustomGroupAdmin(DefaultGroupAdmin):
@@ -81,7 +85,9 @@ class CustomGroupAdmin(DefaultGroupAdmin):
     inlines = (GroupProfileInline,)
     form = GroupPermissionBundleAdminForm
     fieldsets = (
-        (None, {'fields': ('name', 'selected_permission_bundles', 'permissions')}),
+        ('基本信息', {'fields': ('name',)}),
+        ('业务权限包', {'fields': ('selected_permission_bundles',)}),
+        ('高级：额外原生 Django 权限', {'fields': ('explicit_permissions',), 'classes': ('collapse',)}),
     )
 
     def codename(self, obj):
@@ -94,10 +100,10 @@ class CustomGroupAdmin(DefaultGroupAdmin):
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
-        sync_group_permission_bundles(
+        sync_group_permission_assignments(
             form.instance,
             form.cleaned_data.get('selected_permission_bundles'),
-            form.cleaned_data.get('permissions'),
+            form.cleaned_data.get('explicit_permissions'),
         )
 
 

@@ -316,6 +316,7 @@ class ScoringParticipant(models.Model):
         verbose_name = "参评对象"
         verbose_name_plural = "参评对象"
         ordering = ["scheme", "order", "display_name", "pk"]
+        permissions = [("view_all_scoringparticipant", "查看全部参评对象")]
         constraints = [
             models.UniqueConstraint(
                 fields=["scheme", "event_participant"],
@@ -382,6 +383,7 @@ class ScoringResult(models.Model):
         verbose_name = "评分结果"
         verbose_name_plural = "评分结果"
         ordering = ["participant", "aspect__order", "pk"]
+        permissions = [("view_all_scoringresult", "查看全部评分结果")]
         constraints = [
             models.UniqueConstraint(fields=["participant", "aspect"], name="uniq_scoring_result"),
         ]

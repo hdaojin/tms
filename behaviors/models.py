@@ -8,8 +8,6 @@ from pathlib import Path
 from decimal import Decimal
 
 from core.constants import (
-    GROUP_COMPETITOR,
-    BEHAVIORS_UPLOAD_DIR,
     CONDUCT_NATURE_REWARD,
     CONDUCT_NATURE_PENALTY,
     CONDUCT_NATURE_CHOICES,
@@ -20,7 +18,7 @@ from core.constants import (
     CONDUCT_PENALTY_SEVERITY_NAMES,
 )
 from core.models import AuditedModel
-from core.uploads import CONDUCT_ATTACHMENT_UPLOAD_SPEC
+from core.uploads import CONDUCT_ATTACHMENT_UPLOAD_SPEC, PrivateMediaStorage
 from core.utils.validators import validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
 
@@ -203,8 +201,7 @@ class ConductItem(AuditedModel):
 def conduct_attachment_upload_to(instance, filename):
     """
     生成奖惩记录附件上传路径
-    格式: BEHAVIORS_UPLOAD_DIR/username/display_name-YYYYMMDD-ItemName-originalfilename.ext
-    其中 BEHAVIORS_UPLOAD_DIR 定义于 core.constants
+    格式: username/display_name-YYYYMMDD-ItemName-originalfilename.ext
     """
     student = instance.student
     user_name = student.username if student else 'unknown'
@@ -219,10 +216,8 @@ def conduct_attachment_upload_to(instance, filename):
     original_filename = Path(filename).stem
     ext = Path(filename).suffix
     
-    # 使用 behaviors 作为相对路径基础目录
-    base_dir = BEHAVIORS_UPLOAD_DIR.name if isinstance(BEHAVIORS_UPLOAD_DIR, Path) else 'behaviors'
     new_filename = f"{display_name}-{date_part}-{item_name}-{original_filename}{ext}"
-    return f"{base_dir}/{user_name}/{new_filename}"
+    return f"{user_name}/{new_filename}"
 
 
 class ConductRecord(models.Model):
@@ -243,7 +238,6 @@ class ConductRecord(models.Model):
         on_delete=models.CASCADE,
         related_name='conduct_records',
         verbose_name='学生',
-        limit_choices_to={'groups__name': GROUP_COMPETITOR}
     )
     item = models.ForeignKey(
         ConductItem,
@@ -268,6 +262,7 @@ class ConductRecord(models.Model):
     reason = models.TextField('具体原因/描述')
     attachment = models.FileField(
         '附件',
+        storage=PrivateMediaStorage("behaviors"),
         upload_to=conduct_attachment_upload_to,
         blank=True,
         null=True,
@@ -318,6 +313,7 @@ class ConductRecord(models.Model):
         verbose_name_plural = '奖惩记录'
         ordering = ['-occurred_date', '-recorded_at']
         permissions = [
+            ('be_conduct_subject', '可作为奖惩对象'),
             ('add_conduct_record', '录入奖惩记录'),
             ('review_conduct_record', '审核奖惩记录'),
             ('view_all_conduct_records', '查看所有奖惩记录'),
@@ -339,8 +335,16 @@ class ConductRecord(models.Model):
         """验证学生范围与审核状态流。"""
         errors = {}
 
-        if self.student and not self.student.groups.filter(name=GROUP_COMPETITOR).exists():
-            errors['student'] = '只能为选手组用户录入奖惩记录。'
+        if self.student_id:
+            is_subject = self.student.user_permissions.filter(
+                content_type__app_label="behaviors",
+                codename="be_conduct_subject",
+            ).exists() or self.student.groups.filter(
+                permissions__content_type__app_label="behaviors",
+                permissions__codename="be_conduct_subject",
+            ).exists()
+            if not is_subject:
+                errors['student'] = '该用户未获“可作为奖惩对象”权限。'
 
         if self.item and self.severity:
             has_rule = ConductSeverityRule.objects.filter(
@@ -430,7 +434,6 @@ class ConductSummary(models.Model):
         on_delete=models.CASCADE,
         related_name='conduct_summary',
         verbose_name='学生',
-        limit_choices_to={'groups__name': GROUP_COMPETITOR}
     )
     total_score = models.DecimalField(
         '总分',

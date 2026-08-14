@@ -92,8 +92,8 @@ class TrainingLog(models.Model):
         ]
         permissions = [
             ("view_all_traininglog", "查看全部训练日志"),
-            ("view_coach_traininglog", "查看教练训练日志"),
-            ("view_competitor_traininglog", "查看选手训练日志"),
+            ("change_all_traininglog", "修改全部训练日志"),
+            ("view_traininglog_statistics", "查看训练日志统计"),
             ("export_traininglog_archive", "导出训练日志归档"),
         ]
 

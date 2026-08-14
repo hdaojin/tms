@@ -1,10 +1,12 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.decorators import login_not_required  # type: ignore
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.db import transaction
 from django.db.models import Case, CharField, Count, F, OuterRef, Subquery, Value, When
 from django.db.models.functions import Coalesce
 from django.views.generic import DetailView
@@ -17,7 +19,9 @@ from .services.users import (
     ROLE_UNASSIGNED,
     get_user_role_badges,
 )
-from .tables import RoleListTable, UserListTable
+from .services.registration import apply_default_registration_group
+from .tables import PermissionBundleReferenceTable, RoleListTable, UserListTable
+from core.permissions import get_permission_bundle_specs
 from core.utils.invitation import generate_invitation_code
 from core.utils.decorators import superuser_required
 from core.utils.mixins import TitleMixin
@@ -31,11 +35,13 @@ def account_signup(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
-            user = form.save(commit=False)
-            # 姓名已由表单处理（last_name 和 first_name）
-            # 新注册用户默认不激活（例如等待邮件激活）
-            user.is_active = False
-            user.save()
+            with transaction.atomic():
+                user = form.save(commit=False)
+                # 姓名已由表单处理（last_name 和 first_name）
+                # 新注册用户默认不激活（例如等待邮件激活）
+                user.is_active = False
+                user.save()
+                apply_default_registration_group(user)
             # 此处可添加发送激活邮件逻辑
             return render(request, 'accounts/signup_done.html', {
                 'title': "注册成功",
@@ -69,6 +75,7 @@ def generate_invitation(request):
 
 
 @login_required
+@permission_required('accounts.change_userprofile', raise_exception=True)
 def account_profile(request):
     """用户查看和编辑个人资料。锁定后不可修改，需管理员在后台解锁。"""
 
@@ -173,6 +180,13 @@ class RoleListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, Sing
             .annotate(user_total=Count("user", distinct=True))
             .order_by("name")
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["permission_bundle_table"] = PermissionBundleReferenceTable(
+            get_permission_bundle_specs()
+        )
+        return context
 
 
 class UserDetailView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, DetailView):

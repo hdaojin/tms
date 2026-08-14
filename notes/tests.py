@@ -1,14 +1,13 @@
 from pathlib import Path
 import shutil
-from unittest.mock import patch
 
 from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TestCase, TransactionTestCase
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
 from notes.models import NoteRepo
@@ -117,9 +116,9 @@ class NotePathBoundaryTests(TestCase):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
         self.addCleanup(lambda: shutil.rmtree(self.temp_dir, ignore_errors=True))
         self.temp_dir.mkdir(parents=True)
-        self.root_patcher = patch("notes.paths.NOTES_ROOT", self.temp_dir)
-        self.root_patcher.start()
-        self.addCleanup(self.root_patcher.stop)
+        self.settings_override = override_settings(NOTES_ROOT=self.temp_dir)
+        self.settings_override.enable()
+        self.addCleanup(self.settings_override.disable)
 
     def test_resolver_allows_parent_segments_only_inside_registered_root(self):
         repo_root = self.temp_dir / "parent" / "repo"
@@ -153,6 +152,11 @@ class NoteViewTests(TestCase):
         self.allowed_user = User.objects.create_user(username="asset-allowed", password="testpass123")
         self.allowed_user.groups.add(self.allowed_group)
         self.denied_user = User.objects.create_user(username="asset-denied", password="testpass123")
+        view_permission = Permission.objects.get(
+            content_type__app_label="notes", codename="view_noterepo"
+        )
+        self.allowed_user.user_permissions.add(view_permission)
+        self.denied_user.user_permissions.add(view_permission)
         self.superuser = User.objects.create_superuser(
             username="notes-superuser",
             email="notes-superuser@example.com",
@@ -194,12 +198,9 @@ class NoteViewTests(TestCase):
         for name in ("two", "three", "four"):
             (self.repo_root / f"{name}.md").write_text(f"# {name}\n", encoding="utf-8")
 
-        self.path_patcher = patch("notes.paths.NOTES_ROOT", self.temp_dir)
-        self.view_patcher = patch("notes.views.NOTES_ROOT", self.temp_dir)
-        self.path_patcher.start()
-        self.view_patcher.start()
-        self.addCleanup(self.path_patcher.stop)
-        self.addCleanup(self.view_patcher.stop)
+        self.settings_override = override_settings(NOTES_ROOT=self.temp_dir)
+        self.settings_override.enable()
+        self.addCleanup(self.settings_override.disable)
 
     def test_unregistered_physical_directory_is_not_accessible(self):
         unregistered = self.temp_dir / "unregistered"

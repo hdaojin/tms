@@ -1,7 +1,9 @@
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.auth.models import Group
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -70,32 +72,64 @@ class SiteConfig(models.Model):
                                       help_text="如: 粤ICP备12345678号-1")
     site_icp_beian_link = models.URLField("ICP备案链接", blank=True,
                                           help_text="如: https://beian.miit.gov.cn/")
+    default_registration_group = models.ForeignKey(
+        Group,
+        verbose_name="新用户默认用户组",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="新注册用户自动加入此组；留空时不授予任何默认业务权限。",
+    )
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
         verbose_name = '站点配置'
         verbose_name_plural = '站点配置'
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(pk=1),
+                name="core_siteconfig_singleton_pk",
+            ),
+        ]
 
     def __str__(self):
         return self.site_name or "站点配置"
+
+    def clean(self):
+        super().clean()
+        if self.pk not in (None, 1):
+            raise ValidationError("站点配置只能存在固定主键为 1 的单例记录。")
+
+    def save(self, *args, **kwargs):
+        if self._state.adding and type(self).objects.filter(pk=1).exists():
+            raise ValidationError("站点配置只能存在一条记录。")
+        self.pk = 1
+        super().save(*args, **kwargs)
+        cache.delete("site_config_solo")
+
+    def delete(self, *args, **kwargs):
+        result = super().delete(*args, **kwargs)
+        cache.delete("site_config_solo")
+        return result
     
     @classmethod
     def get_solo(cls):
         """获取唯一的站点配置实例，若不存在则创建一个默认实例。"""
         cache_key = "site_config_solo"
         obj = cache.get(cache_key)
-        if obj:
+        if obj is not None:
             return obj
 
         obj, _created = cls.objects.get_or_create(id=1, defaults={
-            "site_name": "my site",
-            "site_short_name": "MySite",
-            "site_description": "This is my site description.",
-            "site_keywords": "site, mysite, example",
-            "site_author": "webmaster",
+            "site_name": "Training management system",
+            "site_short_name": "TMS",
+            "site_description": "A training management system for skill competitions.",
+            "site_keywords": "training, management, skills, competitions",
+            "site_author": "hdaojin",
+            "site_copyright": "TMS 版权所有",
         })
         cache.set(cache_key, obj, timeout=settings.CACHE_TIMEOUT)
         return obj
 
-    

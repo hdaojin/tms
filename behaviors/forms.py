@@ -6,8 +6,8 @@ from django.utils import timezone
 from core.constants import (
     CONDUCT_NATURE_CHOICES,
     CONDUCT_NATURE_PENALTY,
-    GROUP_COMPETITOR,
 )
+from core.permissions import get_users_with_explicit_permission
 from core.uploads import CONDUCT_ATTACHMENT_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
 from .models import ConductItem, ConductRecord, get_conduct_severity_choices_with_multiplier
@@ -57,8 +57,9 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # 限定学生选择范围，使用 display_name 显示
-        self.fields['student'].queryset = User.objects.filter(
-            groups__name=GROUP_COMPETITOR,
+        self.fields['student'].queryset = get_users_with_explicit_permission(
+            "behaviors.be_conduct_subject",
+            User.objects.filter(is_active=True),
         ).order_by('username')
         self.fields['student'].label_from_instance = lambda obj: obj.display_name
 

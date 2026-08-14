@@ -88,12 +88,12 @@ class ForumPermissionTests(ForumTestCase):
         self.assertEqual(post.original_content, "Updated original guidance")
         self.assertEqual(post.translation.translated_content, "更新后的中文说明")
 
-    def test_empty_topic_is_hidden_and_owner_can_delete_it(self):
+    def test_empty_topic_is_hidden_and_owner_still_needs_delete_permission(self):
         empty = self.make_topic(user=self.translator_a)
         self.client.force_login(self.reader)
         self.assertEqual(self.client.get(reverse("worldskills_forum:topic_detail", args=[empty.pk])).status_code, 404)
         self.client.force_login(self.translator_a)
-        self.assertEqual(self.client.post(reverse("worldskills_forum:topic_delete", args=[empty.pk])).status_code, 302)
+        self.assertEqual(self.client.post(reverse("worldskills_forum:topic_delete", args=[empty.pk])).status_code, 403)
 
     def test_manager_can_edit_and_delete_any_content(self):
         post = self.make_post(user=self.translator_a)

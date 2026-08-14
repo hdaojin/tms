@@ -6,7 +6,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from accounts.services.permission_bundles import sync_user_permission_bundles
+from accounts.services.permission_assignments import sync_user_permission_assignments
 
 from .models import Notice, NoticeAttachment
 
@@ -98,7 +98,7 @@ class NoticeAttachmentUploadTests(TestCase):
 			username='notice-publisher',
 			password='testpass123',
 		)
-		sync_user_permission_bundles(self.publisher, ['notices.publish_notice'])
+		sync_user_permission_assignments(self.publisher, ['notices.publish_notice'])
 
 	def tearDown(self):
 		for attachment in NoticeAttachment.objects.all():

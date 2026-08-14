@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.http import FileResponse, Http404
 from django.urls import reverse
@@ -13,31 +13,39 @@ from .models import ScoringParticipant, ScoringResult, ScoringScheme, ScoringSch
 from .parser import WorkbookParseError
 from .registry import PARSER_DEFINITIONS
 from .services import confirm_scheme_import, enabled_parser_configs, parse_scheme_upload
+from .selectors import scoring_participants_visible_to
 from .tables import ScoringAspectTable, ScoringParticipantTable, ScoringSchemeTable
 
 
-class ScoringSchemeListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class ScoringSchemeListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = ScoringScheme
     table_class = ScoringSchemeTable
     template_name = "scoring/scheme_list.html"
     title = "评分方案"
     title_icon = "icon-[tabler--clipboard-check]"
+    permission_required = "scoring.view_scoringscheme"
 
     def get_queryset(self):
         return super().get_queryset().select_related("event_module", "event_module__event")
 
 
-class ScoringSchemeDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class ScoringSchemeDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = ScoringScheme
     template_name = "scoring/scheme_detail.html"
     context_object_name = "scheme"
     title = "{title}"
     title_icon = "icon-[tabler--clipboard-check]"
+    permission_required = "scoring.view_scoringscheme"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         aspect_table = ScoringAspectTable(self.object.aspects.select_related("subcriterion"))
-        participant_table = ScoringParticipantTable(self.object.participants.all())
+        participants = ScoringParticipant.objects.none()
+        if self.request.user.has_perm("scoring.view_scoringparticipant"):
+            participants = scoring_participants_visible_to(
+                self.request.user, self.object.participants.all()
+            )
+        participant_table = ScoringParticipantTable(participants)
         context["aspect_table"] = aspect_table
         context["participant_table"] = participant_table
         return context
@@ -128,12 +136,16 @@ class ScoringParticipantCreateView(TitleMixin, PermissionRequiredMixin, CreateVi
         return reverse("scoring:scheme_detail", args=[self.object.scheme_id])
 
 
-class ScoringParticipantDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class ScoringParticipantDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = ScoringParticipant
     template_name = "scoring/participant_detail.html"
     context_object_name = "participant"
     title = "{display_name}"
     title_icon = "icon-[tabler--user-check]"
+    permission_required = "scoring.view_scoringparticipant"
+
+    def get_queryset(self):
+        return scoring_participants_visible_to(self.request.user, super().get_queryset())
 
 
 class ScoringParticipantUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):

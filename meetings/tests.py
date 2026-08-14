@@ -20,7 +20,7 @@ class MeetingUrlTests(TestCase):
 		meeting = Meeting(title='班会', date=date(2026, 1, 2))
 		self.assertEqual(
 			meeting_file_upload_to(meeting, 'minutes.pdf'),
-			'meetings/2026/2026.01.02-班会.pdf',
+			'2026/2026.01.02-班会.pdf',
 		)
 
 	def test_cutover_command_is_noop_on_fresh_meetings_schema(self):

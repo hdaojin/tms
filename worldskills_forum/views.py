@@ -38,17 +38,18 @@ def _filter_context(request):
 
 def _visible_topic_queryset(user):
     queryset = topic_queryset_base()
-    if user.is_superuser or user.has_perm("worldskills_forum.change_forumtopic"):
+    if user.has_perm("worldskills_forum.change_all_forum_content"):
         return queryset
     return queryset.filter(Q(posts__translation__isnull=False) | Q(created_by=user)).distinct()
 
 
-class ForumFeedView(TitleMixin, LoginRequiredMixin, ListView):
+class ForumFeedView(TitleMixin, PermissionRequiredMixin, ListView):
     template_name = "worldskills_forum/feed.html"
     context_object_name = "posts"
     paginate_by = 20
     title = "世赛论坛最新动态"
     title_icon = "icon-[tabler--messages]"
+    permission_required = "worldskills_forum.view_forumpost"
 
     def get_queryset(self):
         return get_published_post_feed(self.request.user, self.request.GET)
@@ -59,8 +60,9 @@ class ForumFeedView(TitleMixin, LoginRequiredMixin, ListView):
         return context
 
 
-class FilterShortcutView(LoginRequiredMixin, View):
+class FilterShortcutView(PermissionRequiredMixin, View):
     filter_name = "all"
+    permission_required = "worldskills_forum.view_forumpost"
 
     def get(self, request):
         return redirect(f"{reverse('worldskills_forum:feed')}?view={self.filter_name}")
@@ -78,16 +80,17 @@ class UnreadFeedView(FilterShortcutView):
     filter_name = "unread"
 
 
-class ForumTopicListView(TitleMixin, LoginRequiredMixin, ListView):
+class ForumTopicListView(TitleMixin, PermissionRequiredMixin, ListView):
     template_name = "worldskills_forum/topic_list.html"
     context_object_name = "topics"
     paginate_by = 20
     title = "论坛主题"
     title_icon = "icon-[tabler--message-circle]"
+    permission_required = "worldskills_forum.view_forumtopic"
 
     def get_queryset(self):
         queryset = get_topic_list_queryset()
-        if not (self.request.user.is_superuser or self.request.user.has_perm("worldskills_forum.change_forumtopic")):
+        if not self.request.user.has_perm("worldskills_forum.change_all_forum_content"):
             queryset = queryset.filter(Q(post_count__gt=0) | Q(created_by=self.request.user))
         q = self.request.GET.get("q", "").strip()
         if q:
@@ -112,11 +115,12 @@ class ForumTopicListView(TitleMixin, LoginRequiredMixin, ListView):
         return context
 
 
-class ForumTopicDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class ForumTopicDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     template_name = "worldskills_forum/topic_detail.html"
     context_object_name = "topic"
     title = "{translated_title}"
     title_icon = "icon-[tabler--message-circle]"
+    permission_required = "worldskills_forum.view_forumtopic"
 
     def get_queryset(self):
         return _visible_topic_queryset(self.request.user)
@@ -183,17 +187,18 @@ class ForumTopicUpdateView(OwnerOrChangePermissionMixin, TitleMixin, LoginRequir
         return reverse("worldskills_forum:topic_detail", kwargs={"pk": self.object.pk})
 
 
-class ForumTopicDeleteView(TitleMixin, LoginRequiredMixin, DeleteView):
+class ForumTopicDeleteView(TitleMixin, PermissionRequiredMixin, DeleteView):
     model = ForumTopic
     template_name = "worldskills_forum/confirm_delete.html"
     success_url = reverse_lazy("worldskills_forum:topic_list")
     title = "删除论坛主题"
     title_icon = "icon-[tabler--trash]"
+    permission_required = "worldskills_forum.delete_forumtopic"
 
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
         is_empty_owner = obj.created_by_id == self.request.user.pk and not obj.posts.exists()
-        if self.request.user.is_superuser or self.request.user.has_perm("worldskills_forum.delete_forumtopic") or is_empty_owner:
+        if self.request.user.has_perm("worldskills_forum.change_all_forum_content") or is_empty_owner:
             return obj
         raise Http404
 
@@ -261,14 +266,21 @@ class ForumPostDeleteView(TitleMixin, PermissionRequiredMixin, DeleteView):
     title = "删除论坛帖子"
     title_icon = "icon-[tabler--trash]"
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.request.user.has_perm("worldskills_forum.change_all_forum_content"):
+            return queryset
+        return queryset.filter(created_by=self.request.user)
+
     def get_success_url(self):
         return reverse("worldskills_forum:topic_detail", kwargs={"pk": self.object.topic_id})
 
 
-class ForumPostAttachmentManageView(TitleMixin, LoginRequiredMixin, TemplateView):
+class ForumPostAttachmentManageView(TitleMixin, PermissionRequiredMixin, TemplateView):
     template_name = "worldskills_forum/attachment_manage.html"
     title = "管理论坛附件"
     title_icon = "icon-[tabler--paperclip]"
+    permission_required = "worldskills_forum.change_forumpostattachment"
 
     def dispatch(self, request, *args, **kwargs):
         self.forum_post = get_object_or_404(ForumPost.objects.select_related("topic", "translation"), pk=kwargs["post_pk"])
@@ -301,11 +313,12 @@ class ForumPostAttachmentManageView(TitleMixin, LoginRequiredMixin, TemplateView
         return self.render_to_response(self.get_context_data(add_form=add_form, metadata_formset=metadata_formset))
 
 
-class ForumAttachmentDeleteView(TitleMixin, LoginRequiredMixin, DeleteView):
+class ForumAttachmentDeleteView(TitleMixin, PermissionRequiredMixin, DeleteView):
     model = ForumPostAttachment
     template_name = "worldskills_forum/confirm_delete.html"
     title = "删除论坛附件"
     title_icon = "icon-[tabler--trash]"
+    permission_required = "worldskills_forum.delete_forumpostattachment"
 
     def get_object(self, queryset=None):
         obj = super().get_object(queryset.select_related("post__translation") if queryset is not None else ForumPostAttachment.objects.select_related("post__translation"))
@@ -317,9 +330,17 @@ class ForumAttachmentDeleteView(TitleMixin, LoginRequiredMixin, DeleteView):
         return reverse("worldskills_forum:attachment_manage", kwargs={"post_pk": self.object.post_id})
 
 
-class ForumAttachmentContentView(LoginRequiredMixin, View):
+class ForumAttachmentContentView(PermissionRequiredMixin, View):
+    permission_required = "worldskills_forum.view_forumpostattachment"
+
     def get(self, request, pk):
-        attachment = get_object_or_404(ForumPostAttachment.objects.select_related("post__topic"), pk=pk, file__isnull=False)
+        attachment = get_object_or_404(
+            ForumPostAttachment.objects.select_related("post__topic").filter(
+                post__topic__in=_visible_topic_queryset(request.user)
+            ),
+            pk=pk,
+            file__isnull=False,
+        )
         if not attachment.file or not attachment.post_id:
             raise Http404
         try:

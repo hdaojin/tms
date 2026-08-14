@@ -146,6 +146,7 @@ class ForumTopic(models.Model):
         ordering = ["-competition_year", "-updated_at", "-pk"]
         verbose_name = "论坛主题"
         verbose_name_plural = "论坛主题"
+        permissions = [("change_all_forum_content", "管理全部论坛内容")]
         indexes = [models.Index(fields=["category"])]
 
     def clean(self):

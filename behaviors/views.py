@@ -1,5 +1,9 @@
+from pathlib import Path
+
+from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.http import HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
+from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.views.generic import CreateView
 from django_tables2 import SingleTableView
@@ -29,13 +33,14 @@ class ConductRecordCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class ConductRecordListView(TitleMixin, SingleTableView):
+class ConductRecordListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = ConductRecord
     table_class = ConductRecordTable
     template_name = 'behaviors/conductrecord_list.html'
     table_pagination = {"per_page": 20}
     title = "奖惩记录列表"
     title_icon = "icon-[tabler--list]"
+    permission_required = "behaviors.view_conductrecord"
 
     def get_queryset(self):
         qs = super().get_queryset().select_related(
@@ -44,19 +49,39 @@ class ConductRecordListView(TitleMixin, SingleTableView):
         return get_conduct_record_list_queryset(qs, self.request.user)
 
 
-class ConductSummaryListView(TitleMixin, SingleTableView):
+class ConductSummaryListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = ConductSummary
     table_class = ConductSummaryTable
     template_name = 'behaviors/conductsummary_list.html'
     table_pagination = {"per_page": 20}
     title = "奖惩汇总"
     title_icon = "icon-[tabler--chart-bar]"
+    permission_required = "behaviors.view_conductsummary"
 
     def get_queryset(self):
         qs = super().get_queryset().select_related('student')
         return get_conduct_summary_list_queryset(qs, self.request.user)
 
 
+@permission_required("behaviors.view_conductrecord", raise_exception=True)
+def conduct_attachment_view(request, pk):
+    record = get_object_or_404(
+        get_conduct_record_list_queryset(
+            ConductRecord.objects.select_related("student", "recorded_by"),
+            request.user,
+        ),
+        pk=pk,
+    )
+    if not record.attachment:
+        raise Http404
+    return FileResponse(
+        record.attachment.open("rb"),
+        as_attachment=True,
+        filename=Path(record.attachment.name).name,
+    )
+
+
+@permission_required("behaviors.add_conduct_record", raise_exception=True)
 def item_choices_view(request):
     """HTMX endpoint: 根据选中的奖惩性质返回对应事项选项。"""
     nature = request.GET.get('nature')
@@ -77,6 +102,7 @@ def item_choices_view(request):
     return HttpResponse(''.join(options))
 
 
+@permission_required("behaviors.add_conduct_record", raise_exception=True)
 def severity_choices_view(request):
     """HTMX endpoint: 根据选中的奖惩事项返回对应严重程度选项。"""
     item_id = request.GET.get('item')

@@ -1,7 +1,7 @@
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
@@ -14,6 +14,11 @@ from .services import mark_stale_running_operations, process_operation
 class SambaAccountViewTests(TestCase):
 	def setUp(self):
 		self.user = User.objects.create_user(username='samba-user', password='testpass123')
+		self.user.user_permissions.add(
+			Permission.objects.get(
+				content_type__app_label='samba', codename='add_sambaoperation'
+			)
+		)
 		self.client.force_login(self.user)
 
 	@patch('samba.services.enable_samba_for_user', return_value={'username': 'samba-user', 'created': True})

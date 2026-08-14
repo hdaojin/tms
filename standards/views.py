@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.urls import reverse
 from django.views.generic import CreateView, DetailView, UpdateView
 from django_tables2 import SingleTableView
@@ -14,20 +14,22 @@ from .tables import CapabilityDomainTable, SkillNodeTable, SkillProjectTable, Sk
 MAINTAIN_PERM = "standards.add_skillproject"
 
 
-class SkillProjectListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class SkillProjectListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = SkillProject
     table_class = SkillProjectTable
     template_name = "standards/project_list.html"
     title = "技能项目"
     title_icon = "icon-[tabler--target-arrow]"
+    permission_required = "standards.view_skillproject"
 
 
-class SkillProjectDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class SkillProjectDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = SkillProject
     template_name = "standards/project_detail.html"
     context_object_name = "project"
     title = "{name}"
     title_icon = "icon-[tabler--target-arrow]"
+    permission_required = "standards.view_skillproject"
 
 
 class SkillProjectCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
@@ -54,20 +56,22 @@ class SkillProjectUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
         return reverse("standards:project_detail", args=[self.object.pk])
 
 
-class CapabilityDomainListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class CapabilityDomainListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = CapabilityDomain
     table_class = CapabilityDomainTable
     template_name = "common/table_page.html"
     title = "能力领域"
     title_icon = "icon-[tabler--category]"
+    permission_required = "standards.view_capabilitydomain"
 
 
-class CapabilityDomainDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class CapabilityDomainDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = CapabilityDomain
     template_name = "standards/domain_detail.html"
     context_object_name = "domain"
     title = "{name}"
     title_icon = "icon-[tabler--category]"
+    permission_required = "standards.view_capabilitydomain"
 
 
 class CapabilityDomainCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
@@ -94,20 +98,22 @@ class CapabilityDomainUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView
         return reverse("standards:domain_detail", args=[self.object.pk])
 
 
-class SkillTreeVersionListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class SkillTreeVersionListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = SkillTreeVersion
     table_class = SkillTreeVersionTable
     template_name = "common/table_page.html"
     title = "标准技能树版本"
     title_icon = "icon-[tabler--git-branch]"
+    permission_required = "standards.view_skilltreeversion"
 
 
-class SkillTreeVersionDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class SkillTreeVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = SkillTreeVersion
     template_name = "standards/tree_detail.html"
     context_object_name = "tree"
     title = "{name}"
     title_icon = "icon-[tabler--git-branch]"
+    permission_required = "standards.view_skilltreeversion"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -140,23 +146,25 @@ class SkillTreeVersionUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView
         return reverse("standards:tree_detail", args=[self.object.pk])
 
 
-class SkillNodeListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class SkillNodeListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = SkillNode
     table_class = SkillNodeTable
     template_name = "common/table_page.html"
     title = "技能节点"
     title_icon = "icon-[tabler--hierarchy]"
+    permission_required = "standards.view_skillnode"
 
     def get_queryset(self):
         return super().get_queryset().select_related("tree_version", "capability_domain", "parent")
 
 
-class SkillNodeDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class SkillNodeDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = SkillNode
     template_name = "standards/node_detail.html"
     context_object_name = "node"
     title = "{name}"
     title_icon = "icon-[tabler--hierarchy]"
+    permission_required = "standards.view_skillnode"
 
 
 class SkillNodeCreateView(TitleMixin, PermissionRequiredMixin, CreateView):

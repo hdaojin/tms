@@ -29,15 +29,19 @@ def can_view_all_conduct_records(user) -> bool:
     return getattr(user, "is_authenticated", False) and (
         getattr(user, "is_superuser", False)
         or user.has_perm(VIEW_ALL_CONDUCT_RECORDS_PERMISSION)
-        or user.has_perm(VIEW_CONDUCT_RECORD_PERMISSION)
-        or user.has_perm(CHANGE_CONDUCT_RECORD_PERMISSION)
-        or user.has_perm(DELETE_CONDUCT_RECORD_PERMISSION)
         or can_review_conduct(user)
     )
 
 
 def can_access_conduct_record_admin_module(user) -> bool:
-    return can_record_conduct(user) or can_review_conduct(user) or can_view_all_conduct_records(user)
+    return (
+        can_record_conduct(user)
+        or can_review_conduct(user)
+        or can_view_all_conduct_records(user)
+        or user.has_perm(VIEW_CONDUCT_RECORD_PERMISSION)
+        or user.has_perm(CHANGE_CONDUCT_RECORD_PERMISSION)
+        or user.has_perm(DELETE_CONDUCT_RECORD_PERMISSION)
+    )
 
 
 def can_view_conduct_record_admin(user, obj=None) -> bool:

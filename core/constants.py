@@ -7,23 +7,6 @@
 from pathlib import Path
 
 
-# ============ 项目路径常量 ============
-# 项目根目录（core/constants.py -> core -> tms）
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-# 私有媒体文件根目录（通过 Django 处理，可控制访问权限）
-PRIVATE_MEDIA_ROOT = BASE_DIR / "media-private"
-
-
-# ============ 用户组名称常量 ============
-GROUP_COACH = "教练"
-GROUP_COMPETITOR = "选手"
-GROUP_ASSISTANT = "班务"
-
-# 所有需要特殊处理的组名列表
-SPECIAL_GROUPS = [GROUP_COACH, GROUP_COMPETITOR]
-
-
 # ============ 操行管理常量 ============
 # 操行性质
 CONDUCT_NATURE_REWARD = 'REWARD'
@@ -133,12 +116,6 @@ CONDUCT_UPLOAD_MAX_SIZE_MB = 50
 
 
 # ============ 文件上传路径 ============
-# 笔记目录（私有，完整路径）
-NOTES_ROOT = PRIVATE_MEDIA_ROOT / "notes"
-
-# 资料资产上传目录（私有，完整路径）
-ARCHIVE_UPLOAD_DIR = PRIVATE_MEDIA_ROOT / "archives"
-
 # 奖惩记录附件上传目录（公共，相对于 MEDIA_ROOT）
 BEHAVIORS_UPLOAD_DIR = Path("behaviors")
 

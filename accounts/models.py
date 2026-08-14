@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.core.validators import RegexValidator
 
 # Create your models here.
@@ -36,6 +36,13 @@ class UserProfile(models.Model):
         default=list,
         blank=True,
         help_text='后台授权时勾选的业务权限包编码列表。',
+    )
+    explicit_permissions = models.ManyToManyField(
+        Permission,
+        blank=True,
+        related_name="+",
+        verbose_name="额外原生权限",
+        help_text="不属于业务权限包、但需要直接授予当前用户的 Django 权限。",
     )
 
     class Meta:
@@ -73,6 +80,13 @@ class GroupProfile(models.Model):
         default=list,
         blank=True,
         help_text='后台授权时勾选的业务权限包编码列表。',
+    )
+    explicit_permissions = models.ManyToManyField(
+        Permission,
+        blank=True,
+        related_name="+",
+        verbose_name="额外原生权限",
+        help_text="不属于业务权限包、但需要直接授予当前用户组的 Django 权限。",
     )
 
     class Meta:

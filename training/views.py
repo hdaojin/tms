@@ -1,20 +1,20 @@
 from calendar import monthrange
 from datetime import date, timedelta
 
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
-from django.db.models import Q
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.http import HttpResponse
 from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import CreateView, DetailView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
 
-from core.constants import GROUP_COACH, GROUP_COMPETITOR
+from core.permissions import get_users_with_explicit_permission
 from core.utils.mixins import TitleMixin
 
 from .forms import TrainingCycleForm, TrainingLogForm, TrainingLogUpdateForm
 from .models import TrainingCycle, TrainingLog
 from .services import build_training_log_archive, create_training_log_asset
+from .selectors import training_logs_changeable_by, training_logs_visible_to
 from .tables import TrainingCycleTable, TrainingLogTable
 
 
@@ -58,20 +58,22 @@ class MonthFilterMixin:
         return context
 
 
-class TrainingCycleListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class TrainingCycleListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = TrainingCycle
     table_class = TrainingCycleTable
     template_name = "training/cycle_list.html"
     title = "训练周期"
     title_icon = "icon-[tabler--calendar-time]"
+    permission_required = "training.view_trainingcycle"
 
 
-class TrainingCycleDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class TrainingCycleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = TrainingCycle
     template_name = "training/cycle_detail.html"
     context_object_name = "cycle"
     title = "{name}"
     title_icon = "icon-[tabler--calendar-time]"
+    permission_required = "training.view_trainingcycle"
 
 
 class TrainingCycleCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
@@ -98,27 +100,35 @@ class TrainingCycleUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
         return reverse("training:cycle_detail", args=[self.object.pk])
 
 
-class TrainingLogListView(MonthFilterMixin, TitleMixin, LoginRequiredMixin, SingleTableView):
+class TrainingLogListView(MonthFilterMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = TrainingLog
     table_class = TrainingLogTable
     template_name = "training/log_list.html"
     title = "训练日志"
     title_icon = "icon-[tabler--file-text]"
+    permission_required = "training.view_traininglog"
 
     def get_queryset(self):
         start, end = self._get_selected_month_range()
         qs = super().get_queryset().select_related("training_cycle", "capability_domain", "uploaded_by")
-        if self.request.user.has_perm("training.view_all_traininglog"):
-            return qs.filter(training_date__range=(start, end))
-        return qs.filter(uploaded_by=self.request.user, training_date__range=(start, end))
+        return training_logs_visible_to(self.request.user, qs).filter(
+            training_date__range=(start, end)
+        )
 
 
-class TrainingLogDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = TrainingLog
     template_name = "training/log_detail.html"
     context_object_name = "log"
     title = "{topic}"
     title_icon = "icon-[tabler--file-text]"
+    permission_required = "training.view_traininglog"
+
+    def get_queryset(self):
+        return training_logs_visible_to(
+            self.request.user,
+            super().get_queryset().select_related("training_cycle", "capability_domain", "uploaded_by"),
+        )
 
 
 class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
@@ -147,27 +157,18 @@ class TrainingLogUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
     title = "编辑训练日志"
     title_icon = "icon-[tabler--edit]"
 
+    def get_queryset(self):
+        return training_logs_changeable_by(self.request.user, super().get_queryset())
+
     def get_success_url(self):
         return reverse("training:log_detail", args=[self.object.pk])
 
 
-class TrainingLogMonthlyStatView(MonthFilterMixin, TitleMixin, LoginRequiredMixin, TemplateView):
+class TrainingLogMonthlyStatView(MonthFilterMixin, TitleMixin, PermissionRequiredMixin, TemplateView):
     template_name = "training/monthly_stats.html"
     title = "训练日志提交统计"
     title_icon = "icon-[tabler--chart-bar]"
-
-    def _get_add_perm_users(self, group_name):
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
-        return (
-            User.objects.filter(is_active=True, groups__name=group_name)
-            .filter(
-                Q(user_permissions__codename="add_traininglog", user_permissions__content_type__app_label="training")
-                | Q(groups__permissions__codename="add_traininglog", groups__permissions__content_type__app_label="training")
-            )
-            .distinct()
-        )
+    permission_required = "training.view_traininglog_statistics"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -175,11 +176,11 @@ class TrainingLogMonthlyStatView(MonthFilterMixin, TitleMixin, LoginRequiredMixi
         today = timezone.localdate()
         if start.year == today.year and start.month == today.month:
             end = min(end, today)
-        comp_qs = self._get_add_perm_users(GROUP_COMPETITOR)
-        coach_qs = self._get_add_perm_users(GROUP_COACH)
-        comp_names = {u.id: u.display_name for u in comp_qs}
-        coach_names = {u.id: u.display_name for u in coach_qs}
-        user_ids = set(comp_names) | set(coach_names)
+        submitters = get_users_with_explicit_permission(
+            "training.add_traininglog"
+        ).filter(is_active=True)
+        user_names = {u.id: u.display_name for u in submitters}
+        user_ids = set(user_names)
         rows = TrainingLog.objects.filter(training_date__range=(start, end), uploaded_by_id__in=user_ids).values_list(
             "training_date", "uploaded_by_id"
         )
@@ -193,9 +194,8 @@ class TrainingLogMonthlyStatView(MonthFilterMixin, TitleMixin, LoginRequiredMixi
             data.append(
                 {
                     "date": cur,
-                    "submitted_competitors": " ".join(sorted(comp_names[uid] for uid in submitted if uid in comp_names)) or "无",
-                    "unsubmitted_competitors": " ".join(sorted(name for uid, name in comp_names.items() if uid not in submitted)) or "全部提交",
-                    "submitted_coaches": " ".join(sorted(coach_names[uid] for uid in submitted if uid in coach_names)) or "无",
+                    "submitted_users": " ".join(sorted(user_names[uid] for uid in submitted if uid in user_names)) or "无",
+                    "unsubmitted_users": " ".join(sorted(name for uid, name in user_names.items() if uid not in submitted)) or "全部提交",
                 }
             )
             cur += timedelta(days=1)
@@ -203,15 +203,15 @@ class TrainingLogMonthlyStatView(MonthFilterMixin, TitleMixin, LoginRequiredMixi
         return context
 
 
-class TrainingLogArchiveExportView(MonthFilterMixin, LoginRequiredMixin, UserPassesTestMixin, TemplateView):
-    raise_exception = True
-
-    def test_func(self):
-        return self.request.user.has_perm("training.export_traininglog_archive")
+class TrainingLogArchiveExportView(MonthFilterMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "training.export_traininglog_archive"
 
     def get(self, request, *args, **kwargs):
         start, end = self._get_selected_month_range()
-        qs = TrainingLog.objects.filter(training_date__range=(start, end))
+        qs = training_logs_visible_to(
+            request.user,
+            TrainingLog.objects.filter(training_date__range=(start, end)),
+        )
         cycle_id = request.GET.get("cycle")
         if cycle_id:
             qs = qs.filter(training_cycle_id=cycle_id)

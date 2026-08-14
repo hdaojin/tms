@@ -4,11 +4,10 @@ from django.utils.text import slugify
 from django.contrib.auth import get_user_model
 from pathlib import Path
 
-from core.uploads import MEETING_FILE_UPLOAD_SPEC
+from core.uploads import MEETING_FILE_UPLOAD_SPEC, PrivateMediaStorage
 from core.models import UploadedDocumentModel
 from core.utils.validators import validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
-from core.constants import MEETINGS_UPLOAD_DIR
 
 
 def meeting_file_upload_to(instance, original_name: str) -> str:
@@ -17,8 +16,7 @@ def meeting_file_upload_to(instance, original_name: str) -> str:
     date_part = instance.date or timezone.localdate()
     safe_title = slugify(instance.title or 'untitled', allow_unicode=True)
     basename = f"{date_part:%Y.%m.%d}-{safe_title}{ext}"
-    base_dir = MEETINGS_UPLOAD_DIR
-    return f"{base_dir}/{date_part:%Y}/{basename}"
+    return f"{date_part:%Y}/{basename}"
 
 
 def meeting_file_validator(file):
@@ -36,6 +34,7 @@ class Meeting(UploadedDocumentModel):
     )
     file = models.FileField(
         "会议记录文件",
+        storage=PrivateMediaStorage("meetings"),
         upload_to=meeting_file_upload_to,
         help_text=MEETING_FILE_UPLOAD_SPEC.help_text("上传会议记录文件"),
         validators=MEETING_FILE_UPLOAD_SPEC.validators(),

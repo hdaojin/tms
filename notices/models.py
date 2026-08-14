@@ -4,10 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from pathlib import Path
 
-from core.constants import (
-    NOTICE_UPLOAD_DIR,
-)
-from core.uploads import NOTICE_ATTACHMENT_UPLOAD_SPEC
+from core.uploads import NOTICE_ATTACHMENT_UPLOAD_SPEC, PrivateMediaStorage
 from core.utils.signals import register_file_cleanup_signals
 
 # Create your models here.
@@ -57,9 +54,7 @@ class Notice(models.Model):
 def notice_attachment_upload_to(instance, original_name: str) -> str:
     """上传通知相关附件的路径。
     符合 Django FileField upload_to 回调签名 (instance, filename)。"""
-    notice_attachment_dir = NOTICE_UPLOAD_DIR
-    # 使用当前时间构建路径，避免使用可能为 None 的 instance.id
-    return f"{notice_attachment_dir}/{timezone.now().strftime('%Y/%m/%d')}/{original_name}"
+    return f"{timezone.now().strftime('%Y/%m/%d')}/{original_name}"
 
 class NoticeAttachment(models.Model):
     """
@@ -67,6 +62,7 @@ class NoticeAttachment(models.Model):
     """
     notice = models.ForeignKey(Notice, on_delete=models.CASCADE, related_name='attachments', verbose_name='通知')
     file = models.FileField(
+        storage=PrivateMediaStorage("notices"),
         upload_to=notice_attachment_upload_to,
         verbose_name='附件文件',
         help_text=NOTICE_ATTACHMENT_UPLOAD_SPEC.help_text("支持多个文件上传"),

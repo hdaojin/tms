@@ -7,6 +7,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.views.generic import CreateView, DetailView, ListView, DeleteView
 from django.urls import reverse_lazy
 from django.http import Http404
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
+from django.views import View
 
 from core.utils.mixins import TitleMixin
 from .models import Notice, NoticeAttachment
@@ -40,7 +43,7 @@ def _get_notices_with_read_status(user):
     return notices
 
 
-class NoticeListView(TitleMixin, LoginRequiredMixin, ListView):
+class NoticeListView(TitleMixin, PermissionRequiredMixin, ListView):
     model = Notice
     template_name = 'notices/notice_list.html'
     partial_template_name = 'notices/notice_list_partial.html'
@@ -48,6 +51,7 @@ class NoticeListView(TitleMixin, LoginRequiredMixin, ListView):
     paginate_by = 10
     title = "通知列表"
     title_icon = "icon-[tabler--list]"
+    permission_required = 'notices.view_notice'
 
     def get_queryset(self):
         return _get_notices_with_read_status(self.request.user)
@@ -59,22 +63,24 @@ class NoticeListView(TitleMixin, LoginRequiredMixin, ListView):
         return [self.template_name]
 
     
-class NoticeDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class NoticeDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = Notice
     template_name = 'notices/notice_detail.html'
     context_object_name = 'notice'
     title = "{title}"
     title_icon = "icon-[tabler--bell]"
+    permission_required = 'notices.view_notice'
 
     def get_queryset(self):
         return _get_notices_with_read_status(self.request.user)
 
 
-class NoticeDeleteView(TitleMixin, LoginRequiredMixin, DeleteView):
+class NoticeDeleteView(TitleMixin, PermissionRequiredMixin, DeleteView):
     model = Notice
     success_url = reverse_lazy('notices:notice_list')
     title = "删除通知"
     title_icon = "icon-[tabler--trash]"
+    permission_required = 'notices.delete_notice'
 
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
@@ -122,3 +128,20 @@ class NoticeCreateView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, 
         if obj is not None:
             messages.success(self.request, "通知已发布成功！")
         return response
+
+
+class NoticeAttachmentContentView(PermissionRequiredMixin, View):
+    permission_required = 'notices.view_noticeattachment'
+
+    def get(self, request, pk):
+        attachment = get_object_or_404(
+            NoticeAttachment.objects.select_related('notice').filter(
+                notice__in=_get_notices_with_read_status(request.user)
+            ),
+            pk=pk,
+        )
+        return FileResponse(
+            attachment.file.open('rb'),
+            as_attachment=True,
+            filename=attachment.file_name,
+        )

@@ -50,7 +50,7 @@
 - [ ] 直接访问 URL 不能绕过模板按钮隐藏。
 - [ ] 对象级 owner/跨组访问规则有测试。
 - [ ] 需要业务授权组合时已复用/更新 permission bundle。
-- [ ] 新角色判断未依赖可变的 `Group.name`；优先稳定 codename/permission。
+- [ ] 业务授权只检查 Django Permission，未依赖 Group 名称/codename；对象范围由 selector/policy 收窄。
 
 ## 7. 文件与归档
 

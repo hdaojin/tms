@@ -1,9 +1,14 @@
 from datetime import date, datetime
+from importlib import import_module
 from io import StringIO
+from unittest.mock import patch
 
 from bs4 import BeautifulSoup
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
+from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.core.management import call_command
 from django.test import TestCase
 from django.urls import reverse
@@ -11,12 +16,48 @@ from django.utils import timezone
 
 from accounts.admin_forms import GroupPermissionBundleAdminForm, UserPermissionBundleAdminForm
 from accounts.models import GroupProfile, UserProfile
-from accounts.services.permission_bundles import sync_group_permission_bundles, sync_user_permission_bundles
+from accounts.services.permission_assignments import (
+    sync_group_permission_assignments,
+    sync_user_permission_assignments,
+)
+from accounts.services.registration import apply_default_registration_group
 from accounts.services.users import get_user_display_name, get_user_full_info
 from behaviors.models import ConductSummary
-from core.constants import GROUP_COMPETITOR
+from core.models import SiteConfig
+from core.permissions import get_permission_bundle_specs
+TEST_GROUP_NAME = "参训人员"
 
 User = get_user_model()
+
+
+class DefaultRegistrationGroupTests(TestCase):
+	def setUp(self):
+		cache.clear()
+
+	def tearDown(self):
+		cache.clear()
+		super().tearDown()
+
+	def test_configured_default_group_is_applied(self):
+		group = Group.objects.create(name='新用户默认组')
+		config = SiteConfig.get_solo()
+		config.default_registration_group = group
+		config.save()
+		user = User.objects.create_user('new-registration-user')
+
+		apply_default_registration_group(user)
+
+		self.assertTrue(user.groups.filter(pk=group.pk).exists())
+
+	def test_empty_default_group_grants_no_group(self):
+		config = SiteConfig.get_solo()
+		config.default_registration_group = None
+		config.save()
+		user = User.objects.create_user('registration-without-default')
+
+		apply_default_registration_group(user)
+
+		self.assertFalse(user.groups.exists())
 
 
 class UserDisplayNameServiceTests(TestCase):
@@ -66,6 +107,11 @@ class AccountHomeTestCase(TestCase):
 		self.user = User.objects.create_user(
 			username='account-user',
 			password='testpass123',
+		)
+		self.user.user_permissions.add(
+			Permission.objects.get(
+				content_type__app_label='behaviors', codename='view_conductrecord'
+			)
 		)
 		self.client.force_login(self.user)
 
@@ -128,7 +174,7 @@ class UserAdminDeleteTest(TestCase):
 class UserListTableTemplateRegressionTest(TestCase):
 	def setUp(self):
 		self.admin = User.objects.create_superuser('table-admin', password='testpass123')
-		self.competitor_group, _ = Group.objects.get_or_create(name=GROUP_COMPETITOR)
+		self.competitor_group, _ = Group.objects.get_or_create(name=TEST_GROUP_NAME)
 		User.objects.filter(pk=self.admin.pk).update(
 			date_joined=datetime(2026, 3, 31, 8, 0, tzinfo=timezone.get_current_timezone())
 		)
@@ -162,7 +208,7 @@ class UserListRoleColumnTests(TestCase):
 	def setUp(self):
 		self.admin = User.objects.create_superuser('role-table-admin', password='testpass123')
 		self.coach_group = Group.objects.create(name='教练')
-		self.competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+		self.competitor_group = Group.objects.create(name=TEST_GROUP_NAME)
 
 		self.coach = User.objects.create_user(
 			username='a-coach',
@@ -233,15 +279,15 @@ class UserListRoleColumnTests(TestCase):
 		multi_role_row = soup.find('td', string='张多角').find_parent('tr')
 		multi_role_text = multi_role_row.get_text(' ', strip=True)
 		self.assertIn('教练', multi_role_text)
-		self.assertIn(GROUP_COMPETITOR, multi_role_text)
+		self.assertIn(TEST_GROUP_NAME, multi_role_text)
 		multi_role_cells = multi_role_row.find_all('td')
 		multi_role_cell = multi_role_cells[roles_column_index]
 		coach_badge = multi_role_cell.find('span', string='教练')
-		competitor_badge = multi_role_cell.find('span', string=GROUP_COMPETITOR)
+		competitor_badge = multi_role_cell.find('span', string=TEST_GROUP_NAME)
 		self.assertIn('badge-soft', coach_badge.get('class', []))
-		self.assertIn('badge-primary', coach_badge.get('class', []))
+		self.assertIn('badge-accent', coach_badge.get('class', []))
 		self.assertIn('badge-soft', competitor_badge.get('class', []))
-		self.assertIn('badge-success', competitor_badge.get('class', []))
+		self.assertIn('badge-accent', competitor_badge.get('class', []))
 		active_cell = multi_role_cells[activation_column_index]
 		self.assertIsNotNone(active_cell.select_one('.icon-\\[tabler--circle-check-filled\\].text-success'))
 
@@ -320,11 +366,11 @@ class UserListRoleColumnTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		soup = BeautifulSoup(response.content, 'html.parser')
 		coach_badge = soup.find('span', string='教练')
-		competitor_badge = soup.find('span', string=GROUP_COMPETITOR)
+		competitor_badge = soup.find('span', string=TEST_GROUP_NAME)
 		self.assertIn('badge-soft', coach_badge.get('class', []))
-		self.assertIn('badge-primary', coach_badge.get('class', []))
+		self.assertIn('badge-accent', coach_badge.get('class', []))
 		self.assertIn('badge-soft', competitor_badge.get('class', []))
-		self.assertIn('badge-success', competitor_badge.get('class', []))
+		self.assertIn('badge-accent', competitor_badge.get('class', []))
 
 		response = self.client.get(reverse('accounts:user_detail', args=[self.admin.pk]))
 
@@ -374,7 +420,7 @@ class UserListRoleColumnTests(TestCase):
 class AccountPermissionBundleAccessTests(TestCase):
 	def test_user_list_allows_access_via_view_all_profiles_bundle(self):
 		user = User.objects.create_user('profile-viewer', password='testpass123')
-		sync_user_permission_bundles(user, ['accounts.view_all_profiles'])
+		sync_user_permission_assignments(user, ['accounts.view_all_profiles'])
 		self.client.force_login(user)
 
 		response = self.client.get(reverse('accounts:user_list'))
@@ -384,7 +430,7 @@ class AccountPermissionBundleAccessTests(TestCase):
 
 	def test_role_list_allows_access_via_view_all_profiles_bundle(self):
 		user = User.objects.create_user('role-viewer', password='testpass123')
-		sync_user_permission_bundles(user, ['accounts.view_all_profiles'])
+		sync_user_permission_assignments(user, ['accounts.view_all_profiles'])
 		self.client.force_login(user)
 
 		response = self.client.get(reverse('accounts:role_list'))
@@ -401,7 +447,7 @@ class RoleListViewTests(TestCase):
 			group=self.role,
 			codename='coach',
 			description='教练组',
-			selected_permission_bundles=['training.maintain_training'],
+			selected_permission_bundles=['training.manage_all_logs'],
 		)
 		for index in range(2):
 			user = User.objects.create_user(
@@ -418,12 +464,39 @@ class RoleListViewTests(TestCase):
 		self.assertContains(response, '教练')
 		self.assertContains(response, 'coach')
 		self.assertContains(response, '教练组')
-		self.assertContains(response, '维护训练')
+		self.assertContains(response, '管理全部训练日志')
 
 		soup = BeautifulSoup(response.content, 'html.parser')
 		role_row = soup.find('td', string='教练').find_parent('tr')
 		role_text = role_row.get_text(' ', strip=True)
 		self.assertIn('2', role_text)
+
+	def test_role_list_shows_complete_permission_bundle_reference_in_catalog_order(self):
+		response = self.client.get(reverse('accounts:role_list'))
+
+		self.assertEqual(response.status_code, 200)
+		soup = BeautifulSoup(response.content, 'html.parser')
+		reference = soup.select_one('#permission-bundle-reference')
+		self.assertIsNotNone(reference)
+		self.assertIn('业务权限包参考', reference.get_text(' ', strip=True))
+
+		headers = [header.get_text(' ', strip=True) for header in reference.select('thead th')]
+		self.assertEqual(
+			headers,
+			['业务权限包', '配置编码', '用途说明', '自动附加的底层 Django 权限'],
+		)
+
+		specs = get_permission_bundle_specs()
+		rows = reference.select('tbody tr')
+		self.assertEqual(len(rows), len(specs))
+		self.assertEqual(
+			[row.select('td')[1].get_text(' ', strip=True) for row in rows],
+			[spec.code for spec in specs],
+		)
+		self.assertEqual(
+			[code.get_text(strip=True) for code in rows[0].select('td')[3].select('code')],
+			list(specs[0].permissions),
+		)
 
 
 class PermissionBundleSyncServiceTests(TestCase):
@@ -431,7 +504,7 @@ class PermissionBundleSyncServiceTests(TestCase):
 		group = Group.objects.create(name='奖惩录入组')
 		extra_permission = Permission.objects.get(codename='review_conduct_record')
 
-		sync_group_permission_bundles(group, ['behaviors.record_conduct'], [extra_permission])
+		sync_group_permission_assignments(group, ['behaviors.record_conduct'], [extra_permission])
 
 		group.refresh_from_db()
 		self.assertEqual(group.profile.selected_permission_bundles, ['behaviors.record_conduct'])
@@ -440,7 +513,6 @@ class PermissionBundleSyncServiceTests(TestCase):
 			{
 				'add_conduct_record',
 				'review_conduct_record',
-				'view_all_conduct_records',
 				'view_conductrecord',
 				'view_conductsummary',
 			},
@@ -454,20 +526,16 @@ class PermissionBundleSyncServiceTests(TestCase):
 			content_type__model='group',
 		)
 
-		sync_user_permission_bundles(user, ['training.maintain_training'], [extra_permission])
+		sync_user_permission_assignments(user, ['training.manage_all_logs'], [extra_permission])
 
 		user.refresh_from_db()
-		self.assertEqual(user.profile.selected_permission_bundles, ['training.maintain_training'])
+		self.assertEqual(user.profile.selected_permission_bundles, ['training.manage_all_logs'])
 		self.assertSetEqual(
 			set(user.user_permissions.values_list('codename', flat=True)),
 			{
-				'add_traininglog',
-				'add_trainingcycle',
-				'change_trainingcycle',
 				'change_traininglog',
-				'export_traininglog_archive',
+				'change_all_traininglog',
 				'view_all_traininglog',
-				'view_trainingcycle',
 				'view_traininglog',
 				'add_group',
 			},
@@ -476,36 +544,69 @@ class PermissionBundleSyncServiceTests(TestCase):
 	def test_sync_group_permission_bundles_for_training_maintenance_grants_training_permissions(self):
 		group = Group.objects.create(name='训练维护组')
 
-		sync_group_permission_bundles(group, ['training.maintain_training'])
+		sync_group_permission_assignments(group, ['training.manage_all_logs'])
 
 		group.refresh_from_db()
-		self.assertEqual(group.profile.selected_permission_bundles, ['training.maintain_training'])
+		self.assertEqual(group.profile.selected_permission_bundles, ['training.manage_all_logs'])
 		self.assertSetEqual(
 			set(group.permissions.values_list('codename', flat=True)),
 			{
-				'add_trainingcycle',
-				'add_traininglog',
-				'change_trainingcycle',
 				'change_traininglog',
-				'export_traininglog_archive',
+				'change_all_traininglog',
 				'view_all_traininglog',
-				'view_trainingcycle',
 				'view_traininglog',
 			},
 		)
+
+	def test_removing_bundle_revokes_its_materialized_permissions(self):
+		group = Group.objects.create(name='撤权测试组')
+		sync_group_permission_assignments(group, ['meetings.upload_meeting'])
+
+		sync_group_permission_assignments(group, [])
+
+		self.assertFalse(group.permissions.exists())
+		self.assertEqual(group.profile.selected_permission_bundles, [])
+
+	def test_explicit_permission_survives_overlapping_bundle_removal(self):
+		group = Group.objects.create(name='重叠来源测试组')
+		overlapping = Permission.objects.get(
+			content_type__app_label='meetings', codename='view_meeting'
+		)
+		sync_group_permission_assignments(
+			group,
+			['meetings.view_meetings'],
+			[overlapping],
+		)
+
+		sync_group_permission_assignments(group, [])
+
+		self.assertTrue(group.permissions.filter(pk=overlapping.pk).exists())
+		self.assertTrue(group.profile.explicit_permissions.filter(pk=overlapping.pk).exists())
+
+	def test_assignment_sync_rolls_back_profile_when_projection_write_fails(self):
+		group = Group.objects.create(name='事务回滚测试组')
+		sync_group_permission_assignments(group, ['meetings.view_meetings'])
+
+		with patch.object(type(group.permissions), 'set', side_effect=RuntimeError('projection failed')):
+			with self.assertRaisesRegex(RuntimeError, 'projection failed'):
+				sync_group_permission_assignments(group, ['training.manage_all_logs'])
+
+		group.profile.refresh_from_db()
+		self.assertEqual(group.profile.selected_permission_bundles, ['meetings.view_meetings'])
 
 
 class PermissionBundleAdminFormTests(TestCase):
 	def test_group_admin_form_only_shows_extra_permissions(self):
 		group = Group.objects.create(name='表单测试组')
 		extra_permission = Permission.objects.get(codename='review_conduct_record')
-		sync_group_permission_bundles(group, ['behaviors.record_conduct'], [extra_permission])
+		sync_group_permission_assignments(group, ['behaviors.record_conduct'], [extra_permission])
 
 		form = GroupPermissionBundleAdminForm(instance=group)
 
 		self.assertEqual(form.initial['selected_permission_bundles'], ['behaviors.record_conduct'])
+		self.assertEqual(form.fields['selected_permission_bundles'].help_text, '')
 		self.assertQuerySetEqual(
-			form.fields['permissions'].initial.order_by('pk'),
+			form.initial['explicit_permissions'].order_by('pk'),
 			Permission.objects.filter(pk=extra_permission.pk),
 			transform=lambda permission: permission,
 		)
@@ -517,13 +618,14 @@ class PermissionBundleAdminFormTests(TestCase):
 			content_type__app_label='auth',
 			content_type__model='group',
 		)
-		sync_user_permission_bundles(user, ['training.maintain_training'], [extra_permission])
+		sync_user_permission_assignments(user, ['training.manage_all_logs'], [extra_permission])
 
 		form = UserPermissionBundleAdminForm(instance=user)
 
-		self.assertEqual(form.initial['selected_permission_bundles'], ['training.maintain_training'])
+		self.assertEqual(form.initial['selected_permission_bundles'], ['training.manage_all_logs'])
+		self.assertEqual(form.fields['selected_permission_bundles'].help_text, '')
 		self.assertQuerySetEqual(
-			form.fields['user_permissions'].initial.order_by('pk'),
+			form.initial['explicit_permissions'].order_by('pk'),
 			Permission.objects.filter(pk=extra_permission.pk),
 			transform=lambda permission: permission,
 		)
@@ -541,7 +643,8 @@ class PermissionBundleAdminPageTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '业务权限包')
-		self.assertContains(response, '额外原生权限')
+		self.assertContains(response, '额外原生 Django 权限')
+		self.assertNotContains(response, '勾选业务权限包后，系统会自动补齐底层 Django 权限。')
 
 	def test_user_admin_change_page_shows_business_permission_bundle_field(self):
 		user = User.objects.create_user('page-user', password='testpass123')
@@ -550,70 +653,71 @@ class PermissionBundleAdminPageTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '业务权限包')
-		self.assertContains(response, '额外原生权限')
+		self.assertContains(response, '额外原生 Django 权限')
+		self.assertNotContains(response, '勾选业务权限包后，系统会自动补齐底层 Django 权限。')
 
 
-class PermissionBundleBackfillCommandTests(TestCase):
-	def test_command_preview_does_not_write_profiles(self):
-		group = Group.objects.create(name='预检查组')
-		group.permissions.add(
-			Permission.objects.get(codename='add_trainingcycle'),
-			Permission.objects.get(codename='add_traininglog'),
-			Permission.objects.get(codename='change_trainingcycle'),
-			Permission.objects.get(codename='change_traininglog'),
-			Permission.objects.get(codename='export_traininglog_archive'),
-			Permission.objects.get(codename='view_all_traininglog'),
-			Permission.objects.get(codename='view_trainingcycle'),
-			Permission.objects.get(codename='view_traininglog'),
+class PermissionAssignmentReconciliationTests(TestCase):
+	def test_dry_run_reports_but_does_not_repair_drift(self):
+		group = Group.objects.create(name='漂移组')
+		sync_group_permission_assignments(group, ['meetings.view_meetings'])
+		extra = Permission.objects.get(
+			content_type__app_label='notices', codename='add_notice'
 		)
+		group.permissions.add(extra)
 
 		output = StringIO()
-		call_command('backfill_permission_bundles', stdout=output)
+		call_command('reconcile_permission_assignments', stdout=output)
 
-		self.assertFalse(hasattr(group, 'profile'))
-		self.assertIn('用户组 预检查组: 业务权限包 -> training.maintain_training', output.getvalue())
-		self.assertIn('以上为预检查结果', output.getvalue())
+		self.assertTrue(group.permissions.filter(pk=extra.pk).exists())
+		self.assertIn('用户组漂移 1 个', output.getvalue())
+		self.assertIn('dry-run', output.getvalue())
 
-	def test_command_execute_backfills_group_and_user_bundles(self):
-		group = Group.objects.create(name='训练日志组')
-		group.permissions.add(
-			Permission.objects.get(codename='add_trainingcycle'),
-			Permission.objects.get(codename='add_traininglog'),
-			Permission.objects.get(codename='change_trainingcycle'),
-			Permission.objects.get(codename='change_traininglog'),
-			Permission.objects.get(codename='export_traininglog_archive'),
-			Permission.objects.get(codename='view_all_traininglog'),
-			Permission.objects.get(codename='view_trainingcycle'),
-			Permission.objects.get(codename='view_traininglog'),
+	def test_apply_repairs_drift_and_preserves_explicit_permissions(self):
+		group = Group.objects.create(name='修复组')
+		extra = Permission.objects.get(
+			content_type__app_label='notices', codename='add_notice'
+		)
+		sync_group_permission_assignments(group, ['meetings.view_meetings'], [extra])
+		group.permissions.remove(extra)
+
+		call_command('reconcile_permission_assignments', '--apply')
+
+		self.assertTrue(group.permissions.filter(pk=extra.pk).exists())
+		self.assertTrue(group.profile.explicit_permissions.filter(pk=extra.pk).exists())
+
+
+class PermissionHardCutoverMigrationTests(TestCase):
+	def test_cutover_clears_only_authorization_configuration(self):
+		group = Group.objects.create(name='保留业务关系的组')
+		user = User.objects.create_user('cutover-user')
+		user.groups.add(group)
+		extra = Permission.objects.get(
+			content_type__app_label='auth', codename='view_group'
+		)
+		sync_group_permission_assignments(group, ['meetings.view_meetings'], [extra])
+		sync_user_permission_assignments(user, ['training.submit_logs'], [extra])
+		training_log_type = ContentType.objects.get(
+			app_label='training', model='traininglog'
+		)
+		obsolete = Permission.objects.create(
+			content_type=training_log_type,
+			codename='view_coach_traininglog',
+			name='旧教练训练日志权限',
 		)
 
-		user = User.objects.create_user('bundle-backfill-user', password='testpass123')
-		user.user_permissions.add(
-			Permission.objects.get(codename='add_conduct_record'),
-			Permission.objects.get(codename='review_conduct_record'),
-			Permission.objects.get(codename='view_all_conduct_records'),
-			Permission.objects.get(codename='view_conductrecord'),
-			Permission.objects.get(codename='view_conductsummary'),
-		)
+		migration = import_module('accounts.migrations.0020_reset_legacy_permission_assignments')
+		migration.reset_legacy_permission_assignments(django_apps, None)
 
-		output = StringIO()
-		call_command('backfill_permission_bundles', '--execute', stdout=output)
-
-		group.refresh_from_db()
-		user.refresh_from_db()
-		self.assertEqual(group.profile.selected_permission_bundles, ['training.maintain_training'])
-		self.assertEqual(
-			user.profile.selected_permission_bundles,
-			['behaviors.record_conduct', 'behaviors.review_conduct'],
-		)
-		self.assertSetEqual(
-			set(user.user_permissions.values_list('codename', flat=True)),
-			{
-				'add_conduct_record',
-				'review_conduct_record',
-				'view_all_conduct_records',
-				'view_conductrecord',
-				'view_conductsummary',
-			},
-		)
-		self.assertIn('已回填 2 个对象的业务权限包。', output.getvalue())
+		self.assertTrue(User.objects.filter(pk=user.pk).exists())
+		self.assertTrue(Group.objects.filter(pk=group.pk).exists())
+		self.assertTrue(user.groups.filter(pk=group.pk).exists())
+		self.assertFalse(group.permissions.exists())
+		self.assertFalse(user.user_permissions.exists())
+		group.profile.refresh_from_db()
+		user.profile.refresh_from_db()
+		self.assertEqual(group.profile.selected_permission_bundles, [])
+		self.assertEqual(user.profile.selected_permission_bundles, [])
+		self.assertFalse(group.profile.explicit_permissions.exists())
+		self.assertFalse(user.profile.explicit_permissions.exists())
+		self.assertFalse(Permission.objects.filter(pk=obsolete.pk).exists())

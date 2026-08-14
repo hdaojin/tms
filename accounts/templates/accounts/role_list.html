@@ -1,6 +1,19 @@
 {% extends "layouts/app.html" %}
+{% load django_tables2 %}
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
-  {% include "components/table_wrapper.html" with table=table %}
+  <div class="space-y-8">
+    {% include "components/table_wrapper.html" with table=table %}
+
+    <section id="permission-bundle-reference" class="space-y-4 pt-8">
+      <div>
+        <h2 class="text-lg font-semibold">业务权限包参考</h2>
+        <p class="text-sm text-base-content/60">以下内容来自随系统部署的权限包目录，仅供授权配置时查阅。</p>
+      </div>
+      <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+        {% render_table permission_bundle_table %}
+      </div>
+    </section>
+  </div>
 {% endblock %}

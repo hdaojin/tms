@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.urls import reverse
 from django.views.generic import CreateView, DeleteView, DetailView, UpdateView
 from django_tables2 import SingleTableView
@@ -24,20 +24,22 @@ from .models import (
 from .tables import CompetitionLevelTable, CompetitionSeriesTable, EventModuleTable, EventParticipantTable, EventTable
 
 
-class CompetitionSeriesListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class CompetitionSeriesListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = CompetitionSeries
     table_class = CompetitionSeriesTable
     template_name = "common/table_page.html"
     title = "赛事系列"
     title_icon = "icon-[tabler--trophy]"
+    permission_required = "events.view_competitionseries"
 
 
-class CompetitionSeriesDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class CompetitionSeriesDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = CompetitionSeries
     template_name = "events/series_detail.html"
     context_object_name = "series"
     title = "{name}"
     title_icon = "icon-[tabler--trophy]"
+    permission_required = "events.view_competitionseries"
 
 
 class CompetitionSeriesCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
@@ -64,20 +66,22 @@ class CompetitionSeriesUpdateView(TitleMixin, PermissionRequiredMixin, UpdateVie
         return reverse("events:series_detail", args=[self.object.pk])
 
 
-class CompetitionLevelListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class CompetitionLevelListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = CompetitionLevel
     table_class = CompetitionLevelTable
     template_name = "common/table_page.html"
     title = "赛事级别"
     title_icon = "icon-[tabler--stairs]"
+    permission_required = "events.view_competitionlevel"
 
 
-class CompetitionLevelDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class CompetitionLevelDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = CompetitionLevel
     template_name = "events/level_detail.html"
     context_object_name = "level"
     title = "{name}"
     title_icon = "icon-[tabler--stairs]"
+    permission_required = "events.view_competitionlevel"
 
 
 class CompetitionLevelCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
@@ -104,23 +108,25 @@ class CompetitionLevelUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView
         return reverse("events:level_detail", args=[self.object.pk])
 
 
-class EventListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class EventListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = Event
     table_class = EventTable
     template_name = "events/event_list.html"
     title = "事件"
     title_icon = "icon-[tabler--calendar-event]"
+    permission_required = "events.view_event"
 
     def get_queryset(self):
         return super().get_queryset().select_related("skill_project", "series", "level", "training_cycle")
 
 
-class EventDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class EventDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = Event
     template_name = "events/event_detail.html"
     context_object_name = "event"
     title = "{name}"
     title_icon = "icon-[tabler--calendar-event]"
+    permission_required = "events.view_event"
 
 
 class EventCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
@@ -152,20 +158,22 @@ class EventUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
         return reverse("events:event_detail", args=[self.object.pk])
 
 
-class EventModuleListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class EventModuleListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = EventModule
     table_class = EventModuleTable
     template_name = "common/table_page.html"
     title = "事件模块"
     title_icon = "icon-[tabler--layout-grid]"
+    permission_required = "events.view_eventmodule"
 
 
-class EventModuleDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class EventModuleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = EventModule
     template_name = "events/module_detail.html"
     context_object_name = "module"
     title = "{name}"
     title_icon = "icon-[tabler--layout-grid]"
+    permission_required = "events.view_eventmodule"
 
     def get_queryset(self):
         return super().get_queryset().select_related("event", "event__skill_project").prefetch_related(
@@ -247,20 +255,22 @@ class EventModuleCapabilityDomainMapDeleteView(TitleMixin, PermissionRequiredMix
         return reverse("events:module_detail", args=[self.object.event_module_id])
 
 
-class EventParticipantListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class EventParticipantListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = EventParticipant
     table_class = EventParticipantTable
     template_name = "common/table_page.html"
     title = "事件参与人员"
     title_icon = "icon-[tabler--users]"
+    permission_required = "events.view_eventparticipant"
 
 
-class EventParticipantDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class EventParticipantDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = EventParticipant
     template_name = "events/participant_detail.html"
     context_object_name = "participant"
     title = "{display_name}"
     title_icon = "icon-[tabler--user]"
+    permission_required = "events.view_eventparticipant"
 
 
 class EventParticipantCreateView(TitleMixin, PermissionRequiredMixin, CreateView):

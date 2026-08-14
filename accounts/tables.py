@@ -7,13 +7,10 @@ from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 
 from accounts.services.users import get_user_display_name, get_user_role_badges
-from core.permissions import get_permission_bundle_specs
+from core.permissions import get_permission_bundle_spec_map
 from core.tables import BaseTable, BaseDateColumn, ActionsColumn
 
 User = get_user_model()
-PERMISSION_BUNDLE_NAMES = {
-    spec.code: spec.name for spec in get_permission_bundle_specs()
-}
 
 
 class UserListTable(BaseTable):
@@ -212,8 +209,9 @@ class RoleListTable(BaseTable):
     def render_permission_bundles(self, record):
         profile = self._get_profile(record)
         bundle_codes = getattr(profile, "selected_permission_bundles", None) or []
+        specs = get_permission_bundle_spec_map()
         bundle_names = [
-            PERMISSION_BUNDLE_NAMES.get(code, code)
+            specs[code].name if code in specs else code
             for code in bundle_codes
         ]
         return "、".join(bundle_names) or "无"
@@ -228,3 +226,53 @@ class RoleListTable(BaseTable):
             "user_total",
             "permission_bundles",
         )
+
+
+class PermissionBundleReferenceTable(BaseTable):
+    """业务权限包目录参考表。"""
+
+    name = tables.Column(
+        verbose_name="业务权限包",
+        orderable=False,
+        attrs={"td": {"class": "min-w-36 text-left align-middle"}},
+    )
+    code = tables.Column(
+        verbose_name="配置编码",
+        orderable=False,
+        attrs={"td": {"class": "min-w-52 text-left align-middle"}},
+    )
+    description = tables.Column(
+        verbose_name="用途说明",
+        orderable=False,
+        attrs={"td": {"class": "min-w-72 text-left align-middle"}},
+    )
+    permissions = tables.Column(
+        verbose_name="自动附加的底层 Django 权限",
+        orderable=False,
+        attrs={"td": {"class": "min-w-80 text-left align-middle"}},
+    )
+
+    def render_code(self, value):
+        return format_html(
+            '<code class="whitespace-nowrap rounded bg-base-200 px-2 py-1 text-xs">{}</code>',
+            value,
+        )
+
+    def render_permissions(self, value):
+        return format_html(
+            '<div class="space-y-1">{}</div>',
+            format_html_join(
+                "",
+                '<code class="block whitespace-nowrap text-xs">{}</code>',
+                ((permission,) for permission in value),
+            ),
+        )
+
+    class Meta(BaseTable.Meta):
+        fields = ("name", "code", "description", "permissions")
+        attrs = {
+            "class": "table w-full",
+            "thead": {"class": "bg-base-200"},
+            "th": {"class": "text-left whitespace-nowrap"},
+            "td": {"class": "text-left align-middle"},
+        }

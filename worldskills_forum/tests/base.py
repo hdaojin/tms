@@ -21,12 +21,26 @@ class ForumTestCase(TestCase):
         self.expert_role = ForumSourceRole.objects.get(slug="expert")
         self.official_role = ForumSourceRole.objects.get(slug="worldskills_official")
         self.tag = ForumTag.objects.create(name="Linux", slug="linux")
-        self.grant(self.translator_a, "add_forumtopic", "add_forumpost", "add_forumtranslation")
-        self.grant(self.translator_b, "add_forumtopic", "add_forumpost", "add_forumtranslation")
+        read_permissions = (
+            "view_forumtopic", "view_forumpost", "view_forumtranslation",
+            "view_forumpostattachment",
+        )
+        self.grant(self.reader, *read_permissions)
+        translator_permissions = read_permissions + (
+            "add_forumtopic", "change_forumtopic",
+            "add_forumpost", "change_forumpost",
+            "add_forumtranslation", "change_forumtranslation",
+            "add_forumpostattachment", "change_forumpostattachment",
+        )
+        self.grant(self.translator_a, *translator_permissions)
+        self.grant(self.translator_b, *translator_permissions)
         self.grant(
             self.manager,
+            *read_permissions,
             "change_forumtopic", "change_forumpost", "change_forumtranslation",
             "delete_forumtopic", "delete_forumpost", "delete_forumtranslation",
+            "change_forumpostattachment", "delete_forumpostattachment",
+            "change_all_forum_content",
         )
 
     def grant(self, user, *codenames):

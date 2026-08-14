@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -13,12 +13,13 @@ from .selectors import get_unmapped_evidences
 from .tables import KnowledgeEvidenceSkillMapTable, KnowledgeEvidenceTable
 
 
-class KnowledgeEvidenceListView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class KnowledgeEvidenceListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = KnowledgeEvidence
     table_class = KnowledgeEvidenceTable
     template_name = "knowledge/evidence_list.html"
     title = "考点证据"
     title_icon = "icon-[tabler--bulb]"
+    permission_required = "knowledge.view_knowledgeevidence"
 
     def get_queryset(self):
         return super().get_queryset().select_related("skill_project", "event_module", "capability_domain")
@@ -31,12 +32,13 @@ class UnmappedEvidenceListView(KnowledgeEvidenceListView):
         return get_unmapped_evidences()
 
 
-class KnowledgeEvidenceDetailView(TitleMixin, LoginRequiredMixin, DetailView):
+class KnowledgeEvidenceDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = KnowledgeEvidence
     template_name = "knowledge/evidence_detail.html"
     context_object_name = "evidence"
     title = "{title}"
     title_icon = "icon-[tabler--bulb]"
+    permission_required = "knowledge.view_knowledgeevidence"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

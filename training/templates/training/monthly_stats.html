@@ -18,12 +18,12 @@
     </form>
     <div class="overflow-x-auto">
       <table class="table table-sm">
-        <thead><tr><th>日期</th><th>已提交选手</th><th>未提交选手</th><th>已提交教练</th></tr></thead>
+        <thead><tr><th>日期</th><th>已提交人员</th><th>未提交人员</th></tr></thead>
         <tbody>
           {% for row in rows %}
-            <tr><td>{{ row.date }}</td><td>{{ row.submitted_competitors }}</td><td>{{ row.unsubmitted_competitors }}</td><td>{{ row.submitted_coaches }}</td></tr>
+            <tr><td>{{ row.date }}</td><td>{{ row.submitted_users }}</td><td>{{ row.unsubmitted_users }}</td></tr>
           {% empty %}
-            <tr><td colspan="4">暂无数据</td></tr>
+            <tr><td colspan="3">暂无数据</td></tr>
           {% endfor %}
         </tbody>
       </table>

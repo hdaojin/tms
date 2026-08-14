@@ -200,6 +200,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 PRIVATE_MEDIA_ROOT = env.path('PRIVATE_MEDIA_ROOT', default=BASE_DIR / 'media-private')  # type: ignore
+NOTES_ROOT = env.path('NOTES_ROOT', default=Path(PRIVATE_MEDIA_ROOT) / 'notes')  # type: ignore
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/6.0/ref/settings/#default-auto-field

@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.contrib.auth.decorators import permission_required
 
 
 from .forms import SambaPasswordForm
@@ -13,6 +14,7 @@ from .services import (
 )
 
 
+@permission_required("samba.add_sambaoperation", raise_exception=True)
 def samba_account_view(request):
     user = request.user
     last_known_enabled_state = get_last_known_enabled_state(user)

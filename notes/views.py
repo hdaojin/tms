@@ -11,13 +11,12 @@ from urllib.parse import unquote
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import permission_required
 from django.core.cache import cache
 from django.db.models import Prefetch
 from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render
 from django.urls import reverse
-
-from core.constants import NOTES_ROOT
 
 from .models import NoteRepo
 from .paths import (
@@ -75,10 +74,11 @@ def _cache_key(repo: NoteRepo, slug: str, path: Path) -> str:
 
 
 @login_required
+@permission_required("notes.view_noterepo", raise_exception=True)
 def notes_repo_list_view(request: HttpRequest) -> HttpResponse:
     """列出已登记且目录存在的笔记仓库。"""
 
-    notes_root = Path(NOTES_ROOT)
+    notes_root = Path(settings.NOTES_ROOT)
     top_level_dirs = {
         child.name for child in notes_root.iterdir() if child.is_dir()
     } if notes_root.exists() else set()
@@ -159,6 +159,7 @@ def notes_repo_list_view(request: HttpRequest) -> HttpResponse:
 
 
 @login_required
+@permission_required("notes.view_noterepo", raise_exception=True)
 def note_detail_view(
     request: HttpRequest, repo: str, slug: str | None = None, *args: Any, **kwargs: Any
 ) -> HttpResponse:
@@ -216,7 +217,7 @@ def note_detail_view(
         "meta": meta,
         "repo": safe_repo,
         "repo_title": repo_obj.title or safe_repo,
-        "notes_root_name": Path(NOTES_ROOT).name,
+        "notes_root_name": Path(settings.NOTES_ROOT).name,
         "current_note_title": current_note_title,
         "slug": current_slug,
         "meta_parse_error": bool(meta.get("_parse_error")),
@@ -234,6 +235,7 @@ def note_detail_view(
 
 
 @login_required
+@permission_required("notes.view_noterepo", raise_exception=True)
 def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
     """渲染适合打印的训练日志页面。"""
 
@@ -289,6 +291,7 @@ def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
 
 
 @login_required
+@permission_required("notes.view_noterepo", raise_exception=True)
 def note_asset_view(request: HttpRequest, repo: str, asset_path: str) -> HttpResponse:
     """在已登记仓库根目录内安全提供图片和附件。"""
 

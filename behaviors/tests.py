@@ -23,7 +23,6 @@ from core.constants import (
     CONDUCT_SEVERITY_MINOR,
     CONDUCT_SEVERITY_MODERATE,
     CONDUCT_SEVERITY_SEVERE,
-    GROUP_COMPETITOR,
 )
 from behaviors.admin import ConductCategoryAdmin, ConductItemAdmin, ConductRecordAdmin, ConductSeverityRuleAdmin, ConductSummaryAdmin
 from behaviors.models import ConductCategory, ConductItem, ConductRecord, ConductSeverityRule, ConductSummary
@@ -31,6 +30,17 @@ from behaviors.services import prepare_conduct_record_for_save
 
 
 User = get_user_model()
+
+
+def create_conduct_subject_group(name="奖惩对象组"):
+    group = Group.objects.create(name=name)
+    group.permissions.add(
+        Permission.objects.get(
+            content_type__app_label="behaviors",
+            codename="be_conduct_subject",
+        )
+    )
+    return group
 
 
 class ConductItemValidationTestCase(TestCase):
@@ -150,7 +160,7 @@ class ConductRecordValidationTestCase(TestCase):
     """奖惩记录应遵守选手范围与审核状态流。"""
 
     def setUp(self):
-        self.competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        self.competitor_group = create_conduct_subject_group()
         self.student = User.objects.create_user(username='student', password='testpass123')
         self.student.groups.add(self.competitor_group)
         self.outsider = User.objects.create_user(username='outsider', password='testpass123')
@@ -211,7 +221,7 @@ class ConductRecordValidationTestCase(TestCase):
         )
         self.addCleanup(record.attachment.delete, False)
 
-        self.assertTrue(record.attachment.name.startswith('behaviors/'))
+        self.assertFalse(record.attachment.name.startswith('behaviors/'))
         self.assertEqual(Path(record.attachment.path).parent.parent.name, 'behaviors')
 
     def test_record_requires_configured_severity_rule(self):
@@ -291,7 +301,7 @@ class ConductSummarySynchronizationTestCase(TestCase):
     """默认分值与严重程度系数变更后，汇总应自动重算。"""
 
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_conduct_subject_group()
         self.student = User.objects.create_user(username='summary-student', password='testpass123')
         self.student.groups.add(competitor_group)
         self.recorder = User.objects.create_user(username='summary-recorder', password='testpass123')
@@ -351,7 +361,7 @@ class ConductSummaryZeroScoreCountTestCase(TestCase):
     """零分惩罚仍应计入惩罚次数。"""
 
     def test_warning_style_penalty_counts_but_does_not_reduce_total(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_conduct_subject_group()
         student = User.objects.create_user(username='warning-student', password='testpass123')
         student.groups.add(competitor_group)
         recorder = User.objects.create_user(username='warning-recorder', password='testpass123')
@@ -402,7 +412,7 @@ class ConductRecordAdminTestCase(TestCase):
     """仅保留后台时，admin 仍需区分录入与审核权限。"""
 
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_conduct_subject_group()
         self.student = User.objects.create_user(username='admin-student', password='testpass123')
         self.student.groups.add(competitor_group)
 
@@ -608,7 +618,7 @@ class ConductRecordAdminTestCase(TestCase):
 
 class ConductWorkflowServiceTests(TestCase):
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_conduct_subject_group()
         self.student = User.objects.create_user(username='workflow-student', password='testpass123')
         self.student.groups.add(competitor_group)
         self.recorder = User.objects.create_user(username='workflow-recorder', password='testpass123')
@@ -669,14 +679,23 @@ class ConductRecordListViewTests(TestCase):
     """奖惩记录列表应展示核心字段并隐藏录入元数据。"""
 
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_conduct_subject_group()
         self.student = User.objects.create_user(username='list-student', password='testpass123')
         self.student.groups.add(competitor_group)
         self.other_student = User.objects.create_user(username='list-other-student', password='testpass123')
         self.other_student.groups.add(competitor_group)
         self.recorder = User.objects.create_user(username='list-recorder', password='testpass123')
         self.viewer = User.objects.create_user(username='list-viewer', password='testpass123')
-        self.viewer.user_permissions.add(Permission.objects.get(codename='view_all_conduct_records'))
+        view_permission = Permission.objects.get(
+            content_type__app_label='behaviors', codename='view_conductrecord'
+        )
+        self.student.user_permissions.add(view_permission)
+        self.viewer.user_permissions.add(
+            view_permission,
+            Permission.objects.get(
+                content_type__app_label='behaviors', codename='view_all_conduct_records'
+            ),
+        )
 
         category = ConductCategory.objects.create(
             nature=CONDUCT_NATURE_REWARD,
@@ -755,11 +774,16 @@ class ConductRecordListViewTests(TestCase):
 
 class ConductRecordCreateViewTests(TestCase):
     def setUp(self):
-        competitor_group = Group.objects.create(name=GROUP_COMPETITOR)
+        competitor_group = create_conduct_subject_group()
         self.student = User.objects.create_user(username='create-student', password='testpass123')
         self.student.groups.add(competitor_group)
         self.recorder = User.objects.create_user(username='create-recorder', password='testpass123')
         self.recorder.user_permissions.add(Permission.objects.get(codename='add_conduct_record'))
+        self.recorder.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label='behaviors', codename='view_conductrecord'
+            )
+        )
 
         self.category = ConductCategory.objects.create(
             nature=CONDUCT_NATURE_REWARD,

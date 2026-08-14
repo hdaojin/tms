@@ -9,7 +9,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from accounts.services.permission_bundles import sync_user_permission_bundles
+from accounts.services.permission_assignments import sync_user_permission_assignments
 from meetings.admin import MeetingAdmin
 from meetings.models import Meeting
 
@@ -20,10 +20,15 @@ User = get_user_model()
 class MeetingViewPermissionTests(TestCase):
     def setUp(self):
         self.viewer = User.objects.create_user(username="meeting-viewer", password="testpass123")
+        view_permission = Permission.objects.get(
+            content_type__app_label="meetings", codename="view_meeting"
+        )
+        self.viewer.user_permissions.add(view_permission)
         self.uploader = User.objects.create_user(username="meeting-uploader", password="testpass123")
         self.uploader.user_permissions.add(Permission.objects.get(codename="add_meeting"))
         self.deleter = User.objects.create_user(username="meeting-deleter", password="testpass123")
         self.deleter.user_permissions.add(Permission.objects.get(codename="delete_meeting"))
+        self.deleter.user_permissions.add(view_permission)
 
         self.meeting = Meeting.objects.create(
             title="周例会",
@@ -69,7 +74,7 @@ class MeetingViewPermissionTests(TestCase):
 
     def test_meeting_upload_business_bundle_grants_access(self):
         bundle_user = User.objects.create_user(username="meeting-bundle", password="testpass123")
-        sync_user_permission_bundles(bundle_user, ["meetings.upload_meeting"])
+        sync_user_permission_assignments(bundle_user, ["meetings.upload_meeting"])
         self.client.force_login(bundle_user)
 
         response = self.client.get(reverse("meetings:meeting_upload"))

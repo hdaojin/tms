@@ -4,12 +4,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterable
 
-import yaml
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.urls import NoReverseMatch, reverse
+
+from core.config_loader import ConfigurationError, load_yaml_mapping
+from core.permissions.registry import get_declared_permission_labels
 
 
 CACHE_NS = "tms:navigation:v1"
@@ -52,12 +54,53 @@ def _load_config() -> dict:
         return cached
 
     path = _config_path()
-    data: dict = {}
-    if path.exists():
-        with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+    data = load_yaml_mapping(path)
+    _validate_config(data)
     cache.set(cache_key, data, timeout=settings.CACHE_TIMEOUT)
     return data
+
+
+def _validate_config(data: dict) -> None:
+    if not isinstance(data.get("sections"), list):
+        raise ConfigurationError("navigation.yml 的 sections 必须是列表。")
+    declared_permissions = get_declared_permission_labels()
+
+    def validate_item(raw: dict, location: str) -> None:
+        if not isinstance(raw, dict) or not isinstance(raw.get("key"), str) or not isinstance(raw.get("label"), str):
+            raise ConfigurationError(f"{location} 必须包含字符串 key 和 label。")
+        permissions = raw.get("permissions") or []
+        if not isinstance(permissions, list) or any(not isinstance(value, str) for value in permissions):
+            raise ConfigurationError(f"{location}.permissions 必须是字符串列表。")
+        children = raw.get("children") or []
+        is_leaf = not children and bool(raw.get("url") or raw.get("url_name"))
+        modes = sum(
+            bool(value)
+            for value in (
+                raw.get("login_required") is False,
+                permissions,
+                raw.get("staff_required"),
+                raw.get("superuser_required"),
+            )
+        )
+        if is_leaf and modes != 1:
+            raise ConfigurationError(f"{location} 必须且只能声明一种访问模式。")
+        for permission in permissions:
+            if permission not in declared_permissions:
+                raise ConfigurationError(f"{location} 引用了不存在的权限 {permission}。")
+        if not isinstance(children, list):
+            raise ConfigurationError(f"{location}.children 必须是列表。")
+        for index, child in enumerate(children, start=1):
+            validate_item(child, f"{location}.children[{index}]")
+
+    for section_index, section in enumerate(data["sections"], start=1):
+        if not isinstance(section, dict) or not isinstance(section.get("items"), list):
+            raise ConfigurationError(f"sections[{section_index}] 必须包含 items 列表。")
+        for item_index, item in enumerate(section["items"], start=1):
+            validate_item(item, f"sections[{section_index}].items[{item_index}]")
+
+
+def validate_navigation_config() -> None:
+    _validate_config(load_yaml_mapping(_config_path()))
 
 
 def get_theme_choices() -> list[str]:

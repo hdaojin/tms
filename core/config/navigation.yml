@@ -51,6 +51,7 @@ sections:
             label: 通知公告列表
             url_name: notices:notice_list
             icon_class: icon-[tabler--bell] size-5 text-info
+            permissions: [notices.view_notice]
           - key: notices_create
             label: 创建通知公告
             url_name: notices:notice_create
@@ -71,22 +72,27 @@ sections:
             label: 最新动态
             url_name: worldskills_forum:feed
             icon_class: icon-[tabler--news] size-5 text-info
+            permissions: [worldskills_forum.view_forumpost]
           - key: worldskills_forum_topics
             label: 主题
             url_name: worldskills_forum:topic_list
             icon_class: icon-[tabler--message-circle] size-5 text-primary
+            permissions: [worldskills_forum.view_forumtopic]
           - key: worldskills_forum_important
             label: 重要信息
             url_name: worldskills_forum:important_feed
             icon_class: icon-[tabler--alert-triangle] size-5 text-warning
+            permissions: [worldskills_forum.view_forumpost]
           - key: worldskills_forum_official
             label: 官方信息
             url_name: worldskills_forum:official_feed
             icon_class: icon-[tabler--rosette] size-5 text-info
+            permissions: [worldskills_forum.view_forumpost]
           - key: worldskills_forum_unread
             label: 未读信息
             url_name: worldskills_forum:unread_feed
             icon_class: icon-[tabler--mail] size-5 text-secondary
+            permissions: [worldskills_forum.view_forumpost]
           - key: worldskills_forum_workbench
             label: 翻译工作台
             url_name: worldskills_forum:workbench
@@ -107,6 +113,7 @@ sections:
             label: 训练周期
             url_name: training:cycle_list
             icon_class: icon-[tabler--calendar-stats] size-5 text-success
+            permissions: [training.view_trainingcycle]
           - key: training_create
             label: 新增训练周期
             url_name: training:cycle_create
@@ -117,6 +124,7 @@ sections:
             label: 训练日志
             url_name: training:log_list
             icon_class: icon-[tabler--file-text] size-5 text-success
+            permissions: [training.view_traininglog]
           - key: training_log_upload
             label: 上传训练日志
             url_name: training:log_upload
@@ -127,6 +135,7 @@ sections:
             label: 提交统计
             url_name: training:monthly_stats
             icon_class: icon-[tabler--chart-bar] size-5 text-info
+            permissions: [training.view_traininglog_statistics]
       - key: glossary_learning_group
         label: 专业词汇学习
         icon_class: icon-[tabler--language] size-5 text-accent
@@ -135,14 +144,17 @@ sections:
             label: 词条浏览
             url_name: glossary:browse
             icon_class: icon-[tabler--list-letters] size-5 text-accent
+            permissions: [glossary.view_glossaryentry]
           - key: glossary_study
             label: 开始学习
             url_name: glossary:study_start
             icon_class: icon-[tabler--brain] size-5 text-success
+            permissions: [glossary.view_glossaryentry, glossary.add_studysession]
           - key: glossary_my_stats
             label: 我的统计
             url_name: glossary:my_stats
             icon_class: icon-[tabler--chart-bar] size-5 text-info
+            permissions: [glossary.view_studysession]
           - key: glossary_proposals
             label: 词条提案
             url_name: glossary:proposal_list
@@ -185,6 +197,7 @@ sections:
             label: 赛事系列
             url_name: events:series_list
             icon_class: icon-[tabler--trophy] size-5 text-warning
+            permissions: [events.view_competitionseries]
           - key: event_series_create
             label: 新增赛事系列
             url_name: events:series_create
@@ -195,6 +208,7 @@ sections:
             label: 赛事级别
             url_name: events:level_list
             icon_class: icon-[tabler--stairs] size-5 text-warning
+            permissions: [events.view_competitionlevel]
           - key: event_level_create
             label: 新增赛事级别
             url_name: events:level_create
@@ -209,6 +223,7 @@ sections:
             label: 事件
             url_name: events:event_list
             icon_class: icon-[tabler--calendar-event] size-5 text-warning
+            permissions: [events.view_event]
           - key: event_create
             label: 新增事件
             url_name: events:event_create
@@ -219,6 +234,7 @@ sections:
             label: 事件模块
             url_name: events:module_list
             icon_class: icon-[tabler--layout-grid] size-5 text-warning
+            permissions: [events.view_eventmodule]
           - key: event_module_create
             label: 新增事件模块
             url_name: events:module_create
@@ -229,6 +245,7 @@ sections:
             label: 参与人员
             url_name: events:participant_list
             icon_class: icon-[tabler--users-group] size-5 text-info
+            permissions: [events.view_eventparticipant]
           - key: event_participant_create
             label: 新增参与人员
             url_name: events:participant_create
@@ -243,6 +260,7 @@ sections:
             label: 试题
             url_name: examcontent:paper_list
             icon_class: icon-[tabler--file-analytics] size-5 text-warning
+            permissions: [examcontent.view_exampaper]
           - key: examcontent_create
             label: 新增试题
             url_name: examcontent:paper_create
@@ -253,6 +271,7 @@ sections:
             label: 试题要求
             url_name: examcontent:requirement_list
             icon_class: icon-[tabler--list-check] size-5 text-warning
+            permissions: [examcontent.view_examrequirement]
           - key: exam_requirements_create
             label: 新增试题要求
             url_name: examcontent:requirement_create
@@ -267,6 +286,7 @@ sections:
             label: 评分方案
             url_name: scoring:scheme_list
             icon_class: icon-[tabler--clipboard-check] size-5 text-primary
+            permissions: [scoring.view_scoringscheme]
           - key: scoring_import
             label: 导入评分表
             url_name: scoring:scheme_import
@@ -299,6 +319,7 @@ sections:
             label: 技能项目
             url_name: standards:project_list
             icon_class: icon-[tabler--target-arrow] size-5 text-info
+            permissions: [standards.view_skillproject]
           - key: standards_create
             label: 新增技能项目
             url_name: standards:project_create
@@ -309,6 +330,7 @@ sections:
             label: 能力领域
             url_name: standards:domain_list
             icon_class: icon-[tabler--category] size-5 text-info
+            permissions: [standards.view_capabilitydomain]
           - key: standards_domain_create
             label: 新增能力领域
             url_name: standards:domain_create
@@ -319,6 +341,7 @@ sections:
             label: 标准技能树版本
             url_name: standards:tree_list
             icon_class: icon-[tabler--hierarchy-3] size-5 text-success
+            permissions: [standards.view_skilltreeversion]
           - key: standards_tree_create
             label: 新增标准技能树版本
             url_name: standards:tree_create
@@ -329,6 +352,7 @@ sections:
             label: 技能节点
             url_name: standards:node_list
             icon_class: icon-[tabler--hierarchy-2] size-5 text-info
+            permissions: [standards.view_skillnode]
           - key: standards_node_create
             label: 新增技能节点
             url_name: standards:node_create
@@ -343,6 +367,7 @@ sections:
             label: 考点证据
             url_name: knowledge:evidence_list
             icon_class: icon-[tabler--clipboard-list] size-5 text-accent
+            permissions: [knowledge.view_knowledgeevidence]
           - key: knowledge_create
             label: 新增考点证据
             url_name: knowledge:evidence_create
@@ -359,6 +384,7 @@ sections:
             label: 未映射考点
             url_name: knowledge:unmapped
             icon_class: icon-[tabler--map-question] size-5 text-error
+            permissions: [knowledge.view_knowledgeevidence]
 
   - key: resources
     label: 资料
@@ -373,6 +399,7 @@ sections:
             label: 资料资产
             url_name: archives:asset_list
             icon_class: icon-[tabler--files] size-5 text-primary
+            permissions: [archives.view_archiveasset]
           - key: archive_upload
             label: 上传资料资产
             url_name: archives:asset_upload
@@ -387,6 +414,7 @@ sections:
             label: 笔记仓库
             url_name: notes:repo_list
             icon_class: icon-[tabler--book] size-5 text-warning
+            permissions: [notes.view_noterepo]
 
   - key: meetings
     label: 会议
@@ -401,6 +429,7 @@ sections:
             label: 会议记录
             url_name: meetings:meeting_list
             icon_class: icon-[tabler--calendar] size-5 text-primary
+            permissions: [meetings.view_meeting]
           - key: meeting_upload
             label: 上传会议记录
             url_name: meetings:meeting_upload
@@ -421,6 +450,7 @@ sections:
             label: 奖惩记录
             url_name: behaviors:conductrecord_list
             icon_class: icon-[tabler--gavel] size-5 text-secondary
+            permissions: [behaviors.view_conductrecord]
           - key: behavior_create
             label: 录入奖惩记录
             url_name: behaviors:conductrecord_create
@@ -431,6 +461,7 @@ sections:
             label: 操行汇总
             url_name: behaviors:conductsummary_list
             icon_class: icon-[tabler--chart-donut] size-5 text-info
+            permissions: [behaviors.view_conductsummary]
 
   - key: account
     label: 账户
@@ -445,14 +476,17 @@ sections:
             label: 用户中心
             url_name: accounts:home
             icon_class: icon-[tabler--user] size-5 text-primary
+            permissions: [accounts.change_userprofile]
           - key: account_profile
             label: 个人资料
             url_name: accounts:profile
             icon_class: icon-[tabler--user-circle] size-5 text-primary
+            permissions: [accounts.change_userprofile]
           - key: samba
             label: Samba 账户
             url_name: samba:accounts
             icon_class: icon-[tabler--server] size-5 text-info
+            permissions: [samba.add_sambaoperation]
       - key: account_admin
         label: 系统管理
         icon_class: icon-[tabler--settings] size-5 text-neutral
@@ -461,12 +495,12 @@ sections:
             label: 用户管理
             url_name: accounts:user_list
             icon_class: icon-[tabler--users] size-5 text-primary
-            staff_required: true
+            permissions: [accounts.view_all_profiles]
           - key: roles
             label: 角色权限
             url_name: accounts:role_list
             icon_class: icon-[tabler--shield-lock] size-5 text-warning
-            staff_required: true
+            permissions: [auth.view_group]
           - key: account_invitation
             label: 生成邀请码
             url_name: accounts:generate_invitation
@@ -509,3 +543,4 @@ sections:
             url_name: demo:index
             icon_class: icon-[tabler--components] size-5 text-accent
             debug_only: true
+            staff_required: true

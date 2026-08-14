@@ -157,6 +157,7 @@ class ProposalAndPermissionTests(GlossaryTestCase):
 
     def test_login_browse_and_owner_statistics_boundaries(self):
         self.assertEqual(self.client.get(reverse("glossary:browse")).status_code, 302)
+        self._grant(self.user, "view_glossaryentry", "view_studysession")
         self.client.force_login(self.user)
         self.assertEqual(self.client.get(reverse("glossary:browse")).status_code, 200)
         self.assertEqual(self.client.get(reverse("glossary:my_stats")).status_code, 200)

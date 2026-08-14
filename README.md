@@ -184,7 +184,7 @@ uv run manage.py migrate
 ### 5. 导入基础数据
 
 ```bash
-uv run manage.py loaddata core/default accounts/default behaviors/default
+uv run manage.py loaddata core/default behaviors/default
 ```
 
 ### 6. 创建超级管理员
@@ -345,7 +345,7 @@ mkdir -p /srv/tms/media-private
 
 ```bash
 uv run manage.py migrate
-uv run manage.py loaddata core/default accounts/default behaviors/default
+uv run manage.py loaddata core/default behaviors/default
 uv run manage.py createsuperuser
 ```
 
@@ -356,6 +356,18 @@ uv run manage.py migrate
 ```
 
 数据库结构变更应通过 Django migration 管理；部署前应按实际环境做好数据库和上传文件备份。
+
+权限架构硬切换版本首次部署前，必须确认至少一个可用超级管理员，并备份数据库及公开/私有上传目录。本次迁移会清空旧的用户/用户组权限包选择和原生权限分配，但保留用户、用户组、组成员关系和业务数据。迁移后按以下顺序检查并重建授权投影：
+
+```bash
+uv run manage.py check --deploy
+uv run manage.py reconcile_permission_assignments
+uv run manage.py reconcile_permission_assignments --apply
+uv run manage.py migrate_private_media
+uv run manage.py migrate_private_media --apply
+```
+
+前两条对账命令默认只报告差异；确认输出后才执行 `--apply`。敏感文件迁移同样先 dry-run，完成后再重启应用。权限包定义位于 `core/config/permission_bundles.yml`，修改后必须重新执行检查与授权对账。
 
 ### 5. 收集静态文件
 

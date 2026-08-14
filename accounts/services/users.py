@@ -2,17 +2,11 @@ from __future__ import annotations
 
 from django.utils import timezone
 
-from core.constants import GROUP_ASSISTANT, GROUP_COACH, GROUP_COMPETITOR
-
-
 ROLE_STAFF = "工作人员"
 ROLE_SUPERUSER = "超级用户"
 ROLE_UNASSIGNED = "未分配"
 
 ROLE_BADGE_CLASSES = {
-    GROUP_COACH: "badge badge-soft badge-primary",
-    GROUP_COMPETITOR: "badge badge-soft badge-success",
-    GROUP_ASSISTANT: "badge badge-soft badge-info",
     ROLE_STAFF: "badge badge-soft badge-secondary",
     ROLE_SUPERUSER: "badge badge-soft badge-error",
 }

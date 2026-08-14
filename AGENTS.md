@@ -89,10 +89,10 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 
 - 保持 Django 默认 `auth.User`；不要引入自定义 User 模型。
 - 全局登录由 `LoginRequiredMiddleware` 强制；公开 view 必须显式使用 `login_not_required`。
-- 新业务授权优先使用 Django permission 与 `core.permissions` 中的业务权限包，不要通过页面隐藏代替后端授权。
-- 需要表达稳定“角色身份”时优先使用 `GroupProfile.codename` 或统一权限/角色 helper；**不要在新业务逻辑中依赖可修改的 `Group.name` 显示名称**。
-- `CrossGroupAccessMixin` 中基于组显示名称的判断视为兼容逻辑；不要继续扩散这一模式。
-- 对对象级访问复用 `OwnerRequiredMixin`、`CrossGroupAccessMixin`、`PermissionRequiredMixin`、`SuperuserRequiredMixin`，或在 service/view 中实现更明确的权限入口。
+- Django Permission 是运行时唯一授权事实来源；业务权限包只用于部署期授权配置与原生权限投影。
+- Group 名称和 `GroupProfile.codename` 不用于业务授权；codename 只保留给 Samba 等技术集成。
+- 对象范围统一由 selector/policy 收窄；基础 Permission 表示默认或本人范围，`*_all` 只扩大范围。
+- 对象级访问复用 `OwnerRequiredMixin`、`PermissionRequiredMixin`、`SuperuserRequiredMixin`，或在 service/view 中实现更明确的权限入口。
 - 模板与兼容层可显示 `user.display_name` / `user.full_info`；新增 Python 逻辑优先使用 `accounts.services.users.get_user_display_name()` / `get_user_full_info()`。
 
 ## 文件、归档与敏感数据

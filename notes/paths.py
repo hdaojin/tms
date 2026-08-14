@@ -4,7 +4,7 @@ import re
 from pathlib import Path, PurePosixPath
 from urllib.parse import unquote
 
-from core.constants import NOTES_ROOT
+from django.conf import settings
 
 
 class InvalidNotePathError(Exception):
@@ -38,7 +38,7 @@ def resolve_note_repo_root(relative_path: str, *, require_exists: bool = True) -
     """解析配置目录，并确保真实路径仍位于 NOTES_ROOT 内。"""
 
     normalized = normalize_note_relative_path(relative_path)
-    notes_root = Path(NOTES_ROOT).resolve()
+    notes_root = Path(settings.NOTES_ROOT).resolve()
     candidate = notes_root.joinpath(*PurePosixPath(normalized).parts)
     resolved = candidate.resolve(strict=False)
     if not resolved.is_relative_to(notes_root):

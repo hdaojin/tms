@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db.models import Count, Max, Q
 from django.http import FileResponse, Http404
@@ -100,13 +100,14 @@ def _statistics_rows(attempts):
     return rows
 
 
-class GlossaryBrowseView(TitleMixin, LoginRequiredMixin, SingleTableView):
+class GlossaryBrowseView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = GlossaryEntry
     table_class = GlossaryBrowseTable
     template_name = "glossary/browse.html"
     paginate_by = 50
     title = "专业词条浏览"
     title_icon = "icon-[tabler--language]"
+    permission_required = "glossary.view_glossaryentry"
 
     def get_queryset(self):
         queryset = GlossaryEntry.objects.filter(is_active=True, glossary__is_active=True).select_related(
@@ -484,11 +485,12 @@ class GlossaryImportDownloadView(PermissionRequiredMixin, View):
         )
 
 
-class StudyStartView(TitleMixin, LoginRequiredMixin, FormView):
+class StudyStartView(TitleMixin, PermissionRequiredMixin, FormView):
     form_class = StudyStartForm
     template_name = "glossary/study_start.html"
     title = "开始词汇学习"
     title_icon = "icon-[tabler--brain]"
+    permission_required = ("glossary.view_glossaryentry", "glossary.add_studysession")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -514,9 +516,10 @@ class StudyStartView(TitleMixin, LoginRequiredMixin, FormView):
         return reverse("glossary:study_session", args=[self.object.pk])
 
 
-class StudySessionView(TitleMixin, LoginRequiredMixin, View):
+class StudySessionView(TitleMixin, PermissionRequiredMixin, View):
     title = "专业词汇学习"
     title_icon = "icon-[tabler--brain]"
+    permission_required = "glossary.view_studysession"
 
     def get(self, request, *args, **kwargs):
         session = _session_for_user(request, kwargs["pk"])
@@ -544,7 +547,9 @@ class StudySessionView(TitleMixin, LoginRequiredMixin, View):
         )
 
 
-class StudyAnswerView(LoginRequiredMixin, View):
+class StudyAnswerView(PermissionRequiredMixin, View):
+    permission_required = ("glossary.change_studysession", "glossary.add_studyattempt")
+
     def post(self, request, *args, **kwargs):
         session = _session_for_user(request, kwargs["pk"])
         attempt = get_object_or_404(StudyAttempt, pk=request.POST.get("attempt_id"), session=session)
@@ -587,7 +592,9 @@ class StudyAnswerView(LoginRequiredMixin, View):
         )
 
 
-class StudyStopView(LoginRequiredMixin, View):
+class StudyStopView(PermissionRequiredMixin, View):
+    permission_required = "glossary.change_studysession"
+
     def post(self, request, *args, **kwargs):
         session = _session_for_user(request, kwargs["pk"])
         stop_session(session)
@@ -595,10 +602,11 @@ class StudyStopView(LoginRequiredMixin, View):
         return redirect("glossary:session_summary", pk=session.pk)
 
 
-class StudySessionSummaryView(TitleMixin, LoginRequiredMixin, TemplateView):
+class StudySessionSummaryView(TitleMixin, PermissionRequiredMixin, TemplateView):
     template_name = "glossary/study_summary.html"
     title = "学习会话总结"
     title_icon = "icon-[tabler--chart-dots]"
+    permission_required = "glossary.view_studysession"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -619,9 +627,10 @@ class StudySessionSummaryView(TitleMixin, LoginRequiredMixin, TemplateView):
         return context
 
 
-class BaseStatisticsView(TitleMixin, LoginRequiredMixin, TemplateView):
+class BaseStatisticsView(TitleMixin, PermissionRequiredMixin, TemplateView):
     template_name = "glossary/statistics.html"
     include_user_filter = False
+    permission_required = "glossary.view_studysession"
 
     def get_target_user(self, form):
         return self.request.user
@@ -677,7 +686,7 @@ class MyStatisticsView(BaseStatisticsView):
     title_icon = "icon-[tabler--chart-bar]"
 
 
-class AllStatisticsView(PermissionRequiredMixin, BaseStatisticsView):
+class AllStatisticsView(BaseStatisticsView):
     permission_required = ALL_STATS_PERMISSION
     include_user_filter = True
     title = "全部词汇学习统计"

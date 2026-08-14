@@ -132,12 +132,12 @@ Template 只做展示和轻量状态判断；表格展示逻辑优先放 django-
 - GET 是否有查看权限。
 - POST/PUT/DELETE 是否有对应修改权限。
 - 直接访问 URL 是否仍然受保护。
-- 对象级所有者/跨角色访问是否符合业务规则。
+- 对象级所有者范围和 `*_all` 扩展范围是否符合业务规则。
 - 是否应新增/复用业务 permission bundle。
 
 不要仅通过隐藏按钮实现权限。
 
-需要角色身份判断时遵循 `AGENTS.md`：优先稳定 codename/permission，不扩散基于 `Group.name` 的新逻辑。
+遵循 `AGENTS.md`：业务授权只检查 Django Permission；Group 名称/codename 不用于授权，对象范围由 selector/policy 收窄。
 
 ## Step 7：HTMX 与前端实现
 

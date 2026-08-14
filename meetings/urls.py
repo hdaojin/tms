@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import MeetingUploadView, MeetingListView, MeetingDetailView, MeetingDeleteView, meeting_pdf_inline
+from .views import MeetingUploadView, MeetingListView, MeetingDetailView, MeetingDeleteView, MeetingFileContentView, meeting_pdf_inline
 
 app_name = 'meetings'
 
@@ -9,4 +9,5 @@ urlpatterns = [
     path('detail/<int:pk>/', MeetingDetailView.as_view(), name='meeting_detail'),
     path('delete/<int:pk>/', MeetingDeleteView.as_view(), name='meeting_delete'),
     path('pdf_inline/<int:pk>/', meeting_pdf_inline, name='meeting_pdf_inline'),
+    path('file/<int:pk>/', MeetingFileContentView.as_view(), name='meeting_file'),
 ]

@@ -5,15 +5,12 @@
 """
 from __future__ import annotations
 
-from typing import Any, Set
+from typing import Any
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404
 from django.urls import reverse
-
-from core.constants import GROUP_COACH, GROUP_COMPETITOR
-
 
 class SuperuserRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     """
@@ -26,77 +23,6 @@ class SuperuserRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     
     def test_func(self) -> bool:
         return self.request.user.is_superuser  # type: ignore
-
-
-class CrossGroupAccessMixin:
-    """
-    跨组访问权限混入
-    
-    实现选手和教练之间的互相查看权限：
-    - 超级管理员可以查看所有内容
-    - 用户可以查看自己的内容
-    - 选手可以查看教练的内容
-    - 教练可以查看选手的内容
-    
-    用法:
-        class MyDetailView(CrossGroupAccessMixin, DetailView):
-            owner_field = "uploaded_by"  # 对象所有者字段名
-            ...
-    """
-    owner_field: str = "uploaded_by"  # 所有者字段名，子类可覆盖
-    
-    def get_user_groups(self, user: Any) -> Set[str]:
-        """获取用户所属的组名集合"""
-        if not user or not getattr(user, 'pk', None):
-            return set()
-        groups = getattr(user, 'groups', None)
-        if groups is None:
-            return set()
-        return set(groups.values_list('name', flat=True))
-    
-    def check_cross_group_access(self, obj: Any) -> bool:
-        """
-        检查当前用户是否有权访问指定对象
-        
-        Args:
-            obj: 要检查访问权限的对象
-            
-        Returns:
-            bool: 是否有访问权限
-        """
-        user = self.request.user  # type: ignore
-        
-        # 超级管理员放行
-        if getattr(user, 'is_superuser', False):
-            return True
-        
-        # 获取对象所有者
-        owner = getattr(obj, self.owner_field, None)
-        owner_id = getattr(owner, 'pk', None) if owner else getattr(obj, f'{self.owner_field}_id', None)
-        
-        # 本人放行
-        if owner_id == getattr(user, 'pk', None):
-            return True
-        
-        # 检查跨组访问权限
-        user_groups = self.get_user_groups(user)
-        owner_user = owner if owner else None
-        owner_groups = self.get_user_groups(owner_user) if owner_user else set()
-        
-        # 选手可以查看教练，教练可以查看选手
-        is_user_competitor = GROUP_COMPETITOR in user_groups
-        is_user_coach = GROUP_COACH in user_groups
-        is_owner_competitor = GROUP_COMPETITOR in owner_groups
-        is_owner_coach = GROUP_COACH in owner_groups
-        
-        return (is_user_competitor and is_owner_coach) or (is_user_coach and is_owner_competitor)
-    
-    def get_object(self, queryset: Any = None) -> Any:
-        """重写 get_object 以添加跨组访问权限检查"""
-        obj = super().get_object(queryset)  # type: ignore
-        if not self.check_cross_group_access(obj):
-            raise Http404
-        return obj
 
 
 class OwnerRequiredMixin:

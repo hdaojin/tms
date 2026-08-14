@@ -17,9 +17,16 @@ from django.template import Context, Template
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve, reverse
 
-from accounts.services.permission_bundles import sync_user_permission_bundles
+from accounts.services.permission_assignments import sync_user_permission_assignments
 from behaviors.models import ConductSummary
 from core import navigation
+from core.models import SiteConfig
+from core.permissions import (
+    PermissionBundleCatalogError,
+    normalize_permission_bundle_codes,
+    validate_declared_permissions,
+)
+from core.permissions import registry as permission_registry
 from core.forms.fields import MultipleFileField
 from core.uploads import (
     CONDUCT_ATTACHMENT_UPLOAD_SPEC,
@@ -43,6 +50,82 @@ User = get_user_model()
 PDF_BYTES = b"%PDF-1.7\n% test pdf\n"
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 ZIP_BYTES = b"PK\x03\x04" + b"\x00" * 16
+
+
+class PermissionBundleRegistryTests(TestCase):
+    def tearDown(self):
+        permission_registry.get_permission_bundle_specs.cache_clear()
+        super().tearDown()
+
+    def test_unknown_bundle_code_is_rejected(self):
+        with self.assertRaisesRegex(PermissionBundleCatalogError, "未知权限包"):
+            normalize_permission_bundle_codes(["missing.bundle"])
+
+    def test_duplicate_bundle_code_is_rejected(self):
+        raw = {
+            "version": 1,
+            "bundles": [
+                {
+                    "code": "test.bundle",
+                    "name": "测试一",
+                    "description": "测试权限包一",
+                    "permissions": ["auth.view_group"],
+                },
+                {
+                    "code": "test.bundle",
+                    "name": "测试二",
+                    "description": "测试权限包二",
+                    "permissions": ["auth.add_group"],
+                },
+            ],
+        }
+        permission_registry.get_permission_bundle_specs.cache_clear()
+        with patch.object(permission_registry, "load_yaml_mapping", return_value=raw):
+            with self.assertRaisesRegex(PermissionBundleCatalogError, "code 重复"):
+                permission_registry.get_permission_bundle_specs()
+
+    def test_catalog_permission_must_exist_in_model_declarations(self):
+        raw = {
+            "version": 1,
+            "bundles": [
+                {
+                    "code": "test.bundle",
+                    "name": "测试",
+                    "description": "测试权限包",
+                    "permissions": ["missing.view_missing"],
+                },
+            ],
+        }
+        permission_registry.get_permission_bundle_specs.cache_clear()
+        with patch.object(permission_registry, "load_yaml_mapping", return_value=raw):
+            with self.assertRaisesRegex(PermissionBundleCatalogError, "不存在的权限"):
+                validate_declared_permissions()
+
+
+class SiteConfigSingletonTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def tearDown(self):
+        cache.clear()
+        super().tearDown()
+
+    def test_second_site_config_cannot_overwrite_singleton(self):
+        original = SiteConfig.get_solo()
+        duplicate = SiteConfig(site_name="不应覆盖")
+
+        with self.assertRaisesRegex(ValidationError, "只能存在一条"):
+            duplicate.save()
+
+        original.refresh_from_db()
+        self.assertNotEqual(original.site_name, "不应覆盖")
+
+    def test_save_invalidates_cached_singleton(self):
+        config = SiteConfig.get_solo()
+        config.site_name = "更新后的站点"
+        config.save()
+
+        self.assertEqual(SiteConfig.get_solo().site_name, "更新后的站点")
 JSON_BYTES = b'{"ok": true}'
 
 
@@ -101,10 +184,11 @@ class NavigationConfigCacheTests(TestCase):
         super().tearDown()
 
     @override_settings(CACHE_TIMEOUT=10)
-    @patch("core.navigation.yaml.safe_load", return_value={"themes": ["light"]})
+    @patch("core.navigation._validate_config")
+    @patch("core.navigation.load_yaml_mapping", return_value={"themes": ["light"]})
     @patch("core.navigation.cache.set")
     @patch("core.navigation.cache.get", return_value=None)
-    def test_load_config_uses_global_cache_timeout(self, mock_cache_get, mock_cache_set, mock_safe_load):
+    def test_load_config_uses_global_cache_timeout(self, mock_cache_get, mock_cache_set, mock_load, mock_validate):
         config = navigation._load_config()
 
         self.assertEqual(config, {"themes": ["light"]})
@@ -114,7 +198,8 @@ class NavigationConfigCacheTests(TestCase):
             {"themes": ["light"]},
             timeout=10,
         )
-        mock_safe_load.assert_called_once()
+        mock_load.assert_called_once()
+        mock_validate.assert_called_once_with({"themes": ["light"]})
 
 
 class MobileNavigationTemplateTests(TestCase):
@@ -147,7 +232,7 @@ class MobileNavigationTemplateTests(TestCase):
 
     def test_render_mobile_navigation_shows_current_section_and_permitted_nested_items(self):
         user = User.objects.create_user(username="mobile-nav-user", password="testpass123")
-        sync_user_permission_bundles(user, ["training.maintain_training"])
+        sync_user_permission_assignments(user, ["training.manage_all_logs", "training.view_statistics"])
 
         request = self.factory.get(reverse("training:log_upload"))
         request.user = user
@@ -163,6 +248,7 @@ class MobileNavigationTemplateTests(TestCase):
 
     def test_render_mobile_navigation_hides_notice_create_without_permission(self):
         user = User.objects.create_user(username="notice-nav-user", password="testpass123")
+        user = self._grant_permissions(user, "notices.view_notice")
 
         request = self.factory.get(reverse("notices:notice_list"))
         request.user = user
@@ -177,7 +263,7 @@ class MobileNavigationTemplateTests(TestCase):
 
     def test_render_mobile_navigation_shows_notice_create_with_publish_bundle(self):
         user = User.objects.create_user(username="notice-nav-editor", password="testpass123")
-        sync_user_permission_bundles(user, ["notices.publish_notice"])
+        sync_user_permission_assignments(user, ["notices.publish_notice"])
         user = User.objects.get(pk=user.pk)
 
         request = self.factory.get(reverse("notices:notice_list"))
@@ -199,8 +285,8 @@ class MobileNavigationTemplateTests(TestCase):
             user,
         )
 
-        self.assertIn("技能节点", html)
-        self.assertIn(f'href="{reverse("samba:accounts")}"', html)
+        self.assertNotIn("技能节点", html)
+        self.assertNotIn(f'href="{reverse("samba:accounts")}"', html)
         for label in [
             "新增训练周期",
             "上传训练日志",
@@ -287,6 +373,12 @@ class MobileNavigationTemplateTests(TestCase):
 
     def test_render_sections_cards_keeps_dashboard_members_unchanged(self):
         user = User.objects.create_user(username="dashboard-nav-user", password="testpass123")
+        user = self._grant_permissions(
+            user,
+            "notices.view_notice", "meetings.view_meeting", "training.view_trainingcycle",
+            "events.view_event", "standards.view_skillproject", "archives.view_archiveasset",
+            "behaviors.view_conductrecord",
+        )
 
         html = self._render_menu_tag(
             "{% load menu_tags %}{% render_sections_cards %}",
@@ -301,6 +393,12 @@ class MobileNavigationTemplateTests(TestCase):
 
     def test_mobile_navigation_marks_reorganized_business_sections_active(self):
         user = User.objects.create_user(username="business-section-user", password="testpass123")
+        user = self._grant_permissions(
+            user,
+            "standards.view_skillproject", "knowledge.view_knowledgeevidence",
+            "archives.view_archiveasset", "notes.view_noterepo",
+            "examcontent.view_exampaper", "scoring.view_scoringscheme",
+        )
 
         expected_sections = [
             (reverse("standards:project_list"), "标准"),
@@ -412,6 +510,14 @@ class PublicShellNavigationTests(TestCase):
 
     def test_header_navigation_is_limited_to_primary_text_entries(self):
         user = User.objects.create_user(username="header-nav-user", password="testpass123")
+        user.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label__in=["events", "standards", "training", "behaviors"],
+                codename__in=[
+                    "view_event", "view_skillproject", "view_trainingcycle", "view_conductrecord"
+                ],
+            )
+        )
         request = self.factory.get(reverse("accounts:home"))
         request.user = user
         request.resolver_match = resolve(request.path)
@@ -439,6 +545,11 @@ class PublicShellNavigationTests(TestCase):
 
     def test_sidebar_marks_only_current_leaf_active(self):
         user = User.objects.create_user(username="sidebar-active-user", password="testpass123")
+        user.user_permissions.add(
+            Permission.objects.get(
+                content_type__app_label="training", codename="view_traininglog_statistics"
+            )
+        )
         request = self.factory.get(reverse("training:monthly_stats"))
         request.user = user
         request.resolver_match = resolve(request.path)

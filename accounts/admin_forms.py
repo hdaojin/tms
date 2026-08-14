@@ -4,31 +4,15 @@ from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserChangeForm
-from django.contrib.auth.models import Group
-from django.utils.html import format_html, format_html_join
+from django.contrib.auth.models import Group, Permission
 
-from accounts.services.permission_bundles import (
-    get_group_extra_permissions,
+from accounts.services.permission_assignments import (
+    get_group_explicit_permissions,
     get_group_permission_bundle_codes,
-    get_user_extra_permissions,
+    get_user_explicit_permissions,
     get_user_permission_bundle_codes,
 )
-from core.permissions import get_permission_bundle_choices, get_permission_bundle_specs
-
-
-def _build_permission_bundle_help_text():
-    items = format_html_join(
-        "",
-        "<li><strong>{}</strong>：{} 自动附加 {}</li>",
-        (
-            (spec.name, spec.description, "、".join(spec.permission_labels))
-            for spec in get_permission_bundle_specs()
-        ),
-    )
-    return format_html(
-        "勾选业务权限包后，系统会自动补齐底层 Django 权限。<ul>{}</ul>",
-        items,
-    )
+from core.permissions import get_permission_bundle_choices
 
 
 class PermissionBundleField(forms.MultipleChoiceField):
@@ -36,7 +20,6 @@ class PermissionBundleField(forms.MultipleChoiceField):
         kwargs.setdefault("required", False)
         kwargs.setdefault("label", "业务权限包")
         kwargs.setdefault("choices", get_permission_bundle_choices())
-        kwargs.setdefault("help_text", _build_permission_bundle_help_text())
         kwargs.setdefault(
             "widget",
             FilteredSelectMultiple("业务权限包", is_stacked=False),
@@ -46,6 +29,15 @@ class PermissionBundleField(forms.MultipleChoiceField):
 
 class GroupPermissionBundleAdminForm(forms.ModelForm):
     selected_permission_bundles = PermissionBundleField()
+    explicit_permissions = forms.ModelMultipleChoiceField(
+        queryset=Permission.objects.select_related("content_type").order_by(
+            "content_type__app_label", "content_type__model", "codename"
+        ),
+        required=False,
+        label="额外原生 Django 权限",
+        help_text="仅选择业务权限包之外确实需要的权限。原始 Group.permissions 是自动生成的投影。",
+        widget=FilteredSelectMultiple("额外原生 Django 权限", is_stacked=False),
+    )
 
     class Meta:
         model = Group
@@ -53,18 +45,23 @@ class GroupPermissionBundleAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if "permissions" in self.fields:
-            self.fields["permissions"].label = "额外原生权限"
-            self.fields["permissions"].help_text = (
-                "这里只需要选择业务权限包之外的额外权限；系统会自动补齐业务权限包依赖的底层权限。"
-            )
+        self.fields.pop("permissions", None)
         if self.instance.pk:
             self.initial["selected_permission_bundles"] = get_group_permission_bundle_codes(self.instance)
-            self.fields["permissions"].initial = get_group_extra_permissions(self.instance)
+            self.initial["explicit_permissions"] = get_group_explicit_permissions(self.instance)
 
 
 class UserPermissionBundleAdminForm(UserChangeForm):
     selected_permission_bundles = PermissionBundleField()
+    explicit_permissions = forms.ModelMultipleChoiceField(
+        queryset=Permission.objects.select_related("content_type").order_by(
+            "content_type__app_label", "content_type__model", "codename"
+        ),
+        required=False,
+        label="额外原生 Django 权限",
+        help_text="仅选择业务权限包之外确实需要的权限。原始 User.user_permissions 是自动生成的投影。",
+        widget=FilteredSelectMultiple("额外原生 Django 权限", is_stacked=False),
+    )
 
     class Meta(UserChangeForm.Meta):
         model = get_user_model()
@@ -72,11 +69,7 @@ class UserPermissionBundleAdminForm(UserChangeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if "user_permissions" in self.fields:
-            self.fields["user_permissions"].label = "额外原生权限"
-            self.fields["user_permissions"].help_text = (
-                "这里只需要选择业务权限包之外直接授予当前用户的额外权限；系统会自动补齐业务权限包依赖的底层权限。"
-            )
+        self.fields.pop("user_permissions", None)
         if self.instance.pk:
             self.initial["selected_permission_bundles"] = get_user_permission_bundle_codes(self.instance)
-            self.fields["user_permissions"].initial = get_user_extra_permissions(self.instance)
+            self.initial["explicit_permissions"] = get_user_explicit_permissions(self.instance)

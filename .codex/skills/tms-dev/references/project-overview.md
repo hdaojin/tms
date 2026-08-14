@@ -100,8 +100,9 @@ ExamRequirement            ScoringAspect          原始业务文件
 ## 权限入口
 
 - Django permission 是后端授权基础。
-- `core/permissions/bundles.py` 将业务权限组合为可分配权限包。
-- `accounts.GroupProfile.codename` 是稳定组标识；Django `Group.name` 更适合作为显示名/兼容数据，不应成为新业务角色判断的唯一依据。
+- `core/config/permission_bundles.yml` 声明部署期静态业务权限包，`core/permissions/registry.py` 严格校验并展开。
+- `accounts.services.permission_assignments` 事务化维护 Bundle/显式权限来源及原生权限投影。
+- Django Permission 是运行时唯一授权事实来源；Group 名称/codename 仅用于显示或技术集成。
 - 常用 mixin 位于 `core/utils/mixins.py`。
 
 ## 文件入口
