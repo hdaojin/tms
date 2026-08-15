@@ -111,6 +111,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 ## 文件、归档与敏感数据
 
 - 共享上传限制、扩展名、路径和存储规则集中在 `core/constants.py` 与 `core/uploads.py`；不要在各 APP 重写一套临时 validator/storage。
+- 前端文件上传统一复用 `templates/components/file_upload.html`；FilePond v5 作为通用上传组件的底层实现细节，业务 APP 不直接初始化或依赖其 API。服务端 `MultipleFileField` / `UploadSpec` 仍是上传校验的最终事实来源。详细约定见 `docs/developer/file-upload.md` 与 ADR 0004。
 - 私有或敏感文件使用 `PrivateMediaStorage` / `settings.PRIVATE_MEDIA_ROOT`，必须经过有权限检查的 Django view 提供，不得由 Web 服务器直接暴露。
 - 领域主链路中的原始试题、评分表、结果包、训练资料等应优先登记为 `ArchiveAsset`，业务对象保存结构化关系，不重复保存另一份“文件主记录”。
 - 多文件表单复用 `core.forms.fields.MultipleFileField` / `MultipleFileInput`。
@@ -141,7 +142,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - Tailwind 4 按源码文本检测完整 class；模板/JS 中不要通过字符串拼接动态生成 Tailwind class。需要变体时映射到**完整静态 class 字符串**，必要时使用 `@source inline()` 等 Tailwind 4 机制。
 - DaisyUI 组件优先使用语义化组件 class，再用 Tailwind utility 做局部布局和微调；保持现有主题体系。
 - Iconify 使用完整静态形式，例如 `icon-[tabler--calendar]`；不要拼接 icon 名称。
-- 项目依赖 `@alpinejs/csp`。不要添加原生内联 `<script>`、`onclick=` 或 `javascript:` URL；Alpine 指令必须保持 CSP build 可执行，复杂逻辑放入仓库静态 JS。
+- 项目继续使用 `@alpinejs/csp`，但脚本组织遵循“**默认外置、按需内联**”，不要把“零 inline JavaScript”当作目标。跨页面复用、较复杂、需要独立测试或持续维护的逻辑优先放入 `static/js/`；页面局部、一次性、很短且与当前模板强耦合的初始化、配置或事件逻辑，如果内联明显更清晰，可以使用 inline `<script>` / `<script type="module">`，简短 `onclick` / `x-on` 也可在确有理由时使用。不得为了形式上消除少量内联代码而制造不必要的全局状态、通用组件或 `data-*` 转发层。`javascript:` URL 仍禁止；若实际启用 HTTP CSP，则同时遵守真实 CSP 的 nonce、hash 和 source 限制。
 - 新模板引入新的 Tailwind/Iconify class 后必须重新构建 CSS，并提交 `static/css/output.css` 的实际变化。
 
 框架行为不确定时优先查当前上游官方文档：Django 6、django-htmx、django-tables2、Tailwind CSS 4、DaisyUI 5、Alpine.js CSP 与 Iconify Tailwind 4，而不是依据旧版本经验猜测。
