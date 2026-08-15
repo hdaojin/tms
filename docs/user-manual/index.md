@@ -19,6 +19,7 @@
 - [articles/overview.md](articles/overview.md): 文章内容说明。
 - [behaviors/overview.md](behaviors/overview.md): 操行记录与角色边界。
 - [event_countdown/overview.md](event_countdown/overview.md): 通用竞赛倒计时大屏说明。
+- [feedback/overview.md](feedback/overview.md): 意见反馈、附件和处理结果说明。
 - [events/overview.md](events/overview.md): 事件、事件模块、参与人员和结果汇总说明。
 - [examcontent/overview.md](examcontent/overview.md): 试题结构化与试题要求说明。
 - [glossary/overview.md](glossary/overview.md): 专业词库导入、词条提案、学习模式与统计说明。

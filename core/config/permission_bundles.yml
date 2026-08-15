@@ -156,6 +156,15 @@ bundles:
     description: 管理全部论坛内容和基础分类。
     permissions: [worldskills_forum.view_forumtopic, worldskills_forum.change_forumtopic, worldskills_forum.delete_forumtopic, worldskills_forum.change_all_forum_content, worldskills_forum.view_forumpost, worldskills_forum.change_forumpost, worldskills_forum.delete_forumpost, worldskills_forum.view_forumtranslation, worldskills_forum.change_forumtranslation, worldskills_forum.delete_forumtranslation, worldskills_forum.view_forumpostattachment, worldskills_forum.change_forumpostattachment, worldskills_forum.delete_forumpostattachment, worldskills_forum.view_forumcategory, worldskills_forum.add_forumcategory, worldskills_forum.change_forumcategory, worldskills_forum.view_forummodule, worldskills_forum.add_forummodule, worldskills_forum.change_forummodule, worldskills_forum.view_forumsourcerole, worldskills_forum.add_forumsourcerole, worldskills_forum.change_forumsourcerole, worldskills_forum.view_forumtag, worldskills_forum.add_forumtag, worldskills_forum.change_forumtag]
 
+  - code: feedback.handle_feedback
+    name: 处理意见反馈
+    description: 查看私密反馈并更新反馈状态和处理结果。
+    permissions: [feedback.manage_feedback, feedback.view_private_feedback]
+  - code: feedback.identify_anonymous
+    name: 查看匿名反馈人身份
+    description: 在本人有权查看反馈的前提下查看匿名提交者身份。
+    permissions: [feedback.view_anonymous_identity]
+
   - code: glossary.study_glossary
     name: 学习专业词汇
     description: 查看词库和词条并记录本人学习进度。

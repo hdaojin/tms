@@ -10,6 +10,7 @@ layouts:
   header:
     - home
     - events
+    - feedback
     - worldskills_forum
     - standards
     - training
@@ -17,6 +18,7 @@ layouts:
     - about
   dashboard:
     - notice
+    - feedback
     - worldskills_forum
     - standards
     - training
@@ -58,6 +60,26 @@ sections:
             icon_class: icon-[tabler--send] size-5 text-primary
             permissions:
               - notices.add_notice
+
+  - key: feedback
+    label: 反馈
+    description: 意见反馈与问题跟踪
+    icon_class: icon-[tabler--message-report] size-5 text-primary
+    items:
+      - key: feedback_group
+        label: 意见反馈
+        icon_class: icon-[tabler--message-report] size-5 text-primary
+        children:
+          - key: feedback
+            label: 意见反馈列表
+            url_name: feedback:list
+            icon_class: icon-[tabler--message-report] size-5 text-primary
+            login_required: true
+          - key: feedback_create
+            label: 提交反馈
+            url_name: feedback:create
+            icon_class: icon-[tabler--message-plus] size-5 text-success
+            login_required: true
 
   - key: worldskills_forum
     label: 世赛论坛

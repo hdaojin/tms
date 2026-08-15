@@ -1,0 +1,23 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <form class="card border border-base-300 bg-base-100 shadow-sm" method="post" enctype="multipart/form-data" x-data="feedbackForm">
+    <div class="card-body space-y-5">
+      {% csrf_token %}
+      {% include "components/form_errors.html" with form=form %}
+      <div class="grid gap-4 md:grid-cols-2">
+        {% include "components/field.html" with field=form.category %}
+        {% include "components/field.html" with field=form.title %}
+        {% include "components/field.html" with field=form.content %}
+        {% include "feedback/fragments/attachment_picker.html" with field=form.attachments %}
+        {% include "components/field.html" with field=form.is_anonymous %}
+        {% include "components/field.html" with field=form.is_private %}
+      </div>
+      <div class="flex flex-wrap justify-end gap-3">
+        <a class="btn btn-ghost" href="{% url 'feedback:list' %}">取消</a>
+        <button class="btn btn-primary" type="submit"><span class="icon-[tabler--send] size-5" aria-hidden="true"></span>提交反馈</button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
