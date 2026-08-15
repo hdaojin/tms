@@ -1,0 +1,46 @@
+{% load feedback_tags form_extras %}
+<section id="feedback-replies" class="space-y-4">
+  <div class="flex items-center gap-2">
+    <span class="icon-[tabler--messages] size-6 text-primary" aria-hidden="true"></span>
+    <h2 class="text-xl font-semibold">回复 / 讨论</h2>
+  </div>
+  <div class="space-y-4">
+    {% for reply in feedback.replies.all %}
+      <article class="rounded-box border border-base-300 bg-base-100 p-4 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-base-content/60">
+          {% reply_author feedback reply as author_label %}
+          <span class="font-semibold text-base-content">{{ author_label }}</span>
+          <time datetime="{{ reply.created_at|date:'c' }}">{{ reply.created_at|date:"Y-m-d H:i" }}</time>
+        </div>
+        <div class="mt-3 whitespace-pre-wrap break-words">{{ reply.content }}</div>
+        {% if reply.attachments.all %}
+          <div class="mt-4 flex flex-wrap gap-3">
+            {% for attachment in reply.attachments.all %}
+              {% if attachment.is_safe_image %}
+                <button class="overflow-hidden rounded-box border border-base-300" type="button" data-modal-target="reply-image-{{ attachment.pk }}">
+                  <img class="size-24 object-cover" src="{% url 'feedback:attachment' attachment.pk %}" alt="{{ attachment.original_filename }}">
+                </button>
+                <dialog id="reply-image-{{ attachment.pk }}" class="modal">
+                  <div class="modal-box max-w-5xl">
+                    <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" aria-label="关闭">✕</button></form>
+                    <img class="max-h-[75vh] w-full object-contain" src="{% url 'feedback:attachment' attachment.pk %}" alt="{{ attachment.original_filename }}">
+                    <p class="mt-3 text-sm text-base-content/60">{{ attachment.original_filename }}</p>
+                  </div>
+                  <form method="dialog" class="modal-backdrop"><button>关闭</button></form>
+                </dialog>
+              {% else %}
+                <a class="flex items-center gap-2 rounded-box border border-base-300 px-3 py-2 text-sm link-hover" href="{% url 'feedback:attachment' attachment.pk %}">
+                  <span class="icon-[tabler--paperclip] size-5" aria-hidden="true"></span>
+                  <span class="max-w-52 truncate">{{ attachment.original_filename }}</span>
+                  <span class="text-xs text-base-content/60">{{ attachment.file_size|filesize_display }}</span>
+                </a>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+      </article>
+    {% empty %}
+      <p class="rounded-box border border-dashed border-base-300 p-5 text-sm text-base-content/60">暂时还没有回复。</p>
+    {% endfor %}
+  </div>
+</section>

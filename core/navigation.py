@@ -73,10 +73,12 @@ def _validate_config(data: dict) -> None:
             raise ConfigurationError(f"{location}.permissions 必须是字符串列表。")
         children = raw.get("children") or []
         is_leaf = not children and bool(raw.get("url") or raw.get("url_name"))
+        explicit_login_required = raw.get("login_required") is True and "login_required" in raw
         modes = sum(
             bool(value)
             for value in (
                 raw.get("login_required") is False,
+                explicit_login_required,
                 permissions,
                 raw.get("staff_required"),
                 raw.get("superuser_required"),

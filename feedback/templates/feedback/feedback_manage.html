@@ -1,0 +1,23 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="mx-auto max-w-3xl">
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <div class="mb-4">
+        <p class="font-mono text-sm text-primary">#{{ feedback.pk }}</p>
+        <h1 class="text-2xl font-bold">{{ feedback.title }}</h1>
+      </div>
+      <form method="post" class="space-y-4">
+        {% csrf_token %}
+        {% include "components/form_errors.html" with form=form %}
+        {% include "components/field.html" with field=form.status %}
+        {% include "components/field.html" with field=form.resolution %}
+        <div class="flex justify-end gap-3">
+          <a class="btn btn-ghost" href="{% url 'feedback:detail' feedback.pk %}">取消</a>
+          <button class="btn btn-primary" type="submit">保存处理结果</button>
+        </div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

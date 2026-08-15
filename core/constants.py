@@ -97,6 +97,17 @@ WORLDSKILLS_FORUM_ATTACHMENT_UPLOAD_MAX_SIZE_MB = 50
 WORLDSKILLS_FORUM_ATTACHMENT_MAX_COUNT = 10
 WORLDSKILLS_FORUM_ATTACHMENT_MAX_TOTAL_SIZE_MB = 100
 
+# 意见反馈附件
+FEEDBACK_ATTACHMENT_ALLOWED_EXTENSIONS = [
+    "jpg", "jpeg", "png", "webp",
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+    "txt", "md", "csv", "json", "yaml", "yml", "xml", "conf", "cfg", "ini", "log",
+    "zip",
+]
+FEEDBACK_ATTACHMENT_UPLOAD_MAX_SIZE_MB = 20
+FEEDBACK_ATTACHMENT_MAX_COUNT = 10
+FEEDBACK_ATTACHMENT_MAX_TOTAL_SIZE_MB = 50
+
 # 训练日志允许的扩展名和大小
 TRAINING_LOG_ALLOWED_EXTENSIONS = ['doc', 'docx', 'pdf', 'txt', 'md']
 TRAINING_LOG_UPLOAD_MAX_SIZE_MB = 20

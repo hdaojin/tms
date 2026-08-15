@@ -22,7 +22,7 @@ TMS 是基于 Django 6 / Python 3.13 的单体应用。主要前端与交互技�
 
 - 平台基础：`core`、`accounts`、`samba`。
 - 领域主链路：`standards`、`events`、`archives`、`training`、`examcontent`、`scoring`、`knowledge`。
-- 业务扩展：`glossary`、`worldskills_forum`、`notes`、`meetings`、`notices`、`behaviors`、`event_countdown`。
+- 业务扩展：`glossary`、`worldskills_forum`、`feedback`、`notes`、`meetings`、`notices`、`behaviors`、`event_countdown`。
 - `demo` 仅在 `DEBUG=True` 时加载。
 
 领域主链路应保持为：

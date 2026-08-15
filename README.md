@@ -84,6 +84,7 @@ TMS（Training Management System）是一个面向技能竞赛训练场景的 Dj
 
 - **专业词库**：专业词库、词条提案、词汇学习会话和学习统计。
 - **世赛论坛**：WorldSkills 论坛信息的中文翻译、主题归档、重要/官方/未读信息和翻译工作台。
+- **意见反馈**：提交 Bug、功能需求、意见建议和投诉，支持匿名、私密、附件和处理结果跟踪。
 - **教学笔记**：教学笔记仓库、Markdown 内容展示、代码高亮和 Mermaid 图形渲染。
 - **会议记录**：会议资料与记录管理。
 - **通知公告**：通知发布与浏览。
@@ -105,6 +106,7 @@ examcontent
 knowledge
 glossary
 worldskills_forum
+feedback
 notes
 meetings
 notices

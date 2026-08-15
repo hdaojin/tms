@@ -1,0 +1,9 @@
+{% include "components/form_errors.html" with form=reply_form %}
+<form class="space-y-4" method="post" action="{% url 'feedback:reply' feedback.pk %}" enctype="multipart/form-data">
+  {% csrf_token %}
+  {% include "components/field.html" with field=reply_form.content %}
+  {% include "feedback/fragments/attachment_picker.html" with field=reply_form.attachments %}
+  <div class="flex justify-end">
+    <button class="btn btn-primary" type="submit"><span class="icon-[tabler--send] size-5" aria-hidden="true"></span>提交回复</button>
+  </div>
+</form>
