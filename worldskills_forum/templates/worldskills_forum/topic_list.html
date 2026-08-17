@@ -1,22 +1,5 @@
 {% extends "layouts/app.html" %}
 
-{% partialdef filter-controls %}
-  <div class="card-body grid gap-3 md:grid-cols-4">
-    <label class="form-control md:col-span-2"><span class="label-text mb-1">关键字</span><input id="forum-topic-search" class="input w-full" type="search" name="q" value="{{ list_filters.q }}" placeholder="搜索中英文、作者、标签和附件名称"></label>
-    <label class="form-control"><span class="label-text mb-1">年份</span><select class="forum-topic-filter-select select w-full" name="year"><option value="">全部年份</option>{% for year in years %}<option value="{{ year }}" {% if list_filters.year == year|stringformat:'s' %}selected{% endif %}>{{ year }}</option>{% endfor %}</select></label>
-    <label class="form-control"><span class="label-text mb-1">模块</span><select class="forum-topic-filter-select select w-full" name="module"><option value="">全部模块</option>{% for item in modules %}<option value="{{ item.pk }}" {% if list_filters.module == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
-    <label class="form-control"><span class="label-text mb-1">分类</span><select class="forum-topic-filter-select select w-full" name="category"><option value="">全部分类</option>{% for item in categories %}<option value="{{ item.pk }}" {% if list_filters.category == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
-    <label class="form-control"><span class="label-text mb-1">标签</span><select class="forum-topic-filter-select select w-full" name="tag"><option value="">全部标签</option>{% for item in tags %}<option value="{{ item.pk }}" {% if list_filters.tag == item.pk|stringformat:'s' %}selected{% endif %}>{{ item.name }}</option>{% endfor %}</select></label>
-    <label class="form-control"><span class="label-text mb-1">信息类型</span><select class="forum-topic-filter-select select w-full" name="post_type"><option value="">全部类型</option>{% for value,label in post_types %}<option value="{{ value }}" {% if list_filters.post_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-    <label class="form-control"><span class="label-text mb-1">状态</span><select class="forum-topic-filter-select select w-full" name="status"><option value="">全部状态</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if list_filters.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-    <label class="form-control"><span class="label-text mb-1">重要程度</span><select class="forum-topic-filter-select select w-full" name="importance"><option value="">全部程度</option>{% for value,label in importance_choices %}<option value="{{ value }}" {% if list_filters.importance == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
-    <div class="flex flex-wrap items-center justify-end gap-2 md:col-span-4">
-      <span id="forum-topic-filter-indicator" class="htmx-indicator loading loading-spinner loading-sm text-primary" role="status" aria-label="正在筛选"></span>
-      <a class="btn btn-ghost" href="{{ request.path }}">重置</a>
-    </div>
-  </div>
-{% endpartialdef filter-controls %}
-
 {% partialdef results %}
   <div class="grid gap-4 lg:grid-cols-2">{% for topic in topics %}<article class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body"><div class="flex flex-wrap gap-2"><span class="badge badge-outline">{{ topic.competition_year }}</span><span class="badge badge-outline">{{ topic.module }}</span><span class="badge badge-outline">{{ topic.category }}</span><span class="badge badge-ghost">{{ topic.get_status_display }}</span>{% if topic.importance != 'normal' %}<span class="badge badge-warning">{{ topic.get_importance_display }}</span>{% endif %}</div><h2 class="card-title"><a class="link link-hover" href="{% url 'worldskills_forum:topic_detail' topic.pk %}">{{ topic.translated_title }}</a></h2><p class="text-sm text-base-content/60">{{ topic.original_title }}</p><p>{{ topic.summary|default:'暂无中文摘要'|truncatechars:180 }}</p><div class="flex flex-wrap gap-1">{% for tag in topic.tags.all %}<span class="badge badge-sm">{{ tag.name }}</span>{% endfor %}</div><div class="text-sm text-base-content/60">{{ topic.post_count }} 条信息{% if topic.latest_translation_at %} · 最近更新 {{ topic.latest_translation_at|date:'Y-m-d H:i' }}{% else %} · 待发布首条翻译{% endif %}</div></div></article>{% empty %}<div class="alert lg:col-span-2">暂无符合条件的主题。</div>{% endfor %}</div>
   {% include "worldskills_forum/_pagination.html" %}
