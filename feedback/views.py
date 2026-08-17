@@ -12,7 +12,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import FormView, ListView, TemplateView
 
-from core.utils.listing import FilterableListMixin
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 from core.utils.mixins import TitleMixin
 
 from .forms import FeedbackForm, FeedbackManageForm, FeedbackReplyForm
@@ -53,20 +53,38 @@ class FeedbackListView(TitleMixin, LoginRequiredMixin, FilterableListMixin, List
     paginate_by = 20
 
     search_fields = ("title", "content")
-    filter_fields = {"category": "category", "status": "status"}
-    filter_choices = {
-        "category": FeedbackCategory.choices,
-        "status": FeedbackStatus.choices,
-    }
-    extra_filter_params = ("scope",)
-    list_filter_target_id = "feedback-list"
-    list_filter_indicator_id = "feedback-filter-indicator"
-    list_filter_controls_template = "feedback/feedback_list.html#filter-controls"
-    list_filter_trigger = (
-        "submit, change from:.feedback-filter-select, input changed delay:400ms "
-        "from:#feedback-search, search from:#feedback-search"
+    list_filter_specs = (
+        ListFilterSpec(
+            name="category",
+            label="反馈类型",
+            control="select",
+            lookup="category",
+            choices=FeedbackCategory.choices,
+            empty_label="全部类型",
+        ),
+        ListFilterSpec(
+            name="status",
+            label="状态",
+            control="select",
+            lookup="status",
+            choices=FeedbackStatus.choices,
+            empty_label="全部状态",
+        ),
+        ListFilterSpec(
+            name="scope",
+            label="查看范围",
+            control="select",
+            choices=(("my", "我提交的"),),
+            empty_label="全部可见反馈",
+        ),
+        ListFilterSpec(
+            name="q",
+            label="搜索",
+            control="search",
+            placeholder="搜索标题或正文",
+        ),
     )
-    list_filter_form_class = "rounded-box border border-base-300 bg-base-100 p-3 shadow-sm"
+    list_filter_target_id = "feedback-list"
 
     def get_base_queryset(self):
         return visible_feedbacks_for(self.request.user)
@@ -78,25 +96,14 @@ class FeedbackListView(TitleMixin, LoginRequiredMixin, FilterableListMixin, List
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        filters = context["list_filters"]
-        context.update(
+        context["page_actions"] = [
             {
-                "category_choices": FeedbackCategory.choices,
-                "status_choices": FeedbackStatus.choices,
-                "selected_category": filters["category"],
-                "selected_status": filters["status"],
-                "selected_query": filters["q"],
-                "selected_scope": filters["scope"],
-                "page_actions": [
-                    {
-                        "label": "提交反馈",
-                        "href": reverse("feedback:create"),
-                        "icon": "icon-[tabler--message-plus]",
-                        "variant_class": "btn btn-primary btn-soft btn-sm",
-                    }
-                ],
+                "label": "提交反馈",
+                "href": reverse("feedback:create"),
+                "icon": "icon-[tabler--message-plus]",
+                "variant_class": "btn btn-primary btn-soft btn-sm",
             }
-        )
+        ]
         return context
 
 
