@@ -1,6 +1,6 @@
 from django.urls import reverse
 
-from feedback.models import FeedbackStatus
+from feedback.models import FeedbackCategory, FeedbackStatus
 
 from .base import FeedbackTestCase
 
@@ -40,7 +40,7 @@ class FeedbackViewTests(FeedbackTestCase):
                     "label": "提交反馈",
                     "href": reverse("feedback:create"),
                     "icon": "icon-[tabler--message-plus]",
-                    "variant_class": "btn-outline",
+                    "variant_class": "btn btn-primary btn-soft btn-sm",
                 }
             ],
         )
@@ -65,6 +65,24 @@ class FeedbackViewTests(FeedbackTestCase):
         self.assertContains(response, '<span class="sr-only">搜索</span>', html=False)
         self.assertContains(response, f'href="{reverse("feedback:list")}">重置</a>', html=False)
         self.assertNotContains(response, ">筛选</button>", html=False)
+
+    def test_list_filters_and_search_keep_existing_behavior(self):
+        mine = self.make_feedback(title="登录异常", category=FeedbackCategory.BUG)
+        others = self.make_feedback(author=self.other, title="登录异常（他人）", category=FeedbackCategory.BUG)
+        feature = self.make_feedback(title="功能建议", category=FeedbackCategory.FEATURE)
+        self.client.force_login(self.author)
+
+        response = self.client.get(
+            reverse("feedback:list"),
+            {"category": "bug", "status": "open", "scope": "my", "q": "登录"},
+        )
+        self.assertContains(response, mine.title)
+        self.assertNotContains(response, others.title)
+        self.assertNotContains(response, feature.title)
+
+        invalid_filter_response = self.client.get(reverse("feedback:list"), {"category": "not-a-category"})
+        self.assertContains(invalid_filter_response, mine.title)
+        self.assertContains(invalid_filter_response, feature.title)
 
     def test_private_feedback_returns_404_to_unauthorized_user(self):
         feedback = self.make_feedback(is_private=True, author=self.other)
