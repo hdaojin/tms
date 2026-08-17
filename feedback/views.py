@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import FormView, ListView, TemplateView
 
+from core.utils.listing import FilterableListMixin
 from core.utils.mixins import TitleMixin
 
 from .forms import FeedbackForm, FeedbackManageForm, FeedbackReplyForm
@@ -22,7 +23,7 @@ from .permissions import (
     can_view_anonymous_identity,
     can_view_feedback,
 )
-from .selectors import feedback_detail_for, filtered_feedbacks_for
+from .selectors import feedback_detail_for, visible_feedbacks_for
 from .services import add_feedback_reply, create_feedback, update_feedback_status
 
 
@@ -45,36 +46,47 @@ def _detail_context(request: HttpRequest, feedback: Feedback, *, reply_form=None
     }
 
 
-class FeedbackListView(TitleMixin, LoginRequiredMixin, ListView):
+class FeedbackListView(TitleMixin, LoginRequiredMixin, FilterableListMixin, ListView):
     template_name = "feedback/feedback_list.html"
     title = "意见反馈"
     title_icon = "icon-[tabler--message-report]"
     paginate_by = 20
 
-    def get_queryset(self):
-        return filtered_feedbacks_for(
-            self.request.user,
-            category=self.request.GET.get("category", ""),
-            status=self.request.GET.get("status", ""),
-            query=self.request.GET.get("q", ""),
-            scope=self.request.GET.get("scope", ""),
-        )
+    search_fields = ("title", "content")
+    filter_fields = {"category": "category", "status": "status"}
+    filter_choices = {
+        "category": FeedbackCategory.choices,
+        "status": FeedbackStatus.choices,
+    }
+    extra_filter_params = ("scope",)
+    list_filter_target_id = "feedback-list"
+    list_filter_indicator_id = "feedback-filter-indicator"
+    list_filter_controls_template = "feedback/feedback_list.html#filter-controls"
+    list_filter_trigger = (
+        "submit, change from:.feedback-filter-select, input changed delay:400ms "
+        "from:#feedback-search, search from:#feedback-search"
+    )
+    list_filter_form_class = "rounded-box border border-base-300 bg-base-100 p-3 shadow-sm"
 
-    def get_template_names(self):
-        if getattr(self.request, "htmx", False):
-            return ["feedback/fragments/feedback_list.html"]
-        return [self.template_name]
+    def get_base_queryset(self):
+        return visible_feedbacks_for(self.request.user)
+
+    def apply_custom_filters(self, queryset):
+        if self.request.GET.get("scope") == "my":
+            queryset = queryset.filter(author_id=self.request.user.pk)
+        return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        filters = context["list_filters"]
         context.update(
             {
                 "category_choices": FeedbackCategory.choices,
                 "status_choices": FeedbackStatus.choices,
-                "selected_category": self.request.GET.get("category", ""),
-                "selected_status": self.request.GET.get("status", ""),
-                "selected_query": self.request.GET.get("q", ""),
-                "selected_scope": self.request.GET.get("scope", ""),
+                "selected_category": filters["category"],
+                "selected_status": filters["status"],
+                "selected_query": filters["q"],
+                "selected_scope": filters["scope"],
                 "page_actions": [
                     {
                         "label": "提交反馈",
