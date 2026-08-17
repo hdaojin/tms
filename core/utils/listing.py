@@ -37,7 +37,6 @@ class FilterableListMixin:
 
     htmx_partial_name = "results"
     list_filter_target_id = "list-results"
-    list_filter_indicator_id = "list-filter-indicator"
     list_filter_trigger = (
         "submit, change from:.list-filter-select, input changed delay:400ms "
         "from:.list-filter-search, search from:.list-filter-search"
@@ -137,7 +136,6 @@ class FilterableListMixin:
                 "list_filter_controls": self.get_list_filter_controls(),
                 "list_filter_url": self.request.path,
                 "list_filter_target_id": self.list_filter_target_id,
-                "list_filter_indicator_id": self.list_filter_indicator_id,
                 "list_filter_trigger": self.list_filter_trigger,
             }
         )
