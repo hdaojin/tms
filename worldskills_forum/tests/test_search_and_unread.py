@@ -39,6 +39,16 @@ class SearchAndUnreadTests(ForumTestCase):
         response = self.client.get(reverse("worldskills_forum:topic_list"), params)
         self.assertContains(response, target.translated_title)
         self.assertNotContains(response, other.translated_title)
+        self.assertContains(
+            response,
+            'hx-trigger="submit, change from:.forum-topic-filter-select, input changed delay:400ms '
+            'from:#forum-topic-search, search from:#forum-topic-search"',
+            html=False,
+        )
+        self.assertContains(response, 'id="forum-topic-search"', html=False)
+        self.assertContains(response, 'class="forum-topic-filter-select select w-full"', html=False)
+        self.assertNotContains(response, ">筛选</button>", html=False)
+        self.assertContains(response, f'href="{reverse("worldskills_forum:topic_list")}">重置</a>', html=False)
 
         htmx_response = self.client.get(
             reverse("worldskills_forum:topic_list"),
