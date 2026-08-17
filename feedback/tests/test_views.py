@@ -26,7 +26,7 @@ class FeedbackViewTests(FeedbackTestCase):
         feedback = self.author.feedbacks_created.get(title="新反馈")
         self.assertEqual(self.client.get(reverse("feedback:detail", args=[feedback.pk])).status_code, 200)
 
-    def test_list_renders_compact_auto_filter_toolbar(self):
+    def test_list_renders_shared_auto_filter_toolbar(self):
         self.client.force_login(self.author)
         response = self.client.get(
             reverse("feedback:list"),
@@ -51,15 +51,17 @@ class FeedbackViewTests(FeedbackTestCase):
         )
         self.assertContains(
             response,
-            'hx-trigger="submit, change from:.feedback-filter-select, input changed delay:400ms '
-            'from:#feedback-search, search from:#feedback-search"',
+            'hx-trigger="submit, change from:.list-filter-select, input changed delay:400ms '
+            'from:.list-filter-search, search from:.list-filter-search"',
             html=False,
         )
-        self.assertContains(response, 'hx-indicator="#feedback-filter-indicator"', html=False)
+        self.assertContains(response, 'hx-indicator="#list-filter-indicator"', html=False)
+        self.assertContains(response, 'class="list-filter-select select w-full md:select-sm"', html=False)
+        self.assertContains(response, 'class="list-filter-search input w-full md:input-sm"', html=False)
         self.assertContains(response, '<option value="bug" selected>', html=False)
         self.assertContains(response, '<option value="open" selected>', html=False)
         self.assertContains(response, '<option value="my" selected>', html=False)
-        self.assertEqual(response.context["selected_query"], "登录")
+        self.assertEqual(response.context["list_filters"]["q"], "登录")
         self.assertContains(response, 'value="登录"', html=False)
         self.assertContains(response, '<span class="sr-only">反馈类型</span>', html=False)
         self.assertContains(response, '<span class="sr-only">搜索</span>', html=False)
