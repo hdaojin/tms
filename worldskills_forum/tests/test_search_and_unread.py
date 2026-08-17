@@ -39,14 +39,20 @@ class SearchAndUnreadTests(ForumTestCase):
         response = self.client.get(reverse("worldskills_forum:topic_list"), params)
         self.assertContains(response, target.translated_title)
         self.assertNotContains(response, other.translated_title)
+        self.assertEqual(
+            [control["name"] for control in response.context["list_filter_controls"]],
+            ["year", "module", "category", "tag", "post_type", "status", "importance", "q"],
+        )
         self.assertContains(
             response,
-            'hx-trigger="submit, change from:.forum-topic-filter-select, input changed delay:400ms '
-            'from:#forum-topic-search, search from:#forum-topic-search"',
+            'hx-trigger="submit, change from:.list-filter-select, input changed delay:400ms '
+            'from:.list-filter-search, search from:.list-filter-search"',
             html=False,
         )
-        self.assertContains(response, 'id="forum-topic-search"', html=False)
-        self.assertContains(response, 'class="forum-topic-filter-select select w-full"', html=False)
+        self.assertContains(response, 'hx-indicator="#list-filter-indicator"', html=False)
+        self.assertContains(response, 'class="list-filter-select select w-full md:select-sm"', html=False)
+        self.assertContains(response, 'class="list-filter-search input w-full md:input-sm"', html=False)
+        self.assertContains(response, '<option value="2026" selected>', html=False)
         self.assertNotContains(response, ">筛选</button>", html=False)
         self.assertContains(response, f'href="{reverse("worldskills_forum:topic_list")}">重置</a>', html=False)
 
@@ -57,7 +63,7 @@ class SearchAndUnreadTests(ForumTestCase):
         )
         self.assertEqual(htmx_response.status_code, 200)
         self.assertNotContains(htmx_response, "<!doctype html>", html=False)
-        self.assertNotContains(htmx_response, "关键字")
+        self.assertNotContains(htmx_response, "全部年份")
         self.assertContains(htmx_response, target.translated_title)
         self.assertNotContains(htmx_response, other.translated_title)
 
