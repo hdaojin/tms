@@ -49,7 +49,8 @@ class SearchAndUnreadTests(ForumTestCase):
             'from:.list-filter-search, search from:.list-filter-search"',
             html=False,
         )
-        self.assertContains(response, 'hx-indicator="#list-filter-indicator"', html=False)
+        self.assertNotContains(response, "hx-indicator=", html=False)
+        self.assertNotContains(response, "loading-spinner", html=False)
         self.assertContains(response, 'class="list-filter-select select w-full md:select-sm"', html=False)
         self.assertContains(response, 'class="list-filter-search input w-full md:input-sm"', html=False)
         self.assertContains(response, '<option value="2026" selected>', html=False)
