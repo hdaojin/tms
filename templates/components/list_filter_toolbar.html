@@ -1,8 +1,8 @@
 {% comment %}
-通用列表筛选工具栏外壳。
-业务页通过 list_filter_controls_template 提供具体筛选控件（可指向 Django 6 template partial）。
+通用列表筛选工具栏。
+筛选控件由后端 list_filter_controls 声明，模板统一负责布局、DaisyUI 样式、自动筛选、加载状态和重置。
 {% endcomment %}
-<form class="{{ list_filter_form_class }}"
+<form class="rounded-box border border-base-300 bg-base-100 p-3 shadow-sm"
       method="get"
       action="{{ list_filter_url }}"
       hx-get="{{ list_filter_url }}"
@@ -11,5 +11,35 @@
       hx-push-url="true"
       hx-indicator="#{{ list_filter_indicator_id }}"
       hx-sync="this:replace">
-  {% include list_filter_controls_template %}
+  <div class="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+    {% for control in list_filter_controls %}
+      {% if control.type == "select" %}
+        <label class="min-w-0 md:w-36 md:shrink-0">
+          <span class="sr-only">{{ control.label }}</span>
+          <select class="list-filter-select select w-full md:select-sm" name="{{ control.name }}">
+            <option value="">{{ control.empty_label }}</option>
+            {% for option in control.choices %}
+              <option value="{{ option.value }}"{% if control.value == option.value %} selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      {% elif control.type == "search" %}
+        <label class="col-span-2 min-w-0 md:min-w-64 md:flex-1">
+          <span class="sr-only">{{ control.label }}</span>
+          <input class="list-filter-search input w-full md:input-sm"
+                 type="search"
+                 name="{{ control.name }}"
+                 value="{{ control.value }}"
+                 placeholder="{{ control.placeholder }}">
+        </label>
+      {% endif %}
+    {% endfor %}
+    <div class="col-span-2 flex shrink-0 items-center justify-end gap-1 md:ml-auto">
+      <span id="{{ list_filter_indicator_id }}"
+            class="htmx-indicator loading loading-spinner loading-sm text-primary"
+            role="status"
+            aria-label="正在筛选"></span>
+      <a class="btn btn-ghost px-3 md:btn-sm" href="{{ list_filter_url }}">重置</a>
+    </div>
+  </div>
 </form>
