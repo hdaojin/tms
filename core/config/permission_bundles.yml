@@ -1,188 +1,188 @@
 version: 1
 bundles:
   - code: accounts.manage_own_profile
-    name: 管理本人资料
+    name: 用户管理 | 管理本人资料
     description: 查看并维护本人的用户资料。
     permissions: [accounts.change_userprofile]
   - code: accounts.view_all_profiles
-    name: 查看全部用户资料
+    name: 用户管理 | 查看全部用户资料
     description: 查看用户、用户资料和角色列表。
     permissions: [accounts.view_all_profiles, auth.view_group]
 
   - code: notices.view_notices
-    name: 查看通知
+    name: 通知 | 查看通知
     description: 查看对本人可见的通知及附件。
     permissions: [notices.view_notice, notices.view_noticeattachment]
   - code: notices.publish_notice
-    name: 发布通知
+    name: 通知 | 发布通知
     description: 发布和维护通知及附件。
     permissions: [notices.view_notice, notices.add_notice, notices.change_notice, notices.add_noticeattachment, notices.change_noticeattachment]
 
   - code: meetings.view_meetings
-    name: 查看会议记录
+    name: 会议记录 | 查看会议记录
     description: 查看会议记录和附件。
     permissions: [meetings.view_meeting]
   - code: meetings.upload_meeting
-    name: 上传会议记录
+    name: 会议记录 | 上传会议记录
     description: 上传并维护会议记录。
     permissions: [meetings.view_meeting, meetings.add_meeting, meetings.change_meeting]
   - code: meetings.delete_meeting
-    name: 删除会议记录
+    name: 会议记录 | 删除会议记录
     description: 删除会议记录。
     permissions: [meetings.view_meeting, meetings.delete_meeting]
 
   - code: training.view_cycles
-    name: 查看训练周期
+    name: 训练管理 | 查看训练周期
     description: 查看训练周期。
     permissions: [training.view_trainingcycle]
   - code: training.manage_cycles
-    name: 管理训练周期
+    name: 训练管理 | 管理训练周期
     description: 新增和修改训练周期。
     permissions: [training.view_trainingcycle, training.add_trainingcycle, training.change_trainingcycle]
   - code: training.submit_logs
-    name: 提交训练日志
+    name: 训练管理 | 提交训练日志
     description: 查看并维护本人提交的训练日志。
     permissions: [training.view_trainingcycle, training.view_traininglog, training.add_traininglog, training.change_traininglog]
   - code: training.view_all_logs
-    name: 查看全部训练日志
+    name: 训练管理 | 查看全部训练日志
     description: 将训练日志查看范围扩大到全部人员。
     permissions: [training.view_traininglog, training.view_all_traininglog]
   - code: training.manage_all_logs
-    name: 管理全部训练日志
+    name: 训练管理 | 管理全部训练日志
     description: 将训练日志修改范围扩大到全部人员。
     permissions: [training.view_traininglog, training.change_traininglog, training.view_all_traininglog, training.change_all_traininglog]
   - code: training.view_statistics
-    name: 查看训练统计
+    name: 训练管理 | 查看训练统计
     description: 查看训练日志统计。
     permissions: [training.view_traininglog_statistics]
   - code: training.export_logs
-    name: 导出训练日志
+    name: 训练管理 | 导出训练日志
     description: 导出有权查看的训练日志归档。
     permissions: [training.view_traininglog, training.export_traininglog_archive]
 
   - code: behaviors.conduct_subject
-    name: 奖惩对象
+    name: 学生奖惩管理 | 奖惩对象
     description: 可被选为奖惩记录对象；不授予页面访问权。
     permissions: [behaviors.be_conduct_subject]
   - code: behaviors.record_conduct
-    name: 录入奖惩记录
+    name: 学生奖惩管理 | 录入奖惩记录
     description: 录入奖惩记录并查看本人录入的记录。
     permissions: [behaviors.add_conduct_record, behaviors.view_conductrecord, behaviors.view_conductsummary]
   - code: behaviors.review_conduct
-    name: 审核奖惩记录
+    name: 学生奖惩管理 | 审核奖惩记录
     description: 审核奖惩记录并查看汇总。
     permissions: [behaviors.review_conduct_record, behaviors.view_conductrecord, behaviors.view_conductsummary]
   - code: behaviors.view_all_conduct_records
-    name: 查看全部奖惩记录
+    name: 学生奖惩管理 | 查看全部奖惩记录
     description: 将奖惩记录范围扩大到全部人员。
     permissions: [behaviors.view_conductrecord, behaviors.view_conductsummary, behaviors.view_all_conduct_records]
 
   - code: standards.view_standard
-    name: 查看标准体系
+    name: 标准体系 | 查看标准体系
     description: 查看技能项目、能力领域和技能树。
     permissions: [standards.view_skillproject, standards.view_capabilitydomain, standards.view_skilltreeversion, standards.view_skillnode]
   - code: standards.maintain_standard
-    name: 维护标准体系
+    name: 标准体系 | 维护标准体系
     description: 新增和修改技能项目、能力领域和技能树。
     permissions: [standards.view_skillproject, standards.add_skillproject, standards.change_skillproject, standards.view_capabilitydomain, standards.add_capabilitydomain, standards.change_capabilitydomain, standards.view_skilltreeversion, standards.add_skilltreeversion, standards.change_skilltreeversion, standards.view_skillnode, standards.add_skillnode, standards.change_skillnode]
 
   - code: events.view_event_catalog
-    name: 查看事件目录
+    name: 事件 | 查看事件目录
     description: 查看赛事系列、级别、事件和模块。
     permissions: [events.view_competitionseries, events.view_competitionlevel, events.view_event, events.view_eventmodule, events.view_eventmodulecapabilitydomainmap]
   - code: events.view_event_participants
-    name: 查看事件参与人员
+    name: 事件 | 查看事件参与人员
     description: 查看事件参与人员和结果摘要。
     permissions: [events.view_event, events.view_eventparticipant, events.view_eventresultsummary]
   - code: events.maintain_event
-    name: 维护事件
+    name: 事件 | 维护事件
     description: 新增和修改事件目录、模块映射和参与人员。
     permissions: [events.view_competitionseries, events.add_competitionseries, events.change_competitionseries, events.view_competitionlevel, events.add_competitionlevel, events.change_competitionlevel, events.view_event, events.add_event, events.change_event, events.view_eventmodule, events.add_eventmodule, events.change_eventmodule, events.view_eventmodulecapabilitydomainmap, events.add_eventmodulecapabilitydomainmap, events.change_eventmodulecapabilitydomainmap, events.delete_eventmodulecapabilitydomainmap, events.view_eventparticipant, events.add_eventparticipant, events.change_eventparticipant]
 
   - code: examcontent.view_examcontent
-    name: 查看试题结构
+    name: 试题结构 | 查看试题结构
     description: 查看试题和结构化要求。
     permissions: [examcontent.view_exampaper, examcontent.view_examrequirement]
   - code: examcontent.maintain_examcontent
-    name: 维护试题结构
+    name: 试题结构 | 维护试题结构
     description: 新增和修改试题及结构化要求。
     permissions: [examcontent.view_exampaper, examcontent.add_exampaper, examcontent.change_exampaper, examcontent.view_examrequirement, examcontent.add_examrequirement, examcontent.change_examrequirement]
 
   - code: scoring.view_schemes
-    name: 查看评分方案
+    name: 评分 | 查看评分方案
     description: 查看评分方案及其评分结构。
     permissions: [scoring.view_scoringscheme, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption]
   - code: scoring.view_own_results
-    name: 查看本人评分结果
+    name: 评分 | 查看本人评分结果
     description: 查看与本人关联的参评对象和评分结果。
     permissions: [scoring.view_scoringparticipant, scoring.view_scoringresult]
   - code: scoring.view_all_results
-    name: 查看全部评分结果
+    name: 评分 | 查看全部评分结果
     description: 将参评对象和评分结果范围扩大到全部人员。
     permissions: [scoring.view_scoringparticipant, scoring.view_scoringresult, scoring.view_all_scoringparticipant, scoring.view_all_scoringresult]
   - code: scoring.maintain_scoring
-    name: 维护评分
+    name: 评分 | 维护评分
     description: 导入评分表并维护参评对象和评分结果。
     permissions: [scoring.view_scoringscheme, scoring.add_scoringscheme, scoring.change_scoringscheme, scoring.view_scoringparserconfig, scoring.view_scoringschemeimport, scoring.add_scoringschemeimport, scoring.change_scoringschemeimport, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption, scoring.view_scoringparticipant, scoring.add_scoringparticipant, scoring.change_scoringparticipant, scoring.view_all_scoringparticipant, scoring.view_scoringresult, scoring.add_scoringresult, scoring.change_scoringresult, scoring.view_all_scoringresult, scoring.view_scoringresultimport, scoring.add_scoringresultimport, scoring.change_scoringresultimport]
 
   - code: knowledge.view_knowledge
-    name: 查看考点知识
+    name: 考点知识 | 查看考点知识
     description: 查看考点证据和技能映射。
     permissions: [knowledge.view_knowledgeevidence, knowledge.view_knowledgeevidenceskillmap]
   - code: knowledge.maintain_knowledge
-    name: 维护考点知识
+    name: 考点知识 | 维护考点知识
     description: 新增、审核和维护考点证据及技能映射。
     permissions: [knowledge.view_knowledgeevidence, knowledge.add_knowledgeevidence, knowledge.change_knowledgeevidence, knowledge.view_knowledgeevidenceskillmap, knowledge.add_knowledgeevidenceskillmap, knowledge.change_knowledgeevidenceskillmap, knowledge.delete_knowledgeevidenceskillmap]
 
   - code: archives.view_archive
-    name: 查看资料资产
+    name: 资料资产 | 查看资料资产
     description: 查看并下载有权访问的资料资产。
     permissions: [archives.view_archiveasset]
   - code: archives.maintain_archive
-    name: 维护资料资产
+    name: 资料资产 | 维护资料资产
     description: 新增和修改资料资产及业务绑定。
     permissions: [archives.view_archiveasset, archives.add_archiveasset, archives.change_archiveasset]
 
   - code: worldskills_forum.view_forum
-    name: 查看世赛论坛
+    name: 世赛论坛 | 查看世赛论坛
     description: 查看已发布的论坛主题、帖子、翻译和附件。
     permissions: [worldskills_forum.view_forumtopic, worldskills_forum.view_forumpost, worldskills_forum.view_forumtranslation, worldskills_forum.view_forumpostattachment]
   - code: worldskills_forum.translate_forum
-    name: 翻译世赛论坛
+    name: 世赛论坛 | 翻译世赛论坛
     description: 创建论坛主题、帖子及中文翻译，并维护本人创建的内容。
     permissions: [worldskills_forum.view_forumtopic, worldskills_forum.add_forumtopic, worldskills_forum.change_forumtopic, worldskills_forum.view_forumpost, worldskills_forum.add_forumpost, worldskills_forum.change_forumpost, worldskills_forum.view_forumtranslation, worldskills_forum.add_forumtranslation, worldskills_forum.change_forumtranslation, worldskills_forum.view_forumpostattachment, worldskills_forum.add_forumpostattachment, worldskills_forum.change_forumpostattachment]
   - code: worldskills_forum.manage_forum
-    name: 管理世赛论坛
+    name: 世赛论坛 | 管理世赛论坛
     description: 管理全部论坛内容和基础分类。
     permissions: [worldskills_forum.view_forumtopic, worldskills_forum.change_forumtopic, worldskills_forum.delete_forumtopic, worldskills_forum.change_all_forum_content, worldskills_forum.view_forumpost, worldskills_forum.change_forumpost, worldskills_forum.delete_forumpost, worldskills_forum.view_forumtranslation, worldskills_forum.change_forumtranslation, worldskills_forum.delete_forumtranslation, worldskills_forum.view_forumpostattachment, worldskills_forum.change_forumpostattachment, worldskills_forum.delete_forumpostattachment, worldskills_forum.view_forumcategory, worldskills_forum.add_forumcategory, worldskills_forum.change_forumcategory, worldskills_forum.view_forummodule, worldskills_forum.add_forummodule, worldskills_forum.change_forummodule, worldskills_forum.view_forumsourcerole, worldskills_forum.add_forumsourcerole, worldskills_forum.change_forumsourcerole, worldskills_forum.view_forumtag, worldskills_forum.add_forumtag, worldskills_forum.change_forumtag]
 
   - code: feedback.handle_feedback
-    name: 处理意见反馈
+    name: 意见反馈 | 处理意见反馈
     description: 查看私密反馈并更新反馈状态和处理结果。
     permissions: [feedback.manage_feedback, feedback.view_private_feedback]
   - code: feedback.identify_anonymous
-    name: 查看匿名反馈人身份
+    name: 意见反馈 | 查看匿名反馈人身份
     description: 在本人有权查看反馈的前提下查看匿名提交者身份。
     permissions: [feedback.view_anonymous_identity]
 
   - code: glossary.study_glossary
-    name: 学习专业词汇
+    name: 专业词汇 | 学习专业词汇
     description: 查看词库和词条并记录本人学习进度。
     permissions: [glossary.view_professionalglossary, glossary.view_glossaryentry, glossary.view_studysession, glossary.add_studysession, glossary.change_studysession, glossary.view_studyattempt, glossary.add_studyattempt]
   - code: glossary.contribute_entries
-    name: 贡献专业词条
+    name: 专业词汇 | 贡献专业词条
     description: 提交并维护本人的词条提案。
     permissions: [glossary.view_glossaryentryproposal, glossary.add_glossaryentryproposal, glossary.change_glossaryentryproposal]
   - code: glossary.manage_glossaries
-    name: 管理专业词库
+    name: 专业词汇 | 管理专业词库
     description: 管理词库、正式词条、导入、提案审核和全体学习统计。
     permissions: [glossary.view_professionalglossary, glossary.add_professionalglossary, glossary.change_professionalglossary, glossary.view_glossaryentry, glossary.add_glossaryentry, glossary.change_glossaryentry, glossary.view_glossaryentryproposal, glossary.change_glossaryentryproposal, glossary.view_glossaryimport, glossary.add_glossaryimport, glossary.change_glossaryimport, glossary.view_all_study_statistics]
 
   - code: notes.view_notes
-    name: 查看笔记
+    name: 笔记 | 查看笔记
     description: 查看经仓库受众范围允许的笔记和附件。
     permissions: [notes.view_noterepo]
   - code: samba.manage_own_account
-    name: 管理本人 Samba 账户
+    name: Samba管理 | 管理本人 Samba 账户
     description: 查看并提交本人的 Samba 账户操作。
     permissions: [samba.view_sambaoperation, samba.add_sambaoperation]

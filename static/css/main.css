@@ -7,7 +7,12 @@
 @source not "../../staticfiles";
 @plugin "@tailwindcss/typography";
 @plugin "daisyui" {
-  themes: light --default, dark --prefersdark, corporate, business, night;
+  themes:
+    light --default,
+    dark --prefersdark,
+    corporate,
+    business,
+    night;
   logs: false;
 }
 @plugin "@iconify/tailwind4";
@@ -63,9 +68,154 @@
   .tms-countdown-shell {
     min-height: 100%;
     background:
-      radial-gradient(circle at 20% 15%, color-mix(in oklab, var(--color-primary) 20%, transparent), transparent 32rem),
-      radial-gradient(circle at 80% 10%, color-mix(in oklab, var(--color-accent) 16%, transparent), transparent 26rem),
+      radial-gradient(
+        circle at 20% 15%,
+        color-mix(in oklab, var(--color-primary) 20%, transparent),
+        transparent 32rem
+      ),
+      radial-gradient(
+        circle at 80% 10%,
+        color-mix(in oklab, var(--color-accent) 16%, transparent),
+        transparent 26rem
+      ),
       linear-gradient(135deg, var(--color-base-200), var(--color-base-100));
+  }
+
+  .tms-file-upload-wrapper {
+    position: relative;
+  }
+
+  .tms-file-upload-wrapper:focus-within file-pond[data-tms-file-upload] {
+    --tms-upload-border-color: var(--color-base-content);
+    outline: 2px solid var(--color-base-content);
+    outline-offset: 2px;
+    isolation: isolate;
+  }
+
+  .tms-file-upload-wrapper[data-drag-active="true"]
+    file-pond[data-tms-file-upload] {
+    --tms-upload-border-color: var(--color-primary);
+    --default-border: 2px solid var(--color-primary);
+    background-color: color-mix(
+      in srgb,
+      var(--color-primary) 10%,
+      var(--color-base-100)
+    );
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  .tms-upload-paste-active,
+  .tms-upload-drag-status {
+    display: none;
+  }
+
+  .tms-file-upload-wrapper:focus-within .tms-upload-paste-idle {
+    display: none;
+  }
+
+  .tms-file-upload-wrapper:focus-within .tms-upload-paste-active {
+    display: inline;
+    color: var(--color-info);
+  }
+
+  .tms-file-upload-wrapper[data-drag-active="true"] .tms-upload-paste-hint {
+    display: none;
+  }
+
+  .tms-file-upload-wrapper[data-drag-active="true"] .tms-upload-drag-status {
+    display: flex;
+  }
+
+  file-pond[data-tms-file-upload] {
+    display: block;
+    width: 100%;
+    margin: 0;
+    border-radius: var(--radius-field);
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+    --tms-upload-border-color: color-mix(
+      in oklab,
+      var(--color-base-content) 20%,
+      transparent
+    );
+    transition:
+      background-color 150ms ease,
+      outline-color 150ms ease;
+    --default-font-family: inherit;
+    --default-padding: 0.75rem;
+    --default-border-radius: var(--radius-field);
+    --default-color: currentColor;
+    --default-background-color: var(--color-base-100);
+    --default-accent-color: var(--color-primary);
+    --default-accent-color-text: var(--color-primary-content);
+    --default-border: var(--border) solid var(--tms-upload-border-color);
+  }
+
+  file-pond[data-tms-file-upload]::part(source-description-element) {
+    color: var(--color-base-content);
+    font-size: 1rem;
+    font-weight: 400;
+  }
+
+  file-pond[data-tms-file-upload]::part(browse-label) {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-decoration-color: color-mix(
+      in oklab,
+      var(--color-primary) 55%,
+      transparent
+    );
+    text-underline-offset: 0.15em;
+    transition:
+      color 150ms ease,
+      text-decoration-color 150ms ease;
+  }
+
+  file-pond[data-tms-file-upload]::part(browse-label):hover {
+    color: color-mix(
+      in oklab,
+      var(--color-primary) 80%,
+      var(--color-base-content)
+    );
+    text-decoration-color: currentColor;
+  }
+
+  file-pond[data-tms-file-upload]::part(image-entry) {
+    grid-template:
+      minmax(2rem, 1fr) min-content /
+      min-content 4rem minmax(0, 1fr) min-content;
+    min-height: calc(4rem + var(--default-padding));
+  }
+
+  file-pond[data-tms-file-upload]::part(image-entry-load-state) {
+    grid-row: 1 / 3;
+    grid-column: 1;
+  }
+
+  file-pond[data-tms-file-upload]::part(image-entry-media) {
+    align-self: center;
+    grid-row: 1 / 3;
+    grid-column: 2;
+    width: 4rem;
+    height: 4rem;
+    overflow: hidden;
+    border-radius: var(--radius-field);
+  }
+
+  file-pond[data-tms-file-upload]::part(image-entry-info) {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  file-pond[data-tms-file-upload]::part(image-entry-store-state) {
+    grid-row: 1;
+    grid-column: 4;
+  }
+
+  file-pond[data-tms-file-upload]::part(image-entry-status) {
+    grid-row: 2;
+    grid-column: 3 / 5;
   }
 
   .countdown-theme-network .countdown-bg {
@@ -137,7 +287,14 @@
 
   .tms-note-content .mermaid svg text,
   [data-note-print-page] .mermaid svg text {
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif !important;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      "Microsoft YaHei",
+      sans-serif !important;
   }
 
   .mermaid-render-error {
@@ -183,4 +340,12 @@
     background-color: var(--color-base-200);
     color: var(--color-base-content);
   }
+}
+
+#feedback-filter-indicator {
+  display: none;
+}
+
+#feedback-filter-indicator.htmx-request {
+  display: inline-block;
 }

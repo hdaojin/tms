@@ -33,7 +33,8 @@ class MultipleFileField(forms.FileField):
             attrs = upload_spec.widget_attrs(type="file") if upload_spec else {"type": "file"}
             widget = MultipleFileInput(attrs=attrs)
         elif upload_spec:
-            widget.attrs.setdefault("accept", upload_spec.accept)
+            for attr_name, attr_value in upload_spec.widget_attrs().items():
+                widget.attrs.setdefault(attr_name, attr_value)
         kwargs["widget"] = widget
 
         super().__init__(*args, **kwargs)

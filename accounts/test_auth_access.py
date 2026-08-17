@@ -65,3 +65,30 @@ class LoginRequiredMiddlewareAccessTests(TestCase):
         response = self.client.get(reverse("accounts:user_list"))
 
         self.assertEqual(response.status_code, 403)
+
+
+class RememberMeLoginTests(TestCase):
+    """验证登录页“记住我”勾选框的会话有效期行为。"""
+
+    def setUp(self):
+        self.user = User.objects.create_user("remember-me-user", password="testpass123")
+
+    def test_login_without_remember_me_expires_on_browser_close(self):
+        self.client.post(
+            reverse("accounts:login"),
+            {"username": "remember-me-user", "password": "testpass123"},
+        )
+
+        self.assertTrue(self.client.session.get_expire_at_browser_close())
+
+    def test_login_with_remember_me_keeps_default_session(self):
+        self.client.post(
+            reverse("accounts:login"),
+            {
+                "username": "remember-me-user",
+                "password": "testpass123",
+                "remember_me": "on",
+            },
+        )
+
+        self.assertFalse(self.client.session.get_expire_at_browser_close())

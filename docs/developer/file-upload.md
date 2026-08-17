@@ -8,7 +8,7 @@ TMS 的文件上传能力统一由一个公共组件提供，业务 APP 不分�
 
 - 点击选择文件；
 - 拖放文件；
-- 对适合的上传字段支持 Ctrl+V 直接粘贴截图/图片；
+- 点击或聚焦目标上传区域后支持 Ctrl+V / Cmd+V 粘贴截图或普通文件；
 - 多文件队列；
 - 图片缩略图预览；
 - 删除待提交文件；
@@ -61,11 +61,12 @@ FilePond 的 accept、size、count 等 validator 只是提前给用户反馈。�
 
 ### 3. 第一阶段不改变上传协议
 
-FilePond 第一阶段只增强原生文件输入，提交仍然是：
+FilePond 第一阶段仍使用浏览器原生表单提交，具体链路是：
 
 ```text
 FilePond entries
-    -> 原生 input.files
+    -> form-associated custom element
+    -> ElementInternals.setFormValue(FormData)
     -> multipart/form-data
     -> Django request.FILES
     -> Django Form
@@ -83,13 +84,11 @@ hx-encoding="multipart/form-data"
 
 暂不增加上传临时表、上传 token、独立 upload endpoint、后台清理任务等异步上传基础设施。
 
-## 为什么需要 FileInputStore
+## FilePond v5 的表单关联机制
 
-FilePond v5 默认可以从内部 `<input type="file">` 读取用户选择的文件，也能通过 DataTransfer 读取拖放文件；`ClipboardSource` 可以产生来自剪贴板的 File/Blob。
+FilePond v5 的 `<file-pond>` 是 form-associated custom element。组件升级时会读取并移除 slot 中的原生文件 input，把 `name`、`id`、`accept`、`multiple`、`required` 等语义转移到主机，并通过 `ElementInternals.setFormValue()` 将当前 entries 写入表单 `FormData`。
 
-为了让**选择、拖放、粘贴得到的所有 entries** 最终都按原有 Django 表单方式进入 `request.FILES`，TMS 应显式加载 FilePond v5 的 `FileInputStore`，并把它绑定到组件内部的原生 `<input type="file">`。
-
-这样无需把 TMS 第一阶段改造成异步上传 API，同时也不会让 Django Form 感知 FilePond 的存在。
+因此 TMS 不绑定 FilePond Shadow DOM 内部 input，也不加载 `FileInputStore`。选择、拖放和粘贴得到的文件都由同一 entries 列表进入普通或 HTMX multipart 提交；JavaScript 完全加载失败时，未升级的原生 input 仍保留基础上传能力。
 
 ## 前端依赖管理
 
@@ -180,7 +179,7 @@ core/uploads.py
 - `required`；
 - 其他 widget attrs。
 
-FilePond 只是包装原生 input，不重新创造业务字段。
+FilePond 升级该原生 input 后继承这些字段语义，并通过 form-associated custom element 提交；业务模板仍不直接创建另一套字段或隐藏 input。
 
 ## TMS 与 FilePond 的配置边界
 
@@ -199,7 +198,6 @@ FilePond 只是包装原生 input，不重新创造业务字段。
 建议第一阶段全局启用：
 
 - `ClipboardSource`；
-- `FileInputStore`；
 - `FileSizeValidator`；
 - `ListCountValidator`（当字段提供数量限制时使用）。
 
@@ -245,13 +243,9 @@ data-upload-preview
 
 ### 默认启用范围
 
-Ctrl+V 主要用于图片/截图型附件。
+Ctrl+V 同时用于截图和操作系统剪贴板提供的普通文件。
 
-建议 `paste=auto`：
-
-- `accept` 包含 `image/*` 或 png/jpg/jpeg/gif/webp/bmp 等图片格式时自动启用；
-- 纯 xlsx、pdf 等专用导入字段默认不显示“粘贴截图”提示；
-- 特殊场景可通过 `data-upload-paste=true/false` 显式覆盖。
+默认所有上传字段启用粘贴：缺省、`auto` 和 `true` 都表示启用，`false` 表示显式禁用。文件是否允许加入仍由字段的 `accept`、前端 validator 和服务端校验共同决定。
 
 ### paste scope
 
@@ -259,15 +253,15 @@ Ctrl+V 主要用于图片/截图型附件。
 
 TMS 的 `ClipboardSource.shouldHandlePaste` 采用以下顺序：
 
-1. 当前焦点在普通 `input`、`textarea` 或 `contenteditable` 中时，不接管文件上传组件之外的粘贴；
-2. 当前 focus 位于某个 paste-enabled FilePond 内时，只由该组件处理；
-3. 若页面只有一个可见且 paste-enabled 的 FilePond，并且当前焦点不在文本编辑控件中，可允许它接收页面级截图粘贴；
-4. 页面存在多个候选上传器且无法唯一判断目标时，不猜测目标，要求用户先点击/聚焦对应上传区域。
+1. 剪贴板不包含 `File` 项时不接管，普通文本粘贴保持浏览器默认行为；
+2. 用户必须先点击或通过键盘聚焦目标上传区域；
+3. 只有焦点所在上传区域的 FilePond 接收该次粘贴；
+4. 页面存在多个上传器时不做唯一候选猜测，因此不会重复添加或投递到错误字段。
 
 上传区域应可获得焦点，并显示简短提示，例如：
 
 ```text
-拖放、选择文件，或 Ctrl+V 粘贴截图
+先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴截图或文件
 ```
 
 粘贴图片与点击选择的图片进入同一个 FilePond entries 队列，后续处理完全一致。
@@ -276,7 +270,7 @@ TMS 的 `ClipboardSource.shouldHandlePaste` 采用以下顺序：
 
 FilePond v5 使用 Web Component。`defineFilePond()` 注册后，浏览器会自动升级当前和之后出现的 `<file-pond>` 元素。
 
-TMS 仍需给每个实例绑定 `FileInputStore` 和 `ClipboardSource` 的 per-instance 配置，因此 `static/js/filepond.js` 提供一个幂等初始化函数，例如：
+TMS 仍需给每个实例绑定 `ClipboardSource`、校验、浏览按钮和交互状态等 per-instance 配置，因此 `static/js/filepond.js` 提供一个幂等初始化函数，例如：
 
 ```text
 initFilePonds(root)
@@ -345,6 +339,8 @@ FilePond v5 使用 Web Component / Shadow DOM。TMS 不试图向 Shadow DOM 内�
 
 让上传区域与 TMS 的 `base-*`、`primary`、`error`、圆角和明暗主题保持一致。
 
+保留 FilePond 原生上传区域和内置“浏览文件”入口，不在外部重复增加按钮。上传区域的边框、圆角和焦点态复用 DaisyUI 表单字段 token；说明文字保持正文样式，仅通过 locale 中的 `browse-label` part 为“浏览文件”提供主色及悬停强调。图片队列使用固定小缩略图，`<file-pond noattribution>` 关闭默认品牌标识。
+
 样式集中放在 `static/css/main.css` 的明确 FilePond 区域，不由各 APP 覆盖。
 
 ## JavaScript 与 CSP
@@ -355,8 +351,9 @@ FilePond v5 使用 Web Component / Shadow DOM。TMS 不试图向 Shadow DOM 内�
 
 若部署实际启用 Content-Security-Policy：
 
-- 图片预览需要允许 FilePond 所需的 `blob:` / `data:` 图像来源；
-- 可优先配置 `workersURL` 指向 TMS 本地 static 的 FilePond workers，减少对 `worker-src blob:` 的依赖；
+- 图片预览需要在 `img-src` 中允许 FilePond 所需的 `blob:` / `data:` 图像来源；
+- `workersURL` 指向 TMS 本地 static 的 FilePond workers；当前 beta 的图片预览仍会回退到 Blob Worker，因此 `worker-src` 同时允许 `'self'` 和 `blob:`；
+- `script-src` 不因 FilePond 放宽为 `blob:`；
 - 具体 CSP 以实际启用的 header 为准，不仅凭代码风格假设。
 
 ## 无障碍和降级
@@ -409,13 +406,13 @@ async（按需）
 1. 单文件点击选择并提交；
 2. 多文件点击选择并提交；
 3. 拖放一个和多个文件；
-4. Ctrl+V 粘贴 Windows/浏览器截图；
-5. 粘贴图片后与普通选择文件一起提交；
+4. 点击上传区域后 Ctrl+V 粘贴 Windows/浏览器截图；
+5. 从操作系统复制普通文件，点击上传区域后粘贴，并与普通选择文件一起提交；
 6. 删除待上传文件后不会进入 `request.FILES`；
 7. 不允许的扩展名在前端提示，并且绕过前端后仍被 Django 拒绝；
 8. 超过 `UploadSpec.max_size_mb` 前后端均拒绝；
-9. textarea 中 Ctrl+V 文本不被上传组件拦截；
-10. 同页两个上传组件不会同时接收截图；
+9. 未聚焦上传区域时不接收文件，textarea 中 Ctrl+V 文本不被上传组件拦截；
+10. 同页两个上传组件只由当前聚焦区域接收截图或文件；
 11. HTMX swap 后新出现的上传组件正常工作且不会重复初始化；
 12. HTMX multipart 提交能在 Django Form 中收到所有文件；
 13. form reset 能清空待上传队列；

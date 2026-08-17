@@ -50,6 +50,7 @@ return render(request, "demo/list.html#results", context)
 - Django `FileField` / `MultipleFileField`、`UploadSpec` 及服务端 validator 始终是文件类型、大小和内容校验的最终事实来源；FilePond 的前端校验只用于即时反馈，不能替代服务端校验。
 - 第一阶段保持普通 `multipart/form-data` 表单提交和 HTMX multipart 提交，不因引入 FilePond 而强制改成异步上传 API。需要大文件、分块上传或临时附件时，再按具体业务引入异步 store。
 - FilePond v5 当前允许跟随 beta 版本升级；`package-lock.json` 保持每次提交的可复现版本，升级后应做上传组件的聚焦回归验证。
+- 上传区域使用 FilePond 内置“浏览文件”入口、拖放和粘贴提供统一体验；粘贴截图或普通文件前必须先点击或聚焦目标上传区域，纯文本粘贴不应被拦截。
 - 详细约定见 `docs/developer/file-upload.md` 和相关 ADR。
 
 ## HTMX

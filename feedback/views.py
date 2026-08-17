@@ -8,6 +8,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import FileResponse, Http404, HttpRequest
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views import View
 from django.views.generic import FormView, ListView, TemplateView
 
@@ -74,6 +75,14 @@ class FeedbackListView(TitleMixin, LoginRequiredMixin, ListView):
                 "selected_status": self.request.GET.get("status", ""),
                 "selected_query": self.request.GET.get("q", ""),
                 "selected_scope": self.request.GET.get("scope", ""),
+                "page_actions": [
+                    {
+                        "label": "提交反馈",
+                        "href": reverse("feedback:create"),
+                        "icon": "icon-[tabler--message-plus]",
+                        "variant_class": "btn btn-primary btn-soft btn-sm",
+                    }
+                ],
             }
         )
         return context

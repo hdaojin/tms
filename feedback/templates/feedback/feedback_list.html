@@ -1,42 +1,54 @@
 {% extends "layouts/app.html" %}
 {% block content %}
-<div class="space-y-5">
-  <div class="flex flex-wrap justify-end gap-3">
-    <a class="btn btn-primary" href="{% url 'feedback:create' %}">
-      <span class="icon-[tabler--message-plus] size-5" aria-hidden="true"></span>提交反馈
-    </a>
-  </div>
-
-  <form class="card border border-base-300 bg-base-100 shadow-sm" method="get" action="{% url 'feedback:list' %}" hx-get="{% url 'feedback:list' %}" hx-target="#feedback-list" hx-push-url="true">
-    <div class="card-body grid gap-4 md:grid-cols-4">
-      <label class="fieldset">
-        <span class="fieldset-legend">反馈类型</span>
-        <select class="select w-full" name="category">
+<div class="space-y-4">
+  <form class="rounded-box border border-base-300 bg-base-100 p-3 shadow-sm"
+        method="get"
+        action="{% url 'feedback:list' %}"
+        hx-get="{% url 'feedback:list' %}"
+        hx-trigger="submit, change from:.feedback-filter-select, input changed delay:400ms from:#feedback-search, search from:#feedback-search"
+        hx-target="#feedback-list"
+        hx-push-url="true"
+        hx-indicator="#feedback-filter-indicator"
+        hx-sync="this:replace">
+    <div class="grid grid-cols-2 gap-2 md:flex md:items-center">
+      <label class="min-w-0 md:w-32 md:shrink-0">
+        <span class="sr-only">反馈类型</span>
+        <select class="feedback-filter-select select w-full md:select-sm" name="category">
           <option value="">全部类型</option>
           {% for value, label in category_choices %}<option value="{{ value }}"{% if selected_category == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
       </label>
-      <label class="fieldset">
-        <span class="fieldset-legend">状态</span>
-        <select class="select w-full" name="status">
+      <label class="min-w-0 md:w-32 md:shrink-0">
+        <span class="sr-only">状态</span>
+        <select class="feedback-filter-select select w-full md:select-sm" name="status">
           <option value="">全部状态</option>
           {% for value, label in status_choices %}<option value="{{ value }}"{% if selected_status == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
       </label>
-      <label class="fieldset">
-        <span class="fieldset-legend">查看范围</span>
-        <select class="select w-full" name="scope">
+      <label class="col-span-2 min-w-0 md:w-40 md:shrink-0">
+        <span class="sr-only">查看范围</span>
+        <select class="feedback-filter-select select w-full md:select-sm" name="scope">
           <option value="">全部可见反馈</option>
           <option value="my"{% if selected_scope == "my" %} selected{% endif %}>我提交的</option>
         </select>
       </label>
-      <label class="fieldset">
-        <span class="fieldset-legend">搜索</span>
-        <input class="input w-full" type="search" name="q" value="{{ selected_query }}" placeholder="搜索标题或正文">
-      </label>
-      <div class="flex flex-wrap justify-end gap-3 md:col-span-4">
-        <a class="btn btn-ghost" href="{% url 'feedback:list' %}">重置</a>
-        <button class="btn btn-primary" type="submit"><span class="icon-[tabler--search] size-5" aria-hidden="true"></span>筛选</button>
+      <div class="col-span-2 flex min-w-0 items-center gap-2 md:contents">
+        <label class="min-w-0 flex-1">
+          <span class="sr-only">搜索</span>
+          <input id="feedback-search"
+                 class="input w-full md:input-sm"
+                 type="search"
+                 name="q"
+                 value="{{ selected_query }}"
+                 placeholder="搜索标题或正文">
+        </label>
+        <div class="flex shrink-0 items-center gap-1">
+          <span id="feedback-filter-indicator"
+                class="htmx-indicator loading loading-spinner loading-sm text-primary"
+                role="status"
+                aria-label="正在筛选"></span>
+          <a class="btn btn-ghost px-3 md:btn-sm" href="{% url 'feedback:list' %}">重置</a>
+        </div>
       </div>
     </div>
   </form>

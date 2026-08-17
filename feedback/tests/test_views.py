@@ -6,10 +6,13 @@ from .base import FeedbackTestCase
 
 
 class FeedbackViewTests(FeedbackTestCase):
-    def test_create_form_explains_form_wide_screenshot_paste(self):
+    def test_create_form_explains_focused_screenshot_and_file_paste(self):
         self.client.force_login(self.author)
         response = self.client.get(reverse("feedback:create"))
-        self.assertContains(response, "复制截图后直接按 Ctrl+V / Cmd+V 即可添加，无需点击此处")
+        self.assertContains(response, "先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴截图或文件")
+        self.assertNotContains(response, "data-tms-upload-browse")
+        self.assertContains(response, "noattribution")
+        self.assertNotContains(response, "无需点击")
         self.assertNotContains(response, 'x-on:paste="handlePaste"', html=False)
 
     def test_list_create_and_detail_are_available_to_logged_in_users(self):
@@ -22,6 +25,46 @@ class FeedbackViewTests(FeedbackTestCase):
         self.assertEqual(create_response.status_code, 302)
         feedback = self.author.feedbacks_created.get(title="新反馈")
         self.assertEqual(self.client.get(reverse("feedback:detail", args=[feedback.pk])).status_code, 200)
+
+    def test_list_renders_compact_auto_filter_toolbar(self):
+        self.client.force_login(self.author)
+        response = self.client.get(
+            reverse("feedback:list"),
+            {"category": "bug", "status": "open", "scope": "my", "q": "登录"},
+        )
+
+        self.assertEqual(
+            response.context["page_actions"],
+            [
+                {
+                    "label": "提交反馈",
+                    "href": reverse("feedback:create"),
+                    "icon": "icon-[tabler--message-plus]",
+                    "variant_class": "btn-outline",
+                }
+            ],
+        )
+        self.assertContains(
+            response,
+            '<span class="icon-[tabler--message-plus] size-4" aria-hidden="true"></span>',
+            html=False,
+        )
+        self.assertContains(
+            response,
+            'hx-trigger="submit, change from:.feedback-filter-select, input changed delay:400ms '
+            'from:#feedback-search, search from:#feedback-search"',
+            html=False,
+        )
+        self.assertContains(response, 'hx-indicator="#feedback-filter-indicator"', html=False)
+        self.assertContains(response, '<option value="bug" selected>', html=False)
+        self.assertContains(response, '<option value="open" selected>', html=False)
+        self.assertContains(response, '<option value="my" selected>', html=False)
+        self.assertEqual(response.context["selected_query"], "登录")
+        self.assertContains(response, 'value="登录"', html=False)
+        self.assertContains(response, '<span class="sr-only">反馈类型</span>', html=False)
+        self.assertContains(response, '<span class="sr-only">搜索</span>', html=False)
+        self.assertContains(response, f'href="{reverse("feedback:list")}">重置</a>', html=False)
+        self.assertNotContains(response, ">筛选</button>", html=False)
 
     def test_private_feedback_returns_404_to_unauthorized_user(self):
         feedback = self.make_feedback(is_private=True, author=self.other)
@@ -95,11 +138,14 @@ class FeedbackViewTests(FeedbackTestCase):
         response = self.client.get(reverse("feedback:detail", args=[feedback.pk]))
         self.assertNotContains(response, f'action="{reverse("feedback:reply", args=[feedback.pk])}"', html=False)
 
-    def test_reply_form_explains_form_wide_screenshot_paste(self):
+    def test_reply_form_explains_focused_screenshot_and_file_paste(self):
         feedback = self.make_feedback()
         self.client.force_login(self.author)
         response = self.client.get(reverse("feedback:detail", args=[feedback.pk]))
-        self.assertContains(response, "复制截图后直接按 Ctrl+V / Cmd+V 即可添加，无需点击此处")
+        self.assertContains(response, "先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴截图或文件")
+        self.assertNotContains(response, "data-tms-upload-browse")
+        self.assertContains(response, "noattribution")
+        self.assertNotContains(response, "无需点击")
         self.assertNotContains(response, 'x-on:paste="handlePaste"', html=False)
 
     def test_manager_can_update_status_and_detail_shows_resolution(self):

@@ -1,23 +1,67 @@
 {% comment %}
-文件上传组件。
-参数: name, label, accept, multiple, required, help_text, max_size_mb, extra_class。
-交互逻辑由 static/js/app.js 通过 data-file-upload 绑定。
+  文件上传组件。 参数: field, help_text, extra_class。 field 必须是 Django
+  BoundField；FilePond 从它继承字段语义，并由 form-associated custom element
+  接管提交。交互逻辑由 static/js/filepond.js 统一绑定。
 {% endcomment %}
-<div class="rounded-box border border-dashed border-base-300 bg-base-100 p-5 {{ extra_class }}" data-file-upload>
-  <label class="flex cursor-pointer flex-col items-center justify-center gap-3 text-center">
-    <span class="icon-[tabler--cloud-upload] size-10 text-primary" aria-hidden="true"></span>
-    <span class="font-medium">{{ label|default:"选择文件" }}</span>
-    <span class="text-sm text-base-content/60">
-      {% if help_text %}{{ help_text }}{% else %}拖放或点击选择文件{% endif %}
-      {% if max_size_mb %}，单个文件不超过 {{ max_size_mb }} MB{% endif %}
-    </span>
-    <input class="file-input file-input-bordered w-full max-w-md"
-           type="file"
-           name="{{ name }}"
-           {% if accept %}accept="{{ accept }}"{% endif %}
-           {% if multiple %}multiple{% endif %}
-           {% if required %}required{% endif %}
-           data-file-input>
-  </label>
-  <ul class="mt-4 hidden space-y-2 text-sm" data-file-list></ul>
-</div>
+{% load form_extras %}
+{% with paste=field|get_widget_attr:"data-upload-paste" preview=field|get_widget_attr:"data-upload-preview" max_size=field|get_widget_attr:"data-upload-max-size-mb" max_files=field|get_widget_attr:"data-upload-max-files" max_total_size=field|get_widget_attr:"data-upload-max-total-size-mb" aria_label=field|get_widget_attr:"aria-label" describedby=field|file_upload_describedby %}
+  <div
+    class="tms-file-upload-wrapper {{ extra_class }}"
+    data-tms-file-upload-wrapper
+    data-drag-active="false"
+  >
+    <file-pond
+      data-tms-file-upload
+      data-upload-paste="{{ paste|default:'auto' }}"
+      data-upload-preview="{{ preview|default:'true' }}"
+      noattribution
+      tabindex="0"
+      aria-label="{% if aria_label %}{{ aria_label }}{% else %}{{ field.label }}{% endif %}"
+      aria-describedby="{{ describedby }}"
+      {% if field.errors %}aria-invalid="true"{% endif %}
+      {% if max_size %}data-upload-max-size-mb="{{ max_size }}"{% endif %}
+      {% if max_files %}data-upload-max-files="{{ max_files }}"{% endif %}
+      {% if max_total_size %}data-upload-max-total-size-mb="{{ max_total_size }}"{% endif %}
+    >
+      {{ field }}
+    </file-pond>
+    <div
+      class="mt-3 flex flex-wrap items-center gap-3"
+      data-tms-upload-enhanced
+      hidden
+    >
+      <p
+        id="{{ field.id_for_label }}_paste_hint"
+        class="tms-upload-paste-hint text-sm text-base-content/70"
+        aria-live="polite"
+        data-tms-upload-paste-hint
+      >
+        <span class="tms-upload-paste-idle"
+          >支持直接复制/粘贴截图或文件，先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴</span
+        >
+        <span class="tms-upload-paste-active"
+          >上传区域已选中，可按 Ctrl+V / Cmd+V 粘贴</span
+        >
+      </p>
+      <p
+        class="tms-upload-drag-status items-center gap-2 font-medium text-primary"
+        role="status"
+        aria-live="polite"
+        data-tms-upload-drag-status
+      >
+        <span
+          class="icon-[tabler--cloud-upload] size-5"
+          aria-hidden="true"
+        ></span>
+        松开以上传
+      </p>
+    </div>
+    <p
+      id="{{ field.id_for_label }}_helptext"
+      class="mt-2 text-sm text-base-content/60"
+      data-tms-upload-help
+    >
+      {% if help_text %}{{ help_text }}{% endif %}
+    </p>
+  </div>
+{% endwith %}

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import django_tables2 as tables
+from django import forms
 from django.contrib.flatpages.models import FlatPage
 from django.contrib.sites.models import Site
 from django.contrib.auth import get_user_model
@@ -653,7 +654,10 @@ class UploadSpecTests(TestCase):
 
         self.assertEqual(spec.accept, ".pdf,.docx")
         self.assertEqual(spec.help_text("上传资料"), "上传资料，支持 pdf, docx，大小不超过 12MB")
-        self.assertEqual(spec.widget_attrs(type="file"), {"type": "file", "accept": ".pdf,.docx"})
+        self.assertEqual(
+            spec.widget_attrs(type="file"),
+            {"type": "file", "accept": ".pdf,.docx", "data-upload-max-size-mb": "12"},
+        )
         self.assertEqual(len(spec.validators()), 2)
 
     def test_upload_size_validator_reports_chinese_error(self):
@@ -823,6 +827,72 @@ class UploadSpecAdoptionTests(TestCase):
             MeetingUploadForm().fields["file"].widget.attrs["accept"],
             MEETING_FILE_UPLOAD_SPEC.accept,
         )
+
+    def test_file_upload_component_preserves_bound_field_attributes(self):
+        class UploadForm(forms.Form):
+            attachments = MultipleFileField(
+                label="附件",
+                upload_spec=UploadSpec(["png"], 7),
+                required=False,
+            )
+
+        form = UploadForm()
+        html = Template('{% include "components/field.html" with field=form.attachments %}').render(
+            Context({"form": form})
+        )
+
+        self.assertIn("<file-pond", html)
+        self.assertIn('name="attachments"', html)
+        self.assertIn('accept=".png"', html)
+        self.assertIn(" multiple", html)
+        self.assertIn('data-upload-max-size-mb="7"', html)
+        self.assertIn('tabindex="0"', html)
+        self.assertIn(" noattribution", html)
+        self.assertNotIn("data-tms-upload-browse", html)
+        self.assertIn("先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴截图或文件", html)
+        self.assertIn("data-tms-upload-drag-status", html)
+
+    def test_file_upload_component_links_help_and_errors_for_accessibility(self):
+        class UploadForm(forms.Form):
+            attachment = forms.FileField(label="附件", required=True)
+
+        form = UploadForm(data={}, files={})
+        self.assertFalse(form.is_valid())
+        html = Template('{% include "components/field.html" with field=form.attachment %}').render(
+            Context({"form": form})
+        )
+
+        self.assertIn('id="id_attachment_error"', html)
+        self.assertIn('id="id_attachment_helptext"', html)
+        self.assertIn('id="id_attachment_paste_hint"', html)
+        self.assertIn('aria-invalid="true"', html)
+        self.assertIn(
+            'aria-describedby="id_attachment_helptext id_attachment_paste_hint id_attachment_error"',
+            html,
+        )
+
+    def test_response_csp_allows_filepond_preview_and_worker_sources(self):
+        response = self.client.get("/")
+        directives = {
+            parts[0]: parts[1:]
+            for directive in response.headers["Content-Security-Policy"].split(";")
+            if (parts := directive.split())
+        }
+
+        self.assertIn("blob:", directives["img-src"])
+        self.assertEqual(directives["worker-src"], ["'self'", "blob:"])
+        self.assertNotIn("blob:", directives["script-src"])
+
+    def test_multipart_form_component_adds_htmx_encoding(self):
+        class UploadForm(forms.Form):
+            attachment = forms.FileField(required=False)
+
+        html = Template('{% include "components/form.html" with form=form %}').render(
+            Context({"form": UploadForm()})
+        )
+
+        self.assertIn('enctype="multipart/form-data"', html)
+        self.assertIn('hx-encoding="multipart/form-data"', html)
 
     def test_archive_asset_file_uses_upload_spec_help_text(self):
         from archives.models import ARCHIVE_ASSET_UPLOAD_SPEC, ArchiveAsset

@@ -268,6 +268,7 @@ class UploadSpec:
 
     def widget_attrs(self, **attrs: Any) -> dict[str, Any]:
         attrs.setdefault("accept", self.accept)
+        attrs.setdefault("data-upload-max-size-mb", str(self.max_size_mb))
         return attrs
 
     def help_text(self, action_text: str = "上传文件") -> str:

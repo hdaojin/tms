@@ -3,6 +3,7 @@ from __future__ import annotations
 from django import forms
 from django.core.exceptions import ValidationError
 
+from core.constants import FEEDBACK_ATTACHMENT_MAX_COUNT, FEEDBACK_ATTACHMENT_MAX_TOTAL_SIZE_MB
 from core.forms.fields import MultipleFileField
 from core.uploads import FEEDBACK_ATTACHMENT_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
@@ -19,6 +20,7 @@ class FeedbackForm(StyledFormMixin, forms.Form):
         label="附件",
         upload_spec=FEEDBACK_ATTACHMENT_UPLOAD_SPEC,
         required=False,
+        help_text=FEEDBACK_ATTACHMENT_UPLOAD_SPEC.help_text("上传附件"),
     )
     is_anonymous = forms.BooleanField(label="匿名提交", required=False)
     is_private = forms.BooleanField(label="仅工作人员可见", required=False)
@@ -27,7 +29,12 @@ class FeedbackForm(StyledFormMixin, forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["category"].widget.attrs.update({"x-ref": "category", "x-on:change": "categoryChanged"})
         self.fields["is_private"].widget.attrs.update({"x-ref": "private", "x-on:change": "privateChanged"})
-        self.fields["attachments"].widget.attrs.update({"x-ref": "input", "x-on:change": "handleChange"})
+        self.fields["attachments"].widget.attrs.update(
+            {
+                "data-upload-max-files": str(FEEDBACK_ATTACHMENT_MAX_COUNT),
+                "data-upload-max-total-size-mb": str(FEEDBACK_ATTACHMENT_MAX_TOTAL_SIZE_MB),
+            }
+        )
         if not self.is_bound and self.initial.get("category") == FeedbackCategory.COMPLAINT:
             self.fields["is_private"].initial = True
 
@@ -59,11 +66,17 @@ class FeedbackReplyForm(StyledFormMixin, forms.Form):
         label="附件",
         upload_spec=FEEDBACK_ATTACHMENT_UPLOAD_SPEC,
         required=False,
+        help_text=FEEDBACK_ATTACHMENT_UPLOAD_SPEC.help_text("上传附件"),
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["attachments"].widget.attrs.update({"x-ref": "input", "x-on:change": "handleChange"})
+        self.fields["attachments"].widget.attrs.update(
+            {
+                "data-upload-max-files": str(FEEDBACK_ATTACHMENT_MAX_COUNT),
+                "data-upload-max-total-size-mb": str(FEEDBACK_ATTACHMENT_MAX_TOTAL_SIZE_MB),
+            }
+        )
 
     def clean_content(self):
         content = self.cleaned_data["content"].strip()

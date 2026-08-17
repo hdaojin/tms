@@ -1,0 +1,33 @@
+/*!
+* FilePond v5.0.0-beta.63
+* Copyright (c) 2017-2026 Pqina B.V.
+* Released under the MIT License
+* https://filepond.com
+*/
+import { onDestroy as p } from "../../../../vendor/svelte/src/index-client.js";
+import { pop as s, push as c } from "../../../../vendor/svelte/src/internal/client/context.js";
+import { first_child as l } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
+import { comment as u, append as d } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
+import { element as h } from "../../../../vendor/svelte/src/internal/client/dom/blocks/svelte-element.js";
+import { attach as g } from "../../../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
+import { attribute_effect as b } from "../../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
+import { prop as e } from "../../../../vendor/svelte/src/internal/client/reactivity/props.js";
+import { measurable as v } from "../../../attachments/measurable.js";
+import { rectFromBounds as y } from "../../../../utils/rect.js";
+import { noop as _ } from "../../../../utils/placeholder.js";
+function z(a, r) {
+  c(r, !0);
+  let i = e(r, "tag", 3, "li"), t = e(r, "onmeasureitem", 3, _);
+  p(() => {
+    t()();
+  });
+  var o = u(), f = l(o);
+  h(f, i, !1, (m, x) => {
+    g(m, () => v({
+      onmeasure: (n) => t()(y(n))
+    })), b(m, () => ({ class: r.class, part: r.part }));
+  }), d(a, o), s();
+}
+export {
+  z as default
+};

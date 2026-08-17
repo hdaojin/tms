@@ -566,3 +566,58 @@ sections:
             icon_class: icon-[tabler--components] size-5 text-accent
             debug_only: true
             staff_required: true
+          - key: feedback_create
+            label: 提交反馈
+            url_name: feedback:create
+            icon_class: icon-[tabler--message-plus] size-5 text-success
+            login_required: true
+
+  - key: worldskills_forum
+    label: 世赛论坛
+    description: 世界技能论坛翻译与讨论信息
+    icon_class: icon-[tabler--messages] size-5 text-info
+    items:
+      - key: worldskills_forum_group
+        label: 世赛论坛
+        icon_class: icon-[tabler--messages] size-5 text-info
+        children:
+          - key: worldskills_forum
+            label: 最新动态
+            url_name: worldskills_forum:feed
+            icon_class: icon-[tabler--news] size-5 text-info
+            permissions: [worldskills_forum.view_forumpost]
+          - key: worldskills_forum_topics
+            label: 主题
+            url_name: worldskills_forum:topic_list
+            icon_class: icon-[tabler--message-circle] size-5 text-primary
+            permissions: [worldskills_forum.view_forumtopic]
+          - key: worldskills_forum_important
+            label: 重要信息
+            url_name: worldskills_forum:important_feed
+            icon_class: icon-[tabler--alert-triangle] size-5 text-warning
+            permissions: [worldskills_forum.view_forumpost]
+          - key: worldskills_forum_official
+            label: 官方信息
+            url_name: worldskills_forum:official_feed
+            icon_class: icon-[tabler--rosette] size-5 text-info
+            permissions: [worldskills_forum.view_forumpost]
+          - key: worldskills_forum_unread
+            label: 未读信息
+            url_name: worldskills_forum:unread_feed
+            icon_class: icon-[tabler--mail] size-5 text-secondary
+            permissions: [worldskills_forum.view_forumpost]
+          - key: worldskills_forum_workbench
+            label: 翻译工作台
+            url_name: worldskills_forum:workbench
+            icon_class: icon-[tabler--language] size-5 text-accent
+            permissions:
+              - worldskills_forum.add_forumpost
+
+  - key: training
+    label: 训练
+    description: 训练周期与训练日志
+    icon_class: icon-[tabler--run] size-5 text-success
+    items:
+      - key: training_group
+        label: 训练管理
+        icon_class: icon-[tabler--run] size-5 text-success

@@ -15,7 +15,7 @@
 {% elif not field %}
 {% else %}
 {% if field.errors and show_errors|default:True %}
-  <div class="alert alert-error md:col-span-2">
+  <div id="{{ field.id_for_label }}_error" class="alert alert-error md:col-span-2">
     <span class="icon-[tabler--alert-circle] size-5" aria-hidden="true"></span>
     <ul class="list-disc pl-4">
       {% for error in field.errors %}
@@ -81,7 +81,7 @@
       </legend>
     {% endif %}
     {% if use_fancy_upload|default:True %}
-      {% include "components/file_upload.html" with name=field.html_name accept=field|get_accept_types multiple=field|is_multiple_file required=field.field.required help_text=field.help_text %}
+      {% include "components/file_upload.html" with field=field help_text=field.help_text %}
     {% else %}
       {{ field }}
     {% endif %}

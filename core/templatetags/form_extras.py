@@ -45,6 +45,28 @@ def get_accept_types(field: BoundField) -> str:
 
 
 @register.filter
+def get_widget_attr(field: BoundField, name: str) -> str:
+    """获取文件控件的自定义属性，供公共表单组件转发配置。"""
+    return str(field.field.widget.attrs.get(name, ''))
+
+
+@register.filter
+def file_upload_describedby(field: BoundField) -> str:
+    """组合上传组件的静态说明、帮助文本和动态错误关联。"""
+    widget_value = str(field.field.widget.attrs.get('aria-describedby', ''))
+    ids = widget_value.split()
+    ids.extend(
+        [
+            f'{field.id_for_label}_helptext',
+            f'{field.id_for_label}_paste_hint',
+        ]
+    )
+    if field.errors:
+        ids.append(f'{field.id_for_label}_error')
+    return ' '.join(dict.fromkeys(ids))
+
+
+@register.filter
 def filename(file_path: str) -> str:
     """从文件路径中提取文件名（不含路径）"""
     if not file_path:

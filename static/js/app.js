@@ -108,34 +108,6 @@
     });
   }
 
-  function initFileUploads(root) {
-    root.querySelectorAll("[data-file-upload]").forEach(function (container) {
-      const input = container.querySelector("[data-file-input]");
-      const list = container.querySelector("[data-file-list]");
-      if (!input || !list) return;
-
-      input.addEventListener("change", function () {
-        list.innerHTML = "";
-        const files = Array.from(input.files || []);
-        list.classList.toggle("hidden", files.length === 0);
-        files.forEach(function (file) {
-          const item = document.createElement("li");
-          item.className = "flex items-center justify-between gap-3 rounded-box bg-base-200 px-3 py-2";
-          const size = file.size ? (file.size / 1024 / 1024).toFixed(2) + " MB" : "";
-          item.innerHTML =
-            '<span class="truncate">' +
-            file.name.replace(/[&<>"']/g, function (char) {
-              return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char];
-            }) +
-            '</span><span class="shrink-0 text-xs text-base-content/60">' +
-            size +
-            "</span>";
-          list.appendChild(item);
-        });
-      });
-    });
-  }
-
   function initConditionalGroups(root) {
     root.querySelectorAll("[data-toggle-target]").forEach(function (checkbox) {
       const target = document.querySelector(checkbox.dataset.toggleTarget);
@@ -191,7 +163,6 @@
     initHistoryBack(root);
     initPrint(root);
     initClipboard(root);
-    initFileUploads(root);
     initConditionalGroups(root);
     initCountdown(root);
   }

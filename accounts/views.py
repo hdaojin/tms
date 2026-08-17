@@ -4,8 +4,9 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.decorators import login_not_required  # type: ignore
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, login as auth_login
 from django.contrib.auth.models import Group
+from django.contrib.auth.views import LoginView
 from django.db import transaction
 from django.db.models import Case, CharField, Count, F, OuterRef, Subquery, Value, When
 from django.db.models.functions import Coalesce
@@ -28,6 +29,16 @@ from core.utils.mixins import TitleMixin
 from .models import UserProfile
 
 User = get_user_model()
+
+
+class CustomLoginView(LoginView):
+    """登录视图：勾选“记住我”时保持默认会话有效期，不勾选则关闭浏览器即失效。"""
+
+    def form_valid(self, form):
+        auth_login(self.request, form.get_user())
+        if not self.request.POST.get("remember_me"):
+            self.request.session.set_expiry(0)
+        return redirect(self.get_success_url())
 
 
 @login_not_required

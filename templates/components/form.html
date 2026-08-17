@@ -8,6 +8,7 @@ hx_attrs 为后端构造的完整属性字符串，避免在模板中拼接复�
       method="{{ method|default:'post' }}"
       class="{{ form_class|default:'space-y-6' }}"
       {% if form.is_multipart %}enctype="multipart/form-data"{% endif %}
+      {% if form.is_multipart %}hx-encoding="multipart/form-data"{% endif %}
       {{ hx_attrs|safe }}>
   {% csrf_token %}
   {% for hidden in form.hidden_fields %}

@@ -31,10 +31,10 @@ def sanitize_original_filename(filename: str | None) -> str:
 
 
 class FeedbackCategory(models.TextChoices):
-    BUG = "bug", "Bug"
+    BUG = "bug", "Bug反馈"
     FEATURE = "feature", "功能需求"
     SUGGESTION = "suggestion", "意见建议"
-    COMPLAINT = "complaint", "投诉"
+    COMPLAINT = "complaint", "我要投诉"
 
 
 class FeedbackStatus(models.TextChoices):
