@@ -121,7 +121,10 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixi
     list_filter_target_id = "forum-topic-list"
     list_filter_indicator_id = "forum-topic-filter-indicator"
     list_filter_controls_template = "worldskills_forum/topic_list.html#filter-controls"
-    list_filter_trigger = "submit"
+    list_filter_trigger = (
+        "submit, change from:.forum-topic-filter-select, input changed delay:400ms "
+        "from:#forum-topic-search, search from:#forum-topic-search"
+    )
     list_filter_form_class = "card border border-base-300 bg-base-100 shadow-sm"
 
     def get_base_queryset(self):
