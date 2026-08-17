@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, TemplateView, UpdateView
 
+from core.utils.listing import FilterableListMixin
 from core.utils.mixins import TitleMixin
 
 from .forms import AttachmentAddForm, AttachmentMetadataFormSet, ForumPostTranslationForm, ForumTopicForm
@@ -80,7 +81,7 @@ class UnreadFeedView(FilterShortcutView):
     filter_name = "unread"
 
 
-class ForumTopicListView(TitleMixin, PermissionRequiredMixin, ListView):
+class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixin, ListView):
     template_name = "worldskills_forum/topic_list.html"
     context_object_name = "topics"
     paginate_by = 20
@@ -88,23 +89,45 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, ListView):
     title_icon = "icon-[tabler--message-circle]"
     permission_required = "worldskills_forum.view_forumtopic"
 
-    def get_queryset(self):
+    search_fields = (
+        "translated_title",
+        "original_title",
+        "summary",
+        "module__name",
+        "tags__name",
+        "category__name",
+        "posts__author_name",
+        "posts__original_content",
+        "posts__translation__translated_content",
+        "posts__attachments__original_filename",
+        "posts__attachments__caption_zh",
+    )
+    filter_fields = {
+        "year": "competition_year",
+        "module": "module_id",
+        "category": "category_id",
+        "tag": "tags__id",
+        "post_type": "posts__post_type",
+        "status": "status",
+        "importance": "importance",
+    }
+    filter_choices = {
+        "post_type": PostType.choices,
+        "status": TopicStatus.choices,
+        "importance": Importance.choices,
+    }
+    search_requires_distinct = True
+    always_distinct = True
+    list_filter_target_id = "forum-topic-list"
+    list_filter_indicator_id = "forum-topic-filter-indicator"
+    list_filter_controls_template = "worldskills_forum/topic_list.html#filter-controls"
+    list_filter_trigger = "submit"
+    list_filter_form_class = "card border border-base-300 bg-base-100 shadow-sm"
+
+    def get_base_queryset(self):
         queryset = get_topic_list_queryset()
         if not self.request.user.has_perm("worldskills_forum.change_all_forum_content"):
             queryset = queryset.filter(Q(post_count__gt=0) | Q(created_by=self.request.user))
-        q = self.request.GET.get("q", "").strip()
-        if q:
-            queryset = queryset.filter(
-                Q(translated_title__icontains=q) | Q(original_title__icontains=q) | Q(summary__icontains=q)
-                | Q(module__name__icontains=q) | Q(tags__name__icontains=q) | Q(category__name__icontains=q) | Q(posts__author_name__icontains=q)
-                | Q(posts__original_content__icontains=q) | Q(posts__translation__translated_content__icontains=q)
-                | Q(posts__attachments__original_filename__icontains=q) | Q(posts__attachments__caption_zh__icontains=q)
-            ).distinct()
-        mapping = {"year": "competition_year", "module": "module_id", "category": "category_id", "tag": "tags__id", "status": "status", "importance": "importance"}
-        for key, lookup in mapping.items():
-            value = self.request.GET.get(key)
-            if value:
-                queryset = queryset.filter(**{lookup: value})
         return queryset
 
     def get_context_data(self, **kwargs):
