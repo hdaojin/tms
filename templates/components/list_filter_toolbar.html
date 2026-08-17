@@ -1,0 +1,15 @@
+{% comment %}
+通用列表筛选工具栏外壳。
+业务页通过 list_filter_controls_template 提供具体筛选控件（可指向 Django 6 template partial）。
+{% endcomment %}
+<form class="{{ list_filter_form_class }}"
+      method="get"
+      action="{{ list_filter_url }}"
+      hx-get="{{ list_filter_url }}"
+      hx-trigger="{{ list_filter_trigger }}"
+      hx-target="#{{ list_filter_target_id }}"
+      hx-push-url="true"
+      hx-indicator="#{{ list_filter_indicator_id }}"
+      hx-sync="this:replace">
+  {% include list_filter_controls_template %}
+</form>
