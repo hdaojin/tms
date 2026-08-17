@@ -19,6 +19,38 @@ class SearchAndUnreadTests(ForumTestCase):
         self.assertContains(self.client.get(reverse("worldskills_forum:feed"), {"q": "Network"}), "Network infrastructure")
         self.assertContains(self.client.get(reverse("worldskills_forum:feed"), {"q": "中文评分"}), "中文评分说明")
 
+    def test_topic_list_uses_shared_filtering_and_htmx_partial(self):
+        target = self.make_topic(
+            translated_title="筛选目标主题",
+            original_title="Filtering Target Topic",
+            source_url="https://forum.example.com/t/filter-target",
+        )
+        self.make_post(topic=target, source_url="https://forum.example.com/p/filter-target")
+        other = self.make_topic(
+            competition_year=2025,
+            translated_title="其他主题",
+            original_title="Other Topic",
+            source_url="https://forum.example.com/t/filter-other",
+        )
+        self.make_post(topic=other, source_url="https://forum.example.com/p/filter-other")
+        self.client.force_login(self.reader)
+
+        params = {"q": "目标", "year": "2026"}
+        response = self.client.get(reverse("worldskills_forum:topic_list"), params)
+        self.assertContains(response, target.translated_title)
+        self.assertNotContains(response, other.translated_title)
+
+        htmx_response = self.client.get(
+            reverse("worldskills_forum:topic_list"),
+            params,
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(htmx_response.status_code, 200)
+        self.assertNotContains(htmx_response, "<!doctype html>", html=False)
+        self.assertNotContains(htmx_response, "关键字")
+        self.assertContains(htmx_response, target.translated_title)
+        self.assertNotContains(htmx_response, other.translated_title)
+
     def test_unread_uses_translation_publish_time(self):
         viewed_at = timezone.now() - timedelta(days=1)
         post = self.make_post(posted_at=timezone.now() - timedelta(days=10), published_at=timezone.now())
