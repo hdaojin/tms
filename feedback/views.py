@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import FormView, ListView, TemplateView
 
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 from core.utils.mixins import TitleMixin
 
 from .forms import FeedbackForm, FeedbackManageForm, FeedbackReplyForm
@@ -22,7 +23,7 @@ from .permissions import (
     can_view_anonymous_identity,
     can_view_feedback,
 )
-from .selectors import feedback_detail_for, filtered_feedbacks_for
+from .selectors import feedback_detail_for, visible_feedbacks_for
 from .services import add_feedback_reply, create_feedback, update_feedback_status
 
 
@@ -45,46 +46,64 @@ def _detail_context(request: HttpRequest, feedback: Feedback, *, reply_form=None
     }
 
 
-class FeedbackListView(TitleMixin, LoginRequiredMixin, ListView):
+class FeedbackListView(TitleMixin, LoginRequiredMixin, FilterableListMixin, ListView):
     template_name = "feedback/feedback_list.html"
     title = "意见反馈"
     title_icon = "icon-[tabler--message-report]"
     paginate_by = 20
 
-    def get_queryset(self):
-        return filtered_feedbacks_for(
-            self.request.user,
-            category=self.request.GET.get("category", ""),
-            status=self.request.GET.get("status", ""),
-            query=self.request.GET.get("q", ""),
-            scope=self.request.GET.get("scope", ""),
-        )
+    search_fields = ("title", "content")
+    list_filter_specs = (
+        ListFilterSpec(
+            name="category",
+            label="反馈类型",
+            control="select",
+            lookup="category",
+            choices=FeedbackCategory.choices,
+            empty_label="全部类型",
+        ),
+        ListFilterSpec(
+            name="status",
+            label="状态",
+            control="select",
+            lookup="status",
+            choices=FeedbackStatus.choices,
+            empty_label="全部状态",
+        ),
+        ListFilterSpec(
+            name="scope",
+            label="查看范围",
+            control="select",
+            choices=(("my", "我提交的"),),
+            empty_label="全部可见反馈",
+        ),
+        ListFilterSpec(
+            name="q",
+            label="搜索",
+            control="search",
+            placeholder="搜索标题或正文",
+        ),
+    )
+    list_filter_target_id = "feedback-list"
 
-    def get_template_names(self):
-        if getattr(self.request, "htmx", False):
-            return ["feedback/fragments/feedback_list.html"]
-        return [self.template_name]
+    def get_base_queryset(self):
+        return visible_feedbacks_for(self.request.user)
+
+    def apply_custom_filters(self, queryset):
+        if self.request.GET.get("scope") == "my":
+            queryset = queryset.filter(author_id=self.request.user.pk)
+        return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(
+        context["page_actions"] = [
             {
-                "category_choices": FeedbackCategory.choices,
-                "status_choices": FeedbackStatus.choices,
-                "selected_category": self.request.GET.get("category", ""),
-                "selected_status": self.request.GET.get("status", ""),
-                "selected_query": self.request.GET.get("q", ""),
-                "selected_scope": self.request.GET.get("scope", ""),
-                "page_actions": [
-                    {
-                        "label": "提交反馈",
-                        "href": reverse("feedback:create"),
-                        "icon": "icon-[tabler--message-plus]",
-                        "variant_class": "btn btn-primary btn-soft btn-sm",
-                    }
-                ],
+                "label": "提交反馈",
+                "href": reverse("feedback:create"),
+                "icon": "icon-[tabler--message-plus]",
+                "variant_class": "btn btn-primary btn-soft btn-sm",
             }
-        )
+        ]
         return context
 
 

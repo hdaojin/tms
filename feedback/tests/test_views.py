@@ -1,6 +1,6 @@
 from django.urls import reverse
 
-from feedback.models import FeedbackStatus
+from feedback.models import FeedbackCategory, FeedbackStatus
 
 from .base import FeedbackTestCase
 
@@ -26,7 +26,7 @@ class FeedbackViewTests(FeedbackTestCase):
         feedback = self.author.feedbacks_created.get(title="新反馈")
         self.assertEqual(self.client.get(reverse("feedback:detail", args=[feedback.pk])).status_code, 200)
 
-    def test_list_renders_compact_auto_filter_toolbar(self):
+    def test_list_renders_shared_auto_filter_toolbar(self):
         self.client.force_login(self.author)
         response = self.client.get(
             reverse("feedback:list"),
@@ -40,7 +40,7 @@ class FeedbackViewTests(FeedbackTestCase):
                     "label": "提交反馈",
                     "href": reverse("feedback:create"),
                     "icon": "icon-[tabler--message-plus]",
-                    "variant_class": "btn-outline",
+                    "variant_class": "btn btn-primary btn-soft btn-sm",
                 }
             ],
         )
@@ -51,20 +51,41 @@ class FeedbackViewTests(FeedbackTestCase):
         )
         self.assertContains(
             response,
-            'hx-trigger="submit, change from:.feedback-filter-select, input changed delay:400ms '
-            'from:#feedback-search, search from:#feedback-search"',
+            'hx-trigger="submit, change from:.list-filter-select, input changed delay:400ms '
+            'from:.list-filter-search, search from:.list-filter-search"',
             html=False,
         )
-        self.assertContains(response, 'hx-indicator="#feedback-filter-indicator"', html=False)
+        self.assertNotContains(response, "hx-indicator=", html=False)
+        self.assertNotContains(response, "loading-spinner", html=False)
+        self.assertContains(response, 'class="list-filter-select select w-full md:select-sm"', html=False)
+        self.assertContains(response, 'class="list-filter-search input w-full md:input-sm"', html=False)
         self.assertContains(response, '<option value="bug" selected>', html=False)
         self.assertContains(response, '<option value="open" selected>', html=False)
         self.assertContains(response, '<option value="my" selected>', html=False)
-        self.assertEqual(response.context["selected_query"], "登录")
+        self.assertEqual(response.context["list_filters"]["q"], "登录")
         self.assertContains(response, 'value="登录"', html=False)
         self.assertContains(response, '<span class="sr-only">反馈类型</span>', html=False)
         self.assertContains(response, '<span class="sr-only">搜索</span>', html=False)
         self.assertContains(response, f'href="{reverse("feedback:list")}">重置</a>', html=False)
         self.assertNotContains(response, ">筛选</button>", html=False)
+
+    def test_list_filters_and_search_keep_existing_behavior(self):
+        mine = self.make_feedback(title="登录异常", category=FeedbackCategory.BUG)
+        others = self.make_feedback(author=self.other, title="登录异常（他人）", category=FeedbackCategory.BUG)
+        feature = self.make_feedback(title="功能建议", category=FeedbackCategory.FEATURE)
+        self.client.force_login(self.author)
+
+        response = self.client.get(
+            reverse("feedback:list"),
+            {"category": "bug", "status": "open", "scope": "my", "q": "登录"},
+        )
+        self.assertContains(response, mine.title)
+        self.assertNotContains(response, others.title)
+        self.assertNotContains(response, feature.title)
+
+        invalid_filter_response = self.client.get(reverse("feedback:list"), {"category": "not-a-category"})
+        self.assertContains(invalid_filter_response, mine.title)
+        self.assertContains(invalid_filter_response, feature.title)
 
     def test_private_feedback_returns_404_to_unauthorized_user(self):
         feedback = self.make_feedback(is_private=True, author=self.other)

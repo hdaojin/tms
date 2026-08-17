@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, TemplateView, UpdateView
 
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 from core.utils.mixins import TitleMixin
 
 from .forms import AttachmentAddForm, AttachmentMetadataFormSet, ForumPostTranslationForm, ForumTopicForm
@@ -80,7 +81,7 @@ class UnreadFeedView(FilterShortcutView):
     filter_name = "unread"
 
 
-class ForumTopicListView(TitleMixin, PermissionRequiredMixin, ListView):
+class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixin, ListView):
     template_name = "worldskills_forum/topic_list.html"
     context_object_name = "topics"
     paginate_by = 20
@@ -88,29 +89,106 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, ListView):
     title_icon = "icon-[tabler--message-circle]"
     permission_required = "worldskills_forum.view_forumtopic"
 
-    def get_queryset(self):
+    search_fields = (
+        "translated_title",
+        "original_title",
+        "summary",
+        "module__name",
+        "tags__name",
+        "category__name",
+        "posts__author_name",
+        "posts__original_content",
+        "posts__translation__translated_content",
+        "posts__attachments__original_filename",
+        "posts__attachments__caption_zh",
+    )
+    search_requires_distinct = True
+    always_distinct = True
+    list_filter_target_id = "forum-topic-list"
+
+    def get_list_filter_specs(self):
+        years = (
+            ForumTopic.objects.filter(posts__translation__isnull=False)
+            .values_list("competition_year", flat=True)
+            .distinct()
+            .order_by("-competition_year")
+        )
+        modules = ForumModule.objects.filter(is_active=True).values_list("pk", "name")
+        categories = ForumCategory.objects.filter(is_active=True).values_list("pk", "name")
+        tags = ForumTag.objects.values_list("pk", "name")
+        return (
+            ListFilterSpec(
+                name="year",
+                label="年份",
+                control="select",
+                lookup="competition_year",
+                choices=tuple((year, year) for year in years),
+                empty_label="全部年份",
+            ),
+            ListFilterSpec(
+                name="module",
+                label="模块",
+                control="select",
+                lookup="module_id",
+                choices=tuple(modules),
+                empty_label="全部模块",
+            ),
+            ListFilterSpec(
+                name="category",
+                label="分类",
+                control="select",
+                lookup="category_id",
+                choices=tuple(categories),
+                empty_label="全部分类",
+            ),
+            ListFilterSpec(
+                name="tag",
+                label="标签",
+                control="select",
+                lookup="tags__id",
+                choices=tuple(tags),
+                empty_label="全部标签",
+            ),
+            ListFilterSpec(
+                name="post_type",
+                label="信息类型",
+                control="select",
+                lookup="posts__post_type",
+                choices=PostType.choices,
+                empty_label="全部类型",
+            ),
+            ListFilterSpec(
+                name="status",
+                label="状态",
+                control="select",
+                lookup="status",
+                choices=TopicStatus.choices,
+                empty_label="全部状态",
+            ),
+            ListFilterSpec(
+                name="importance",
+                label="重要程度",
+                control="select",
+                lookup="importance",
+                choices=Importance.choices,
+                empty_label="全部程度",
+            ),
+            ListFilterSpec(
+                name="q",
+                label="搜索",
+                control="search",
+                placeholder="搜索中英文、作者、标签和附件名称",
+            ),
+        )
+
+    def get_base_queryset(self):
         queryset = get_topic_list_queryset()
         if not self.request.user.has_perm("worldskills_forum.change_all_forum_content"):
             queryset = queryset.filter(Q(post_count__gt=0) | Q(created_by=self.request.user))
-        q = self.request.GET.get("q", "").strip()
-        if q:
-            queryset = queryset.filter(
-                Q(translated_title__icontains=q) | Q(original_title__icontains=q) | Q(summary__icontains=q)
-                | Q(module__name__icontains=q) | Q(tags__name__icontains=q) | Q(category__name__icontains=q) | Q(posts__author_name__icontains=q)
-                | Q(posts__original_content__icontains=q) | Q(posts__translation__translated_content__icontains=q)
-                | Q(posts__attachments__original_filename__icontains=q) | Q(posts__attachments__caption_zh__icontains=q)
-            ).distinct()
-        mapping = {"year": "competition_year", "module": "module_id", "category": "category_id", "tag": "tags__id", "status": "status", "importance": "importance"}
-        for key, lookup in mapping.items():
-            value = self.request.GET.get(key)
-            if value:
-                queryset = queryset.filter(**{lookup: value})
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(_filter_context(self.request))
-        context["status_choices"] = TopicStatus.choices
         context["can_create"] = self.request.user.has_perm("worldskills_forum.add_forumtopic")
         return context
 

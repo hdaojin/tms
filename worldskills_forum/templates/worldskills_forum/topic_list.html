@@ -1,9 +1,16 @@
 {% extends "layouts/app.html" %}
+
+{% partialdef results %}
+  <div class="grid gap-4 lg:grid-cols-2">{% for topic in topics %}<article class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body"><div class="flex flex-wrap gap-2"><span class="badge badge-outline">{{ topic.competition_year }}</span><span class="badge badge-outline">{{ topic.module }}</span><span class="badge badge-outline">{{ topic.category }}</span><span class="badge badge-ghost">{{ topic.get_status_display }}</span>{% if topic.importance != 'normal' %}<span class="badge badge-warning">{{ topic.get_importance_display }}</span>{% endif %}</div><h2 class="card-title"><a class="link link-hover" href="{% url 'worldskills_forum:topic_detail' topic.pk %}">{{ topic.translated_title }}</a></h2><p class="text-sm text-base-content/60">{{ topic.original_title }}</p><p>{{ topic.summary|default:'暂无中文摘要'|truncatechars:180 }}</p><div class="flex flex-wrap gap-1">{% for tag in topic.tags.all %}<span class="badge badge-sm">{{ tag.name }}</span>{% endfor %}</div><div class="text-sm text-base-content/60">{{ topic.post_count }} 条信息{% if topic.latest_translation_at %} · 最近更新 {{ topic.latest_translation_at|date:'Y-m-d H:i' }}{% else %} · 待发布首条翻译{% endif %}</div></div></article>{% empty %}<div class="alert lg:col-span-2">暂无符合条件的主题。</div>{% endfor %}</div>
+  {% include "worldskills_forum/_pagination.html" %}
+{% endpartialdef results %}
+
 {% block content %}
 <div class="space-y-5">
   {% if can_create %}<div class="flex justify-end"><a class="btn btn-primary" href="{% url 'worldskills_forum:topic_create' %}"><span class="icon-[tabler--plus] size-5"></span>创建主题</a></div>{% endif %}
-  {% include "worldskills_forum/_filters.html" %}
-  <div class="grid gap-4 lg:grid-cols-2">{% for topic in topics %}<article class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body"><div class="flex flex-wrap gap-2"><span class="badge badge-outline">{{ topic.competition_year }}</span><span class="badge badge-outline">{{ topic.module }}</span><span class="badge badge-outline">{{ topic.category }}</span><span class="badge badge-ghost">{{ topic.get_status_display }}</span>{% if topic.importance != 'normal' %}<span class="badge badge-warning">{{ topic.get_importance_display }}</span>{% endif %}</div><h2 class="card-title"><a class="link link-hover" href="{% url 'worldskills_forum:topic_detail' topic.pk %}">{{ topic.translated_title }}</a></h2><p class="text-sm text-base-content/60">{{ topic.original_title }}</p><p>{{ topic.summary|default:'暂无中文摘要'|truncatechars:180 }}</p><div class="flex flex-wrap gap-1">{% for tag in topic.tags.all %}<span class="badge badge-sm">{{ tag.name }}</span>{% endfor %}</div><div class="text-sm text-base-content/60">{{ topic.post_count }} 条信息{% if topic.latest_translation_at %} · 最近更新 {{ topic.latest_translation_at|date:'Y-m-d H:i' }}{% else %} · 待发布首条翻译{% endif %}</div></div></article>{% empty %}<div class="alert lg:col-span-2">暂无符合条件的主题。</div>{% endfor %}</div>
-  {% include "worldskills_forum/_pagination.html" %}
+  {% include "components/list_filter_toolbar.html" %}
+  <div id="forum-topic-list">
+    {% partial results %}
+  </div>
 </div>
 {% endblock %}

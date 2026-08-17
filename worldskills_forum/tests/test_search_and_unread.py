@@ -19,6 +19,55 @@ class SearchAndUnreadTests(ForumTestCase):
         self.assertContains(self.client.get(reverse("worldskills_forum:feed"), {"q": "Network"}), "Network infrastructure")
         self.assertContains(self.client.get(reverse("worldskills_forum:feed"), {"q": "中文评分"}), "中文评分说明")
 
+    def test_topic_list_uses_shared_filtering_and_htmx_partial(self):
+        target = self.make_topic(
+            translated_title="筛选目标主题",
+            original_title="Filtering Target Topic",
+            source_url="https://forum.example.com/t/filter-target",
+        )
+        self.make_post(topic=target, source_url="https://forum.example.com/p/filter-target")
+        other = self.make_topic(
+            competition_year=2025,
+            translated_title="其他主题",
+            original_title="Other Topic",
+            source_url="https://forum.example.com/t/filter-other",
+        )
+        self.make_post(topic=other, source_url="https://forum.example.com/p/filter-other")
+        self.client.force_login(self.reader)
+
+        params = {"q": "目标", "year": "2026"}
+        response = self.client.get(reverse("worldskills_forum:topic_list"), params)
+        self.assertContains(response, target.translated_title)
+        self.assertNotContains(response, other.translated_title)
+        self.assertEqual(
+            [control["name"] for control in response.context["list_filter_controls"]],
+            ["year", "module", "category", "tag", "post_type", "status", "importance", "q"],
+        )
+        self.assertContains(
+            response,
+            'hx-trigger="submit, change from:.list-filter-select, input changed delay:400ms '
+            'from:.list-filter-search, search from:.list-filter-search"',
+            html=False,
+        )
+        self.assertNotContains(response, "hx-indicator=", html=False)
+        self.assertNotContains(response, "loading-spinner", html=False)
+        self.assertContains(response, 'class="list-filter-select select w-full md:select-sm"', html=False)
+        self.assertContains(response, 'class="list-filter-search input w-full md:input-sm"', html=False)
+        self.assertContains(response, '<option value="2026" selected>', html=False)
+        self.assertNotContains(response, ">筛选</button>", html=False)
+        self.assertContains(response, f'href="{reverse("worldskills_forum:topic_list")}">重置</a>', html=False)
+
+        htmx_response = self.client.get(
+            reverse("worldskills_forum:topic_list"),
+            params,
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertEqual(htmx_response.status_code, 200)
+        self.assertNotContains(htmx_response, "<!doctype html>", html=False)
+        self.assertNotContains(htmx_response, "全部年份")
+        self.assertContains(htmx_response, target.translated_title)
+        self.assertNotContains(htmx_response, other.translated_title)
+
     def test_unread_uses_translation_publish_time(self):
         viewed_at = timezone.now() - timedelta(days=1)
         post = self.make_post(posted_at=timezone.now() - timedelta(days=10), published_at=timezone.now())

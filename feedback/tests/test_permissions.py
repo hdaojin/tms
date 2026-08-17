@@ -1,10 +1,9 @@
-from feedback.models import FeedbackCategory
 from feedback.permissions import (
     can_view_feedback,
     get_feedback_author_label,
     get_reply_author_label,
 )
-from feedback.selectors import filtered_feedbacks_for, visible_feedbacks_for
+from feedback.selectors import visible_feedbacks_for
 
 from .base import FeedbackTestCase
 
@@ -26,13 +25,6 @@ class FeedbackPermissionAndSelectorTests(FeedbackTestCase):
     def test_identity_permission_does_not_grant_private_access(self):
         private = self.make_feedback(is_private=True)
         self.assertFalse(can_view_feedback(self.identity_viewer, private))
-
-    def test_search_and_filters_start_from_visible_scope(self):
-        self.make_feedback(title="公开 Bug")
-        self.make_feedback(title="私密 Bug", is_private=True, author=self.other)
-        queryset = filtered_feedbacks_for(self.author, category=FeedbackCategory.BUG, query="Bug")
-        self.assertEqual(queryset.count(), 1)
-        self.assertEqual(queryset.first().title, "公开 Bug")
 
     def test_anonymous_identity_and_reply_labels_are_separate(self):
         feedback = self.make_feedback(is_anonymous=True)

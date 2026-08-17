@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 
-from .models import Feedback, FeedbackAttachment, FeedbackCategory, FeedbackReply, FeedbackStatus
+from .models import Feedback, FeedbackAttachment, FeedbackReply
 from .permissions import can_view_private_feedback
 
 
@@ -22,20 +22,6 @@ def visible_feedbacks_for(user):
     )
     if not can_view_private_feedback(user):
         queryset = queryset.filter(Q(is_private=False) | Q(author_id=user.pk))
-    return queryset
-
-
-def filtered_feedbacks_for(user, *, category="", status="", query="", scope=""):
-    queryset = visible_feedbacks_for(user)
-    if category in {value for value, _label in FeedbackCategory.choices}:
-        queryset = queryset.filter(category=category)
-    if status in {value for value, _label in FeedbackStatus.choices}:
-        queryset = queryset.filter(status=status)
-    if scope == "my":
-        queryset = queryset.filter(author_id=user.pk)
-    query = (query or "").strip()
-    if query:
-        queryset = queryset.filter(Q(title__icontains=query) | Q(content__icontains=query))
     return queryset
 
 
