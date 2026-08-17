@@ -1,6 +1,6 @@
 {% comment %}
 通用列表筛选工具栏。
-筛选控件由后端 list_filter_controls 声明，模板统一负责布局、DaisyUI 样式、自动筛选、加载状态和重置。
+筛选控件由后端 list_filter_controls 声明，模板统一负责布局、DaisyUI 样式、自动筛选和重置。
 {% endcomment %}
 <form class="rounded-box border border-base-300 bg-base-100 p-3 shadow-sm"
       method="get"
@@ -9,7 +9,6 @@
       hx-trigger="{{ list_filter_trigger }}"
       hx-target="#{{ list_filter_target_id }}"
       hx-push-url="true"
-      hx-indicator="#{{ list_filter_indicator_id }}"
       hx-sync="this:replace">
   <div class="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
     {% for control in list_filter_controls %}
@@ -35,10 +34,6 @@
       {% endif %}
     {% endfor %}
     <div class="col-span-2 flex shrink-0 items-center justify-end gap-1 md:ml-auto">
-      <span id="{{ list_filter_indicator_id }}"
-            class="htmx-indicator loading loading-spinner loading-sm text-primary"
-            role="status"
-            aria-label="正在筛选"></span>
       <a class="btn btn-ghost px-3 md:btn-sm" href="{{ list_filter_url }}">重置</a>
     </div>
   </div>
