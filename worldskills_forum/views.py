@@ -28,7 +28,7 @@ FILTER_KEYS = ("q", "year", "module", "category", "tag", "post_type", "importanc
 def _filter_context(request):
     return {
         "filters": {key: request.GET.get(key, "") for key in FILTER_KEYS},
-        "years": ForumTopic.objects.filter(posts__translation__isnull=False).values_list("competition_year", flat=True).distinct().order_by("-competition_year"),
+        # "years": ForumTopic.objects.filter(posts__translation__isnull=False).values_list("competition_year", flat=True).distinct().order_by("-competition_year"),
         "modules": ForumModule.objects.filter(is_active=True),
         "categories": ForumCategory.objects.filter(is_active=True),
         "tags": ForumTag.objects.all(),
@@ -107,24 +107,24 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixi
     list_filter_target_id = "forum-topic-list"
 
     def get_list_filter_specs(self):
-        years = (
-            ForumTopic.objects.filter(posts__translation__isnull=False)
-            .values_list("competition_year", flat=True)
-            .distinct()
-            .order_by("-competition_year")
-        )
+        # years = (
+        #     ForumTopic.objects.filter(posts__translation__isnull=False)
+        #     .values_list("competition_year", flat=True)
+        #     .distinct()
+        #     .order_by("-competition_year")
+        # )
         modules = ForumModule.objects.filter(is_active=True).values_list("pk", "name")
         categories = ForumCategory.objects.filter(is_active=True).values_list("pk", "name")
         tags = ForumTag.objects.values_list("pk", "name")
         return (
-            ListFilterSpec(
-                name="year",
-                label="年份",
-                control="select",
-                lookup="competition_year",
-                choices=tuple((year, year) for year in years),
-                empty_label="全部年份",
-            ),
+            # ListFilterSpec(
+            #     name="year",
+            #     label="年份",
+            #     control="select",
+            #     lookup="competition_year",
+            #     choices=tuple((year, year) for year in years),
+            #     empty_label="全部年份",
+            # ),
             ListFilterSpec(
                 name="module",
                 label="模块",
