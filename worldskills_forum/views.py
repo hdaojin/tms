@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, ListView, TemplateView, UpdateView
 
-from core.utils.listing import FilterableListMixin
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 from core.utils.mixins import TitleMixin
 
 from .forms import AttachmentAddForm, AttachmentMetadataFormSet, ForumPostTranslationForm, ForumTopicForm
@@ -102,30 +102,84 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixi
         "posts__attachments__original_filename",
         "posts__attachments__caption_zh",
     )
-    filter_fields = {
-        "year": "competition_year",
-        "module": "module_id",
-        "category": "category_id",
-        "tag": "tags__id",
-        "post_type": "posts__post_type",
-        "status": "status",
-        "importance": "importance",
-    }
-    filter_choices = {
-        "post_type": PostType.choices,
-        "status": TopicStatus.choices,
-        "importance": Importance.choices,
-    }
     search_requires_distinct = True
     always_distinct = True
     list_filter_target_id = "forum-topic-list"
-    list_filter_indicator_id = "forum-topic-filter-indicator"
-    list_filter_controls_template = "worldskills_forum/topic_list.html#filter-controls"
-    list_filter_trigger = (
-        "submit, change from:.forum-topic-filter-select, input changed delay:400ms "
-        "from:#forum-topic-search, search from:#forum-topic-search"
-    )
-    list_filter_form_class = "card border border-base-300 bg-base-100 shadow-sm"
+
+    def get_list_filter_specs(self):
+        years = (
+            ForumTopic.objects.filter(posts__translation__isnull=False)
+            .values_list("competition_year", flat=True)
+            .distinct()
+            .order_by("-competition_year")
+        )
+        modules = ForumModule.objects.filter(is_active=True).values_list("pk", "name")
+        categories = ForumCategory.objects.filter(is_active=True).values_list("pk", "name")
+        tags = ForumTag.objects.values_list("pk", "name")
+        return (
+            ListFilterSpec(
+                name="year",
+                label="年份",
+                control="select",
+                lookup="competition_year",
+                choices=tuple((year, year) for year in years),
+                empty_label="全部年份",
+            ),
+            ListFilterSpec(
+                name="module",
+                label="模块",
+                control="select",
+                lookup="module_id",
+                choices=tuple(modules),
+                empty_label="全部模块",
+            ),
+            ListFilterSpec(
+                name="category",
+                label="分类",
+                control="select",
+                lookup="category_id",
+                choices=tuple(categories),
+                empty_label="全部分类",
+            ),
+            ListFilterSpec(
+                name="tag",
+                label="标签",
+                control="select",
+                lookup="tags__id",
+                choices=tuple(tags),
+                empty_label="全部标签",
+            ),
+            ListFilterSpec(
+                name="post_type",
+                label="信息类型",
+                control="select",
+                lookup="posts__post_type",
+                choices=PostType.choices,
+                empty_label="全部类型",
+            ),
+            ListFilterSpec(
+                name="status",
+                label="状态",
+                control="select",
+                lookup="status",
+                choices=TopicStatus.choices,
+                empty_label="全部状态",
+            ),
+            ListFilterSpec(
+                name="importance",
+                label="重要程度",
+                control="select",
+                lookup="importance",
+                choices=Importance.choices,
+                empty_label="全部程度",
+            ),
+            ListFilterSpec(
+                name="q",
+                label="搜索",
+                control="search",
+                placeholder="搜索中英文、作者、标签和附件名称",
+            ),
+        )
 
     def get_base_queryset(self):
         queryset = get_topic_list_queryset()
@@ -135,8 +189,6 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixi
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(_filter_context(self.request))
-        context["status_choices"] = TopicStatus.choices
         context["can_create"] = self.request.user.has_perm("worldskills_forum.add_forumtopic")
         return context
 
