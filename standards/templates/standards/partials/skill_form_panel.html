@@ -1,0 +1,84 @@
+<section
+  id="skill-create-panel"
+  class="space-y-5 p-4 sm:p-6"
+  data-skill-form-dirty="{% if skill_form.is_bound %}true{% else %}false{% endif %}"
+>
+  {% if create_success %}
+    <div class="alert alert-success" role="status">
+      <span
+        class="icon-[tabler--circle-check] size-5"
+        aria-hidden="true"
+      ></span>
+      <div class="flex flex-1 flex-wrap items-center justify-between gap-2">
+        <span
+          >{{ create_success }}{% if created_hidden_by_filters %}当前筛选条件未显示该技能。{% elif created_catalog_url %}该技能不在当前分页。{% endif %}</span
+        >
+        {% if created_catalog_url %}
+          <a class="btn btn-outline btn-sm" href="{{ created_catalog_url }}"
+            >{% if created_hidden_by_filters %}清除筛选并查看{% else %}前往所在分页{% endif %}</a
+          >
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  <form
+    method="post"
+    id="skill-create-form"
+    action=""
+    class="space-y-5"
+    hx-post=""
+    hx-target="#skill-create-panel"
+    hx-swap="outerHTML"
+    hx-sync="this:replace"
+  >
+    {% csrf_token %}
+    {% for hidden in skill_form.hidden_fields %}{{ hidden }}{% endfor %}
+    {% include "components/form_errors.html" with form=skill_form %}
+
+    <div class="grid gap-4">
+      {% include "components/field.html" with field=skill_form.name %}
+    </div>
+
+    <div id="skill-candidates">
+      {% include "standards/partials/skill_candidates.html" %}
+    </div>
+
+    <div class="space-y-4">
+      {% include "components/field.html" with field=skill_form.aliases_text %}
+      {% include "components/field.html" with field=skill_form.description %}
+    </div>
+
+    <details class="bg-base-50 collapse-arrow collapse border border-base-300">
+      <summary class="collapse-title font-medium">更多设置</summary>
+      <div class="collapse-content space-y-4">
+        <div id="skill-related-domains-field">
+          {% include "components/field.html" with field=skill_form.related_domains %}
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="min-w-0">
+            {% include "components/field.html" with field=skill_form.difficulty %}
+          </div>
+          <div class="min-w-0">
+            {% include "components/field.html" with field=skill_form.order %}
+          </div>
+        </div>
+
+        {% include "components/field.html" with field=skill_form.tags_text %}
+
+        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div class="min-w-0">
+            {% include "components/field.html" with field=skill_form.is_core %}
+          </div>
+          <div class="min-w-0">
+            {% include "components/field.html" with field=skill_form.is_assessable %}
+          </div>
+          <div class="min-w-0">
+            {% include "components/field.html" with field=skill_form.is_active %}
+          </div>
+        </div>
+      </div>
+    </details>
+  </form>
+</section>

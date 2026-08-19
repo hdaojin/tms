@@ -38,12 +38,12 @@ DEVELOPMENT_SECRET_KEY = 'django-insecure-development-only-key-do-not-use-in-pro
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # Local development should explicitly set DEBUG=True in .env.
-DEBUG = env.bool('DEBUG', default=False) # type: ignore
+DEBUG = env.bool('DEBUG', default=False)  # type: ignore
 
 SECRET_KEY = env(
     'SECRET_KEY',
     default=DEVELOPMENT_SECRET_KEY if DEBUG else '',
-) # type: ignore
+)  # type: ignore
 
 if not SECRET_KEY:
     raise ImproperlyConfigured('SECRET_KEY must be set when DEBUG=False.')
@@ -54,9 +54,9 @@ if not DEBUG and SECRET_KEY.startswith(('django-insecure-', 'ChangeMe', 'change-
 ALLOWED_HOSTS = env.list(
     'ALLOWED_HOSTS',
     default=['localhost', '127.0.0.1'] if DEBUG else [],
-) # type: ignore
+)  # type: ignore
 
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[]) # type: ignore
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])  # type: ignore
 
 # Application definition
 
@@ -79,12 +79,10 @@ INSTALLED_APPS = [
     'accounts',
     'samba',
     'standards.apps.StandardsConfig',
-    'archives.apps.ArchivesConfig',
-    'events.apps.EventsConfig',
+    'assessments.apps.AssessmentsConfig',
     'training.apps.TrainingConfig',
     'scoring.apps.ScoringConfig',
-    'examcontent.apps.ExamcontentConfig',
-    'knowledge.apps.KnowledgeConfig',
+    'evidence.apps.EvidenceConfig',
     'glossary.apps.GlossaryConfig',
     'worldskills_forum.apps.WorldskillsForumConfig',
     'feedback.apps.FeedbackConfig',
@@ -102,18 +100,17 @@ if DEBUG:
 SITE_ID = 1
 
 MIDDLEWARE = [
-    'django_htmx.middleware.HtmxMiddleware',     # django-htmx 中间件
+    'django_htmx.middleware.HtmxMiddleware',  # django-htmx 中间件
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    
-    'django.contrib.auth.middleware.LoginRequiredMiddleware',   # 启用将所有未认证请求重定向到登录页面
+    'django.contrib.auth.middleware.LoginRequiredMiddleware',  # 启用将所有未认证请求重定向到登录页面
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django.middleware.csp.ContentSecurityPolicyMiddleware',
-    'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',   # 启用 flatpages 中间件
+    'django.contrib.flatpages.middleware.FlatpageFallbackMiddleware',  # 启用 flatpages 中间件
 ]
 
 ROOT_URLCONF = 'tmsproject.urls'
@@ -130,7 +127,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'django.template.context_processors.csp',
-                'core.utils.context_processors.custom_context',     # 自定义上下文处理器
+                'core.utils.context_processors.custom_context',  # 自定义上下文处理器
             ],
         },
     },
@@ -151,7 +148,7 @@ WSGI_APPLICATION = 'tmsproject.wsgi.application'
 # }
 
 DATABASES = {
-    'default': env.db(default=f'sqlite:///{BASE_DIR}/db.sqlite3') # type: ignore
+    'default': env.db(default=f'sqlite:///{BASE_DIR}/db.sqlite3')  # type: ignore
 }
 
 

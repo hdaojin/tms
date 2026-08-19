@@ -1,4 +1,10 @@
 (function () {
+  let pendingSkillRowId = null;
+
+  document.body.addEventListener("skillAliasAdded", function (event) {
+    if (event.detail && event.detail.skillId)
+      pendingSkillRowId = `skill-row-${event.detail.skillId}`;
+  });
   function initThemeControls(root) {
     function syncThemeControls() {
       if (!window.tmsTheme) return;
@@ -156,6 +162,208 @@
     });
   }
 
+  function initSkillCreateDrawer(root) {
+    const dialogs = [];
+    if (root.matches && root.matches("[data-skill-create-dialog]"))
+      dialogs.push(root);
+    if (root.closest) {
+      const parentDialog = root.closest("[data-skill-create-dialog]");
+      if (parentDialog) dialogs.push(parentDialog);
+    }
+    if (root.querySelectorAll) {
+      root
+        .querySelectorAll("[data-skill-create-dialog]")
+        .forEach(function (dialog) {
+          dialogs.push(dialog);
+        });
+    }
+
+    function focusSkillName(dialog) {
+      window.requestAnimationFrame(function () {
+        const nameInput = dialog.querySelector("#id_name");
+        if (nameInput) nameInput.focus();
+      });
+    }
+
+    function openSkillDialog(dialog) {
+      if (!dialog.open) dialog.showModal();
+      document.body.classList.add("overflow-hidden");
+      focusSkillName(dialog);
+    }
+
+    function hideDiscardPrompt(dialog) {
+      const prompt = dialog.querySelector("[data-skill-discard-prompt]");
+      if (!prompt) return;
+      prompt.classList.add("hidden");
+      prompt.classList.remove("flex");
+      Array.from(prompt.parentElement.children).forEach(function (element) {
+        if (element !== prompt) element.inert = false;
+      });
+    }
+
+    function showDiscardPrompt(dialog) {
+      const prompt = dialog.querySelector("[data-skill-discard-prompt]");
+      if (!prompt) return;
+      Array.from(prompt.parentElement.children).forEach(function (element) {
+        if (element !== prompt) element.inert = true;
+      });
+      prompt.classList.remove("hidden");
+      prompt.classList.add("flex");
+      const cancelButton = prompt.querySelector("[data-skill-discard-cancel]");
+      if (cancelButton) cancelButton.focus();
+    }
+
+    function resetSkillForm(dialog, focusAfterReset) {
+      const resetButton = dialog.querySelector("[data-skill-form-reset]");
+      if (!resetButton) return;
+      resetButton.click();
+      dialog.dataset.focusAfterReset = focusAfterReset ? "true" : "false";
+    }
+
+    function scrollToPendingSkill() {
+      if (!pendingSkillRowId) return;
+      const element = document.getElementById(pendingSkillRowId);
+      if (!element) return;
+      pendingSkillRowId = null;
+      element.classList.add(
+        "bg-success/10",
+        "outline",
+        "outline-2",
+        "outline-success/40",
+        "scroll-mt-24",
+      );
+      window.requestAnimationFrame(function () {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    }
+
+    function closeSkillDialog(dialog) {
+      hideDiscardPrompt(dialog);
+      resetSkillForm(dialog, false);
+      dialog.dataset.dirty = "false";
+      dialog.close();
+    }
+
+    function requestSkillDialogClose(dialog) {
+      if (dialog.dataset.dirty === "true") {
+        showDiscardPrompt(dialog);
+        return;
+      }
+      closeSkillDialog(dialog);
+    }
+
+    dialogs.forEach(function (dialog) {
+      let replacedPanel = null;
+      if (root.matches && root.matches("#skill-create-panel"))
+        replacedPanel = root;
+      if (!replacedPanel && root.querySelector)
+        replacedPanel = root.querySelector("#skill-create-panel");
+      if (replacedPanel && dialog.contains(replacedPanel)) {
+        dialog.dataset.dirty = replacedPanel.dataset.skillFormDirty || "false";
+      }
+
+      if (dialog.dataset.skillDrawerBound === "true") {
+        if (dialog.dataset.focusAfterReset === "true") {
+          delete dialog.dataset.focusAfterReset;
+          focusSkillName(dialog);
+        }
+        return;
+      }
+      dialog.dataset.skillDrawerBound = "true";
+
+      dialog.addEventListener("input", function (event) {
+        if (event.target.closest("#skill-create-form"))
+          dialog.dataset.dirty = "true";
+      });
+      dialog.addEventListener("change", function (event) {
+        if (event.target.closest("#skill-create-form"))
+          dialog.dataset.dirty = "true";
+      });
+      dialog.addEventListener("cancel", function (event) {
+        event.preventDefault();
+        const prompt = dialog.querySelector("[data-skill-discard-prompt]");
+        if (prompt && !prompt.classList.contains("hidden")) {
+          hideDiscardPrompt(dialog);
+          focusSkillName(dialog);
+          return;
+        }
+        requestSkillDialogClose(dialog);
+      });
+      dialog.addEventListener("click", function (event) {
+        if (event.target === dialog) requestSkillDialogClose(dialog);
+      });
+      dialog.addEventListener("close", function () {
+        document.body.classList.remove("overflow-hidden");
+        scrollToPendingSkill();
+      });
+      dialog.addEventListener("click", function (event) {
+        if (event.target.closest("[data-skill-drawer-close]"))
+          requestSkillDialogClose(dialog);
+        if (event.target.closest("[data-skill-discard-cancel]")) {
+          hideDiscardPrompt(dialog);
+          focusSkillName(dialog);
+        }
+        if (event.target.closest("[data-skill-discard-confirm]"))
+          closeSkillDialog(dialog);
+        if (event.target.closest("[data-skill-form-reset]"))
+          dialog.dataset.focusAfterReset = "true";
+      });
+
+      if (dialog.dataset.skillAutoOpen === "true") {
+        openSkillDialog(dialog);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("focus");
+        window.history.replaceState(window.history.state, "", url);
+      }
+    });
+
+    if (root.querySelectorAll) {
+      root
+        .querySelectorAll(".js-skill-drawer-open")
+        .forEach(function (trigger) {
+          if (trigger.dataset.skillDrawerBound === "true") return;
+          trigger.dataset.skillDrawerBound = "true";
+          trigger.addEventListener("click", function (event) {
+            const dialog = document.querySelector("[data-skill-create-dialog]");
+            if (!dialog) return;
+            event.preventDefault();
+            openSkillDialog(dialog);
+          });
+        });
+    }
+  }
+
+  function initScrollAfterSwap(root) {
+    let element =
+      root.matches && root.matches("[data-scroll-after-swap]")
+        ? root
+        : root.querySelector && root.querySelector("[data-scroll-after-swap]");
+    if (!element && pendingSkillRowId) {
+      element = document.getElementById(pendingSkillRowId);
+      if (element) {
+        element.classList.add(
+          "bg-success/10",
+          "outline",
+          "outline-2",
+          "outline-success/40",
+          "scroll-mt-24",
+        );
+        pendingSkillRowId = null;
+      }
+    }
+    if (!element) return;
+    const openSkillDialog = document.querySelector(
+      "[data-skill-create-dialog][open]",
+    );
+    if (openSkillDialog) {
+      if (element.id) pendingSkillRowId = element.id;
+      return;
+    }
+    window.requestAnimationFrame(function () {
+      element.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
   function initAll(root) {
     initThemeControls(root);
     initModals(root);
@@ -165,6 +373,8 @@
     initClipboard(root);
     initConditionalGroups(root);
     initCountdown(root);
+    initSkillCreateDrawer(root);
+    initScrollAfterSwap(root);
   }
 
   document.addEventListener("DOMContentLoaded", function () {
@@ -172,5 +382,16 @@
   });
   document.body.addEventListener("htmx:afterSwap", function (event) {
     initAll(event.target);
+  });
+  document.body.addEventListener("skillCreated", function (event) {
+    const dialog = document.querySelector("[data-skill-create-dialog]");
+    if (!dialog) return;
+    dialog.dataset.dirty = "false";
+    if (event.detail && event.detail.skillId)
+      pendingSkillRowId = `skill-row-${event.detail.skillId}`;
+    window.requestAnimationFrame(function () {
+      const nameInput = dialog.querySelector("#id_name");
+      if (nameInput) nameInput.focus();
+    });
   });
 })();

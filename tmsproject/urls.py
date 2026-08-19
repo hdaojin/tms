@@ -51,12 +51,10 @@ urlpatterns = [
     path("behaviors/", include("behaviors.urls", namespace="behaviors")),
     path("countdown/", include("event_countdown.urls", namespace="event_countdown")),
     path("standards/", include("standards.urls", namespace="standards")),
-    path("archives/", include("archives.urls", namespace="archives")),
-    path("events/", include("events.urls", namespace="events")),
+    path("assessments/", include("assessments.urls", namespace="assessments")),
     path("training/", include("training.urls", namespace="training")),
     path("scoring/", include("scoring.urls", namespace="scoring")),
-    path("examcontent/", include("examcontent.urls", namespace="examcontent")),
-    path("knowledge/", include("knowledge.urls", namespace="knowledge")),
+    path("evidence/", include("evidence.urls", namespace="evidence")),
     path("glossary/", include("glossary.urls", namespace="glossary")),
     path("worldskills-forum/", include("worldskills_forum.urls", namespace="worldskills_forum")),
     path("feedback/", include("feedback.urls", namespace="feedback")),
@@ -70,7 +68,9 @@ if settings.DEBUG:
 
 # 在开发环境中添加静态文件和媒体文件的URL配置
 if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=getattr(settings, 'STATICFILES_DIRS', [settings.BASE_DIR / 'static'])[0])
+    urlpatterns += static(
+        settings.STATIC_URL, document_root=getattr(settings, 'STATICFILES_DIRS', [settings.BASE_DIR / 'static'])[0]
+    )
     urlpatterns += static(settings.MEDIA_URL, document_root=getattr(settings, 'MEDIA_ROOT', None))
 
 # # Flatpages 全局兜底（不要 pages 前缀）：必须放在最后，避免吞掉其它路由与静态路由

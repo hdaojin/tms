@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 
 from core.uploads import GLOSSARY_WORKBOOK_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
+from standards.forms import DefaultSkillProjectFormMixin
 from standards.models import SkillProject
 
 from .models import GlossaryEntry, GlossaryEntryProposal, ProfessionalGlossary, StudySession
@@ -37,7 +38,7 @@ class AliasFieldsMixin:
         return instance
 
 
-class ProfessionalGlossaryForm(StyledFormMixin, forms.ModelForm):
+class ProfessionalGlossaryForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
     class Meta:
         model = ProfessionalGlossary
         fields = ["skill_project", "name", "description", "is_active"]

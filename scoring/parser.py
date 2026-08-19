@@ -197,7 +197,12 @@ def _build_raw_snapshot(formula_sheet, value_sheet) -> dict[str, Any]:
                 }
             )
         rows.append({"row_number": formula_row[0].row, "cells": cells})
-    return {"sheet_name": formula_sheet.title, "max_row": formula_sheet.max_row, "max_column": formula_sheet.max_column, "rows": rows}
+    return {
+        "sheet_name": formula_sheet.title,
+        "max_row": formula_sheet.max_row,
+        "max_column": formula_sheet.max_column,
+        "rows": rows,
+    }
 
 
 def _cell(row: dict[str, Any], column_index: int) -> dict[str, Any]:
@@ -508,9 +513,7 @@ def parse_marking_workbook(file_or_path, *, expected_module_code: str = "") -> P
                     "calculation_row",
                     "max_mark",
                 }
-                errors.extend(
-                    _row_unexpected_errors(row, detail_mapping, allowed, EXPECTED_DETAIL_HEADERS, "评分点行")
-                )
+                errors.extend(_row_unexpected_errors(row, detail_mapping, allowed, EXPECTED_DETAIL_HEADERS, "评分点行"))
                 description = _field_text(row, detail_mapping, "description")
                 command = _field_text(row, detail_mapping, "extra_description")
                 requirement = _field_text(row, detail_mapping, "requirement")
@@ -677,5 +680,3 @@ def calculate_file_sha256(file_obj: BinaryIO) -> str:
         except (AttributeError, OSError):
             pass
     return digest.hexdigest()
-
-

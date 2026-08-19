@@ -21,15 +21,20 @@ TMS 是基于 Django 6 / Python 3.13 的单体应用。主要前端与交互技�
 当前 APP 按职责大致分为：
 
 - 平台基础：`core`、`accounts`、`samba`。
-- 领域主链路：`standards`、`events`、`archives`、`training`、`examcontent`、`scoring`、`knowledge`。
+- 领域主链路：`standards`、`assessments`、`scoring`、`evidence`、`training`。
 - 业务扩展：`glossary`、`worldskills_forum`、`feedback`、`notes`、`meetings`、`notices`、`behaviors`、`event_countdown`。
 - `demo` 仅在 `DEBUG=True` 时加载。
 
 领域主链路应保持为：
 
-`技能项目/标准技能树 -> 赛事或考核 -> 试题/评分方案 -> 考点证据 -> 技能点映射 -> 评分结果 -> 训练分析与反馈`
+`技术领域/WSOS -> 稳定 Skill -> Assessment/Evidence/TrainingTask -> ScoringResult/TaskExecution -> Skill 分析 -> 教练人工调整`
 
 具体业务术语和不变量以 `CONTEXT.md` 为准。不要重新引入已经被替换的旧 APP/旧术语（例如旧 `assessments`、`competitions`、`skills`、`traininglogs` 链路）。
+
+- `Skill` 是跨技能树版本稳定的业务本体；`SkillTreeNode` 只负责版本内组织，不把历史 Evidence、TrainingTask 或评分结果绑定到易变节点。
+- `TechnicalDomain` 是训练组织和权限范围轴；跨领域 AssessmentModule/TrainingTask 必须通过显式教练分配授权整体编辑。
+- 技能历史考查只统计已批准 Evidence 与已批准映射，技能表现从真实评分结果按当前映射动态反推；训练完成不命名为 mastery。
+- 系统不自动生成或调整训练计划，分析结果只支持教练人工决策。
 
 ## 任务规模与最小修改原则
 
@@ -88,7 +93,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - 对树、递归关系和统计汇总特别关注 N+1 与重复遍历；不要为了代码简短在循环中递归发查询。
 - 统计口径必须复用统一 selector，而不是在多个页面分别重写。
 
-`knowledge/selectors.py` 可作为读取层拆分的参考，但新增统计仍需检查查询复杂度。
+`standards/selectors.py` 中的技能闭环统计可作为读取层拆分的参考，但新增统计仍需检查查询复杂度。
 
 ### Forms / Views / Templates
 
@@ -113,7 +118,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - 共享上传限制、扩展名、路径和存储规则集中在 `core/constants.py` 与 `core/uploads.py`；不要在各 APP 重写一套临时 validator/storage。
 - 前端文件上传统一复用 `templates/components/file_upload.html`；FilePond v5 作为通用上传组件的底层实现细节，业务 APP 不直接初始化或依赖其 API。服务端 `MultipleFileField` / `UploadSpec` 仍是上传校验的最终事实来源。详细约定见 `docs/developer/file-upload.md` 与 ADR 0004。
 - 私有或敏感文件使用 `PrivateMediaStorage` / `settings.PRIVATE_MEDIA_ROOT`，必须经过有权限检查的 Django view 提供，不得由 Web 服务器直接暴露。
-- 领域主链路中的原始试题、评分表、结果包、训练资料等应优先登记为 `ArchiveAsset`，业务对象保存结构化关系，不重复保存另一份“文件主记录”。
+- 业务文件必须由其业务 APP 拥有；跨 APP 统一的是 storage、upload、validation、cleanup 等技术能力，不建立全局泛型文件资产模型。
 - 多文件表单复用 `core.forms.fields.MultipleFileField` / `MultipleFileInput`。
 - 文件模型按项目既有机制注册清理 signal；删除/替换行为必须有测试。
 - `GenericForeignKey` 不能提供数据库外键完整性；新增泛型绑定时必须明确允许的目标类型，并在 service/model 校验业务归属一致性。

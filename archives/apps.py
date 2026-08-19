@@ -1,7 +1,0 @@
-from django.apps import AppConfig
-
-
-class ArchivesConfig(AppConfig):
-    default_auto_field = "django.db.models.BigAutoField"
-    name = 'archives'
-    verbose_name = "资料资产"

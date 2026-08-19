@@ -1,70 +1,52 @@
-from calendar import monthrange
-from datetime import date, timedelta
-
+from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.http import HttpResponse
+from pathlib import Path
+
+from django.http import FileResponse, HttpResponse
 from django.urls import reverse
-from django.utils import timezone
-from django.views.generic import CreateView, DetailView, TemplateView, UpdateView
+from django.views.generic import CreateView, DetailView, FormView, UpdateView
 from django_tables2 import SingleTableView
 
-from core.permissions import get_users_with_explicit_permission
 from core.utils.mixins import TitleMixin
 
-from .forms import TrainingCycleForm, TrainingLogForm, TrainingLogUpdateForm
-from .models import TrainingCycle, TrainingLog
-from .services import build_training_log_archive, create_training_log_asset
-from .selectors import training_logs_changeable_by, training_logs_visible_to
-from .tables import TrainingCycleTable, TrainingLogTable
+from .forms import (
+    CoachFeedbackForm,
+    TaskExecutionForm,
+    TrainingCycleForm,
+    TrainingLogForm,
+    TrainingPlanForm,
+    TrainingTaskForm,
+)
+from .models import TaskExecution, TrainingCycle, TrainingLog, TrainingPlan, TrainingTask
+from .selectors import (
+    manageable_training_tasks_for,
+    training_logs_changeable_by,
+    training_logs_visible_to,
+    visible_task_executions_for,
+    visible_training_tasks_for,
+)
+from .services import build_training_log_archive, record_coach_feedback, update_execution_facts
+from .tables import TaskExecutionTable, TrainingCycleTable, TrainingLogTable, TrainingPlanTable, TrainingTaskTable
 
 
-class MonthFilterMixin:
-    month_option_count = 12
-
-    def _get_selected_year_month(self):
-        today = timezone.localdate()
-        try:
-            year = int(self.request.GET.get("year") or today.year)
-        except (TypeError, ValueError):
-            year = today.year
-        try:
-            month = int(self.request.GET.get("month") or today.month)
-        except (TypeError, ValueError):
-            month = today.month
-        if month < 1 or month > 12:
-            month = today.month
-        return year, month
-
-    def _get_selected_month_range(self):
-        year, month = self._get_selected_year_month()
-        return date(year, month, 1), date(year, month, monthrange(year, month)[1])
-
-    def _get_recent_months(self):
-        today = timezone.localdate()
-        year, month = today.year, today.month
-        months = []
-        for _ in range(self.month_option_count):
-            months.append({"year": year, "month": month, "name": f"{year}年{month:02d}月"})
-            month -= 1
-            if month == 0:
-                month = 12
-                year -= 1
-        return months
+class ListPageMixin:
+    template_name = "training/object_list.html"
+    create_url_name = None
+    create_label = "新增"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        year, month = self._get_selected_year_month()
-        context.update({"months": self._get_recent_months(), "selected_year": year, "selected_month": month})
+        context.update(create_url_name=self.create_url_name, create_label=self.create_label)
         return context
 
 
-class TrainingCycleListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
+class TrainingCycleListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = TrainingCycle
     table_class = TrainingCycleTable
-    template_name = "training/cycle_list.html"
     title = "训练周期"
-    title_icon = "icon-[tabler--calendar-time]"
     permission_required = "training.view_trainingcycle"
+    create_url_name = "training:cycle_create"
+    create_label = "新增训练周期"
 
 
 class TrainingCycleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -72,7 +54,6 @@ class TrainingCycleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     template_name = "training/cycle_detail.html"
     context_object_name = "cycle"
     title = "{name}"
-    title_icon = "icon-[tabler--calendar-time]"
     permission_required = "training.view_trainingcycle"
 
 
@@ -80,40 +61,207 @@ class TrainingCycleCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingCycle
     form_class = TrainingCycleForm
     template_name = "common/form.html"
-    permission_required = "training.add_trainingcycle"
+    extra_context = {"grid_class": "grid gap-4 md:grid-cols-2"}
     title = "新增训练周期"
-    title_icon = "icon-[tabler--plus]"
+    permission_required = "training.add_trainingcycle"
 
     def get_success_url(self):
         return reverse("training:cycle_detail", args=[self.object.pk])
 
 
-class TrainingCycleUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
-    model = TrainingCycle
-    form_class = TrainingCycleForm
-    template_name = "common/form.html"
-    permission_required = "training.change_trainingcycle"
+class TrainingCycleUpdateView(TrainingCycleCreateView, UpdateView):
     title = "编辑训练周期"
-    title_icon = "icon-[tabler--edit]"
+    permission_required = "training.change_trainingcycle"
+
+
+class TrainingPlanListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
+    model = TrainingPlan
+    table_class = TrainingPlanTable
+    title = "训练计划"
+    permission_required = "training.view_trainingplan"
+    create_url_name = "training:plan_create"
+    create_label = "新增训练计划"
+
+
+class TrainingPlanDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
+    model = TrainingPlan
+    template_name = "training/plan_detail.html"
+    context_object_name = "plan"
+    title = "{title}"
+    permission_required = "training.view_trainingplan"
+
+
+class TrainingPlanCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
+    model = TrainingPlan
+    form_class = TrainingPlanForm
+    template_name = "common/form.html"
+    extra_context = {"grid_class": "grid gap-4 md:grid-cols-2"}
+    title = "新增训练计划"
+    permission_required = "training.add_trainingplan"
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse("training:cycle_detail", args=[self.object.pk])
+        return reverse("training:plan_detail", args=[self.object.pk])
 
 
-class TrainingLogListView(MonthFilterMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
-    model = TrainingLog
-    table_class = TrainingLogTable
-    template_name = "training/log_list.html"
-    title = "训练日志"
-    title_icon = "icon-[tabler--file-text]"
-    permission_required = "training.view_traininglog"
+class TrainingPlanUpdateView(TrainingPlanCreateView, UpdateView):
+    title = "编辑训练计划"
+    permission_required = "training.change_trainingplan"
+
+
+class TrainingTaskListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
+    model = TrainingTask
+    table_class = TrainingTaskTable
+    title = "训练任务"
+    permission_required = "training.view_trainingtask"
+    create_url_name = "training:task_create"
+    create_label = "新增训练任务"
 
     def get_queryset(self):
-        start, end = self._get_selected_month_range()
-        qs = super().get_queryset().select_related("training_cycle", "capability_domain", "uploaded_by")
-        return training_logs_visible_to(self.request.user, qs).filter(
-            training_date__range=(start, end)
+        return visible_training_tasks_for(self.request.user).select_related(
+            "training_plan", "training_plan__training_cycle"
         )
+
+
+class MyTrainingView(TrainingTaskListView):
+    title = "我的训练"
+    create_url_name = None
+
+    def get_queryset(self):
+        return (
+            TrainingTask.objects.filter(executions__user=self.request.user).select_related("training_plan").distinct()
+        )
+
+
+class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
+    model = TrainingTask
+    template_name = "training/task_detail.html"
+    context_object_name = "task"
+    title = "{title}"
+    permission_required = "training.view_trainingtask"
+
+    def get_queryset(self):
+        return visible_training_tasks_for(self.request.user).prefetch_related(
+            "domain_links__technical_domain",
+            "skill_links__skill",
+            "coach_links__user",
+            "executions__user",
+            "attachments",
+        )
+
+
+class TrainingTaskCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
+    model = TrainingTask
+    form_class = TrainingTaskForm
+    template_name = "common/form.html"
+    title = "新增训练任务"
+    permission_required = "training.add_trainingtask"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if skill_id := self.request.GET.get("skill"):
+            from standards.models import Skill
+
+            skill = Skill.objects.filter(pk=skill_id, is_active=True).first()
+            if skill:
+                initial.update(
+                    skills=[skill],
+                    primary_skill=skill,
+                    domains=[skill.primary_domain],
+                    primary_domain=skill.primary_domain,
+                )
+        return initial
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse("training:task_detail", args=[self.object.pk])
+
+
+class TrainingTaskUpdateView(TrainingTaskCreateView, UpdateView):
+    title = "编辑训练任务"
+    permission_required = "training.change_trainingtask"
+
+    def get_queryset(self):
+        return manageable_training_tasks_for(self.request.user)
+
+
+class TaskExecutionListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
+    model = TaskExecution
+    table_class = TaskExecutionTable
+    title = "任务执行"
+    permission_required = "training.view_taskexecution"
+    create_url_name = None
+
+    def get_queryset(self):
+        return visible_task_executions_for(self.request.user).select_related("training_task", "user")
+
+
+class TaskExecutionDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
+    model = TaskExecution
+    template_name = "training/execution_detail.html"
+    context_object_name = "execution"
+    title = "任务执行详情"
+    permission_required = "training.view_taskexecution"
+
+    def get_queryset(self):
+        return visible_task_executions_for(self.request.user)
+
+
+class TaskExecutionUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
+    model = TaskExecution
+    form_class = TaskExecutionForm
+    template_name = "common/form.html"
+    title = "更新任务执行"
+    permission_required = "training.change_taskexecution"
+
+    def get_queryset(self):
+        return TaskExecution.objects.filter(user=self.request.user)
+
+    def form_valid(self, form):
+        self.object = update_execution_facts(self.get_object(), user=self.request.user, **form.cleaned_data)
+        return HttpResponse(status=302, headers={"Location": self.get_success_url()})
+
+    def get_success_url(self):
+        return reverse("training:execution_detail", args=[self.object.pk])
+
+
+class CoachFeedbackView(TitleMixin, PermissionRequiredMixin, FormView):
+    form_class = CoachFeedbackForm
+    template_name = "common/form.html"
+    title = "填写教练反馈"
+    permission_required = "training.change_taskexecution"
+
+    def form_valid(self, form):
+        execution = visible_task_executions_for(self.request.user).get(pk=self.kwargs["pk"])
+        record_coach_feedback(execution, user=self.request.user, feedback=form.cleaned_data["coach_feedback"])
+        messages.success(self.request, "教练反馈已保存。")
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse("training:execution_detail", args=[self.kwargs["pk"]])
+
+
+class TrainingLogListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
+    model = TrainingLog
+    table_class = TrainingLogTable
+    title = "训练日志"
+    permission_required = "training.view_traininglog"
+    create_url_name = "training:log_create"
+    create_label = "新增训练日志"
+
+    def get_queryset(self):
+        return training_logs_visible_to(self.request.user).select_related("training_cycle", "author")
 
 
 class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -121,104 +269,60 @@ class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     template_name = "training/log_detail.html"
     context_object_name = "log"
     title = "{topic}"
-    title_icon = "icon-[tabler--file-text]"
     permission_required = "training.view_traininglog"
 
     def get_queryset(self):
-        return training_logs_visible_to(
-            self.request.user,
-            super().get_queryset().select_related("training_cycle", "capability_domain", "uploaded_by"),
-        )
+        return training_logs_visible_to(self.request.user)
 
 
 class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingLog
     form_class = TrainingLogForm
     template_name = "common/form.html"
+    title = "新增训练日志"
     permission_required = "training.add_traininglog"
-    title = "上传训练日志"
-    title_icon = "icon-[tabler--upload]"
 
-    def form_valid(self, form):
-        form.instance.uploaded_by = self.request.user
-        response = super().form_valid(form)
-        create_training_log_asset(self.object, form.cleaned_data["file"], user=self.request.user)
-        return response
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["author"] = self.request.user
+        return kwargs
 
     def get_success_url(self):
         return reverse("training:log_detail", args=[self.object.pk])
 
 
-class TrainingLogUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
-    model = TrainingLog
-    form_class = TrainingLogUpdateForm
-    template_name = "common/form.html"
-    permission_required = "training.change_traininglog"
+class TrainingLogUpdateView(TrainingLogCreateView, UpdateView):
     title = "编辑训练日志"
-    title_icon = "icon-[tabler--edit]"
+    permission_required = "training.change_traininglog"
 
     def get_queryset(self):
-        return training_logs_changeable_by(self.request.user, super().get_queryset())
-
-    def get_success_url(self):
-        return reverse("training:log_detail", args=[self.object.pk])
+        return training_logs_changeable_by(self.request.user)
 
 
-class TrainingLogMonthlyStatView(MonthFilterMixin, TitleMixin, PermissionRequiredMixin, TemplateView):
-    template_name = "training/monthly_stats.html"
-    title = "训练日志提交统计"
-    title_icon = "icon-[tabler--chart-bar]"
-    permission_required = "training.view_traininglog_statistics"
+class TrainingLogDownloadView(PermissionRequiredMixin, DetailView):
+    model = TrainingLog
+    permission_required = "training.view_traininglog"
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        start, end = self._get_selected_month_range()
-        today = timezone.localdate()
-        if start.year == today.year and start.month == today.month:
-            end = min(end, today)
-        submitters = get_users_with_explicit_permission(
-            "training.add_traininglog"
-        ).filter(is_active=True)
-        user_names = {u.id: u.display_name for u in submitters}
-        user_ids = set(user_names)
-        rows = TrainingLog.objects.filter(training_date__range=(start, end), uploaded_by_id__in=user_ids).values_list(
-            "training_date", "uploaded_by_id"
+    def get_queryset(self):
+        return training_logs_visible_to(self.request.user).exclude(document="")
+
+    def get(self, request, *args, **kwargs):
+        log = self.get_object()
+        response = FileResponse(
+            log.document.open("rb"),
+            as_attachment=True,
+            filename=Path(log.document.name).name,
         )
-        by_day = {}
-        for day, user_id in rows:
-            by_day.setdefault(day, set()).add(user_id)
-        data = []
-        cur = start
-        while cur <= end:
-            submitted = by_day.get(cur, set())
-            data.append(
-                {
-                    "date": cur,
-                    "submitted_users": " ".join(sorted(user_names[uid] for uid in submitted if uid in user_names)) or "无",
-                    "unsubmitted_users": " ".join(sorted(name for uid, name in user_names.items() if uid not in submitted)) or "全部提交",
-                }
-            )
-            cur += timedelta(days=1)
-        context["rows"] = data
-        return context
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cache-Control"] = "private, no-store"
+        return response
 
 
-class TrainingLogArchiveExportView(MonthFilterMixin, PermissionRequiredMixin, TemplateView):
+class TrainingLogArchiveExportView(PermissionRequiredMixin, SingleTableView):
     permission_required = "training.export_traininglog_archive"
 
     def get(self, request, *args, **kwargs):
-        start, end = self._get_selected_month_range()
-        qs = training_logs_visible_to(
-            request.user,
-            TrainingLog.objects.filter(training_date__range=(start, end)),
-        )
-        cycle_id = request.GET.get("cycle")
-        if cycle_id:
-            qs = qs.filter(training_cycle_id=cycle_id)
-        data = build_training_log_archive(qs)
-        filename = f"training-logs-{start:%Y-%m}.zip"
-        response = HttpResponse(data, content_type="application/zip")
-        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        payload = build_training_log_archive(training_logs_visible_to(request.user))
+        response = HttpResponse(payload, content_type="application/zip")
+        response["Content-Disposition"] = 'attachment; filename="training-logs.zip"'
         return response
-
-# Create your views here.

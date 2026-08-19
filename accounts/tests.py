@@ -696,7 +696,7 @@ class PermissionHardCutoverMigrationTests(TestCase):
 			content_type__app_label='auth', codename='view_group'
 		)
 		sync_group_permission_assignments(group, ['meetings.view_meetings'], [extra])
-		sync_user_permission_assignments(user, ['training.submit_logs'], [extra])
+		sync_user_permission_assignments(user, ['training.competitor'], [extra])
 		training_log_type = ContentType.objects.get(
 			app_label='training', model='traininglog'
 		)
@@ -721,3 +721,25 @@ class PermissionHardCutoverMigrationTests(TestCase):
 		self.assertFalse(group.profile.explicit_permissions.exists())
 		self.assertFalse(user.profile.explicit_permissions.exists())
 		self.assertFalse(Permission.objects.filter(pk=obsolete.pk).exists())
+
+
+class RetiredTrainingMainlineBundleMigrationTests(TestCase):
+	def test_cleanup_removes_only_retired_bundle_codes(self):
+		group = Group.objects.create(name='保留其他权限包')
+		profile = GroupProfile.objects.create(group=group)
+		profile.selected_permission_bundles = [
+			'training.submit_logs',
+			'meetings.view_meetings',
+		]
+		profile.save(update_fields=['selected_permission_bundles'])
+
+		migration = import_module(
+			'accounts.migrations.0022_remove_retired_training_mainline_bundle_codes'
+		)
+		migration.remove_retired_bundle_codes(django_apps, None)
+
+		group.profile.refresh_from_db()
+		self.assertEqual(
+			group.profile.selected_permission_bundles,
+			['meetings.view_meetings'],
+		)

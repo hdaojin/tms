@@ -1,0 +1,13 @@
+{% if created_catalog_url %}
+  <div class="alert alert-success shadow-sm" role="status">
+    <span class="icon-[tabler--circle-check] size-5" aria-hidden="true"></span>
+    <div class="flex flex-1 flex-wrap items-center justify-between gap-2">
+      <span
+        >{{ create_success }}{% if created_hidden_by_filters %}当前筛选条件未显示该技能。{% else %}该技能不在当前分页。{% endif %}</span
+      >
+      <a class="btn btn-outline btn-sm" href="{{ created_catalog_url }}">
+        {% if created_hidden_by_filters %}清除筛选并查看{% else %}前往所在分页{% endif %}
+      </a>
+    </div>
+  </div>
+{% endif %}

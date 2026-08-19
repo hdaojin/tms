@@ -1,0 +1,9 @@
+{% if alias_error %}
+  <div class="alert alert-error text-sm"><span>{{ alias_error }}</span></div>
+{% elif alias_added %}
+  <div class="alert alert-success text-sm">
+    <span>已将“{{ term }}”登记为 {{ skill.display_code }} · {{ skill.name }} 的别名，未创建重复技能。</span>
+  </div>
+{% else %}
+  <div class="alert alert-info text-sm"><span>该称谓已经属于此技能，无需重复登记。</span></div>
+{% endif %}
