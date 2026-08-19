@@ -1,0 +1,86 @@
+{% if can_add_skill %}
+  <dialog
+    id="skill-create-dialog"
+    class="tms-side-dialog"
+    data-skill-create-dialog
+    {% if focus_create %}data-skill-auto-open="true"{% endif %}
+    aria-labelledby="skill-create-title"
+  >
+    <section class="tms-side-dialog-panel relative flex min-h-0 flex-col">
+      <header
+        class="flex shrink-0 items-start justify-between gap-4 border-b border-base-300 px-4 py-4 sm:px-6"
+      >
+        <div>
+          <h2 id="skill-create-title" class="text-xl font-bold">新增技能</h2>
+          <p class="mt-1 text-sm text-base-content/60">
+            {{ project.name }} · {{ domain.name }}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="btn btn-square btn-ghost btn-sm"
+          data-skill-drawer-close
+          aria-label="关闭新增技能"
+        >
+          <span class="icon-[tabler--x] size-5" aria-hidden="true"></span>
+        </button>
+      </header>
+
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        {% include "standards/partials/skill_form_panel.html" %}
+      </div>
+
+      <footer
+        class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-base-300 bg-base-100 px-4 py-3 sm:px-6"
+      >
+        <button
+          type="button"
+          class="btn btn-ghost"
+          hx-get="{% url 'standards:skill_form_reset' project.pk domain.pk %}"
+          hx-target="#skill-create-panel"
+          hx-swap="outerHTML"
+          data-skill-form-reset
+        >
+          重置
+        </button>
+        <button type="submit" class="btn btn-primary" form="skill-create-form">
+          <span class="icon-[tabler--plus] size-4" aria-hidden="true"></span>
+          新增技能
+        </button>
+      </footer>
+
+      <div
+        class="absolute inset-0 z-20 hidden items-center justify-center bg-base-300/70 p-4"
+        data-skill-discard-prompt
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="skill-discard-title"
+      >
+        <div class="w-full max-w-sm rounded-box bg-base-100 p-6 shadow-2xl">
+          <h3 id="skill-discard-title" class="text-lg font-bold">
+            放弃未提交的内容？
+          </h3>
+          <p class="mt-2 text-sm text-base-content/70">
+            当前技能尚未提交，关闭后将清空本条录入内容。
+          </p>
+          <div class="mt-6 flex flex-wrap justify-end gap-3">
+            <button
+              type="button"
+              class="btn btn-ghost"
+              data-skill-discard-cancel
+            >
+              继续编辑
+            </button>
+            <button
+              type="button"
+              class="btn btn-error"
+              data-skill-discard-confirm
+            >
+              放弃并关闭
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </dialog>
+{% endif %}

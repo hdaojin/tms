@@ -27,7 +27,9 @@
       </aside>
 
       <main class="tms-page min-w-0 flex-1">
-        <div class="tms-container space-y-4 py-4">
+        <div
+          class="tms-container {% block container_class %}{% endblock %} space-y-4 py-4"
+        >
           {% block breadcrumbs %}
             {% include "partials/breadcrumbs.html" %}
           {% endblock %}

@@ -1,0 +1,1 @@
+{% extends "common/table_page.html" %}{% block content %}<div class="mb-3 flex justify-end">{% if perms.evidence.add_knowledgeevidence %}<a class="btn btn-primary btn-sm" href="{% url 'evidence:evidence_create' %}">新增考点证据</a>{% endif %}</div>{{ block.super }}{% endblock %}

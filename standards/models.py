@@ -3,7 +3,7 @@ from __future__ import annotations
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 
 
@@ -16,6 +16,11 @@ class SkillProject(models.Model):
     description = models.TextField("描述", blank=True)
     order = models.PositiveIntegerField("排序", default=0)
     is_active = models.BooleanField("启用", default=True)
+    is_default = models.BooleanField(
+        "默认项目",
+        default=False,
+        help_text="新建业务对象时优先选择此技能项目；全系统最多只能设置一个默认项目。",
+    )
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
@@ -23,19 +28,43 @@ class SkillProject(models.Model):
         verbose_name = "技能项目"
         verbose_name_plural = "技能项目"
         ordering = ["order", "code", "name"]
+        permissions = [("manage_all_technical_domains", "管理全部训练主线技术领域")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["is_default"],
+                condition=Q(is_default=True),
+                name="uniq_default_skill_project",
+            ),
+            models.CheckConstraint(
+                condition=Q(is_default=False) | Q(is_active=True),
+                name="default_skill_project_must_be_active",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.is_default and not self.is_active:
+            raise ValidationError({"is_default": "默认技能项目必须处于启用状态。"})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        update_fields = kwargs.get("update_fields")
+        should_switch_default = self.is_default and (
+            not self.pk or update_fields is None or "is_default" in update_fields
+        )
+        with transaction.atomic():
+            if should_switch_default:
+                list(type(self).objects.select_for_update().order_by("pk").values_list("pk", flat=True))
+                type(self).objects.filter(is_default=True).exclude(pk=self.pk).update(is_default=False)
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.code} - {self.name}"
 
 
-class CapabilityDomain(models.Model):
-    """长期能力领域，不等同于某届比赛的 A/B/C/D 模块。"""
-
+class TechnicalDomain(models.Model):
     skill_project = models.ForeignKey(
-        SkillProject,
-        verbose_name="技能项目",
-        on_delete=models.CASCADE,
-        related_name="capability_domains",
+        SkillProject, verbose_name="技能项目", on_delete=models.CASCADE, related_name="technical_domains"
     )
     code = models.CharField("领域代码", max_length=50)
     name = models.CharField("领域名称", max_length=120)
@@ -46,28 +75,162 @@ class CapabilityDomain(models.Model):
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
-        verbose_name = "能力领域"
-        verbose_name_plural = "能力领域"
+        verbose_name = "技术领域"
+        verbose_name_plural = "技术领域"
         ordering = ["skill_project", "order", "code", "name"]
         constraints = [
-            models.UniqueConstraint(
-                fields=["skill_project", "code"],
-                name="uniq_capabilitydomain_project_code",
-            ),
+            models.UniqueConstraint(fields=["skill_project", "code"], name="uniq_technicaldomain_project_code")
         ]
 
     def __str__(self):
         return f"{self.skill_project.code} / {self.code} - {self.name}"
 
 
-class SkillTreeVersion(models.Model):
-    """覆盖整个技能项目的标准技能树版本。"""
+class TechnicalDomainMembership(models.Model):
+    class Role(models.TextChoices):
+        LEAD_COACH = "lead_coach", "主教练"
+        COACH = "coach", "教练"
+
+    technical_domain = models.ForeignKey(
+        TechnicalDomain, verbose_name="技术领域", on_delete=models.CASCADE, related_name="memberships"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="用户",
+        on_delete=models.CASCADE,
+        related_name="technical_domain_memberships",
+    )
+    role = models.CharField("职责", max_length=20, choices=Role.choices, default=Role.COACH)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = "技术领域教练"
+        verbose_name_plural = "技术领域教练"
+        ordering = ["technical_domain", "role", "user"]
+        constraints = [
+            models.UniqueConstraint(fields=["technical_domain", "user"], name="uniq_technicaldomain_membership_user")
+        ]
+
+    def __str__(self):
+        return f"{self.technical_domain} / {self.user}"
+
+
+class Skill(models.Model):
+    skill_project = models.ForeignKey(
+        SkillProject, verbose_name="技能项目", on_delete=models.CASCADE, related_name="skills"
+    )
+    primary_domain = models.ForeignKey(
+        TechnicalDomain, verbose_name="主要技术领域", on_delete=models.PROTECT, related_name="primary_skills"
+    )
+    related_domains = models.ManyToManyField(
+        TechnicalDomain, verbose_name="关联技术领域", related_name="related_skills", blank=True
+    )
+    name = models.CharField("技能名称", max_length=200)
+    description = models.TextField("描述", blank=True)
+    difficulty = models.PositiveSmallIntegerField(
+        "难度", default=3, validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    is_core = models.BooleanField("核心技能", default=False)
+    is_assessable = models.BooleanField("可考核", default=True)
+    tags = models.JSONField("标签", default=list, blank=True)
+    order = models.PositiveIntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = "技能"
+        verbose_name_plural = "技能"
+        ordering = ["skill_project", "primary_domain__order", "order", "name", "pk"]
+
+    def clean(self):
+        super().clean()
+        if self.primary_domain_id and self.skill_project_id:
+            if self.primary_domain.skill_project_id != self.skill_project_id:
+                raise ValidationError({"primary_domain": "主要技术领域必须属于当前技能项目。"})
+            if self.is_active and not self.primary_domain.is_active:
+                raise ValidationError({"primary_domain": "启用的技能不能使用已停用的技术领域。"})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def display_code(self):
+        return f"SK-{self.pk:06d}" if self.pk else "SK-待生成"
+
+    @property
+    def aliases(self):
+        prefetched = getattr(self, "_prefetched_objects_cache", {}).get("terms")
+        if prefetched is not None:
+            return [term.term for term in prefetched if term.kind == SkillTerm.Kind.ALIAS]
+        return list(self.terms.filter(kind=SkillTerm.Kind.ALIAS).values_list("term", flat=True))
+
+    def __str__(self):
+        return f"{self.display_code} - {self.name}"
+
+
+class SkillTerm(models.Model):
+    """项目内唯一的技能正式名称或别名登记词条。"""
+
+    class Kind(models.TextChoices):
+        NAME = "name", "正式名称"
+        ALIAS = "alias", "别名"
 
     skill_project = models.ForeignKey(
         SkillProject,
         verbose_name="技能项目",
         on_delete=models.CASCADE,
-        related_name="skill_tree_versions",
+        related_name="skill_terms",
+    )
+    skill = models.ForeignKey(Skill, verbose_name="技能", on_delete=models.CASCADE, related_name="terms")
+    term = models.CharField("称谓", max_length=200)
+    normalized_term = models.CharField("规范化称谓", max_length=400, editable=False)
+    kind = models.CharField("称谓类型", max_length=10, choices=Kind.choices)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "技能称谓"
+        verbose_name_plural = "技能称谓"
+        ordering = ["skill_project", "skill", "kind", "term"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~Q(normalized_term=""),
+                name="skillterm_normalized_not_empty",
+            ),
+            models.UniqueConstraint(
+                fields=["skill_project", "normalized_term"],
+                name="uniq_skillterm_project_normalized",
+            ),
+            models.UniqueConstraint(
+                fields=["skill"],
+                condition=Q(kind="name"),
+                name="uniq_primary_skillterm_per_skill",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if not self.normalized_term:
+            raise ValidationError({"term": "技能称谓不能为空。"})
+        if self.skill_id and self.skill_project_id and self.skill.skill_project_id != self.skill_project_id:
+            raise ValidationError({"skill_project": "技能称谓必须与技能属于同一技能项目。"})
+
+    def save(self, *args, **kwargs):
+        from .services import normalize_skill_term
+
+        self.normalized_term = normalize_skill_term(self.term)
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.term
+
+
+class SkillTreeVersion(models.Model):
+    skill_project = models.ForeignKey(
+        SkillProject, verbose_name="技能项目", on_delete=models.CASCADE, related_name="skill_tree_versions"
     )
     version = models.CharField("版本", max_length=50)
     name = models.CharField("版本名称", max_length=120)
@@ -89,10 +252,7 @@ class SkillTreeVersion(models.Model):
         verbose_name_plural = "标准技能树版本"
         ordering = ["skill_project", "-is_current", "-created_at", "version"]
         constraints = [
-            models.UniqueConstraint(
-                fields=["skill_project", "version"],
-                name="uniq_skilltreeversion_project_version",
-            ),
+            models.UniqueConstraint(fields=["skill_project", "version"], name="uniq_skilltreeversion_project_version"),
             models.UniqueConstraint(
                 fields=["skill_project"],
                 condition=Q(is_current=True),
@@ -101,35 +261,29 @@ class SkillTreeVersion(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        if self.is_current and self.skill_project_id:
-            type(self).objects.filter(
-                skill_project_id=self.skill_project_id,
-                is_current=True,
-            ).exclude(pk=self.pk).update(is_current=False)
-        super().save(*args, **kwargs)
+        with transaction.atomic():
+            if self.is_current and self.skill_project_id:
+                type(self).objects.filter(skill_project_id=self.skill_project_id, is_current=True).exclude(
+                    pk=self.pk
+                ).update(is_current=False)
+            super().save(*args, **kwargs)
 
     def __str__(self):
         suffix = "（当前）" if self.is_current else ""
         return f"{self.skill_project.code} / {self.name} {self.version}{suffix}"
 
 
-class SkillNode(models.Model):
+class SkillTreeNode(models.Model):
     class NodeType(models.TextChoices):
         CATEGORY = "CATEGORY", "技能分类"
         TOPIC = "TOPIC", "能力主题"
-        SKILL = "SKILL", "标准技能点"
+        SKILL = "SKILL", "技能"
 
     tree_version = models.ForeignKey(
-        SkillTreeVersion,
-        verbose_name="技能树版本",
-        on_delete=models.CASCADE,
-        related_name="nodes",
+        SkillTreeVersion, verbose_name="技能树版本", on_delete=models.CASCADE, related_name="nodes"
     )
-    capability_domain = models.ForeignKey(
-        CapabilityDomain,
-        verbose_name="能力领域",
-        on_delete=models.PROTECT,
-        related_name="skill_nodes",
+    technical_domain = models.ForeignKey(
+        TechnicalDomain, verbose_name="技术领域", on_delete=models.PROTECT, related_name="skill_tree_nodes"
     )
     parent = models.ForeignKey(
         "self",
@@ -141,32 +295,37 @@ class SkillNode(models.Model):
     )
     node_type = models.CharField("节点类型", max_length=20, choices=NodeType.choices)
     code = models.CharField("节点代码", max_length=100)
-    name = models.CharField("节点名称", max_length=200)
+    name = models.CharField("节点名称", max_length=200, blank=True)
     description = models.TextField("描述", blank=True)
-    difficulty = models.PositiveSmallIntegerField(
-        "难度",
-        default=3,
-        validators=[MinValueValidator(1), MaxValueValidator(5)],
+    skill = models.ForeignKey(
+        Skill,
+        verbose_name="技能",
+        on_delete=models.PROTECT,
+        related_name="tree_nodes",
+        null=True,
+        blank=True,
     )
-    is_core = models.BooleanField("核心技能", default=False)
-    is_assessable = models.BooleanField("可考核", default=True)
-    tags = models.JSONField("标签", default=list, blank=True)
-    aliases = models.JSONField("别名", default=list, blank=True)
     order = models.PositiveIntegerField("排序", default=0)
     is_active = models.BooleanField("启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
-        verbose_name = "技能节点"
-        verbose_name_plural = "技能节点"
-        ordering = ["tree_version", "capability_domain__order", "parent_id", "order", "code", "name"]
+        verbose_name = "技能树节点"
+        verbose_name_plural = "技能树节点"
+        ordering = ["tree_version", "technical_domain__order", "parent_id", "order", "code"]
         constraints = [
+            models.UniqueConstraint(fields=["tree_version", "code"], name="uniq_skilltreenode_version_code"),
             models.UniqueConstraint(
-                fields=["tree_version", "code"],
-                name="uniq_skillnode_treeversion_code",
+                fields=["tree_version", "skill"],
+                condition=Q(skill__isnull=False),
+                name="uniq_skilltreenode_version_skill",
             ),
         ]
+
+    @property
+    def display_name(self):
+        return self.skill.name if self.node_type == self.NodeType.SKILL and self.skill_id else self.name
 
     @property
     def skill_project(self):
@@ -174,35 +333,52 @@ class SkillNode(models.Model):
 
     def clean(self):
         super().clean()
-        if self.capability_domain_id and self.tree_version_id:
-            if self.capability_domain.skill_project_id != self.tree_version.skill_project_id:
-                raise ValidationError({"capability_domain": "能力领域必须属于当前技能树版本对应的技能项目。"})
+        if self.technical_domain_id and self.tree_version_id:
+            if self.technical_domain.skill_project_id != self.tree_version.skill_project_id:
+                raise ValidationError({"technical_domain": "技术领域必须属于技能树对应的技能项目。"})
+        if self.node_type == self.NodeType.SKILL:
+            if not self.skill_id:
+                raise ValidationError({"skill": "技能节点必须关联一个技能。"})
+            if self.skill_id and self.tree_version_id:
+                if self.skill.skill_project_id != self.tree_version.skill_project_id:
+                    raise ValidationError({"skill": "技能必须属于技能树对应的技能项目。"})
+                allowed_domain_ids = {self.skill.primary_domain_id}
+                if self.skill.pk:
+                    allowed_domain_ids.update(self.skill.related_domains.values_list("pk", flat=True))
+                if self.technical_domain_id not in allowed_domain_ids:
+                    raise ValidationError({"technical_domain": "节点技术领域必须是技能的主要或关联技术领域。"})
+            if self.pk and self.children.exists():
+                raise ValidationError({"node_type": "已有子节点的节点不能改为技能节点。"})
+        else:
+            if self.skill_id:
+                raise ValidationError({"skill": "分类和主题节点不能关联技能。"})
+            if not self.name.strip():
+                raise ValidationError({"name": "分类和主题节点必须填写名称。"})
+
         if self.parent_id and self.pk and self.parent_id == self.pk:
             raise ValidationError({"parent": "父节点不能是当前节点自身。"})
         if self.parent_id:
             if self.parent.tree_version_id != self.tree_version_id:
                 raise ValidationError({"parent": "父节点必须属于同一技能树版本。"})
-            if self.parent.capability_domain_id != self.capability_domain_id:
-                raise ValidationError({"parent": "父节点必须属于同一能力领域。"})
-
-        parent = self.parent if self.parent_id else None
-        while parent is not None:
-            if self.pk and parent.pk == self.pk:
-                raise ValidationError({"parent": "父节点不能是当前节点的下级节点。"})
-            parent = parent.parent
-
-        if self.parent_id is None and self.node_type != self.NodeType.CATEGORY:
+            if self.parent.technical_domain_id != self.technical_domain_id:
+                raise ValidationError({"parent": "父节点必须属于同一技术领域。"})
+            if self.parent.node_type == self.NodeType.SKILL:
+                raise ValidationError({"parent": "技能节点下不能创建子节点。"})
+            if self.parent.node_type == self.NodeType.TOPIC and self.node_type != self.NodeType.SKILL:
+                raise ValidationError({"node_type": "主题节点下只能创建技能节点。"})
+            if self.parent.node_type == self.NodeType.CATEGORY and self.node_type not in {
+                self.NodeType.TOPIC,
+                self.NodeType.SKILL,
+            }:
+                raise ValidationError({"node_type": "分类节点下只能创建主题或技能节点。"})
+        elif self.node_type != self.NodeType.CATEGORY:
             raise ValidationError({"node_type": "根节点只能是技能分类。"})
-        if self.parent_id:
-            parent_type = self.parent.node_type
-            if parent_type == self.NodeType.CATEGORY and self.node_type not in {self.NodeType.TOPIC, self.NodeType.SKILL}:
-                raise ValidationError({"node_type": "技能分类下只能创建能力主题或标准技能点。"})
-            if parent_type == self.NodeType.TOPIC and self.node_type != self.NodeType.SKILL:
-                raise ValidationError({"node_type": "能力主题下只能创建标准技能点。"})
-            if parent_type == self.NodeType.SKILL:
-                raise ValidationError({"parent": "标准技能点下不能再创建子节点。"})
-        if self.pk and self.node_type == self.NodeType.SKILL and self.children.exists():
-            raise ValidationError({"node_type": "已有子节点的节点不能改为标准技能点。"})
+
+        ancestor = self.parent if self.parent_id else None
+        while ancestor is not None:
+            if self.pk and ancestor.pk == self.pk:
+                raise ValidationError({"parent": "父节点不能是当前节点的下级节点。"})
+            ancestor = ancestor.parent
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -221,13 +397,13 @@ class SkillNode(models.Model):
         return ancestors
 
     def get_full_path(self, separator=" / "):
-        return separator.join(f"{node.code} {node.name}" for node in self.get_ancestors(include_self=True))
+        return separator.join(f"{node.code} {node.display_name}" for node in self.get_ancestors(include_self=True))
 
     def get_descendants(self, include_self=False, active_only=False):
         descendants = [self] if include_self else []
 
         def append_children(node):
-            children = node.children.order_by("order", "code", "name", "pk")
+            children = node.children.order_by("order", "code", "pk")
             if active_only:
                 children = children.filter(is_active=True)
             for child in children:
@@ -239,6 +415,98 @@ class SkillNode(models.Model):
         return descendants
 
     def __str__(self):
+        return f"{self.code} - {self.display_name}"
+
+
+class WSOSVersion(models.Model):
+    skill_project = models.ForeignKey(
+        SkillProject, verbose_name="技能项目", on_delete=models.CASCADE, related_name="wsos_versions"
+    )
+    code = models.CharField("版本代码", max_length=50)
+    name = models.CharField("版本名称", max_length=120)
+    description = models.TextField("描述", blank=True)
+    is_current = models.BooleanField("当前版本", default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="创建人",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_wsos_versions",
+    )
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = "WSOS 版本"
+        verbose_name_plural = "WSOS 版本"
+        ordering = ["skill_project", "-is_current", "code"]
+        constraints = [
+            models.UniqueConstraint(fields=["skill_project", "code"], name="uniq_wsosversion_project_code"),
+            models.UniqueConstraint(
+                fields=["skill_project"],
+                condition=Q(is_current=True),
+                name="uniq_current_wsosversion_per_project",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if self.is_current and self.skill_project_id:
+                type(self).objects.filter(skill_project_id=self.skill_project_id, is_current=True).exclude(
+                    pk=self.pk
+                ).update(is_current=False)
+            super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.skill_project.code} / {self.name}"
+
+
+class WSOSSection(models.Model):
+    wsos_version = models.ForeignKey(
+        WSOSVersion, verbose_name="WSOS 版本", on_delete=models.CASCADE, related_name="sections"
+    )
+    code = models.CharField("章节代码", max_length=50)
+    name = models.CharField("章节名称", max_length=160)
+    description = models.TextField("描述", blank=True)
+    weight = models.DecimalField(
+        "权重（%）", max_digits=5, decimal_places=2, validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    order = models.PositiveIntegerField("排序", default=0)
+
+    class Meta:
+        verbose_name = "WSOS 章节"
+        verbose_name_plural = "WSOS 章节"
+        ordering = ["wsos_version", "order", "code"]
+        constraints = [models.UniqueConstraint(fields=["wsos_version", "code"], name="uniq_wsossection_version_code")]
+
+    def __str__(self):
         return f"{self.code} - {self.name}"
 
-# Create your models here.
+
+class SkillWSOSMap(models.Model):
+    skill = models.ForeignKey(Skill, verbose_name="技能", on_delete=models.CASCADE, related_name="wsos_mappings")
+    wsos_section = models.ForeignKey(
+        WSOSSection, verbose_name="WSOS 章节", on_delete=models.CASCADE, related_name="skill_mappings"
+    )
+    note = models.TextField("说明", blank=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "技能与 WSOS 映射"
+        verbose_name_plural = "技能与 WSOS 映射"
+        ordering = ["skill", "wsos_section__order"]
+        constraints = [models.UniqueConstraint(fields=["skill", "wsos_section"], name="uniq_skill_wsos_section")]
+
+    def clean(self):
+        super().clean()
+        if self.skill_id and self.wsos_section_id:
+            if self.skill.skill_project_id != self.wsos_section.wsos_version.skill_project_id:
+                raise ValidationError({"wsos_section": "技能与 WSOS 章节必须属于同一技能项目。"})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.skill} -> {self.wsos_section}"

@@ -72,13 +72,25 @@ TMS（Training Management System）是一个面向技能竞赛训练场景的 Dj
 
 ### 标准、竞赛与训练主链路
 
-- **标准体系**：技能项目、能力领域、标准技能树版本和技能节点。
-- **赛事与考核**：赛事系列、赛事级别、事件、事件模块和参与人员。
-- **试题内容**：事件模块下的试题及结构化试题要求。
+- **标准体系**：技能项目、技术领域、稳定技能、技能树版本和 WSOS 映射。
+- **竞赛与考核**：竞赛与考核系列、级别、Assessment、评测模块、参与人员和私有业务资料。
 - **评分管理**：评分方案、评分表导入、评分点、参评对象和评分结果。
-- **考点知识**：统一管理考点证据，以及考点与标准技能点之间的映射关系。
-- **资料归档**：试题、评分表、结果包、训练资料等文件的统一资产登记与权限控制。
-- **训练管理**：训练周期、训练日志和提交统计。
+- **考点证据**：管理可审核 Evidence 及其与稳定 Skill 的加权映射。
+- **训练管理**：训练周期、计划、任务、选手执行、教练反馈和正式训练日志。
+
+```text
+TechnicalDomain / WSOS
+        ↓
+       Skill
+      ↙    ↘
+ Evidence  TrainingTask
+    ↑          ↓
+Assessment  TaskExecution
+    ↓          ↓
+ Scoring   TrainingLog
+    ↓
+Skill performance → Coach review
+```
 
 ### 业务扩展
 
@@ -98,12 +110,10 @@ core
 accounts
 samba
 standards
-archives
-events
+assessments
 training
 scoring
-examcontent
-knowledge
+evidence
 glossary
 worldskills_forum
 feedback
@@ -122,7 +132,7 @@ event_countdown
 - uv
 - Node.js 与 npm（仅开发环境或前端资源构建时需要）
 
-生产环境推荐使用 PostgreSQL 或 MySQL；SQLite 适合本地开发和轻量测试。
+生产环境使用 PostgreSQL 17；SQLite 用于本地开发和测试。
 
 ## 目录说明
 

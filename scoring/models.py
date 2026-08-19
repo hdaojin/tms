@@ -3,7 +3,6 @@ from __future__ import annotations
 from decimal import Decimal
 
 from django.conf import settings
-from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
@@ -14,14 +13,14 @@ from .registry import PARSER_DEFINITIONS
 
 
 class ScoringScheme(models.Model):
-    event_module = models.ForeignKey(
-        "events.EventModule",
-        verbose_name="事件模块",
+    assessment_module = models.ForeignKey(
+        "assessments.AssessmentModule",
+        verbose_name="评测模块",
         on_delete=models.PROTECT,
         related_name="scoring_schemes",
     )
-    source_asset = models.ForeignKey(
-        "archives.ArchiveAsset",
+    source_document = models.ForeignKey(
+        "assessments.AssessmentDocument",
         verbose_name="来源评分表",
         on_delete=models.PROTECT,
         related_name="scoring_schemes",
@@ -56,19 +55,26 @@ class ScoringScheme(models.Model):
         ordering = ["-created_at", "module_code", "title"]
         constraints = [
             models.UniqueConstraint(
-                fields=["event_module", "module_code"],
-                name="uniq_scoringscheme_eventmodule_code",
+                fields=["assessment_module", "module_code"],
+                name="uniq_scoringscheme_assessmentmodule_code",
             ),
         ]
 
     @property
     def skill_project(self):
-        return self.event_module.event.skill_project
+        return self.assessment_module.assessment.skill_project
 
     def clean(self):
         super().clean()
-        if self.event_module_id and self.module_code and self.event_module.code != self.module_code:
-            raise ValidationError({"module_code": f"评分表模块代码必须与事件模块一致：{self.event_module.code}。"})
+        if self.assessment_module_id and self.module_code and self.assessment_module.code != self.module_code:
+            raise ValidationError({"module_code": f"评分表模块代码必须与评测模块一致：{self.assessment_module.code}。"})
+        if self.source_document_id:
+            from assessments.models import AssessmentDocument
+
+            if self.source_document.document_type != AssessmentDocument.DocumentType.MARKING_SCHEME:
+                raise ValidationError({"source_document": "评分方案来源资料必须是评分表。"})
+            if self.source_document.module_id != self.assessment_module_id:
+                raise ValidationError({"source_document": "来源评分表必须属于当前评测模块。"})
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -124,14 +130,14 @@ class ScoringSchemeImport(models.Model):
         PARSED = "parsed", "已解析"
         CONFIRMED = "confirmed", "已确认"
 
-    event_module = models.ForeignKey(
-        "events.EventModule",
-        verbose_name="事件模块",
+    assessment_module = models.ForeignKey(
+        "assessments.AssessmentModule",
+        verbose_name="评测模块",
         on_delete=models.PROTECT,
         related_name="scoring_scheme_imports",
     )
-    source_asset = models.ForeignKey(
-        "archives.ArchiveAsset",
+    source_document = models.ForeignKey(
+        "assessments.AssessmentDocument",
         verbose_name="来源评分表",
         on_delete=models.PROTECT,
         related_name="scoring_scheme_imports",
@@ -234,12 +240,6 @@ class ScoringAspect(models.Model):
     )
     source_row_number = models.PositiveIntegerField("来源行号")
     order = models.PositiveIntegerField("排序", default=0)
-    knowledge_evidences = GenericRelation(
-        "knowledge.KnowledgeEvidence",
-        content_type_field="source_content_type",
-        object_id_field="source_object_id",
-        related_query_name="scoring_aspect",
-    )
 
     class Meta:
         verbose_name = "评分点"
@@ -288,10 +288,12 @@ class JudgementOption(models.Model):
 
 
 class ScoringParticipant(models.Model):
-    scheme = models.ForeignKey(ScoringScheme, verbose_name="评分方案", on_delete=models.CASCADE, related_name="participants")
-    event_participant = models.ForeignKey(
-        "events.EventParticipant",
-        verbose_name="事件参与人员",
+    scheme = models.ForeignKey(
+        ScoringScheme, verbose_name="评分方案", on_delete=models.CASCADE, related_name="participants"
+    )
+    assessment_participant = models.ForeignKey(
+        "assessments.AssessmentParticipant",
+        verbose_name="评测参与人员",
         on_delete=models.PROTECT,
         related_name="scoring_participations",
         null=True,
@@ -319,9 +321,9 @@ class ScoringParticipant(models.Model):
         permissions = [("view_all_scoringparticipant", "查看全部参评对象")]
         constraints = [
             models.UniqueConstraint(
-                fields=["scheme", "event_participant"],
-                condition=Q(event_participant__isnull=False),
-                name="uniq_scoringparticipant_event_participant",
+                fields=["scheme", "assessment_participant"],
+                condition=Q(assessment_participant__isnull=False),
+                name="uniq_scoringparticipant_assessment_participant",
             ),
             models.UniqueConstraint(
                 fields=["scheme", "user"],
@@ -337,12 +339,12 @@ class ScoringParticipant(models.Model):
 
     def clean(self):
         super().clean()
-        identities = [bool(self.event_participant_id), bool(self.user_id), bool(self.external_identifier)]
+        identities = [bool(self.assessment_participant_id), bool(self.user_id), bool(self.external_identifier)]
         if sum(identities) != 1:
-            raise ValidationError("参评对象必须且只能绑定事件参与人员、用户或外部编号中的一种。")
-        if self.event_participant_id and self.scheme_id:
-            if self.event_participant.event_id != self.scheme.event_module.event_id:
-                raise ValidationError({"event_participant": "事件参与人员必须属于评分方案对应事件。"})
+            raise ValidationError("参评对象必须且只能绑定评测参与人员、用户或外部编号中的一种。")
+        if self.assessment_participant_id and self.scheme_id:
+            if self.assessment_participant.assessment_id != self.scheme.assessment_module.assessment_id:
+                raise ValidationError({"assessment_participant": "评测参与人员必须属于评分方案对应评测。"})
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -404,9 +406,11 @@ class ScoringResult(models.Model):
 
 
 class ScoringResultImport(models.Model):
-    scheme = models.ForeignKey(ScoringScheme, verbose_name="评分方案", on_delete=models.PROTECT, related_name="result_imports")
-    source_asset = models.ForeignKey(
-        "archives.ArchiveAsset",
+    scheme = models.ForeignKey(
+        ScoringScheme, verbose_name="评分方案", on_delete=models.PROTECT, related_name="result_imports"
+    )
+    source_document = models.ForeignKey(
+        "assessments.AssessmentDocument",
         verbose_name="来源结果包",
         on_delete=models.PROTECT,
         related_name="scoring_result_imports",
@@ -427,8 +431,24 @@ class ScoringResultImport(models.Model):
         verbose_name_plural = "结果包导入"
         ordering = ["-imported_at", "-pk"]
 
+    def clean(self):
+        super().clean()
+        if not self.source_document_id or not self.scheme_id:
+            return
+
+        from assessments.models import AssessmentDocument
+
+        if self.source_document.document_type != AssessmentDocument.DocumentType.RESULT_FILE:
+            raise ValidationError({"source_document": "结果包导入来源资料必须是成绩或结果文件。"})
+        if self.source_document.module_id != self.scheme.assessment_module_id:
+            raise ValidationError({"source_document": "来源结果文件必须属于评分方案对应的评测模块。"})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.scheme} / {self.source_asset.filename}"
+        return f"{self.scheme} / {self.source_document.filename}"
+
 
 # Create your models here.
-

@@ -127,6 +127,8 @@ class SiteConfigSingletonTests(TestCase):
         config.save()
 
         self.assertEqual(SiteConfig.get_solo().site_name, "更新后的站点")
+
+
 JSON_BYTES = b'{"ok": true}'
 
 
@@ -233,19 +235,17 @@ class MobileNavigationTemplateTests(TestCase):
 
     def test_render_mobile_navigation_shows_current_section_and_permitted_nested_items(self):
         user = User.objects.create_user(username="mobile-nav-user", password="testpass123")
-        sync_user_permission_assignments(user, ["training.manage_all_logs", "training.view_statistics"])
+        sync_user_permission_assignments(user, ["training.competitor"])
 
-        request = self.factory.get(reverse("training:log_upload"))
+        request = self.factory.get(reverse("training:log_create"))
         request.user = user
         request.resolver_match = resolve(request.path)
 
-        html = Template("{% load menu_tags %}{% render_mobile_navigation %}").render(
-            Context({"request": request})
-        )
+        html = Template("{% load menu_tags %}{% render_mobile_navigation %}").render(Context({"request": request}))
 
         self.assertIn("当前位于“训练”", html)
         self.assertIn("训练日志", html)
-        self.assertIn("提交统计", html)
+        self.assertIn("新增训练日志", html)
 
     def test_render_mobile_navigation_hides_notice_create_without_permission(self):
         user = User.objects.create_user(username="notice-nav-user", password="testpass123")
@@ -255,9 +255,7 @@ class MobileNavigationTemplateTests(TestCase):
         request.user = user
         request.resolver_match = resolve(request.path)
 
-        html = Template("{% load menu_tags %}{% render_mobile_navigation %}").render(
-            Context({"request": request})
-        )
+        html = Template("{% load menu_tags %}{% render_mobile_navigation %}").render(Context({"request": request}))
 
         self.assertIn("通知公告列表", html)
         self.assertNotIn("创建通知公告", html)
@@ -271,9 +269,7 @@ class MobileNavigationTemplateTests(TestCase):
         request.user = user
         request.resolver_match = resolve(request.path)
 
-        html = Template("{% load menu_tags %}{% render_mobile_navigation %}").render(
-            Context({"request": request})
-        )
+        html = Template("{% load menu_tags %}{% render_mobile_navigation %}").render(Context({"request": request}))
 
         self.assertIn("创建通知公告", html)
 
@@ -290,23 +286,17 @@ class MobileNavigationTemplateTests(TestCase):
         self.assertNotIn(f'href="{reverse("samba:accounts")}"', html)
         for label in [
             "新增训练周期",
-            "上传训练日志",
-            "新增赛事系列",
-            "新增赛事级别",
-            "新增事件",
-            "新增事件模块",
+            "新增训练日志",
+            "新增竞赛与考核",
+            "新增评测模块",
             "新增参与人员",
             "导入评分表",
             "新增参评对象",
             "录入评分结果",
             "新增技能项目",
-            "新增能力领域",
             "新增标准技能树版本",
             "新增技能节点",
-            "新增技能映射",
-            "上传资料资产",
-            "新增试题",
-            "新增试题要求",
+            "新增 WSOS 版本",
             "新增考点证据",
             "上传会议记录",
             "录入奖惩记录",
@@ -319,23 +309,20 @@ class MobileNavigationTemplateTests(TestCase):
             user,
             "training.add_trainingcycle",
             "training.add_traininglog",
-            "events.add_competitionseries",
-            "events.add_competitionlevel",
-            "events.add_event",
-            "events.add_eventmodule",
-            "events.add_eventparticipant",
+            "assessments.add_assessment",
+            "assessments.add_assessmentmodule",
+            "assessments.add_assessmentparticipant",
+            "assessments.add_assessmentdocument",
             "scoring.add_scoringscheme",
             "scoring.add_scoringparticipant",
             "scoring.add_scoringresult",
             "standards.add_skillproject",
-            "standards.add_capabilitydomain",
+            "standards.add_technicaldomain",
+            "standards.add_skill",
             "standards.add_skilltreeversion",
-            "standards.add_skillnode",
-            "archives.add_archiveasset",
-            "examcontent.add_exampaper",
-            "examcontent.add_examrequirement",
-            "knowledge.add_knowledgeevidence",
-            "knowledge.add_knowledgeevidenceskillmap",
+            "standards.add_skilltreenode",
+            "standards.add_wsosversion",
+            "evidence.add_knowledgeevidence",
             "meetings.add_meeting",
             "behaviors.add_conduct_record",
         )
@@ -348,24 +335,19 @@ class MobileNavigationTemplateTests(TestCase):
 
         for label in [
             "新增训练周期",
-            "上传训练日志",
-            "新增赛事系列",
-            "新增赛事级别",
-            "新增事件",
-            "新增事件模块",
+            "新增训练日志",
+            "新增竞赛与考核",
+            "新增评测模块",
             "新增参与人员",
+            "上传评测资料",
             "导入评分表",
             "新增参评对象",
             "录入评分结果",
             "新增技能项目",
-            "新增能力领域",
             "新增标准技能树版本",
             "技能节点",
             "新增技能节点",
-            "新增技能映射",
-            "上传资料资产",
-            "新增试题",
-            "新增试题要求",
+            "新增 WSOS 版本",
             "新增考点证据",
             "上传会议记录",
             "录入奖惩记录",
@@ -376,8 +358,12 @@ class MobileNavigationTemplateTests(TestCase):
         user = User.objects.create_user(username="dashboard-nav-user", password="testpass123")
         user = self._grant_permissions(
             user,
-            "notices.view_notice", "meetings.view_meeting", "training.view_trainingcycle",
-            "events.view_event", "standards.view_skillproject", "archives.view_archiveasset",
+            "notices.view_notice",
+            "meetings.view_meeting",
+            "training.view_trainingcycle",
+            "assessments.view_assessment",
+            "standards.view_skillproject",
+            "notes.view_noterepo",
             "behaviors.view_conductrecord",
         )
 
@@ -387,7 +373,7 @@ class MobileNavigationTemplateTests(TestCase):
             user,
         )
 
-        for label in ["通知", "会议", "训练", "竞赛", "标准", "资料", "奖惩"]:
+        for label in ["通知", "会议", "训练", "竞赛与考核", "标准", "资料", "奖惩"]:
             self.assertIn(label, html)
         for hidden_label in ["账户", "关于"]:
             self.assertNotIn(hidden_label, html)
@@ -396,18 +382,19 @@ class MobileNavigationTemplateTests(TestCase):
         user = User.objects.create_user(username="business-section-user", password="testpass123")
         user = self._grant_permissions(
             user,
-            "standards.view_skillproject", "knowledge.view_knowledgeevidence",
-            "archives.view_archiveasset", "notes.view_noterepo",
-            "examcontent.view_exampaper", "scoring.view_scoringscheme",
+            "standards.view_skillproject",
+            "evidence.view_knowledgeevidence",
+            "notes.view_noterepo",
+            "assessments.view_assessment",
+            "scoring.view_scoringscheme",
         )
 
         expected_sections = [
             (reverse("standards:project_list"), "标准"),
-            (reverse("knowledge:evidence_list"), "标准"),
-            (reverse("archives:asset_list"), "资料"),
+            (reverse("evidence:evidence_list"), "竞赛与考核"),
             (reverse("notes:repo_list"), "资料"),
-            (reverse("examcontent:paper_list"), "竞赛"),
-            (reverse("scoring:scheme_list"), "竞赛"),
+            (reverse("assessments:assessment_list"), "竞赛与考核"),
+            (reverse("scoring:scheme_list"), "竞赛与考核"),
         ]
         for path, label in expected_sections:
             with self.subTest(path=path, label=label):
@@ -513,21 +500,17 @@ class PublicShellNavigationTests(TestCase):
         user = User.objects.create_user(username="header-nav-user", password="testpass123")
         user.user_permissions.add(
             *Permission.objects.filter(
-                content_type__app_label__in=["events", "standards", "training", "behaviors"],
-                codename__in=[
-                    "view_event", "view_skillproject", "view_trainingcycle", "view_conductrecord"
-                ],
+                content_type__app_label__in=["assessments", "standards", "training", "behaviors"],
+                codename__in=["view_assessment", "view_skillproject", "view_trainingcycle", "view_conductrecord"],
             )
         )
         request = self.factory.get(reverse("accounts:home"))
         request.user = user
         request.resolver_match = resolve(request.path)
 
-        html = Template("{% load menu_tags %}{% render_sections_nav %}").render(
-            Context({"request": request})
-        )
+        html = Template("{% load menu_tags %}{% render_sections_nav %}").render(Context({"request": request}))
 
-        for label in ["首页", "竞赛", "标准", "训练", "奖惩", "关于"]:
+        for label in ["首页", "竞赛与考核", "标准", "训练", "奖惩", "关于"]:
             self.assertIn(label, html)
         for hidden_label in ["通知", "会议", "资料"]:
             self.assertNotIn(hidden_label, html)
@@ -547,28 +530,22 @@ class PublicShellNavigationTests(TestCase):
     def test_sidebar_marks_only_current_leaf_active(self):
         user = User.objects.create_user(username="sidebar-active-user", password="testpass123")
         user.user_permissions.add(
-            Permission.objects.get(
-                content_type__app_label="training", codename="view_traininglog_statistics"
-            )
+            Permission.objects.get(content_type__app_label="training", codename="view_traininglog")
         )
-        request = self.factory.get(reverse("training:monthly_stats"))
+        request = self.factory.get(reverse("training:log_list"))
         request.user = user
         request.resolver_match = resolve(request.path)
 
-        html = Template("{% load menu_tags %}{% render_section_menu_auto %}").render(
-            Context({"request": request})
-        )
+        html = Template("{% load menu_tags %}{% render_section_menu_auto %}").render(Context({"request": request}))
 
         self.assertIn("<details open>", html)
-        self.assertIn("提交统计", html)
+        self.assertIn("训练日志", html)
         self.assertEqual(html.count("menu-active"), 1)
 
 
 class ResponsiveTableTemplateTests(TestCase):
     def test_table_wrapper_does_not_reuse_page_title_as_section_title(self):
-        html = Template('{% include "components/table_wrapper.html" %}').render(
-            Context({"title": "奖惩记录列表"})
-        )
+        html = Template('{% include "components/table_wrapper.html" %}').render(Context({"title": "奖惩记录列表"}))
 
         self.assertNotIn("奖惩记录列表", html)
 
@@ -695,22 +672,22 @@ class UploadSpecTests(TestCase):
         self.assertEqual(upload.tell(), 5)
 
     def test_private_media_storage_serializes_without_absolute_path(self):
-        storage = PrivateMediaStorage("archives")
+        storage = PrivateMediaStorage("business-documents")
 
         serialized, _ = MigrationWriter.serialize(storage)
 
-        self.assertIn("core.uploads.PrivateMediaStorage('archives')", serialized)
+        self.assertIn("core.uploads.PrivateMediaStorage('business-documents')", serialized)
         self.assertNotIn(str(Path.cwd()), serialized)
         self.assertNotIn("media-private", serialized)
 
     def test_private_media_storage_uses_private_media_root_setting(self):
         tmpdir = Path.cwd() / ".tmp-private-media-root"
         with override_settings(PRIVATE_MEDIA_ROOT=tmpdir):
-            storage = PrivateMediaStorage("archives")
+            storage = PrivateMediaStorage("business-documents")
 
             self.assertEqual(
                 storage.path("sample.pdf"),
-                str(Path(tmpdir) / "archives" / "sample.pdf"),
+                str(Path(tmpdir) / "business-documents" / "sample.pdf"),
             )
 
 
@@ -807,18 +784,18 @@ class MultipleFileFieldTests(TestCase):
 
 class UploadSpecAdoptionTests(TestCase):
     def test_upload_forms_use_upload_spec_accept_attrs(self):
-        from archives.forms import ArchiveAssetForm
+        from assessments.forms import AssessmentDocumentForm
         from behaviors.forms import ConductRecordForm
         from meetings.forms import MeetingUploadForm
         from notices.forms import NoticeForm
         from training.forms import TrainingLogForm
 
-        self.assertIn("accept", ArchiveAssetForm().fields["file"].widget.attrs)
+        self.assertIn("accept", AssessmentDocumentForm().fields["file"].widget.attrs)
         self.assertEqual(
             NoticeForm().fields["attachments"].widget.attrs["accept"],
             NOTICE_ATTACHMENT_UPLOAD_SPEC.accept,
         )
-        self.assertIn("accept", TrainingLogForm().fields["file"].widget.attrs)
+        self.assertIn("accept", TrainingLogForm().fields["document"].widget.attrs)
         self.assertEqual(
             ConductRecordForm().fields["attachment"].widget.attrs["accept"],
             CONDUCT_ATTACHMENT_UPLOAD_SPEC.accept,
@@ -887,16 +864,36 @@ class UploadSpecAdoptionTests(TestCase):
         class UploadForm(forms.Form):
             attachment = forms.FileField(required=False)
 
-        html = Template('{% include "components/form.html" with form=form %}').render(
-            Context({"form": UploadForm()})
-        )
+        html = Template('{% include "components/form.html" with form=form %}').render(Context({"form": UploadForm()}))
 
         self.assertIn('enctype="multipart/form-data"', html)
         self.assertIn('hx-encoding="multipart/form-data"', html)
 
-    def test_archive_asset_file_uses_upload_spec_help_text(self):
-        from archives.models import ARCHIVE_ASSET_UPLOAD_SPEC, ArchiveAsset
+    def test_form_component_uses_single_column_layout_by_default(self):
+        class ExampleForm(forms.Form):
+            name = forms.CharField()
 
-        field = ArchiveAsset._meta.get_field("file")
+        html = Template('{% include "components/form.html" with form=form %}').render(
+            Context({"form": ExampleForm()})
+        )
 
-        self.assertEqual(field.help_text, ARCHIVE_ASSET_UPLOAD_SPEC.help_text("上传资料文件"))
+        self.assertIn('class="flex flex-col gap-4"', html)
+        self.assertNotIn('class="grid gap-4 md:grid-cols-2"', html)
+
+    def test_form_component_accepts_explicit_two_column_layout(self):
+        class ExampleForm(forms.Form):
+            name = forms.CharField()
+
+        html = Template(
+            '{% include "components/form.html" with form=form grid_class="grid gap-4 md:grid-cols-2" %}'
+        ).render(Context({"form": ExampleForm()}))
+
+        self.assertIn('class="grid gap-4 md:grid-cols-2"', html)
+
+    def test_assessment_document_file_uses_upload_spec_help_text(self):
+        from assessments.models import AssessmentDocument
+        from core.uploads import ASSESSMENT_DOCUMENT_UPLOAD_SPEC
+
+        field = AssessmentDocument._meta.get_field("file")
+
+        self.assertEqual(field.help_text, ASSESSMENT_DOCUMENT_UPLOAD_SPEC.help_text())

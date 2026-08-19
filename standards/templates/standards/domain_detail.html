@@ -1,18 +1,63 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<div class="card bg-base-100 shadow-sm">
-  <div class="card-body">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h2 class="card-title">能力领域信息</h2>
-        <p class="text-sm text-base-content/70">{{ domain.skill_project }} / {{ domain.code }}</p>
-      </div>
-      {% if perms.standards.change_capabilitydomain %}
-        <a href="{% url 'standards:domain_edit' domain.pk %}" class="btn btn-outline btn-sm">编辑</a>
-      {% endif %}
-    </div>
-    <p class="whitespace-pre-line">{{ domain.description|default:"暂无描述" }}</p>
+  <div id="skill-catalog-notice">
+    {% include "standards/partials/skill_catalog_notice.html" %}
   </div>
-</div>
+  <div class="space-y-6">
+    <nav class="text-sm text-base-content/60" aria-label="面包屑">
+      <a class="link" href="{% url 'standards:skill_list' project.pk %}"
+        >{{ project.name }}技能目录</a
+      >
+      <span class="px-2">/</span>
+      <span>{{ domain.name }}</span>
+    </nav>
+
+    <section class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="card-title">{{ domain.name }}</h2>
+              {% if not domain.is_active %}
+                <span class="badge badge-sm badge-warning">已停用</span>
+              {% endif %}
+            </div>
+            <p class="text-sm text-base-content/60">
+              {{ project.name }} · {{ domain.code }}
+            </p>
+          </div>
+          {% if can_edit_domain %}
+            <a
+              href="{% url 'standards:domain_edit' project.pk domain.pk %}"
+              class="btn btn-outline btn-sm"
+              >编辑领域</a
+            >
+          {% endif %}
+        </div>
+        {% if can_view_domain_management %}
+          <p class="whitespace-pre-line">
+            {{ domain.description|default:"暂无描述" }}
+          </p>
+          <div>
+            <h3 class="text-sm font-semibold">负责成员</h3>
+            <div class="mt-2 flex flex-wrap gap-2">
+              {% for membership in domain.memberships.all %}
+                <span class="badge badge-outline"
+                  >{{ membership.user }} ·
+                  {{ membership.get_role_display }}</span
+                >
+                {% empty %}
+                <span class="text-sm text-base-content/60">暂无负责成员</span>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    {% include "standards/partials/skill_results.html" %}
+  </div>
+
+  {% include "standards/partials/skill_create_dialog.html" %}
 {% endblock %}

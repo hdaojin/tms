@@ -1,0 +1,161 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <div class="space-y-4">
+    <nav class="text-sm text-base-content/60" aria-label="面包屑">
+      <a
+        class="link"
+        href="{% url 'standards:skill_list' skill.skill_project_id %}"
+        >{{ skill.skill_project.name }}技能目录</a
+      >
+      <span class="px-2">/</span>
+      <a
+        class="link"
+        href="{% url 'standards:domain_detail' skill.skill_project_id skill.primary_domain_id %}"
+        >{{ skill.primary_domain.name }}</a
+      >
+      <span class="px-2">/</span>
+      <span>{{ skill.display_code }}</span>
+    </nav>
+    <section class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body">
+        <div class="flex justify-between gap-3">
+          <div>
+            <h2 class="card-title">
+              {{ skill.display_code }} · {{ skill.name }}
+            </h2>
+            <p>{{ skill.primary_domain }}</p>
+            {% if skill.aliases %}
+              <p class="mt-1 text-sm text-base-content/60">
+                别名：{{ skill.aliases|join:"、" }}
+              </p>
+            {% endif %}
+          </div>
+          {% if can_edit_skill %}
+            <a
+              class="btn btn-outline btn-sm"
+              href="{% url 'standards:skill_edit' skill.pk %}"
+              >编辑</a
+            >
+          {% endif %}
+        </div>
+        <p class="whitespace-pre-line">
+          {{ skill.description|default:"暂无描述" }}
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <span class="badge">难度 {{ skill.difficulty }}</span
+          >{% if skill.is_core %}
+            <span class="badge badge-primary">核心技能</span>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+    <section class="grid gap-4 md:grid-cols-2">
+      <div class="card border border-base-300">
+        <div class="card-body">
+          <h3 class="card-title">关联领域</h3>
+          {% for domain in skill.related_domains.all %}
+            <span>{{ domain }}</span>{% empty %}
+            <p>无</p>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="card border border-base-300">
+        <div class="card-body">
+          <h3 class="card-title">WSOS 映射</h3>
+          {% for mapping in skill.wsos_mappings.all %}
+            <span>{{ mapping.wsos_section }}</span>{% empty %}
+            <p>暂无映射</p>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+    <section class="grid gap-4 lg:grid-cols-3">
+      <div class="card border border-base-300">
+        <div class="card-body">
+          <h3 class="card-title">历史考查</h3>
+          <p>
+            证据 {{ assessment_history.evidence_count }} 条 · 考核
+            {{ assessment_history.assessment_count }} 次
+          </p>
+          <p>
+            折算分值
+            {{ assessment_history.weighted_mark }}{% if assessment_history.latest_date %}
+              · 最近 {{ assessment_history.latest_date }}
+            {% endif %}
+          </p>
+        </div>
+      </div>
+      <div class="card border border-base-300">
+        <div class="card-body">
+          <h3 class="card-title">训练投入</h3>
+          <p>
+            任务 {{ training_investment.task_count }} 个 ·
+            {{ training_investment.actual_minutes }} 分钟
+          </p>
+          <p>
+            完成 {{ training_investment.completed_count }} · 部分完成
+            {{ training_investment.partial_count }} · 受阻
+            {{ training_investment.blocked_count }}
+          </p>
+        </div>
+      </div>
+      <div class="card border border-base-300">
+        <div class="card-body">
+          <h3 class="card-title">考核表现</h3>
+          <p>
+            {{ assessment_performance.awarded_mark }} /
+            {{ assessment_performance.mapped_max_mark }}
+          </p>
+          <p class="text-sm text-base-content/70">
+            按已批准证据映射权重从真实评分结果动态折算。
+          </p>
+        </div>
+      </div>
+    </section>
+    <section class="card border border-base-300">
+      <div class="card-body">
+        <div class="flex items-center justify-between gap-3">
+          <h3 class="card-title">最近得分趋势</h3>
+          {% if perms.training.add_trainingtask %}
+            <a
+              class="btn btn-sm btn-primary"
+              href="{% url 'training:task_create' %}?skill={{ skill.pk }}"
+              >创建训练任务</a
+            >
+          {% endif %}
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>评测</th>
+                <th>参评对象</th>
+                <th>得分</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in assessment_performance.trend %}
+                <tr>
+                  <td>
+                    {{ item.aspect__scheme__assessment_module__assessment__start_date }}
+                  </td>
+                  <td>
+                    {{ item.aspect__scheme__assessment_module__assessment__name }}
+                  </td>
+                  <td>{{ item.participant__display_name }}</td>
+                  <td>{{ item.awarded_mark }} / {{ item.mapped_max_mark }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="4">暂无评分结果</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+{% endblock %}

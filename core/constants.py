@@ -65,15 +65,30 @@ INVITATION_CODE_TIMEOUT = 24 * 60 * 60  # 邀请码超时时间，单位秒
 # ============ 允许上传的文件扩展名和大小常量 ============
 # 默认允许的文件扩展名和大小
 DEFAULT_ALLOWED_EXTENSIONS = ['pdf']
-DEFAULT_UPLOAD_MAX_SIZE_MB = 100 
+DEFAULT_UPLOAD_MAX_SIZE_MB = 100
 
-# 新标准链路资料文件允许的扩展名和大小
-ARCHIVE_ALLOWED_EXTENSIONS = [
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
-    'zip', 'gz', 'bz2', 'rar', '7z',
-    'json', 'txt', 'csv', 'png', 'jpg', 'jpeg',
+# 业务资料文件允许的扩展名和大小
+BUSINESS_DOCUMENT_ALLOWED_EXTENSIONS = [
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'zip',
+    'gz',
+    'bz2',
+    'rar',
+    '7z',
+    'json',
+    'txt',
+    'csv',
+    'png',
+    'jpg',
+    'jpeg',
 ]
-ARCHIVE_UPLOAD_MAX_SIZE_MB = 100
+BUSINESS_DOCUMENT_UPLOAD_MAX_SIZE_MB = 100
 
 # 评分表与结果包允许的扩展名和大小
 SCORING_WORKBOOK_ALLOWED_EXTENSIONS = ['xlsx']
@@ -88,10 +103,32 @@ GLOSSARY_WORKBOOK_MAX_ROWS = 20_000
 
 # 世赛论坛附件
 WORLDSKILLS_FORUM_ATTACHMENT_ALLOWED_EXTENSIONS = [
-    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-    "md", "txt", "csv", "json", "yaml", "yml", "conf", "log",
-    "jpg", "jpeg", "png", "gif", "webp",
-    "zip", "rar", "7z", "tar", "gz", "bz2",
+    "pdf",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+    "md",
+    "txt",
+    "csv",
+    "json",
+    "yaml",
+    "yml",
+    "conf",
+    "log",
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "webp",
+    "zip",
+    "rar",
+    "7z",
+    "tar",
+    "gz",
+    "bz2",
 ]
 WORLDSKILLS_FORUM_ATTACHMENT_UPLOAD_MAX_SIZE_MB = 50
 WORLDSKILLS_FORUM_ATTACHMENT_MAX_COUNT = 10
@@ -99,9 +136,28 @@ WORLDSKILLS_FORUM_ATTACHMENT_MAX_TOTAL_SIZE_MB = 100
 
 # 意见反馈附件
 FEEDBACK_ATTACHMENT_ALLOWED_EXTENSIONS = [
-    "jpg", "jpeg", "png", "webp",
-    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
-    "txt", "md", "csv", "json", "yaml", "yml", "xml", "conf", "cfg", "ini", "log",
+    "jpg",
+    "jpeg",
+    "png",
+    "webp",
+    "pdf",
+    "doc",
+    "docx",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+    "txt",
+    "md",
+    "csv",
+    "json",
+    "yaml",
+    "yml",
+    "xml",
+    "conf",
+    "cfg",
+    "ini",
+    "log",
     "zip",
 ]
 FEEDBACK_ATTACHMENT_UPLOAD_MAX_SIZE_MB = 20
@@ -115,9 +171,25 @@ TRAINING_LOG_UPLOAD_MAX_SIZE_MB = 20
 
 # 通知附件允许的扩展名和大小
 NOTICE_ALLOWED_EXTENSIONS = [
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'md', 'txt',
-    'jpg', 'jpeg', 'png', 'gif',
-    'zip', 'rar', '7z', 'tar', 'gz', 'bz2',
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'md',
+    'txt',
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'zip',
+    'rar',
+    '7z',
+    'tar',
+    'gz',
+    'bz2',
 ]
 NOTICE_UPLOAD_MAX_SIZE_MB = 100
 

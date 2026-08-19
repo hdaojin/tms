@@ -1,0 +1,116 @@
+<section
+  id="skill-results"
+  class="space-y-4"
+  {% if results_oob %}hx-swap-oob="outerHTML"{% endif %}
+  hx-boost="true"
+  hx-get=""
+  hx-trigger="skillAliasAdded from:body"
+  hx-target="#skill-results"
+  hx-push-url="true"
+>
+  <form
+    id="skill-filter-form"
+    class="rounded-box border border-base-300 bg-base-100 p-3 shadow-sm"
+    method="get"
+    action="{% url 'standards:domain_detail' project.pk domain.pk %}"
+    hx-get="{% url 'standards:domain_detail' project.pk domain.pk %}"
+    hx-trigger="submit, change from:.skill-filter-select, input changed delay:400ms from:.skill-filter-search, search from:.skill-filter-search"
+    hx-target="#skill-results"
+    hx-push-url="true"
+    hx-sync="this:replace"
+  >
+    <div class="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+      <label class="col-span-2 min-w-0 md:min-w-64 md:flex-1">
+        <span class="sr-only">搜索技能</span>
+        <input
+          class="skill-filter-search input w-full md:input-sm"
+          type="search"
+          name="q"
+          value="{{ filter_values.q }}"
+          placeholder="搜索名称、别名、描述或 SK-000123"
+        />
+      </label>
+      <label class="min-w-0 md:w-28"
+        ><span class="sr-only">状态</span>
+        <select
+          class="skill-filter-select select w-full md:select-sm"
+          name="active"
+        >
+          <option value="">全部状态</option>
+          <option
+            value="1"
+            {% if filter_values.active == "1" %}selected{% endif %}
+          >
+            启用
+          </option>
+          <option
+            value="0"
+            {% if filter_values.active == "0" %}selected{% endif %}
+          >
+            停用
+          </option>
+        </select>
+      </label>
+      <label class="min-w-0 md:w-28"
+        ><span class="sr-only">核心技能</span>
+        <select
+          class="skill-filter-select select w-full md:select-sm"
+          name="core"
+        >
+          <option value="">全部核心</option>
+          <option
+            value="1"
+            {% if filter_values.core == "1" %}selected{% endif %}
+          >
+            核心
+          </option>
+          <option
+            value="0"
+            {% if filter_values.core == "0" %}selected{% endif %}
+          >
+            非核心
+          </option>
+        </select>
+      </label>
+      <label class="min-w-0 md:w-28"
+        ><span class="sr-only">可考核</span>
+        <select
+          class="skill-filter-select select w-full md:select-sm"
+          name="assessable"
+        >
+          <option value="">全部考核</option>
+          <option
+            value="1"
+            {% if filter_values.assessable == "1" %}selected{% endif %}
+          >
+            可考核
+          </option>
+          <option
+            value="0"
+            {% if filter_values.assessable == "0" %}selected{% endif %}
+          >
+            不可考核
+          </option>
+        </select>
+      </label>
+      <label
+        class="col-span-2 label cursor-pointer justify-start gap-2 md:col-span-1"
+      >
+        <input
+          class="skill-filter-select checkbox checkbox-sm"
+          type="checkbox"
+          name="related"
+          value="1"
+          {% if filter_values.related == "1" %}checked{% endif %}
+        />
+        <span class="label-text whitespace-nowrap">包含关联技能</span>
+      </label>
+      <a
+        class="btn px-3 btn-ghost md:btn-sm"
+        href="{% url 'standards:domain_detail' project.pk domain.pk %}"
+        >重置</a
+      >
+    </div>
+  </form>
+  {% include "components/table_wrapper.html" with table=table table_title="技能条目" description="默认显示当前领域的启用主要技能；可显式包含关联技能。" %}
+</section>

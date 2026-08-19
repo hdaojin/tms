@@ -29,7 +29,7 @@ def reset_legacy_permission_assignments(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("accounts", "0019_groupprofile_explicit_permissions_and_more"),
-        ("training", "0002_alter_traininglog_options"),
+        ("training", "0001_initial"),
     ]
 
     operations = [
