@@ -82,6 +82,8 @@ class SkillForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
             "description": forms.Textarea(attrs={"rows": 4}),
             "related_domains": forms.CheckboxSelectMultiple(),
         }
+        labels = {"order": "技能目录排序"}
+        help_texts = {"order": "仅影响技能目录等普通列表，不影响技能树中的位置和顺序。"}
 
     def __init__(self, *args, user=None, **kwargs):
         self.user = user
@@ -203,12 +205,6 @@ class SkillTreeVersionForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.
 
 class SkillTreeQuickAddForm(StyledFormMixin, forms.Form):
     name = forms.CharField(label="技能名称", max_length=200)
-    description = forms.CharField(
-        label="技能边界说明",
-        required=False,
-        widget=forms.Textarea(attrs={"rows": 2}),
-    )
-    confirm_distinct = forms.BooleanField(label="我已确认这不是同一技能", required=False)
     existing_skill_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
 
 
@@ -276,6 +272,7 @@ class SkillTreeRemoveForm(StyledFormMixin, forms.Form):
             ("promote_children", "仅移除当前技能，并将子技能提升一级（推荐）"),
             ("subtree", "移除整个分支"),
         ),
+        widget=forms.RadioSelect,
     )
     confirm_subtree = forms.BooleanField(label="我确认移除整个分支", required=False)
 

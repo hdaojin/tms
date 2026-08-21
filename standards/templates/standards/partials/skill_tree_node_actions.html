@@ -1,36 +1,107 @@
-<div class="flex flex-wrap items-center justify-end gap-1 py-1 pl-6">
-  {% if node.can_view_skill %}
-    <a class="btn btn-ghost btn-xs" href="{% url 'standards:skill_detail' node.skill.pk %}">查看技能</a>
-  {% endif %}
-  {% if node.can_edit_skill %}
-    <a class="btn btn-ghost btn-xs" href="{% url 'standards:skill_edit' node.skill.pk %}">编辑技能</a>
-  {% endif %}
-  {% if node.can_add_child %}
-    <details class="dropdown dropdown-end">
-      <summary class="btn btn-ghost btn-xs" aria-label="新增子技能">
-        <span class="icon-[tabler--plus] size-4"></span>
-        新增子技能
-      </summary>
-      <div class="dropdown-content z-20 mt-2 w-[min(28rem,90vw)] rounded-box border border-base-300 bg-base-100 p-4 shadow-xl">
-        {% include "standards/partials/skill_tree_quick_add.html" with parent=node %}
-      </div>
-    </details>
-  {% endif %}
-  {% if node.can_move %}
-    <button type="button" class="btn btn-ghost btn-xs" hx-get="{% url 'standards:tree_node_move' tree.pk node.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML">移动</button>
-    <form method="post" hx-post="{% url 'standards:tree_node_reorder' tree.pk node.pk %}" hx-target="#skill-tree-panel" hx-swap="outerHTML">
-      {% csrf_token %}
-      <button class="btn btn-ghost btn-xs" type="submit" name="direction" value="up" aria-label="上移"><span class="icon-[tabler--arrow-up] size-4"></span></button>
-    </form>
-    <form method="post" hx-post="{% url 'standards:tree_node_reorder' tree.pk node.pk %}" hx-target="#skill-tree-panel" hx-swap="outerHTML">
-      {% csrf_token %}
-      <button class="btn btn-ghost btn-xs" type="submit" name="direction" value="down" aria-label="下移"><span class="icon-[tabler--arrow-down] size-4"></span></button>
-    </form>
-  {% endif %}
-  {% if node.can_remove %}
-    <button type="button" class="btn btn-ghost btn-xs text-error" hx-get="{% url 'standards:tree_node_remove' tree.pk node.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML">
-      <span class="icon-[tabler--trash] size-4"></span>
-      从树中移除
+<div class="absolute top-1 right-1 z-10 flex items-center gap-1" data-skill-tree-node-actions>
+  {% if node.can_add_tree_position %}
+    <button
+      type="button"
+      class="btn btn-square btn-ghost btn-xs"
+      aria-label="在“{{ node.skill.name }}”下添加子技能"
+      title="添加子技能"
+      hx-get="{% url 'standards:tree_quick_add_child' tree.pk node.technical_domain_id node.pk %}"
+      hx-target="#skill-tree-children-{{ node.pk }}"
+      hx-swap="beforeend"
+      data-skill-tree-add-child
+      data-skill-tree-editor-trigger
+    >
+      <span class="icon-[tabler--plus] size-4" aria-hidden="true"></span>
     </button>
+  {% endif %}
+
+  {% if node.can_view_skill or node.can_edit_skill or node.can_add_tree_position or node.can_move or node.can_remove %}
+    <details class="dropdown dropdown-end" data-skill-tree-node-menu>
+      <summary
+        class="btn btn-square btn-ghost btn-xs"
+        aria-label="打开“{{ node.skill.name }}”操作菜单"
+        title="更多操作"
+      >
+        <span class="icon-[tabler--dots] size-4" aria-hidden="true"></span>
+      </summary>
+      <ul class="menu dropdown-content z-30 mt-1 w-52 rounded-box border border-base-300 bg-base-100 p-2 shadow-xl">
+        {% if node.can_view_skill %}
+          <li><a href="{% url 'standards:skill_detail' node.skill.pk %}">查看技能详情</a></li>
+        {% endif %}
+        {% if node.can_edit_skill %}
+          <li>
+            <button
+              type="button"
+              hx-get="{% url 'standards:tree_node_skill_edit' tree.pk node.pk %}"
+              hx-target="#skill-tree-dialog"
+              hx-swap="innerHTML"
+              data-skill-tree-dialog-trigger
+            >编辑技能</button>
+          </li>
+        {% endif %}
+
+        {% if node.can_add_tree_position or node.can_move %}
+          <li><hr class="my-1 border-base-300"></li>
+        {% endif %}
+        {% if node.can_add_tree_position %}
+          <li>
+            <button
+              type="button"
+              hx-get="{% url 'standards:tree_quick_add_sibling' tree.pk node.pk %}"
+              hx-target="{% if node.parent_id %}#skill-tree-children-{{ node.parent_id }}{% else %}#skill-tree-roots-{{ node.technical_domain_id }}{% endif %}"
+              hx-swap="beforeend"
+              data-skill-tree-editor-trigger
+            >添加同级技能</button>
+          </li>
+        {% endif %}
+        {% if node.can_move %}
+          <li>
+            <button
+              type="button"
+              hx-get="{% url 'standards:tree_node_move' tree.pk node.pk %}"
+              hx-target="#skill-tree-dialog"
+              hx-swap="innerHTML"
+              data-skill-tree-dialog-trigger
+            >移动到……</button>
+          </li>
+          {% if node.can_move_up %}
+            <li>
+              <form method="post" hx-post="{% url 'standards:tree_node_reorder' tree.pk node.pk %}" hx-target="#skill-tree-panel" hx-swap="outerHTML">
+                {% csrf_token %}
+                <button class="w-full" type="submit" name="direction" value="up">
+                  <span class="icon-[tabler--arrow-up] size-4" aria-hidden="true"></span>
+                  上移
+                </button>
+              </form>
+            </li>
+          {% endif %}
+          {% if node.can_move_down %}
+            <li>
+              <form method="post" hx-post="{% url 'standards:tree_node_reorder' tree.pk node.pk %}" hx-target="#skill-tree-panel" hx-swap="outerHTML">
+                {% csrf_token %}
+                <button class="w-full" type="submit" name="direction" value="down">
+                  <span class="icon-[tabler--arrow-down] size-4" aria-hidden="true"></span>
+                  下移
+                </button>
+              </form>
+            </li>
+          {% endif %}
+        {% endif %}
+
+        {% if node.can_remove %}
+          <li><hr class="my-1 border-base-300"></li>
+          <li>
+            <button
+              type="button"
+              class="text-error"
+              hx-get="{% url 'standards:tree_node_remove' tree.pk node.pk %}"
+              hx-target="#skill-tree-dialog"
+              hx-swap="innerHTML"
+              data-skill-tree-dialog-trigger
+            >从当前技能树移除</button>
+          </li>
+        {% endif %}
+      </ul>
+    </details>
   {% endif %}
 </div>

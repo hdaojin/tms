@@ -1,23 +1,59 @@
 {% if candidates %}
-  <div class="space-y-2 rounded-box bg-base-200 p-3 text-sm">
+  <div class="mt-2 space-y-2 rounded-box bg-base-200 p-3 text-sm">
     <p class="font-medium">可能已有相同或相近技能</p>
     {% for candidate in candidates %}
-      <div class="flex items-start justify-between gap-3 rounded-box bg-base-100 p-2">
-        <div>
+      <div class="flex flex-wrap items-start justify-between gap-3 rounded-box bg-base-100 p-2">
+        <div class="min-w-0">
           <p class="font-medium">{{ candidate.name }}</p>
           <p class="text-xs text-base-content/60">主要领域：{{ candidate.primary_domain.name }}</p>
+          {% if candidate.aliases %}
+            <p class="text-xs text-base-content/60">别名：{{ candidate.aliases|join:"、" }}</p>
+          {% endif %}
           {% if candidate.existing_tree_node %}
-            <p class="text-xs text-warning">已在当前版本：{{ candidate.existing_tree_node.get_full_path }}</p>
+            <p class="mt-1 text-xs text-warning">已在当前版本：{{ candidate.existing_tree_path }}</p>
           {% elif not candidate.is_active %}
-            <p class="text-xs text-warning">该技能已停用</p>
+            <p class="mt-1 text-xs text-warning">该技能已停用，不能挂入技能树。</p>
+          {% elif not candidate.domain_compatible %}
+            <p class="mt-1 text-xs text-warning">该技能未关联当前技术领域。</p>
           {% endif %}
         </div>
-        {% if candidate.can_attach_to_domain %}
-          <button class="btn btn-outline btn-xs" type="submit" name="existing_skill_id" value="{{ candidate.pk }}">使用已有技能</button>
-        {% endif %}
+        <div class="flex shrink-0 flex-wrap justify-end gap-2">
+          {% if candidate.existing_tree_node %}
+            <button
+              class="btn btn-outline btn-xs"
+              type="button"
+              data-skill-tree-locate-node="{{ candidate.existing_tree_node.pk }}"
+            >定位到已有技能</button>
+          {% elif candidate.can_attach_to_domain %}
+            <button
+              class="btn btn-outline btn-xs"
+              type="submit"
+              name="existing_skill_id"
+              value="{{ candidate.pk }}"
+            >使用已有技能</button>
+          {% endif %}
+        </div>
       </div>
     {% endfor %}
   </div>
-  {% include "components/field.html" with field=quick_add_form.description %}
-  {% include "components/field.html" with field=quick_add_form.confirm_distinct %}
+  {% if has_high_similarity and can_create_skill %}
+    <div class="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-box border border-warning/40 bg-warning/5 p-3 text-sm">
+      <span>确实是新的技能？请在完整表单中说明技能边界。</span>
+      <button
+        type="button"
+        class="btn btn-primary btn-sm"
+        hx-get="{{ full_create_url }}"
+        hx-vals='{"name": "{{ candidate_query|escapejs }}"}'
+        hx-target="#skill-tree-dialog"
+        hx-swap="innerHTML"
+        data-skill-tree-dialog-trigger
+      >完整创建新技能</button>
+    </div>
+  {% endif %}
+{% elif candidate_query %}
+  {% if can_create_skill %}
+    <p class="mt-2 text-xs text-success">未发现明显重复候选，按 Enter 可直接创建。</p>
+  {% else %}
+    <p class="mt-2 text-xs text-warning">你可以将已有技能挂入此位置，但没有创建新技能的权限。</p>
+  {% endif %}
 {% endif %}
