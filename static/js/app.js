@@ -1,5 +1,6 @@
 (function () {
   let pendingSkillRowId = null;
+  let pendingSkillTreeDialogTrigger = null;
 
   document.body.addEventListener("skillAliasAdded", function (event) {
     if (event.detail && event.detail.skillId)
@@ -364,39 +365,217 @@
     });
   }
 
-  function closeSkillTreeQuickAdd(form) {
-    form.reset();
-    const details = form.closest("details");
-    if (details) details.open = false;
+  function syncSkillTreeEmptyState(container) {
+    if (!container || !container.children) return;
+    const children = Array.from(container.children);
+    const emptyState = children.find(function (child) {
+      return child.hasAttribute("data-skill-tree-empty");
+    });
+    if (!emptyState) return;
+    const hasContent = children.some(function (child) {
+      return (
+        child.hasAttribute("data-skill-tree-node") ||
+        child.hasAttribute("data-skill-tree-inline-editor")
+      );
+    });
+    emptyState.classList.toggle("hidden", hasContent);
+  }
+
+  function removeSkillTreeInlineEditor(editor) {
+    if (!editor) return;
+    const container = editor.parentElement;
+    editor.remove();
+    syncSkillTreeEmptyState(container);
+  }
+
+  function removeSkillTreeInlineEditors() {
+    document
+      .querySelectorAll("[data-skill-tree-inline-editor]")
+      .forEach(removeSkillTreeInlineEditor);
+  }
+
+  function focusSkillTreeNode(nodeId) {
+    const node = document.getElementById(`skill-tree-node-${nodeId}`);
+    if (!node) return;
+    let ancestor = node.parentElement;
+    while (ancestor) {
+      if (ancestor.tagName === "DETAILS") ancestor.open = true;
+      ancestor = ancestor.parentElement;
+    }
+    const highlight = node.querySelector("[data-skill-tree-node-row]") || node;
+    highlight.classList.add(
+      "bg-success/10",
+      "outline",
+      "outline-2",
+      "outline-success/40",
+    );
+    node.setAttribute("tabindex", "-1");
+    window.requestAnimationFrame(function () {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+      node.focus({ preventScroll: true });
+    });
+    window.setTimeout(function () {
+      highlight.classList.remove(
+        "bg-success/10",
+        "outline",
+        "outline-2",
+        "outline-success/40",
+      );
+    }, 1800);
+  }
+
+  function initSkillTreeInlineEditor(root) {
+    const editors = [];
+    if (root.matches && root.matches("[data-skill-tree-inline-editor]"))
+      editors.push(root);
+    if (root.closest) {
+      const parentEditor = root.closest("[data-skill-tree-inline-editor]");
+      if (parentEditor) editors.push(parentEditor);
+    }
+    if (root.querySelectorAll) {
+      root
+        .querySelectorAll("[data-skill-tree-inline-editor]")
+        .forEach(function (editor) {
+          editors.push(editor);
+        });
+    }
+
+    const uniqueEditors = Array.from(new Set(editors));
+    const activeEditor = uniqueEditors[uniqueEditors.length - 1];
+    if (!activeEditor) return;
+    document
+      .querySelectorAll("[data-skill-tree-inline-editor]")
+      .forEach(function (editor) {
+        if (editor !== activeEditor) removeSkillTreeInlineEditor(editor);
+      });
+    [activeEditor].forEach(function (editor) {
+      syncSkillTreeEmptyState(editor.parentElement);
+      if (editor.dataset.skillTreeInlineBound !== "true") {
+        editor.dataset.skillTreeInlineBound = "true";
+        editor.addEventListener("keydown", function (event) {
+          if (event.key !== "Escape") return;
+          event.preventDefault();
+          removeSkillTreeInlineEditor(editor);
+        });
+        editor.addEventListener("click", function (event) {
+          if (event.target.closest("[data-skill-tree-inline-cancel]")) {
+            event.preventDefault();
+            removeSkillTreeInlineEditor(editor);
+            return;
+          }
+          const locate = event.target.closest("[data-skill-tree-locate-node]");
+          if (!locate) return;
+          const nodeId = locate.dataset.skillTreeLocateNode;
+          removeSkillTreeInlineEditor(editor);
+          focusSkillTreeNode(nodeId);
+        });
+      }
+      window.requestAnimationFrame(function () {
+        const input = editor.querySelector("[data-skill-tree-name-input]");
+        if (input) input.focus();
+      });
+    });
+  }
+
+  function initSkillTreeDialog(root) {
+    const dialogs = [];
+    if (root.matches && root.matches("[data-skill-tree-dialog]"))
+      dialogs.push(root);
+    if (root.closest) {
+      const parentDialog = root.closest("[data-skill-tree-dialog]");
+      if (parentDialog) dialogs.push(parentDialog);
+    }
+    if (root.querySelectorAll) {
+      root
+        .querySelectorAll("[data-skill-tree-dialog]")
+        .forEach(function (dialog) {
+          dialogs.push(dialog);
+        });
+    }
+
+    if (dialogs.length) removeSkillTreeInlineEditors();
+    Array.from(new Set(dialogs)).forEach(function (dialog) {
+      if (dialog.dataset.skillTreeDialogBound !== "true") {
+        dialog.dataset.skillTreeDialogBound = "true";
+        dialog.addEventListener("click", function (event) {
+          if (event.target === dialog) dialog.close();
+          if (event.target.closest("[data-skill-tree-dialog-close]"))
+            dialog.close();
+        });
+        dialog.addEventListener("close", function () {
+          const host = dialog.closest("#skill-tree-dialog");
+          if (host) host.replaceChildren();
+          if (!document.querySelector(".tms-side-dialog[open]"))
+            document.body.classList.remove("overflow-hidden");
+          const trigger = pendingSkillTreeDialogTrigger;
+          pendingSkillTreeDialogTrigger = null;
+          if (trigger && trigger.isConnected) trigger.focus();
+        });
+      }
+      if (!dialog.open && typeof dialog.showModal === "function")
+        dialog.showModal();
+      document.body.classList.add("overflow-hidden");
+      window.requestAnimationFrame(function () {
+        const focusTarget = dialog.querySelector(
+          "[autofocus], #id_name, select, input:not([type='hidden']), button",
+        );
+        if (focusTarget) focusTarget.focus();
+      });
+    });
+
+    if (
+      dialogs.length === 0 &&
+      !document.querySelector("[data-skill-tree-dialog][open]") &&
+      !document.querySelector("[data-skill-create-dialog][open]")
+    ) {
+      document.body.classList.remove("overflow-hidden");
+      if (
+        pendingSkillTreeDialogTrigger &&
+        !pendingSkillTreeDialogTrigger.isConnected
+      )
+        pendingSkillTreeDialogTrigger = null;
+    }
+  }
+
+  function initSkillTreeRemoveForm(root) {
+    const forms = [];
+    if (root.matches && root.matches("[data-skill-tree-remove-form]"))
+      forms.push(root);
+    if (root.closest) {
+      const parentForm = root.closest("[data-skill-tree-remove-form]");
+      if (parentForm) forms.push(parentForm);
+    }
+    if (root.querySelectorAll) {
+      root
+        .querySelectorAll("[data-skill-tree-remove-form]")
+        .forEach(function (form) {
+          forms.push(form);
+        });
+    }
+    Array.from(new Set(forms)).forEach(function (form) {
+      const confirmation = form.querySelector("[data-skill-tree-subtree-confirm]");
+      if (!confirmation) return;
+      function sync() {
+        const selected = form.querySelector("input[name='mode']:checked");
+        confirmation.classList.toggle(
+          "hidden",
+          !selected || selected.value !== "subtree",
+        );
+      }
+      if (form.dataset.skillTreeRemoveBound !== "true") {
+        form.dataset.skillTreeRemoveBound = "true";
+        form.addEventListener("change", function (event) {
+          if (event.target.name === "mode") sync();
+        });
+      }
+      sync();
+    });
   }
 
   function initSkillTreeWorkbench(root) {
-    if (!root.querySelectorAll) return;
-    root.querySelectorAll("[data-skill-tree-quick-add]").forEach(function (form) {
-      if (form.dataset.skillTreeBound === "true") return;
-      form.dataset.skillTreeBound = "true";
-      form.addEventListener("keydown", function (event) {
-        if (event.key !== "Escape") return;
-        event.preventDefault();
-        closeSkillTreeQuickAdd(form);
-      });
-      const cancel = form.querySelector("[data-skill-tree-cancel]");
-      if (cancel) {
-        cancel.addEventListener("click", function (event) {
-          event.preventDefault();
-          closeSkillTreeQuickAdd(form);
-        });
-      }
-      const details = form.closest("details");
-      if (details && details.dataset.skillTreeToggleBound !== "true") {
-        details.dataset.skillTreeToggleBound = "true";
-        details.addEventListener("toggle", function () {
-          if (!details.open) return;
-          const input = details.querySelector("[data-skill-tree-name-input]");
-          if (input) window.requestAnimationFrame(function () { input.focus(); });
-        });
-      }
-    });
+    initSkillTreeInlineEditor(root);
+    initSkillTreeDialog(root);
+    initSkillTreeRemoveForm(root);
   }
 
   function initAll(root) {
@@ -416,6 +595,24 @@
   document.addEventListener("DOMContentLoaded", function () {
     initAll(document);
   });
+  document.body.addEventListener("htmx:beforeRequest", function (event) {
+    const element = event.detail && event.detail.elt;
+    if (!element || !element.closest) return;
+    if (element.closest("[data-skill-tree-editor-trigger]")) {
+      removeSkillTreeInlineEditors();
+      const branchWrapper = element.closest("[data-skill-tree-branch-wrapper]");
+      const branch = branchWrapper
+        ? branchWrapper.querySelector("[data-skill-tree-branch]")
+        : element.closest("[data-skill-tree-branch]");
+      if (branch) branch.open = true;
+    }
+    const menu = element.closest("[data-skill-tree-node-menu]");
+    if (element.closest("[data-skill-tree-dialog-trigger]"))
+      pendingSkillTreeDialogTrigger = menu
+        ? menu.querySelector("summary")
+        : element;
+    if (menu) menu.open = false;
+  });
   document.body.addEventListener("htmx:afterSwap", function (event) {
     initAll(event.target);
   });
@@ -432,31 +629,10 @@
   });
   document.body.addEventListener("skillTreeNodeCreated", function (event) {
     if (!event.detail || !event.detail.nodeId) return;
-    const node = document.getElementById(`skill-tree-node-${event.detail.nodeId}`);
-    if (!node) return;
-    let ancestor = node.parentElement;
-    while (ancestor) {
-      if (ancestor.tagName === "DETAILS") ancestor.open = true;
-      ancestor = ancestor.parentElement;
-    }
-    node.classList.add(
-      "bg-success/10",
-      "outline",
-      "outline-2",
-      "outline-success/40",
-    );
-    node.setAttribute("tabindex", "-1");
-    window.requestAnimationFrame(function () {
-      node.scrollIntoView({ behavior: "smooth", block: "center" });
-      node.focus({ preventScroll: true });
-    });
-    window.setTimeout(function () {
-      node.classList.remove(
-        "bg-success/10",
-        "outline",
-        "outline-2",
-        "outline-success/40",
-      );
-    }, 1800);
+    focusSkillTreeNode(event.detail.nodeId);
+  });
+  document.body.addEventListener("skillTreeNodeFocused", function (event) {
+    if (!event.detail || !event.detail.nodeId) return;
+    focusSkillTreeNode(event.detail.nodeId);
   });
 })();

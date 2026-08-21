@@ -62,6 +62,36 @@ urlpatterns = [
         name="tree_candidates_child",
     ),
     path(
+        "trees/<int:tree_pk>/nodes/<int:node_pk>/quick-add-sibling/",
+        views.skill_tree_quick_add_sibling,
+        name="tree_quick_add_sibling",
+    ),
+    path(
+        "trees/<int:tree_pk>/nodes/<int:node_pk>/candidates-sibling/",
+        views.skill_tree_candidates_sibling,
+        name="tree_candidates_sibling",
+    ),
+    path(
+        "trees/<int:tree_pk>/domains/<int:domain_pk>/skill-create/",
+        views.skill_tree_detailed_create_root,
+        name="tree_skill_create_root",
+    ),
+    path(
+        "trees/<int:tree_pk>/nodes/<int:parent_pk>/skill-create-child/",
+        views.skill_tree_detailed_create_child,
+        name="tree_skill_create_child",
+    ),
+    path(
+        "trees/<int:tree_pk>/nodes/<int:node_pk>/skill-create-sibling/",
+        views.skill_tree_detailed_create_sibling,
+        name="tree_skill_create_sibling",
+    ),
+    path(
+        "trees/<int:tree_pk>/nodes/<int:node_pk>/skill-edit/",
+        views.skill_tree_skill_edit,
+        name="tree_node_skill_edit",
+    ),
+    path(
         "trees/<int:tree_pk>/nodes/<int:node_pk>/move/",
         views.skill_tree_move,
         name="tree_node_move",

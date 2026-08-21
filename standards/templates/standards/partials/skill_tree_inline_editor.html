@@ -1,0 +1,52 @@
+<li class="py-1" data-skill-tree-inline-editor>
+  <form
+    method="post"
+    class="rounded-box border border-primary/30 bg-primary/5 p-2"
+    hx-post="{{ submit_url }}"
+    hx-target="closest [data-skill-tree-inline-editor]"
+    hx-swap="outerHTML"
+    hx-sync="this:replace"
+  >
+    {% csrf_token %}
+    {% for hidden in inline_form.hidden_fields %}{{ hidden }}{% endfor %}
+    {% include "components/form_errors.html" with form=inline_form %}
+    {% if inline_form.name.errors %}
+      <div class="alert alert-error mb-2 py-2 text-sm">
+        <ul class="list-disc pl-4">
+          {% for error in inline_form.name.errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+    <div class="flex items-center gap-2">
+      <span class="icon-[tabler--point] size-4 shrink-0 text-primary" aria-hidden="true"></span>
+      <input
+        type="text"
+        name="name"
+        value="{{ inline_form.name.value|default_if_none:'' }}"
+        class="input input-ghost input-sm min-w-0 flex-1 bg-base-100"
+        maxlength="200"
+        required
+        autofocus
+        autocomplete="off"
+        placeholder="{% if can_create_skill %}输入或搜索技能名称……{% else %}搜索已有技能……{% endif %}"
+        hx-get="{{ candidates_url }}"
+        hx-trigger="input changed delay:350ms, search"
+        hx-target="#skill-tree-inline-candidates"
+        hx-swap="innerHTML"
+        data-skill-tree-name-input
+      />
+      <button
+        type="button"
+        class="btn btn-square btn-ghost btn-sm"
+        aria-label="取消添加技能"
+        title="取消"
+        data-skill-tree-inline-cancel
+      >
+        <span class="icon-[tabler--x] size-4" aria-hidden="true"></span>
+      </button>
+    </div>
+    <div id="skill-tree-inline-candidates">
+      {% include "standards/partials/skill_tree_candidates.html" %}
+    </div>
+  </form>
+</li>

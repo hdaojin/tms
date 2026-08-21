@@ -319,6 +319,42 @@ def create_skill_in_tree(
     )
 
 
+@transaction.atomic
+def create_detailed_skill_in_tree(
+    *,
+    tree_version,
+    technical_domain,
+    parent,
+    skill,
+    aliases,
+    related_domains,
+    actor,
+):
+    """保存完整 SkillForm 数据，并原子挂入服务端确定的树位置。"""
+
+    _lock_tree(tree_version)
+    _require_domain_scope(actor=actor, domain=technical_domain, permission="standards.add_skill")
+    _require_domain_scope(actor=actor, domain=technical_domain, permission="standards.add_skilltreenode")
+    if not technical_domain.is_active:
+        raise ValidationError("已停用的技术领域不能新增技能。")
+    _validate_parent(tree_version=tree_version, technical_domain=technical_domain, parent=parent)
+
+    skill.skill_project = tree_version.skill_project
+    skill.primary_domain = technical_domain
+    saved_skill = save_skill(
+        skill=skill,
+        aliases=aliases,
+        related_domains=related_domains,
+    )
+    return attach_existing_skill_to_tree(
+        tree_version=tree_version,
+        technical_domain=technical_domain,
+        parent=parent,
+        skill=saved_skill,
+        actor=actor,
+    )
+
+
 def _locked_tree_nodes(tree_version):
     return list(
         SkillTreeNode.objects.select_for_update()

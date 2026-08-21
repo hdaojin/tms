@@ -81,6 +81,7 @@ def skill_tree_structure(*, tree_version, user):
         children_by_parent[node.parent_id].append(node)
 
     can_add_node = user.has_perm("standards.add_skilltreenode")
+    can_add_skill = user.has_perm("standards.add_skill")
     can_change_node = user.has_perm("standards.change_skilltreenode")
     can_delete_node = user.has_perm("standards.delete_skilltreenode")
     can_change_skill = user.has_perm("standards.change_skill")
@@ -95,23 +96,36 @@ def skill_tree_structure(*, tree_version, user):
         node.can_edit_skill = can_change_skill and (
             project_admin or node.skill.primary_domain_id in manageable_domain_ids
         )
-        node.can_add_child = (
+        node.can_add_tree_position = (
             can_add_node and node.technical_domain.is_active and node.technical_domain_id in manageable_domain_ids
         )
+        node.can_create_skill = (
+            can_add_skill and node.technical_domain.is_active and node.technical_domain_id in manageable_domain_ids
+        )
         node.can_move = can_change_node and node.technical_domain_id in manageable_domain_ids
+        node.can_move_up = False
+        node.can_move_down = False
         node.can_remove = can_delete_node and node.technical_domain_id in manageable_domain_ids
+        decorate_siblings(node.tree_children, [*ancestors, node.skill.name])
         for child in node.tree_children:
-            decorate_branch(child, [*ancestors, node.skill.name])
             node.descendant_count += child.descendant_count + 1
+
+    def decorate_siblings(siblings, ancestors):
+        for node in siblings:
+            decorate_branch(node, ancestors)
+        for index, node in enumerate(siblings):
+            node.can_move_up = node.can_move and index > 0
+            node.can_move_down = node.can_move and index < len(siblings) - 1
 
     roots_by_domain = defaultdict(list)
     for root in children_by_parent.get(None, []):
         roots_by_domain[root.technical_domain_id].append(root)
-        decorate_branch(root, [])
 
     for domain in domains:
         domain.tree_roots = roots_by_domain.get(domain.pk, [])
-        domain.can_add_root = can_add_node and domain.is_active and domain.pk in manageable_domain_ids
+        decorate_siblings(domain.tree_roots, [])
+        domain.can_add_tree_position = can_add_node and domain.is_active and domain.pk in manageable_domain_ids
+        domain.can_create_skill = can_add_skill and domain.is_active and domain.pk in manageable_domain_ids
         domain.can_manage_tree = domain.pk in manageable_domain_ids
     return domains
 

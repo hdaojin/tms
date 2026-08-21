@@ -8,7 +8,7 @@ from django.db.models import BooleanField, Case, Count, Exists, OuterRef, Q, Val
 from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 from django.views.generic import CreateView, DetailView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
 
@@ -40,6 +40,7 @@ from .selectors import (
 from .services import (
     add_skill_alias,
     attach_existing_skill_to_tree,
+    create_detailed_skill_in_tree,
     create_skill_in_tree,
     find_skill_candidates,
     move_skill_tree_node,
@@ -622,7 +623,6 @@ class SkillTreeVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["tree_domains"] = skill_tree_structure(tree_version=self.object, user=self.request.user)
-        context["quick_add_form"] = SkillTreeQuickAddForm()
         return context
 
 
@@ -645,37 +645,49 @@ def _tree_for_workbench(tree_pk):
 
 def _tree_node(tree, node_pk):
     return get_object_or_404(
-        SkillTreeNode.objects.select_related("skill", "technical_domain", "tree_version"),
+        SkillTreeNode.objects.select_related(
+            "skill",
+            "skill__primary_domain",
+            "technical_domain",
+            "tree_version",
+            "parent",
+            "parent__skill",
+        ),
         pk=node_pk,
         tree_version=tree,
     )
 
 
-def _tree_descendant_count(tree, node):
+def _tree_descendant_stats(tree, node):
     children_by_parent = {}
     for child_id, parent_id in SkillTreeNode.objects.filter(tree_version=tree).values_list("pk", "parent_id"):
         children_by_parent.setdefault(parent_id, []).append(child_id)
+    direct_child_count = len(children_by_parent.get(node.pk, ()))
     count = 0
     stack = list(children_by_parent.get(node.pk, ()))
     while stack:
         current = stack.pop()
         count += 1
         stack.extend(children_by_parent.get(current, ()))
-    return count
+    return direct_child_count, count
 
 
-def _render_tree_panel(request, tree, *, created_node_id=None):
+def _render_tree_panel(request, tree, *, created_node_id=None, focused_node_id=None):
     response = render(
         request,
         "standards/partials/skill_tree_panel.html",
         {
             "tree": tree,
             "tree_domains": skill_tree_structure(tree_version=tree, user=request.user),
-            "quick_add_form": SkillTreeQuickAddForm(),
         },
     )
+    events = {}
     if created_node_id is not None:
-        response.headers["HX-Trigger-After-Swap"] = json.dumps({"skillTreeNodeCreated": {"nodeId": created_node_id}})
+        events["skillTreeNodeCreated"] = {"nodeId": created_node_id}
+    if focused_node_id is not None:
+        events["skillTreeNodeFocused"] = {"nodeId": focused_node_id}
+    if events:
+        response.headers["HX-Trigger-After-Swap"] = json.dumps(events)
     return response
 
 
@@ -685,50 +697,130 @@ def skill_tree_panel(request, tree_pk):
     return _render_tree_panel(request, _tree_for_workbench(tree_pk))
 
 
-def _quick_add_context(*, tree, domain, parent, form, candidates=()):
+def _root_placement(tree, domain_pk):
+    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
+    return domain, None, None
+
+
+def _child_placement(tree, parent_pk, domain_pk=None):
+    parent = _tree_node(tree, parent_pk)
+    if domain_pk is not None and parent.technical_domain_id != domain_pk:
+        raise Http404
+    return parent.technical_domain, parent, parent
+
+
+def _sibling_placement(tree, node_pk):
+    node = _tree_node(tree, node_pk)
+    return node.technical_domain, node.parent, node
+
+
+def _tree_editor_urls(*, tree, domain, kind, anchor):
+    if kind == "root":
+        return {
+            "submit_url": reverse("standards:tree_quick_add_root", args=[tree.pk, domain.pk]),
+            "candidates_url": reverse("standards:tree_candidates_root", args=[tree.pk, domain.pk]),
+            "full_create_url": reverse("standards:tree_skill_create_root", args=[tree.pk, domain.pk]),
+        }
+    if kind == "child":
+        return {
+            "submit_url": reverse(
+                "standards:tree_quick_add_child",
+                args=[tree.pk, domain.pk, anchor.pk],
+            ),
+            "candidates_url": reverse(
+                "standards:tree_candidates_child",
+                args=[tree.pk, domain.pk, anchor.pk],
+            ),
+            "full_create_url": reverse("standards:tree_skill_create_child", args=[tree.pk, anchor.pk]),
+        }
     return {
-        "tree": tree,
-        "domain": domain,
-        "parent": parent,
-        "quick_add_form": form,
-        "candidates": candidates,
+        "submit_url": reverse("standards:tree_quick_add_sibling", args=[tree.pk, anchor.pk]),
+        "candidates_url": reverse("standards:tree_candidates_sibling", args=[tree.pk, anchor.pk]),
+        "full_create_url": reverse("standards:tree_skill_create_sibling", args=[tree.pk, anchor.pk]),
     }
 
 
 def _tree_candidates(*, tree, domain, query):
     candidates = find_skill_candidates(skill_project=tree.skill_project, query=query)
+    candidate_ids = [candidate.pk for candidate in candidates]
+    tree_nodes = list(
+        SkillTreeNode.objects.filter(tree_version=tree)
+        .select_related("skill")
+        .order_by("order", "pk")
+    ) if candidate_ids else []
+    node_by_id = {node.pk: node for node in tree_nodes}
     existing_by_skill = {
-        node.skill_id: node
-        for node in SkillTreeNode.objects.filter(
-            tree_version=tree,
-            skill_id__in=[candidate.pk for candidate in candidates],
-        ).select_related("skill", "parent__skill")
+        node.skill_id: node for node in tree_nodes if node.skill_id in candidate_ids
     }
+
+    def path_for(node):
+        parts = [node.skill.name]
+        parent_id = node.parent_id
+        while parent_id is not None:
+            parent = node_by_id[parent_id]
+            parts.append(parent.skill.name)
+            parent_id = parent.parent_id
+        return " / ".join(reversed(parts))
+
     for candidate in candidates:
         candidate.existing_tree_node = existing_by_skill.get(candidate.pk)
+        candidate.existing_tree_path = (
+            path_for(candidate.existing_tree_node) if candidate.existing_tree_node is not None else ""
+        )
+        candidate.domain_compatible = candidate.primary_domain_id == domain.pk or any(
+            item.pk == domain.pk for item in candidate.related_domains.all()
+        )
         candidate.can_attach_to_domain = (
             candidate.is_active
             and candidate.existing_tree_node is None
-            and (
-                candidate.primary_domain_id == domain.pk
-                or any(item.pk == domain.pk for item in candidate.related_domains.all())
-            )
+            and candidate.domain_compatible
         )
     return candidates
 
 
-@require_POST
-def skill_tree_quick_add(request, tree_pk, domain_pk, parent_pk=None):
-    tree = _tree_for_workbench(tree_pk)
-    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
-    parent = _tree_node(tree, parent_pk) if parent_pk is not None else None
-    if parent is not None and parent.technical_domain_id != domain.pk:
-        raise Http404
+def _tree_inline_context(*, request, tree, domain, parent, kind, anchor, form, candidates=()):
+    can_create_skill = can_manage_domain(request.user, domain, permission="standards.add_skill")
+    return {
+        "tree": tree,
+        "domain": domain,
+        "parent": parent,
+        "inline_form": form,
+        "candidates": candidates,
+        "candidate_query": form.data.get("name", "") if form.is_bound else form.initial.get("name", ""),
+        "has_high_similarity": any(
+            candidate.candidate_high_similarity and not candidate.candidate_exact for candidate in candidates
+        ),
+        "can_create_skill": can_create_skill,
+        **_tree_editor_urls(tree=tree, domain=domain, kind=kind, anchor=anchor),
+    }
+
+
+def _render_tree_inline_editor(*, request, tree, domain, parent, kind, anchor, form, candidates=()):
+    return render(
+        request,
+        "standards/partials/skill_tree_inline_editor.html",
+        _tree_inline_context(
+            request=request,
+            tree=tree,
+            domain=domain,
+            parent=parent,
+            kind=kind,
+            anchor=anchor,
+            form=form,
+            candidates=candidates,
+        ),
+    )
+
+
+def _skill_tree_inline_editor(request, *, tree, domain, parent, kind, anchor):
     if not can_manage_domain(request.user, domain, permission="standards.add_skilltreenode"):
         raise PermissionDenied
-    form = SkillTreeQuickAddForm(request.POST)
+
+    form = SkillTreeQuickAddForm(request.POST if request.method == "POST" else None)
     candidates = []
-    if form.is_valid():
+    if request.method == "POST" and form.is_valid():
+        candidates = _tree_candidates(tree=tree, domain=domain, query=form.cleaned_data["name"])
+        node = None
         try:
             if skill_id := form.cleaned_data.get("existing_skill_id"):
                 skill = get_object_or_404(Skill, pk=skill_id, skill_project=tree.skill_project)
@@ -740,15 +832,246 @@ def skill_tree_quick_add(request, tree_pk, domain_pk, parent_pk=None):
                     actor=request.user,
                 )
             else:
-                node = create_skill_in_tree(
-                    tree_version=tree,
-                    technical_domain=domain,
-                    parent=parent,
-                    name=form.cleaned_data["name"],
-                    description=form.cleaned_data.get("description", ""),
-                    confirm_distinct=form.cleaned_data.get("confirm_distinct", False),
-                    actor=request.user,
-                )
+                exact = next((candidate for candidate in candidates if candidate.candidate_exact), None)
+                high_similarity = [
+                    candidate
+                    for candidate in candidates
+                    if candidate.candidate_high_similarity and not candidate.candidate_exact
+                ]
+                if exact is not None and exact.can_attach_to_domain:
+                    node = attach_existing_skill_to_tree(
+                        tree_version=tree,
+                        technical_domain=domain,
+                        parent=parent,
+                        skill=exact,
+                        actor=request.user,
+                    )
+                elif exact is None and not high_similarity:
+                    if not can_manage_domain(request.user, domain, permission="standards.add_skill"):
+                        form.add_error(
+                            "name",
+                            "你可以将已有技能挂入此位置，但没有创建新技能的权限。",
+                        )
+                    else:
+                        node = create_skill_in_tree(
+                            tree_version=tree,
+                            technical_domain=domain,
+                            parent=parent,
+                            name=form.cleaned_data["name"],
+                            actor=request.user,
+                        )
+                # 精确候选已在树中、不可挂载，或存在高度相似候选时保留编辑器供用户选择。
+                if node is None:
+                    return _render_tree_inline_editor(
+                        request=request,
+                        tree=tree,
+                        domain=domain,
+                        parent=parent,
+                        kind=kind,
+                        anchor=anchor,
+                        form=form,
+                        candidates=candidates,
+                    )
+        except ValidationError as exc:
+            form.add_error(None, exc.message)
+        else:
+            if node is not None:
+                response = _render_tree_panel(request, tree, created_node_id=node.pk)
+                response.headers["HX-Retarget"] = "#skill-tree-panel"
+                response.headers["HX-Reswap"] = "outerHTML"
+                return response
+    if request.method == "POST" and form.data.get("name") and not candidates:
+        candidates = _tree_candidates(tree=tree, domain=domain, query=form.data["name"])
+    return _render_tree_inline_editor(
+        request=request,
+        tree=tree,
+        domain=domain,
+        parent=parent,
+        kind=kind,
+        anchor=anchor,
+        form=form,
+        candidates=candidates,
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def skill_tree_quick_add(request, tree_pk, domain_pk, parent_pk=None):
+    tree = _tree_for_workbench(tree_pk)
+    if parent_pk is None:
+        domain, parent, anchor = _root_placement(tree, domain_pk)
+        kind = "root"
+    else:
+        domain, parent, anchor = _child_placement(tree, parent_pk, domain_pk)
+        kind = "child"
+    return _skill_tree_inline_editor(
+        request,
+        tree=tree,
+        domain=domain,
+        parent=parent,
+        kind=kind,
+        anchor=anchor,
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def skill_tree_quick_add_sibling(request, tree_pk, node_pk):
+    tree = _tree_for_workbench(tree_pk)
+    domain, parent, anchor = _sibling_placement(tree, node_pk)
+    return _skill_tree_inline_editor(
+        request,
+        tree=tree,
+        domain=domain,
+        parent=parent,
+        kind="sibling",
+        anchor=anchor,
+    )
+
+
+def _skill_tree_candidate_fragment(request, *, tree, domain, parent, kind, anchor):
+    if not can_manage_domain(request.user, domain, permission="standards.add_skilltreenode"):
+        raise PermissionDenied
+    query = request.GET.get("name", "")
+    form = SkillTreeQuickAddForm(initial={"name": query})
+    candidates = _tree_candidates(tree=tree, domain=domain, query=query)
+    return render(
+        request,
+        "standards/partials/skill_tree_candidates.html",
+        _tree_inline_context(
+            request=request,
+            tree=tree,
+            domain=domain,
+            parent=parent,
+            kind=kind,
+            anchor=anchor,
+            form=form,
+            candidates=candidates,
+        ),
+    )
+
+
+@require_GET
+def skill_tree_candidates(request, tree_pk, domain_pk, parent_pk=None):
+    tree = _tree_for_workbench(tree_pk)
+    if parent_pk is None:
+        domain, parent, anchor = _root_placement(tree, domain_pk)
+        kind = "root"
+    else:
+        domain, parent, anchor = _child_placement(tree, parent_pk, domain_pk)
+        kind = "child"
+    return _skill_tree_candidate_fragment(
+        request,
+        tree=tree,
+        domain=domain,
+        parent=parent,
+        kind=kind,
+        anchor=anchor,
+    )
+
+
+@require_GET
+def skill_tree_candidates_sibling(request, tree_pk, node_pk):
+    tree = _tree_for_workbench(tree_pk)
+    domain, parent, anchor = _sibling_placement(tree, node_pk)
+    return _skill_tree_candidate_fragment(
+        request,
+        tree=tree,
+        domain=domain,
+        parent=parent,
+        kind="sibling",
+        anchor=anchor,
+    )
+
+
+def _tree_skill_form(*, request, tree, domain, instance=None):
+    data = None
+    if request.method == "POST":
+        data = request.POST.copy()
+        data["skill_project"] = tree.skill_project_id if instance is None else instance.skill_project_id
+        if instance is None:
+            data["primary_domain"] = domain.pk
+    initial = None
+    if instance is None:
+        initial = {
+            "skill_project": tree.skill_project,
+            "primary_domain": domain,
+            "name": request.GET.get("name", "").strip(),
+        }
+    form = SkillForm(data=data, initial=initial, instance=instance, user=request.user)
+    form.fields["skill_project"].widget = forms.HiddenInput()
+    if instance is None:
+        form.fields["primary_domain"].widget = forms.HiddenInput()
+    else:
+        for attribute in ("hx-get", "hx-target", "hx-trigger", "hx-include"):
+            form.fields["name"].widget.attrs.pop(attribute, None)
+    return form
+
+
+def _tree_skill_candidates(*, request, tree, form, exclude_skill=None):
+    query = form.data.get("name", "") if form.is_bound else form.initial.get("name", "")
+    if not query or exclude_skill is not None:
+        return query, []
+    candidates = _decorate_candidate_permissions(
+        request.user,
+        find_skill_candidates(
+            skill_project=tree.skill_project,
+            query=query,
+            exclude_skill=exclude_skill,
+        ),
+    )
+    return query, candidates
+
+
+def _render_tree_skill_dialog(*, request, tree, domain, parent, node, form, action_url, candidates=()):
+    candidate_query = form.data.get("name", "") if form.is_bound else form.initial.get("name", "")
+    return render(
+        request,
+        "standards/partials/skill_tree_skill_form_dialog.html",
+        {
+            "tree": tree,
+            "domain": domain,
+            "parent": parent,
+            "node": node,
+            "skill_form": form,
+            "form_action": action_url,
+            "is_edit": node is not None,
+            "candidates": candidates,
+            "candidate_query": candidate_query,
+            "has_high_similarity": any(
+                candidate.candidate_high_similarity and not candidate.candidate_exact for candidate in candidates
+            ),
+        },
+    )
+
+
+def _skill_tree_detailed_create(request, *, tree, domain, parent, action_url):
+    if not can_manage_domain(request.user, domain, permission="standards.add_skill"):
+        raise PermissionDenied
+    if not can_manage_domain(request.user, domain, permission="standards.add_skilltreenode"):
+        raise PermissionDenied
+
+    form = _tree_skill_form(request=request, tree=tree, domain=domain)
+    is_valid = request.method == "POST" and form.is_valid()
+    _, candidates = _tree_skill_candidates(request=request, tree=tree, form=form)
+    high_similarity = [
+        candidate for candidate in candidates if candidate.candidate_high_similarity and not candidate.candidate_exact
+    ]
+    if is_valid and high_similarity and not form.cleaned_data.get("confirm_distinct"):
+        form.add_error("confirm_distinct", "请先确认候选技能与当前技能并非同一技能。")
+    if is_valid and high_similarity and not form.cleaned_data.get("description", "").strip():
+        form.add_error("description", "存在高相似候选时，请填写描述说明技能边界。")
+
+    if is_valid and not form.errors:
+        skill = form.save(commit=False)
+        try:
+            node = create_detailed_skill_in_tree(
+                tree_version=tree,
+                technical_domain=domain,
+                parent=parent,
+                skill=skill,
+                aliases=form._split_text(form.cleaned_data.get("aliases_text")),
+                related_domains=form.cleaned_data.get("related_domains", ()),
+                actor=request.user,
+            )
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
@@ -756,35 +1079,102 @@ def skill_tree_quick_add(request, tree_pk, domain_pk, parent_pk=None):
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
-    if form.data.get("name"):
-        candidates = _tree_candidates(tree=tree, domain=domain, query=form.data["name"])
-    return render(
-        request,
-        "standards/partials/skill_tree_quick_add.html",
-        _quick_add_context(tree=tree, domain=domain, parent=parent, form=form, candidates=candidates),
+
+    return _render_tree_skill_dialog(
+        request=request,
+        tree=tree,
+        domain=domain,
+        parent=parent,
+        node=None,
+        form=form,
+        action_url=action_url,
+        candidates=candidates,
     )
 
 
-def skill_tree_candidates(request, tree_pk, domain_pk, parent_pk=None):
+@require_http_methods(["GET", "POST"])
+def skill_tree_detailed_create_root(request, tree_pk, domain_pk):
     tree = _tree_for_workbench(tree_pk)
-    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
-    parent = _tree_node(tree, parent_pk) if parent_pk is not None else None
-    if parent is not None and parent.technical_domain_id != domain.pk:
-        raise Http404
-    if not can_manage_domain(request.user, domain, permission="standards.add_skilltreenode"):
-        raise PermissionDenied
-    query = request.GET.get("name", "")
-    candidates = _tree_candidates(tree=tree, domain=domain, query=query)
-    return render(
+    domain, parent, _ = _root_placement(tree, domain_pk)
+    action_url = reverse("standards:tree_skill_create_root", args=[tree.pk, domain.pk])
+    return _skill_tree_detailed_create(
         request,
-        "standards/partials/skill_tree_candidates.html",
-        _quick_add_context(
-            tree=tree,
-            domain=domain,
-            parent=parent,
-            form=SkillTreeQuickAddForm(initial={"name": query}),
-            candidates=candidates,
-        ),
+        tree=tree,
+        domain=domain,
+        parent=parent,
+        action_url=action_url,
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def skill_tree_detailed_create_child(request, tree_pk, parent_pk):
+    tree = _tree_for_workbench(tree_pk)
+    domain, parent, _ = _child_placement(tree, parent_pk)
+    action_url = reverse("standards:tree_skill_create_child", args=[tree.pk, parent.pk])
+    return _skill_tree_detailed_create(
+        request,
+        tree=tree,
+        domain=domain,
+        parent=parent,
+        action_url=action_url,
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def skill_tree_detailed_create_sibling(request, tree_pk, node_pk):
+    tree = _tree_for_workbench(tree_pk)
+    domain, parent, anchor = _sibling_placement(tree, node_pk)
+    action_url = reverse("standards:tree_skill_create_sibling", args=[tree.pk, anchor.pk])
+    return _skill_tree_detailed_create(
+        request,
+        tree=tree,
+        domain=domain,
+        parent=parent,
+        action_url=action_url,
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def skill_tree_skill_edit(request, tree_pk, node_pk):
+    tree = _tree_for_workbench(tree_pk)
+    node = _tree_node(tree, node_pk)
+    if not request.user.has_perm("standards.change_skill"):
+        raise PermissionDenied
+    if not can_manage_skill(request.user, node.skill):
+        raise Http404
+
+    form = _tree_skill_form(
+        request=request,
+        tree=tree,
+        domain=node.technical_domain,
+        instance=node.skill,
+    )
+    if request.method == "POST" and form.is_valid():
+        skill = form.save(commit=False)
+        try:
+            save_skill(
+                skill=skill,
+                aliases=form._split_text(form.cleaned_data.get("aliases_text")),
+                related_domains=form.cleaned_data.get("related_domains", ()),
+                preserve_old_name=form.cleaned_data.get("preserve_old_name", False),
+                old_name=form.old_name,
+            )
+        except ValidationError as exc:
+            form.add_error(None, exc.message)
+        else:
+            response = _render_tree_panel(request, tree, focused_node_id=node.pk)
+            response.headers["HX-Retarget"] = "#skill-tree-panel"
+            response.headers["HX-Reswap"] = "outerHTML"
+            return response
+
+    return _render_tree_skill_dialog(
+        request=request,
+        tree=tree,
+        domain=node.technical_domain,
+        parent=node.parent,
+        node=node,
+        form=form,
+        action_url=reverse("standards:tree_node_skill_edit", args=[tree.pk, node.pk]),
     )
 
 
@@ -821,7 +1211,7 @@ def skill_tree_move(request, tree_pk, node_pk):
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            response = _render_tree_panel(request, tree)
+            response = _render_tree_panel(request, tree, focused_node_id=node.pk)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -852,8 +1242,19 @@ def skill_tree_remove(request, tree_pk, node_pk):
     node = _tree_node(tree, node_pk)
     if not can_manage_domain(request.user, node.technical_domain, permission="standards.delete_skilltreenode"):
         raise PermissionDenied
-    form = SkillTreeRemoveForm(request.POST or None)
-    descendant_count = _tree_descendant_count(tree, node)
+    direct_child_count, descendant_count = _tree_descendant_stats(tree, node)
+    form_data = request.POST.copy() if request.method == "POST" else None
+    if descendant_count == 0 and form_data is not None:
+        form_data["mode"] = "promote_children"
+    form = SkillTreeRemoveForm(form_data, initial={"mode": "promote_children"})
+    if descendant_count:
+        form.fields["mode"].choices = (
+            (
+                "promote_children",
+                f"仅移除当前技能，并将 {direct_child_count} 个直接子技能提升一级（推荐）",
+            ),
+            ("subtree", f"移除整个分支，共 {descendant_count + 1} 个树位置"),
+        )
     if request.method == "POST" and form.is_valid():
         try:
             remove_skill_tree_node(
@@ -875,6 +1276,7 @@ def skill_tree_remove(request, tree_pk, node_pk):
             "tree": tree,
             "node": node,
             "remove_form": form,
+            "direct_child_count": direct_child_count,
             "descendant_count": descendant_count,
             "subtree_count": descendant_count + 1,
         },
