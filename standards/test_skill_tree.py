@@ -466,7 +466,9 @@ class SkillTreePermissionAndViewTests(SkillTreeFixtureMixin, TestCase):
         child = self.node("用户管理", parent=root)
         self.node("sudo", parent=child)
 
-        response = self.client.get(reverse("standards:tree_detail", args=[self.tree.pk]))
+        response = self.client.get(
+            reverse("standards:tree_domain_detail", args=[self.tree.pk, self.linux.pk])
+        )
 
         self.assertContains(response, "Linux")
         self.assertContains(response, "系统管理")
@@ -482,7 +484,9 @@ class SkillTreePermissionAndViewTests(SkillTreeFixtureMixin, TestCase):
         self.node("用户管理", parent=root)
         self.node("网络服务")
 
-        response = self.client.get(reverse("standards:tree_detail", args=[self.tree.pk]))
+        response = self.client.get(
+            reverse("standards:tree_domain_detail", args=[self.tree.pk, self.linux.pk])
+        )
 
         self.assertContains(response, "data-skill-tree-node-row", count=3)
         self.assertContains(response, "data-skill-tree-add-child", count=3)
@@ -746,7 +750,9 @@ class SkillTreePermissionAndViewTests(SkillTreeFixtureMixin, TestCase):
         viewer = self.user_with_permissions("viewer", "view_skilltreeversion")
         self.client.force_login(viewer)
 
-        response = self.client.get(reverse("standards:tree_detail", args=[self.tree.pk]))
+        response = self.client.get(
+            reverse("standards:tree_domain_detail", args=[self.tree.pk, self.linux.pk])
+        )
 
         self.assertContains(response, "只读技能")
         self.assertNotContains(response, "新增根技能")
@@ -826,7 +832,9 @@ class SkillTreePermissionAndViewTests(SkillTreeFixtureMixin, TestCase):
         for index in range(29):
             self.node(f"批量技能 {index}", parent=root, order=index * 10)
 
-        response = self.client.get(reverse("standards:tree_detail", args=[self.tree.pk]))
+        response = self.client.get(
+            reverse("standards:tree_domain_detail", args=[self.tree.pk, self.linux.pk])
+        )
 
         self.assertContains(response, "data-skill-tree-node-row", count=30)
         self.assertEqual(response.content.count(b"data-skill-tree-inline-editor"), 0)
@@ -838,6 +846,7 @@ class SkillTreePermissionAndViewTests(SkillTreeFixtureMixin, TestCase):
         self.assertIn("function focusSkillTreeNode(nodeId)", script)
         self.assertIn("dialog.showModal()", script)
         self.assertIn("function removeSkillTreeInlineEditors()", script)
+        self.assertIn('event.target.closest("[data-skill-tree-node-menu]")', script)
 
     def test_selector_query_count_does_not_grow_with_node_count(self):
         self.admin.has_perm("standards.view_skilltreeversion")
@@ -852,13 +861,15 @@ class SkillTreePermissionAndViewTests(SkillTreeFixtureMixin, TestCase):
         self.assertEqual(len(small_queries), len(large_queries))
 
     def test_legacy_skill_code_no_longer_matches_catalog_search(self):
-        skill = self.skill("Linux 服务")
         response = self.client.get(
             reverse(
                 "standards:domain_detail",
                 kwargs={"project_pk": self.project.pk, "domain_pk": self.linux.pk},
             ),
-            {"q": f"SK-{skill.pk:06d}"},
         )
 
-        self.assertNotContains(response, skill.name)
+        self.assertRedirects(
+            response,
+            reverse("standards:domain_current_tree", args=[self.project.pk, self.linux.pk]),
+            fetch_redirect_response=False,
+        )

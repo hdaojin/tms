@@ -5,13 +5,13 @@
     <nav class="text-sm text-base-content/60" aria-label="面包屑">
       <a
         class="link"
-        href="{% url 'standards:skill_list' skill.skill_project_id %}"
-        >{{ skill.skill_project.name }}技能目录</a
+        href="{% url 'standards:project_detail' skill.skill_project_id %}"
+        >{{ skill.skill_project.name }}标准技能树</a
       >
       <span class="px-2">/</span>
       <a
         class="link"
-        href="{% url 'standards:domain_detail' skill.skill_project_id skill.primary_domain_id %}"
+        href="{% url 'standards:domain_current_tree' skill.skill_project_id skill.primary_domain_id %}"
         >{{ skill.primary_domain.name }}</a
       >
       <span class="px-2">/</span>

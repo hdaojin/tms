@@ -1,0 +1,55 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <div class="space-y-4">
+    <section class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="text-sm text-base-content/60">{{ project.name }} · {{ domain.code }}</p>
+            <h2 class="card-title">{{ domain.name }}技能树</h2>
+            {% if current_tree_missing %}
+              <p class="text-sm text-base-content/60">当前技能项目尚未设置当前技能树版本。</p>
+            {% else %}
+              <p class="text-sm text-base-content/60">
+                {{ tree.name }}（{{ tree.version }}）{% if is_current_tree %} · 当前版本{% else %} · 历史版本{% endif %}
+              </p>
+            {% endif %}
+          </div>
+          {% if tree and perms.standards.change_skilltreeversion %}
+            <a class="btn btn-outline btn-sm" href="{% url 'standards:tree_edit' tree.pk %}">编辑版本</a>
+          {% endif %}
+        </div>
+
+        {% if tree_domains %}
+          <div class="tabs tabs-box tabs-sm self-start">
+            {% for tab_domain in tree_domains %}
+              {% if is_current_tree %}
+                {% url 'standards:domain_current_tree' project.pk tab_domain.pk as tab_url %}
+              {% else %}
+                {% url 'standards:tree_domain_detail' tree.pk tab_domain.pk as tab_url %}
+              {% endif %}
+              <a class="tab{% if tab_domain.pk == domain.pk %} tab-active{% endif %}" href="{{ tab_url }}">{{ tab_domain.name }}</a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if current_tree_missing %}
+      {% include "components/empty_state.html" with title="尚无当前技能树" message="请先在技能树版本中创建版本并设置为当前版本。" %}
+    {% else %}
+      <div class="flex justify-end">
+        <button
+          type="button"
+          class="btn btn-outline btn-sm"
+          hx-get="{% url 'standards:tree_unmounted_skills' tree.pk domain.pk %}"
+          hx-target="#skill-tree-dialog"
+          hx-swap="innerHTML"
+          data-skill-tree-dialog-trigger
+        >未纳入当前树：{{ unmounted_skill_count }}</button>
+      </div>
+      {% include "standards/partials/skill_tree_domain_panel.html" %}
+    {% endif %}
+  </div>
+{% endblock %}

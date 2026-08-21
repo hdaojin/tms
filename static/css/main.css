@@ -88,6 +88,10 @@
     box-shadow: var(--shadow-2xl);
   }
 
+  [data-skill-tree-node-actions]:has([data-skill-tree-node-menu][open]) {
+    z-index: 40;
+  }
+
   @media (min-width: 1024px) {
     .tms-side-dialog-panel {
       width: 40rem;

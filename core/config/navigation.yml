@@ -314,43 +314,26 @@ sections:
         label: 标准体系
         icon_class: icon-[tabler--target-arrow] size-5 text-info
         children:
-          - key: standards
-            label: 技能项目
-            url_name: standards:project_list
-            icon_class: icon-[tabler--target-arrow] size-5 text-info
+          - key: standards_current_tree
+            label: 标准技能树
+            url_name: standards:current_tree_entry
+            icon_class: icon-[tabler--hierarchy-3] size-5 text-success
             permissions: [standards.view_skillproject]
-          - key: standards_create
-            label: 新增技能项目
-            url_name: standards:project_create
-            icon_class: icon-[tabler--plus] size-5 text-info
-            permissions:
-              - standards.add_skillproject
-          - key: standards_skills
-            label: 技能目录
-            url_name: standards:skill_catalog_entry
-            icon_class: icon-[tabler--target] size-5 text-info
-            permissions: [standards.view_skill]
           - key: standards_trees
-            label: 标准技能树版本
+            label: 技能树版本
             url_name: standards:tree_list
             icon_class: icon-[tabler--hierarchy-3] size-5 text-success
             permissions: [standards.view_skilltreeversion]
-          - key: standards_tree_create
-            label: 新增标准技能树版本
-            url_name: standards:tree_create
-            icon_class: icon-[tabler--plus] size-5 text-success
-            permissions:
-              - standards.add_skilltreeversion
           - key: standards_wsos
             label: WSOS 版本
             url_name: standards:wsos_list
             icon_class: icon-[tabler--list-details] size-5 text-accent
             permissions: [standards.view_wsosversion]
-          - key: standards_wsos_create
-            label: 新增 WSOS 版本
-            url_name: standards:wsos_create
-            icon_class: icon-[tabler--plus] size-5 text-accent
-            permissions: [standards.add_wsosversion]
+          - key: standards_projects
+            label: 技能项目管理
+            url_name: standards:project_list
+            icon_class: icon-[tabler--schema] size-5 text-info
+            permissions: [standards.view_skillproject]
 
   - key: resources
     label: 资料

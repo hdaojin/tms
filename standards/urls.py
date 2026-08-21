@@ -9,8 +9,9 @@ urlpatterns = [
     path("projects/create/", views.SkillProjectCreateView.as_view(), name="project_create"),
     path("projects/<int:pk>/", views.SkillProjectDetailView.as_view(), name="project_detail"),
     path("projects/<int:pk>/edit/", views.SkillProjectUpdateView.as_view(), name="project_edit"),
-    path("catalog/", views.SkillCatalogEntryView.as_view(), name="skill_catalog_entry"),
-    path("projects/<int:project_pk>/skills/", views.SkillCatalogView.as_view(), name="skill_list"),
+    path("tree/", views.CurrentSkillTreeEntryView.as_view(), name="current_tree_entry"),
+    path("catalog/", views.CurrentSkillTreeEntryView.as_view(), name="skill_catalog_entry"),
+    path("projects/<int:project_pk>/skills/", views.legacy_skill_list, name="skill_list"),
     path(
         "projects/<int:project_pk>/domains/create/",
         views.TechnicalDomainCreateView.as_view(),
@@ -18,18 +19,18 @@ urlpatterns = [
     ),
     path(
         "projects/<int:project_pk>/domains/<int:domain_pk>/",
-        views.TechnicalDomainDetailView.as_view(),
+        views.legacy_domain_detail,
         name="domain_detail",
+    ),
+    path(
+        "projects/<int:project_pk>/domains/<int:domain_pk>/tree/",
+        views.CurrentDomainSkillTreeView.as_view(),
+        name="domain_current_tree",
     ),
     path(
         "projects/<int:project_pk>/domains/<int:domain_pk>/edit/",
         views.TechnicalDomainUpdateView.as_view(),
         name="domain_edit",
-    ),
-    path(
-        "projects/<int:project_pk>/domains/<int:domain_pk>/skills/form/reset/",
-        views.skill_form_reset,
-        name="skill_form_reset",
     ),
     path("skills/candidates/", views.skill_candidates, name="skill_candidates"),
     path("skills/domain-fields/", views.skill_domain_fields, name="skill_domain_fields"),
@@ -40,7 +41,26 @@ urlpatterns = [
     path("trees/create/", views.SkillTreeVersionCreateView.as_view(), name="tree_create"),
     path("trees/<int:pk>/", views.SkillTreeVersionDetailView.as_view(), name="tree_detail"),
     path("trees/<int:pk>/edit/", views.SkillTreeVersionUpdateView.as_view(), name="tree_edit"),
-    path("trees/<int:tree_pk>/panel/", views.skill_tree_panel, name="tree_panel"),
+    path(
+        "trees/<int:tree_pk>/domains/<int:domain_pk>/",
+        views.VersionDomainSkillTreeView.as_view(),
+        name="tree_domain_detail",
+    ),
+    path(
+        "trees/<int:tree_pk>/domains/<int:domain_pk>/panel/",
+        views.skill_tree_panel,
+        name="tree_panel",
+    ),
+    path(
+        "trees/<int:tree_pk>/domains/<int:domain_pk>/unmounted-skills/",
+        views.skill_tree_unmounted_skills,
+        name="tree_unmounted_skills",
+    ),
+    path(
+        "trees/<int:tree_pk>/domains/<int:domain_pk>/skills/<int:skill_pk>/attach/",
+        views.skill_tree_attach_existing,
+        name="tree_attach_existing_skill",
+    ),
     path(
         "trees/<int:tree_pk>/domains/<int:domain_pk>/quick-add/",
         views.skill_tree_quick_add,

@@ -82,8 +82,8 @@ class SkillForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
             "description": forms.Textarea(attrs={"rows": 4}),
             "related_domains": forms.CheckboxSelectMultiple(),
         }
-        labels = {"order": "技能目录排序"}
-        help_texts = {"order": "仅影响技能目录等普通列表，不影响技能树中的位置和顺序。"}
+        labels = {"order": "排序"}
+        help_texts = {"order": "仅影响技能的普通排序，不影响技能树中的位置和顺序。"}
 
     def __init__(self, *args, user=None, **kwargs):
         self.user = user
@@ -206,6 +206,30 @@ class SkillTreeVersionForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.
 class SkillTreeQuickAddForm(StyledFormMixin, forms.Form):
     name = forms.CharField(label="技能名称", max_length=200)
     existing_skill_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
+
+
+class SkillTreeAttachExistingForm(StyledFormMixin, forms.Form):
+    new_parent = forms.ModelChoiceField(
+        label="挂载位置",
+        queryset=SkillTreeNode.objects.none(),
+        required=False,
+        empty_label="作为当前技术领域的根技能",
+    )
+
+    def __init__(self, *args, tree_version, technical_domain, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["new_parent"].queryset = (
+            SkillTreeNode.objects.filter(
+                tree_version=tree_version,
+                technical_domain=technical_domain,
+            )
+            .select_related("skill")
+            .order_by("order", "pk")
+        )
+
+    def clean_new_parent(self):
+        parent = self.cleaned_data["new_parent"]
+        return parent
 
 
 class SkillTreeMoveForm(StyledFormMixin, forms.Form):

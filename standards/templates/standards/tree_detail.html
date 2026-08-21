@@ -18,6 +18,6 @@
         <p class="whitespace-pre-line">{{ tree.description|default:"暂无描述" }}</p>
       </div>
     </section>
-    {% include "standards/partials/skill_tree_panel.html" %}
+    {% include "components/empty_state.html" with title="暂无可显示的技术领域" message="请先为该技能项目建立技术领域，再进入对应领域的技能树。" %}
   </div>
 {% endblock %}
