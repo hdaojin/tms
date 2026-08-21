@@ -5,7 +5,7 @@ from django import forms
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import BooleanField, Case, Count, Exists, OuterRef, Q, Value, When
-from django.http import Http404
+from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -17,7 +17,9 @@ from core.utils.mixins import TitleMixin
 from .forms import (
     SkillForm,
     SkillProjectForm,
-    SkillTreeNodeForm,
+    SkillTreeMoveForm,
+    SkillTreeQuickAddForm,
+    SkillTreeRemoveForm,
     SkillTreeVersionForm,
     TechnicalDomainForm,
     WSOSVersionForm,
@@ -31,14 +33,23 @@ from .selectors import (
     manageable_skills_for,
     skill_assessment_history,
     skill_assessment_performance,
+    skill_tree_structure,
     skill_training_investment,
     visible_skills_for,
 )
-from .services import add_skill_alias, find_skill_candidates, save_skill
+from .services import (
+    add_skill_alias,
+    attach_existing_skill_to_tree,
+    create_skill_in_tree,
+    find_skill_candidates,
+    move_skill_tree_node,
+    remove_skill_tree_node,
+    reorder_skill_tree_node,
+    save_skill,
+)
 from .tables import (
     SkillProjectTable,
     SkillTable,
-    SkillTreeNodeTable,
     SkillTreeVersionTable,
     WSOSVersionTable,
 )
@@ -295,13 +306,7 @@ class TechnicalDomainDetailView(TitleMixin, PermissionRequiredMixin, SingleTable
         if assessable := self.get_filter_value("assessable"):
             queryset = queryset.filter(is_assessable=assessable == "1")
         if query := self.get_filter_value("q"):
-            code_pk = None
-            normalized_code = query.strip().upper()
-            if normalized_code.startswith("SK-") and normalized_code[3:].isdigit():
-                code_pk = int(normalized_code[3:])
             condition = Q(name__icontains=query) | Q(description__icontains=query) | Q(terms__term__icontains=query)
-            if code_pk is not None:
-                condition |= Q(pk=code_pk)
             queryset = queryset.filter(condition)
         queryset = queryset.annotate(
             is_related_match=Case(
@@ -440,7 +445,7 @@ class TechnicalDomainDetailView(TitleMixin, PermissionRequiredMixin, SingleTable
                     current_page = 1
                 target_page = filtered_ids.index(skill.pk) // self.paginate_by + 1 if skill.pk in filtered_ids else None
                 context = self.get_context_data(skill_form=self.get_form())
-                context["create_success"] = f"已新增技能 {skill.display_code} · {skill.name}。"
+                context["create_success"] = f"已新增技能「{skill.name}」。"
                 if target_page != current_page:
                     context["created_catalog_url"] = self._created_skill_url(skill, filtered_ids)
                     context["created_hidden_by_filters"] = target_page is None
@@ -611,6 +616,15 @@ class SkillTreeVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView
     title = "{name}"
     permission_required = "standards.view_skilltreeversion"
 
+    def get_queryset(self):
+        return SkillTreeVersion.objects.select_related("skill_project")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["tree_domains"] = skill_tree_structure(tree_version=self.object, user=self.request.user)
+        context["quick_add_form"] = SkillTreeQuickAddForm()
+        return context
+
 
 class SkillTreeVersionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
     model = SkillTreeVersion
@@ -625,34 +639,246 @@ class SkillTreeVersionUpdateView(SkillTreeVersionCreateView, UpdateView):
     permission_required = "standards.change_skilltreeversion"
 
 
-class SkillTreeNodeListView(StandardListMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
-    model = SkillTreeNode
-    table_class = SkillTreeNodeTable
-    title = "技能树节点"
-    permission_required = "standards.view_skilltreenode"
-    create_url_name = "standards:node_create"
-    create_label = "新增技能树节点"
+def _tree_for_workbench(tree_pk):
+    return get_object_or_404(SkillTreeVersion.objects.select_related("skill_project"), pk=tree_pk)
 
 
-class SkillTreeNodeDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
-    model = SkillTreeNode
-    context_object_name = "node"
-    template_name = "standards/node_detail.html"
-    title = "{display_name}"
-    permission_required = "standards.view_skilltreenode"
+def _tree_node(tree, node_pk):
+    return get_object_or_404(
+        SkillTreeNode.objects.select_related("skill", "technical_domain", "tree_version"),
+        pk=node_pk,
+        tree_version=tree,
+    )
 
 
-class SkillTreeNodeCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
-    model = SkillTreeNode
-    form_class = SkillTreeNodeForm
-    title = "新增技能树节点"
-    permission_required = "standards.add_skilltreenode"
-    success_url_name = "standards:node_detail"
+def _tree_descendant_count(tree, node):
+    children_by_parent = {}
+    for child_id, parent_id in SkillTreeNode.objects.filter(tree_version=tree).values_list("pk", "parent_id"):
+        children_by_parent.setdefault(parent_id, []).append(child_id)
+    count = 0
+    stack = list(children_by_parent.get(node.pk, ()))
+    while stack:
+        current = stack.pop()
+        count += 1
+        stack.extend(children_by_parent.get(current, ()))
+    return count
 
 
-class SkillTreeNodeUpdateView(SkillTreeNodeCreateView, UpdateView):
-    title = "编辑技能树节点"
-    permission_required = "standards.change_skilltreenode"
+def _render_tree_panel(request, tree, *, created_node_id=None):
+    response = render(
+        request,
+        "standards/partials/skill_tree_panel.html",
+        {
+            "tree": tree,
+            "tree_domains": skill_tree_structure(tree_version=tree, user=request.user),
+            "quick_add_form": SkillTreeQuickAddForm(),
+        },
+    )
+    if created_node_id is not None:
+        response.headers["HX-Trigger-After-Swap"] = json.dumps({"skillTreeNodeCreated": {"nodeId": created_node_id}})
+    return response
+
+
+def skill_tree_panel(request, tree_pk):
+    if not request.user.has_perm("standards.view_skilltreeversion"):
+        raise PermissionDenied
+    return _render_tree_panel(request, _tree_for_workbench(tree_pk))
+
+
+def _quick_add_context(*, tree, domain, parent, form, candidates=()):
+    return {
+        "tree": tree,
+        "domain": domain,
+        "parent": parent,
+        "quick_add_form": form,
+        "candidates": candidates,
+    }
+
+
+def _tree_candidates(*, tree, domain, query):
+    candidates = find_skill_candidates(skill_project=tree.skill_project, query=query)
+    existing_by_skill = {
+        node.skill_id: node
+        for node in SkillTreeNode.objects.filter(
+            tree_version=tree,
+            skill_id__in=[candidate.pk for candidate in candidates],
+        ).select_related("skill", "parent__skill")
+    }
+    for candidate in candidates:
+        candidate.existing_tree_node = existing_by_skill.get(candidate.pk)
+        candidate.can_attach_to_domain = (
+            candidate.is_active
+            and candidate.existing_tree_node is None
+            and (
+                candidate.primary_domain_id == domain.pk
+                or any(item.pk == domain.pk for item in candidate.related_domains.all())
+            )
+        )
+    return candidates
+
+
+@require_POST
+def skill_tree_quick_add(request, tree_pk, domain_pk, parent_pk=None):
+    tree = _tree_for_workbench(tree_pk)
+    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
+    parent = _tree_node(tree, parent_pk) if parent_pk is not None else None
+    if parent is not None and parent.technical_domain_id != domain.pk:
+        raise Http404
+    if not can_manage_domain(request.user, domain, permission="standards.add_skilltreenode"):
+        raise PermissionDenied
+    form = SkillTreeQuickAddForm(request.POST)
+    candidates = []
+    if form.is_valid():
+        try:
+            if skill_id := form.cleaned_data.get("existing_skill_id"):
+                skill = get_object_or_404(Skill, pk=skill_id, skill_project=tree.skill_project)
+                node = attach_existing_skill_to_tree(
+                    tree_version=tree,
+                    technical_domain=domain,
+                    parent=parent,
+                    skill=skill,
+                    actor=request.user,
+                )
+            else:
+                node = create_skill_in_tree(
+                    tree_version=tree,
+                    technical_domain=domain,
+                    parent=parent,
+                    name=form.cleaned_data["name"],
+                    description=form.cleaned_data.get("description", ""),
+                    confirm_distinct=form.cleaned_data.get("confirm_distinct", False),
+                    actor=request.user,
+                )
+        except ValidationError as exc:
+            form.add_error(None, exc.message)
+        else:
+            response = _render_tree_panel(request, tree, created_node_id=node.pk)
+            response.headers["HX-Retarget"] = "#skill-tree-panel"
+            response.headers["HX-Reswap"] = "outerHTML"
+            return response
+    if form.data.get("name"):
+        candidates = _tree_candidates(tree=tree, domain=domain, query=form.data["name"])
+    return render(
+        request,
+        "standards/partials/skill_tree_quick_add.html",
+        _quick_add_context(tree=tree, domain=domain, parent=parent, form=form, candidates=candidates),
+    )
+
+
+def skill_tree_candidates(request, tree_pk, domain_pk, parent_pk=None):
+    tree = _tree_for_workbench(tree_pk)
+    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
+    parent = _tree_node(tree, parent_pk) if parent_pk is not None else None
+    if parent is not None and parent.technical_domain_id != domain.pk:
+        raise Http404
+    if not can_manage_domain(request.user, domain, permission="standards.add_skilltreenode"):
+        raise PermissionDenied
+    query = request.GET.get("name", "")
+    candidates = _tree_candidates(tree=tree, domain=domain, query=query)
+    return render(
+        request,
+        "standards/partials/skill_tree_candidates.html",
+        _quick_add_context(
+            tree=tree,
+            domain=domain,
+            parent=parent,
+            form=SkillTreeQuickAddForm(initial={"name": query}),
+            candidates=candidates,
+        ),
+    )
+
+
+def skill_tree_move(request, tree_pk, node_pk):
+    tree = _tree_for_workbench(tree_pk)
+    node = _tree_node(tree, node_pk)
+    if not can_manage_domain(request.user, node.technical_domain, permission="standards.change_skilltreenode"):
+        raise PermissionDenied
+    form_data = request.POST if request.method == "POST" else request.GET if request.GET else None
+    form = SkillTreeMoveForm(
+        form_data,
+        tree_version=tree,
+        node=node,
+        user=request.user,
+    )
+    form.fields["target_domain"].widget.attrs.update(
+        {
+            "hx-get": reverse("standards:tree_node_move", args=[tree.pk, node.pk]),
+            "hx-target": "#skill-tree-dialog",
+            "hx-trigger": "change",
+            "hx-include": "this",
+        }
+    )
+    if request.method == "POST" and form.is_valid():
+        parent_id = form.cleaned_data.get("new_parent")
+        new_parent = _tree_node(tree, int(parent_id)) if parent_id else None
+        try:
+            move_skill_tree_node(
+                node=node,
+                new_parent=new_parent,
+                target_domain=form.cleaned_data["target_domain"],
+                actor=request.user,
+            )
+        except ValidationError as exc:
+            form.add_error(None, exc.message)
+        else:
+            response = _render_tree_panel(request, tree)
+            response.headers["HX-Retarget"] = "#skill-tree-panel"
+            response.headers["HX-Reswap"] = "outerHTML"
+            return response
+    return render(
+        request,
+        "standards/partials/skill_tree_move_dialog.html",
+        {"tree": tree, "node": node, "move_form": form},
+    )
+
+
+@require_POST
+def skill_tree_reorder(request, tree_pk, node_pk):
+    tree = _tree_for_workbench(tree_pk)
+    node = _tree_node(tree, node_pk)
+    try:
+        reorder_skill_tree_node(
+            node=node,
+            direction=request.POST.get("direction", ""),
+            actor=request.user,
+        )
+    except ValidationError as exc:
+        return HttpResponseBadRequest(exc.message)
+    return _render_tree_panel(request, tree)
+
+
+def skill_tree_remove(request, tree_pk, node_pk):
+    tree = _tree_for_workbench(tree_pk)
+    node = _tree_node(tree, node_pk)
+    if not can_manage_domain(request.user, node.technical_domain, permission="standards.delete_skilltreenode"):
+        raise PermissionDenied
+    form = SkillTreeRemoveForm(request.POST or None)
+    descendant_count = _tree_descendant_count(tree, node)
+    if request.method == "POST" and form.is_valid():
+        try:
+            remove_skill_tree_node(
+                node=node,
+                mode=form.cleaned_data["mode"],
+                actor=request.user,
+            )
+        except ValidationError as exc:
+            form.add_error(None, exc.message)
+        else:
+            response = _render_tree_panel(request, tree)
+            response.headers["HX-Retarget"] = "#skill-tree-panel"
+            response.headers["HX-Reswap"] = "outerHTML"
+            return response
+    return render(
+        request,
+        "standards/partials/skill_tree_remove_dialog.html",
+        {
+            "tree": tree,
+            "node": node,
+            "remove_form": form,
+            "descendant_count": descendant_count,
+            "subtree_count": descendant_count + 1,
+        },
+    )
 
 
 class WSOSVersionListView(StandardListMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):

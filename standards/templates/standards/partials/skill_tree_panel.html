@@ -1,0 +1,40 @@
+<section id="skill-tree-panel" class="space-y-4" aria-label="技能树工作台">
+  {% for domain in tree_domains %}
+    <article class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        <header class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <span class="icon-[tabler--target] size-5 text-primary"></span>
+            <h3 class="text-lg font-semibold">{{ domain.name }}</h3>
+            {% if not domain.is_active %}<span class="badge badge-warning badge-sm">已停用</span>{% endif %}
+          </div>
+          {% if domain.can_add_root %}
+            <details class="dropdown dropdown-end">
+              <summary class="btn btn-primary btn-sm">
+                <span class="icon-[tabler--plus] size-4"></span>
+                新增根技能
+              </summary>
+              <div class="dropdown-content z-20 mt-2 w-[min(28rem,90vw)] rounded-box border border-base-300 bg-base-100 p-4 shadow-xl">
+                {% include "standards/partials/skill_tree_quick_add.html" with parent=None %}
+              </div>
+            </details>
+          {% endif %}
+        </header>
+        {% if domain.tree_roots %}
+          <ul class="space-y-2" role="tree">
+            {% for node in domain.tree_roots %}
+              {% include "standards/partials/skill_tree_branch.html" %}
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="rounded-box border border-dashed border-base-300 p-4 text-sm text-base-content/60">
+            当前领域尚无技能。{% if domain.can_add_root %}可从“新增根技能”开始建立结构。{% endif %}
+          </p>
+        {% endif %}
+      </div>
+    </article>
+  {% empty %}
+    {% include "components/empty_state.html" with title="暂无可显示的技术领域" message="当前技能项目尚未建立启用的技术领域。" %}
+  {% endfor %}
+  <div id="skill-tree-dialog"></div>
+</section>

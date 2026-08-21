@@ -1,9 +1,23 @@
 {% extends "layouts/app.html" %}
+
 {% block content %}
-<div class="card border border-base-300 bg-base-100"><div class="card-body">
-  <div class="flex items-center justify-between gap-3"><div><h2 class="card-title">{{ tree.name }}（{{ tree.version }}）</h2><p>{{ tree.skill_project }}{% if tree.is_current %} · 当前版本{% endif %}</p></div>{% if perms.standards.add_skilltreenode %}<a href="{% url 'standards:node_create' %}" class="btn btn-primary btn-sm">新增节点</a>{% endif %}</div>
-  <p>{{ tree.description|default:"暂无描述" }}</p>
-  <div class="divider">节点</div>
-  <div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>代码</th><th>名称</th><th>技术领域</th><th>类型</th><th>挂载技能</th></tr></thead><tbody>{% for node in tree.nodes.all %}<tr><td><a class="link" href="{% url 'standards:node_detail' node.pk %}">{{ node.code }}</a></td><td>{{ node.display_name }}</td><td>{{ node.technical_domain }}</td><td>{{ node.get_node_type_display }}</td><td>{{ node.skill|default:"-" }}</td></tr>{% empty %}<tr><td colspan="5">暂无节点</td></tr>{% endfor %}</tbody></table></div>
-</div></div>
+  <div class="space-y-4">
+    <section class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-2">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 class="card-title">{{ tree.name }}（{{ tree.version }}）</h2>
+            <p class="text-sm text-base-content/60">
+              {{ tree.skill_project }}{% if tree.is_current %} · 当前版本{% endif %}
+            </p>
+          </div>
+          {% if perms.standards.change_skilltreeversion %}
+            <a class="btn btn-outline btn-sm" href="{% url 'standards:tree_edit' tree.pk %}">编辑版本</a>
+          {% endif %}
+        </div>
+        <p class="whitespace-pre-line">{{ tree.description|default:"暂无描述" }}</p>
+      </div>
+    </section>
+    {% include "standards/partials/skill_tree_panel.html" %}
+  </div>
 {% endblock %}

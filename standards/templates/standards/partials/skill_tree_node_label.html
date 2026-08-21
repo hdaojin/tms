@@ -1,0 +1,6 @@
+<div class="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+  <span class="font-medium">{{ node.skill.name }}</span>
+  {% if node.skill.is_core %}<span class="badge badge-primary badge-sm">核心</span>{% endif %}
+  {% if node.skill.is_assessable %}<span class="badge badge-outline badge-sm">可考核</span>{% endif %}
+  {% if not node.skill.is_active %}<span class="badge badge-warning badge-sm">已停用</span>{% endif %}
+</div>

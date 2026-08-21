@@ -1,0 +1,22 @@
+<li id="skill-tree-node-{{ node.pk }}" class="scroll-mt-24" role="treeitem" data-skill-tree-node>
+  {% if node.tree_children %}
+    <details class="group" open>
+      <summary class="flex cursor-pointer list-none items-center gap-2 rounded-box border border-base-300 bg-base-100 px-3 py-2 hover:bg-base-200">
+        <span class="icon-[tabler--chevron-right] size-4 shrink-0 transition-transform group-open:rotate-90"></span>
+        {% include "standards/partials/skill_tree_node_label.html" %}
+      </summary>
+      {% include "standards/partials/skill_tree_node_actions.html" %}
+      <ul class="ml-5 space-y-2 border-l border-base-300 py-2 pl-3" role="group">
+        {% for child in node.tree_children %}
+          {% include "standards/partials/skill_tree_branch.html" with node=child %}
+        {% endfor %}
+      </ul>
+    </details>
+  {% else %}
+    <div class="flex items-center gap-2 rounded-box border border-base-300 bg-base-100 px-3 py-2 hover:bg-base-200">
+      <span class="icon-[tabler--point] size-4 shrink-0 text-base-content/40"></span>
+      {% include "standards/partials/skill_tree_node_label.html" %}
+    </div>
+    {% include "standards/partials/skill_tree_node_actions.html" %}
+  {% endif %}
+</li>

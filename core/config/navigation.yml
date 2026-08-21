@@ -341,17 +341,6 @@ sections:
             icon_class: icon-[tabler--plus] size-5 text-success
             permissions:
               - standards.add_skilltreeversion
-          - key: standards_nodes
-            label: 技能节点
-            url_name: standards:node_list
-            icon_class: icon-[tabler--hierarchy-2] size-5 text-info
-            permissions: [standards.view_skilltreenode]
-          - key: standards_node_create
-            label: 新增技能节点
-            url_name: standards:node_create
-            icon_class: icon-[tabler--plus] size-5 text-info
-            permissions:
-              - standards.add_skilltreenode
           - key: standards_wsos
             label: WSOS 版本
             url_name: standards:wsos_list

@@ -173,36 +173,14 @@ class StableSkillAndWSOSTests(TestCase):
     def test_same_skill_can_be_mounted_in_multiple_tree_versions(self):
         first = SkillTreeVersion.objects.create(skill_project=self.project, version="V1", name="第一版")
         second = SkillTreeVersion.objects.create(skill_project=self.project, version="V2", name="第二版")
-        first_root = SkillTreeNode.objects.create(
-            tree_version=first,
-            technical_domain=self.domain,
-            node_type=SkillTreeNode.NodeType.CATEGORY,
-            code="V1",
-            name="Linux 类别",
-        )
-        second_root = SkillTreeNode.objects.create(
-            tree_version=second,
-            technical_domain=self.domain,
-            node_type=SkillTreeNode.NodeType.CATEGORY,
-            code="V2",
-            name="Linux 类别",
-        )
         SkillTreeNode.objects.create(
             tree_version=first,
             technical_domain=self.domain,
-            parent=first_root,
-            node_type=SkillTreeNode.NodeType.SKILL,
-            code="V1-LNX",
-            name="Linux",
             skill=self.skill,
         )
         SkillTreeNode.objects.create(
             tree_version=second,
             technical_domain=self.domain,
-            parent=second_root,
-            node_type=SkillTreeNode.NodeType.SKILL,
-            code="V2-LNX",
-            name="Linux",
             skill=self.skill,
         )
         self.assertEqual(self.skill.tree_nodes.count(), 2)
@@ -272,7 +250,7 @@ class SkillTermServiceTests(TestCase):
     def test_save_skill_registers_primary_name_and_aliases(self):
         skill = self.create_skill(aliases=["Linux 账号管理", "用户与用户组管理"])
 
-        self.assertEqual(skill.display_code, f"SK-{skill.pk:06d}")
+        self.assertEqual(str(skill), skill.name)
         self.assertSetEqual(
             set(skill.terms.values_list("kind", "term")),
             {
@@ -484,7 +462,7 @@ class SkillCatalogViewTests(TestCase):
         skill = Skill.objects.get()
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'hx-swap-oob="outerHTML"')
-        self.assertContains(response, skill.display_code)
+        self.assertContains(response, skill.name)
         self.assertJSONEqual(response.headers["HX-Trigger-After-Swap"], {"skillCreated": {"skillId": skill.pk}})
         self.assertContains(response, 'data-skill-form-dirty="false"')
         self.assertSetEqual(set(skill.aliases), {"systemd 服务管理"})

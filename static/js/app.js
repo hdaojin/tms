@@ -364,6 +364,41 @@
     });
   }
 
+  function closeSkillTreeQuickAdd(form) {
+    form.reset();
+    const details = form.closest("details");
+    if (details) details.open = false;
+  }
+
+  function initSkillTreeWorkbench(root) {
+    if (!root.querySelectorAll) return;
+    root.querySelectorAll("[data-skill-tree-quick-add]").forEach(function (form) {
+      if (form.dataset.skillTreeBound === "true") return;
+      form.dataset.skillTreeBound = "true";
+      form.addEventListener("keydown", function (event) {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        closeSkillTreeQuickAdd(form);
+      });
+      const cancel = form.querySelector("[data-skill-tree-cancel]");
+      if (cancel) {
+        cancel.addEventListener("click", function (event) {
+          event.preventDefault();
+          closeSkillTreeQuickAdd(form);
+        });
+      }
+      const details = form.closest("details");
+      if (details && details.dataset.skillTreeToggleBound !== "true") {
+        details.dataset.skillTreeToggleBound = "true";
+        details.addEventListener("toggle", function () {
+          if (!details.open) return;
+          const input = details.querySelector("[data-skill-tree-name-input]");
+          if (input) window.requestAnimationFrame(function () { input.focus(); });
+        });
+      }
+    });
+  }
+
   function initAll(root) {
     initThemeControls(root);
     initModals(root);
@@ -374,6 +409,7 @@
     initConditionalGroups(root);
     initCountdown(root);
     initSkillCreateDrawer(root);
+    initSkillTreeWorkbench(root);
     initScrollAfterSwap(root);
   }
 
@@ -393,5 +429,34 @@
       const nameInput = dialog.querySelector("#id_name");
       if (nameInput) nameInput.focus();
     });
+  });
+  document.body.addEventListener("skillTreeNodeCreated", function (event) {
+    if (!event.detail || !event.detail.nodeId) return;
+    const node = document.getElementById(`skill-tree-node-${event.detail.nodeId}`);
+    if (!node) return;
+    let ancestor = node.parentElement;
+    while (ancestor) {
+      if (ancestor.tagName === "DETAILS") ancestor.open = true;
+      ancestor = ancestor.parentElement;
+    }
+    node.classList.add(
+      "bg-success/10",
+      "outline",
+      "outline-2",
+      "outline-success/40",
+    );
+    node.setAttribute("tabindex", "-1");
+    window.requestAnimationFrame(function () {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+      node.focus({ preventScroll: true });
+    });
+    window.setTimeout(function () {
+      node.classList.remove(
+        "bg-success/10",
+        "outline",
+        "outline-2",
+        "outline-success/40",
+      );
+    }, 1800);
   });
 })();
