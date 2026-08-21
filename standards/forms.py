@@ -201,40 +201,89 @@ class SkillTreeVersionForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.
         widgets = {"description": forms.Textarea(attrs={"rows": 4})}
 
 
-class SkillTreeNodeForm(StyledFormMixin, forms.ModelForm):
-    class Meta:
-        model = SkillTreeNode
-        fields = [
-            "tree_version",
-            "technical_domain",
-            "parent",
-            "node_type",
-            "code",
-            "name",
-            "description",
-            "skill",
-            "order",
-            "is_active",
-        ]
-        widgets = {"description": forms.Textarea(attrs={"rows": 4})}
+class SkillTreeQuickAddForm(StyledFormMixin, forms.Form):
+    name = forms.CharField(label="技能名称", max_length=200)
+    description = forms.CharField(
+        label="技能边界说明",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 2}),
+    )
+    confirm_distinct = forms.BooleanField(label="我已确认这不是同一技能", required=False)
+    existing_skill_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
 
-    def __init__(self, *args, **kwargs):
+
+class SkillTreeMoveForm(StyledFormMixin, forms.Form):
+    target_domain = forms.ModelChoiceField(label="目标技术领域", queryset=TechnicalDomain.objects.none())
+    new_parent = forms.ChoiceField(label="目标父技能", required=False)
+
+    def __init__(self, *args, tree_version, node, user, **kwargs):
         super().__init__(*args, **kwargs)
-        version = self.initial.get("tree_version") or getattr(self.instance, "tree_version", None)
-        if self.is_bound and self.data.get("tree_version"):
-            version = (
-                SkillTreeVersion.objects.filter(pk=self.data.get("tree_version"))
-                .select_related("skill_project")
-                .first()
-            )
-        if version:
-            self.fields["technical_domain"].queryset = TechnicalDomain.objects.filter(
-                skill_project=version.skill_project
-            )
-            self.fields["skill"].queryset = Skill.objects.filter(skill_project=version.skill_project, is_active=True)
-            self.fields["parent"].queryset = SkillTreeNode.objects.filter(tree_version=version).exclude(
-                pk=self.instance.pk
-            )
+        allowed_domains = manageable_domains_for(user, tree_version.skill_project).filter(is_active=True)
+        self.fields["target_domain"].queryset = allowed_domains
+        selected_domain_id = self.data.get("target_domain") if self.is_bound else node.technical_domain_id
+        try:
+            selected_domain_id = int(selected_domain_id)
+        except (TypeError, ValueError):
+            selected_domain_id = node.technical_domain_id
+        allowed_domain_ids = set(allowed_domains.values_list("pk", flat=True))
+        if selected_domain_id not in allowed_domain_ids:
+            selected_domain_id = node.technical_domain_id
+        nodes = list(
+            SkillTreeNode.objects.filter(tree_version=tree_version, technical_domain_id=selected_domain_id)
+            .select_related("skill", "technical_domain")
+            .order_by("order", "pk")
+        )
+        node_by_id = {item.pk: item for item in nodes}
+        children_by_parent = {}
+        for item in nodes:
+            children_by_parent.setdefault(item.parent_id, []).append(item)
+        excluded_ids = set()
+        stack = [node.pk]
+        while stack:
+            current = stack.pop()
+            excluded_ids.add(current)
+            stack.extend(child.pk for child in children_by_parent.get(current, ()))
+
+        path_cache = {}
+
+        def path_for(item):
+            if item.pk in path_cache:
+                return path_cache[item.pk]
+            parts = [item.skill.name]
+            parent_id = item.parent_id
+            while parent_id is not None:
+                parent = node_by_id[parent_id]
+                parts.append(parent.skill.name)
+                parent_id = parent.parent_id
+            path_cache[item.pk] = " / ".join(reversed(parts))
+            return path_cache[item.pk]
+
+        self.fields["new_parent"].choices = [
+            ("", "作为目标技术领域的根技能"),
+            *[
+                (str(item.pk), f"{item.technical_domain.name} / {path_for(item)}")
+                for item in nodes
+                if item.pk not in excluded_ids
+            ],
+        ]
+        self.fields["target_domain"].initial = node.technical_domain
+
+
+class SkillTreeRemoveForm(StyledFormMixin, forms.Form):
+    mode = forms.ChoiceField(
+        label="移除方式",
+        choices=(
+            ("promote_children", "仅移除当前技能，并将子技能提升一级（推荐）"),
+            ("subtree", "移除整个分支"),
+        ),
+    )
+    confirm_subtree = forms.BooleanField(label="我确认移除整个分支", required=False)
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("mode") == "subtree" and not cleaned.get("confirm_subtree"):
+            self.add_error("confirm_subtree", "移除整个分支前必须再次确认。")
+        return cleaned
 
 
 class WSOSVersionForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):

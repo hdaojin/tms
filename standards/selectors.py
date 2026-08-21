@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from decimal import Decimal
 
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Q, Sum
 from django.db.models.functions import Coalesce
 
-from .models import Skill, SkillTreeVersion, TechnicalDomain, WSOSVersion
+from .models import Skill, SkillTreeNode, SkillTreeVersion, TechnicalDomain, WSOSVersion
 
 
 def is_project_admin(user) -> bool:
@@ -58,6 +59,61 @@ def current_skill_tree_for(project):
 
 def current_wsos_for(project):
     return WSOSVersion.objects.filter(skill_project=project, is_current=True).first()
+
+
+def skill_tree_structure(*, tree_version, user):
+    """一次读取整棵树并在内存中构造模板所需的领域与 children 结构。"""
+
+    nodes = list(
+        SkillTreeNode.objects.filter(tree_version=tree_version)
+        .select_related("skill", "skill__primary_domain", "technical_domain", "parent")
+        .order_by("technical_domain__order", "technical_domain_id", "order", "pk")
+    )
+    node_domain_ids = {node.technical_domain_id for node in nodes}
+    domains = list(
+        TechnicalDomain.objects.filter(skill_project=tree_version.skill_project)
+        .filter(Q(is_active=True) | Q(pk__in=node_domain_ids))
+        .order_by("order", "code", "name", "pk")
+    )
+    manageable_domain_ids = set(manageable_domains_for(user, tree_version.skill_project).values_list("pk", flat=True))
+    children_by_parent = defaultdict(list)
+    for node in nodes:
+        children_by_parent[node.parent_id].append(node)
+
+    can_add_node = user.has_perm("standards.add_skilltreenode")
+    can_change_node = user.has_perm("standards.change_skilltreenode")
+    can_delete_node = user.has_perm("standards.delete_skilltreenode")
+    can_change_skill = user.has_perm("standards.change_skill")
+    can_view_skill = user.has_perm("standards.view_skill")
+    project_admin = is_project_admin(user)
+
+    def decorate_branch(node, ancestors):
+        node.tree_children = children_by_parent.get(node.pk, [])
+        node.full_path = " / ".join([*ancestors, node.skill.name])
+        node.descendant_count = 0
+        node.can_view_skill = can_view_skill
+        node.can_edit_skill = can_change_skill and (
+            project_admin or node.skill.primary_domain_id in manageable_domain_ids
+        )
+        node.can_add_child = (
+            can_add_node and node.technical_domain.is_active and node.technical_domain_id in manageable_domain_ids
+        )
+        node.can_move = can_change_node and node.technical_domain_id in manageable_domain_ids
+        node.can_remove = can_delete_node and node.technical_domain_id in manageable_domain_ids
+        for child in node.tree_children:
+            decorate_branch(child, [*ancestors, node.skill.name])
+            node.descendant_count += child.descendant_count + 1
+
+    roots_by_domain = defaultdict(list)
+    for root in children_by_parent.get(None, []):
+        roots_by_domain[root.technical_domain_id].append(root)
+        decorate_branch(root, [])
+
+    for domain in domains:
+        domain.tree_roots = roots_by_domain.get(domain.pk, [])
+        domain.can_add_root = can_add_node and domain.is_active and domain.pk in manageable_domain_ids
+        domain.can_manage_tree = domain.pk in manageable_domain_ids
+    return domains
 
 
 def skill_assessment_history(skill):

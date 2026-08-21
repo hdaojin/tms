@@ -26,7 +26,7 @@ class SkillProjectAdmin(admin.ModelAdmin):
 @admin.register(Skill)
 class SkillAdmin(admin.ModelAdmin):
     form = SkillForm
-    list_display = ("display_code", "name", "skill_project", "primary_domain", "is_active")
+    list_display = ("name", "skill_project", "primary_domain", "is_active")
     list_filter = ("skill_project", "primary_domain", "is_active", "is_core", "is_assessable")
     search_fields = ("name", "description", "terms__term")
 
@@ -62,9 +62,33 @@ admin.site.register(
         TechnicalDomain,
         TechnicalDomainMembership,
         SkillTreeVersion,
-        SkillTreeNode,
         WSOSVersion,
         WSOSSection,
         SkillWSOSMap,
     ]
 )
+
+
+@admin.register(SkillTreeNode)
+class SkillTreeNodeAdmin(admin.ModelAdmin):
+    list_display = ("tree_version", "technical_domain", "skill", "parent", "order")
+    list_filter = ("tree_version", "technical_domain")
+    search_fields = ("skill__name",)
+    readonly_fields = (
+        "tree_version",
+        "technical_domain",
+        "skill",
+        "parent",
+        "order",
+        "created_at",
+        "updated_at",
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

@@ -1,0 +1,36 @@
+<div class="flex flex-wrap items-center justify-end gap-1 py-1 pl-6">
+  {% if node.can_view_skill %}
+    <a class="btn btn-ghost btn-xs" href="{% url 'standards:skill_detail' node.skill.pk %}">查看技能</a>
+  {% endif %}
+  {% if node.can_edit_skill %}
+    <a class="btn btn-ghost btn-xs" href="{% url 'standards:skill_edit' node.skill.pk %}">编辑技能</a>
+  {% endif %}
+  {% if node.can_add_child %}
+    <details class="dropdown dropdown-end">
+      <summary class="btn btn-ghost btn-xs" aria-label="新增子技能">
+        <span class="icon-[tabler--plus] size-4"></span>
+        新增子技能
+      </summary>
+      <div class="dropdown-content z-20 mt-2 w-[min(28rem,90vw)] rounded-box border border-base-300 bg-base-100 p-4 shadow-xl">
+        {% include "standards/partials/skill_tree_quick_add.html" with parent=node %}
+      </div>
+    </details>
+  {% endif %}
+  {% if node.can_move %}
+    <button type="button" class="btn btn-ghost btn-xs" hx-get="{% url 'standards:tree_node_move' tree.pk node.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML">移动</button>
+    <form method="post" hx-post="{% url 'standards:tree_node_reorder' tree.pk node.pk %}" hx-target="#skill-tree-panel" hx-swap="outerHTML">
+      {% csrf_token %}
+      <button class="btn btn-ghost btn-xs" type="submit" name="direction" value="up" aria-label="上移"><span class="icon-[tabler--arrow-up] size-4"></span></button>
+    </form>
+    <form method="post" hx-post="{% url 'standards:tree_node_reorder' tree.pk node.pk %}" hx-target="#skill-tree-panel" hx-swap="outerHTML">
+      {% csrf_token %}
+      <button class="btn btn-ghost btn-xs" type="submit" name="direction" value="down" aria-label="下移"><span class="icon-[tabler--arrow-down] size-4"></span></button>
+    </form>
+  {% endif %}
+  {% if node.can_remove %}
+    <button type="button" class="btn btn-ghost btn-xs text-error" hx-get="{% url 'standards:tree_node_remove' tree.pk node.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML">
+      <span class="icon-[tabler--trash] size-4"></span>
+      从树中移除
+    </button>
+  {% endif %}
+</div>

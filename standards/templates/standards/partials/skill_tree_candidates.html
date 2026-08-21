@@ -1,0 +1,23 @@
+{% if candidates %}
+  <div class="space-y-2 rounded-box bg-base-200 p-3 text-sm">
+    <p class="font-medium">可能已有相同或相近技能</p>
+    {% for candidate in candidates %}
+      <div class="flex items-start justify-between gap-3 rounded-box bg-base-100 p-2">
+        <div>
+          <p class="font-medium">{{ candidate.name }}</p>
+          <p class="text-xs text-base-content/60">主要领域：{{ candidate.primary_domain.name }}</p>
+          {% if candidate.existing_tree_node %}
+            <p class="text-xs text-warning">已在当前版本：{{ candidate.existing_tree_node.get_full_path }}</p>
+          {% elif not candidate.is_active %}
+            <p class="text-xs text-warning">该技能已停用</p>
+          {% endif %}
+        </div>
+        {% if candidate.can_attach_to_domain %}
+          <button class="btn btn-outline btn-xs" type="submit" name="existing_skill_id" value="{{ candidate.pk }}">使用已有技能</button>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  {% include "components/field.html" with field=quick_add_form.description %}
+  {% include "components/field.html" with field=quick_add_form.confirm_distinct %}
+{% endif %}

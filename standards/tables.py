@@ -2,7 +2,7 @@ import django_tables2 as tables
 
 from core.tables import ActionsColumn, BaseTable
 
-from .models import Skill, SkillProject, SkillTreeNode, SkillTreeVersion, WSOSVersion
+from .models import Skill, SkillProject, SkillTreeVersion, WSOSVersion
 
 
 class SkillProjectTable(BaseTable):
@@ -21,7 +21,6 @@ class SkillProjectTable(BaseTable):
 
 
 class SkillTable(BaseTable):
-    display_code = tables.Column(accessor="pk", verbose_name="编号", order_by="pk")
     name = tables.TemplateColumn(
         template_code="""
         <div class="min-w-48 text-left">
@@ -66,7 +65,6 @@ class SkillTable(BaseTable):
     class Meta(BaseTable.Meta):
         model = Skill
         fields = [
-            "display_code",
             "name",
             "relationship",
             "description",
@@ -94,14 +92,6 @@ class SkillTreeVersionTable(BaseTable):
     class Meta(BaseTable.Meta):
         model = SkillTreeVersion
         fields = ["skill_project", "version", "name", "is_current", "actions"]
-
-
-class SkillTreeNodeTable(BaseTable):
-    actions = ActionsColumn("standards:node_detail", "standards:node_edit", edit_perm="standards.change_skilltreenode")
-
-    class Meta(BaseTable.Meta):
-        model = SkillTreeNode
-        fields = ["tree_version", "technical_domain", "code", "node_type", "name", "skill", "actions"]
 
 
 class WSOSVersionTable(BaseTable):

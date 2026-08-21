@@ -157,10 +157,6 @@ class Skill(models.Model):
         super().save(*args, **kwargs)
 
     @property
-    def display_code(self):
-        return f"SK-{self.pk:06d}" if self.pk else "SK-待生成"
-
-    @property
     def aliases(self):
         prefetched = getattr(self, "_prefetched_objects_cache", {}).get("terms")
         if prefetched is not None:
@@ -168,7 +164,7 @@ class Skill(models.Model):
         return list(self.terms.filter(kind=SkillTerm.Kind.ALIAS).values_list("term", flat=True))
 
     def __str__(self):
-        return f"{self.display_code} - {self.name}"
+        return self.name
 
 
 class SkillTerm(models.Model):
@@ -274,11 +270,6 @@ class SkillTreeVersion(models.Model):
 
 
 class SkillTreeNode(models.Model):
-    class NodeType(models.TextChoices):
-        CATEGORY = "CATEGORY", "技能分类"
-        TOPIC = "TOPIC", "能力主题"
-        SKILL = "SKILL", "技能"
-
     tree_version = models.ForeignKey(
         SkillTreeVersion, verbose_name="技能树版本", on_delete=models.CASCADE, related_name="nodes"
     )
@@ -287,45 +278,32 @@ class SkillTreeNode(models.Model):
     )
     parent = models.ForeignKey(
         "self",
-        verbose_name="父节点",
+        verbose_name="父技能",
         on_delete=models.CASCADE,
         related_name="children",
         null=True,
         blank=True,
     )
-    node_type = models.CharField("节点类型", max_length=20, choices=NodeType.choices)
-    code = models.CharField("节点代码", max_length=100)
-    name = models.CharField("节点名称", max_length=200, blank=True)
-    description = models.TextField("描述", blank=True)
     skill = models.ForeignKey(
         Skill,
         verbose_name="技能",
         on_delete=models.PROTECT,
         related_name="tree_nodes",
-        null=True,
-        blank=True,
     )
     order = models.PositiveIntegerField("排序", default=0)
-    is_active = models.BooleanField("启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
         verbose_name = "技能树节点"
         verbose_name_plural = "技能树节点"
-        ordering = ["tree_version", "technical_domain__order", "parent_id", "order", "code"]
+        ordering = ["tree_version", "technical_domain__order", "order", "pk"]
         constraints = [
-            models.UniqueConstraint(fields=["tree_version", "code"], name="uniq_skilltreenode_version_code"),
             models.UniqueConstraint(
                 fields=["tree_version", "skill"],
-                condition=Q(skill__isnull=False),
                 name="uniq_skilltreenode_version_skill",
             ),
         ]
-
-    @property
-    def display_name(self):
-        return self.skill.name if self.node_type == self.NodeType.SKILL and self.skill_id else self.name
 
     @property
     def skill_project(self):
@@ -336,24 +314,14 @@ class SkillTreeNode(models.Model):
         if self.technical_domain_id and self.tree_version_id:
             if self.technical_domain.skill_project_id != self.tree_version.skill_project_id:
                 raise ValidationError({"technical_domain": "技术领域必须属于技能树对应的技能项目。"})
-        if self.node_type == self.NodeType.SKILL:
-            if not self.skill_id:
-                raise ValidationError({"skill": "技能节点必须关联一个技能。"})
-            if self.skill_id and self.tree_version_id:
-                if self.skill.skill_project_id != self.tree_version.skill_project_id:
-                    raise ValidationError({"skill": "技能必须属于技能树对应的技能项目。"})
-                allowed_domain_ids = {self.skill.primary_domain_id}
-                if self.skill.pk:
-                    allowed_domain_ids.update(self.skill.related_domains.values_list("pk", flat=True))
-                if self.technical_domain_id not in allowed_domain_ids:
-                    raise ValidationError({"technical_domain": "节点技术领域必须是技能的主要或关联技术领域。"})
-            if self.pk and self.children.exists():
-                raise ValidationError({"node_type": "已有子节点的节点不能改为技能节点。"})
-        else:
-            if self.skill_id:
-                raise ValidationError({"skill": "分类和主题节点不能关联技能。"})
-            if not self.name.strip():
-                raise ValidationError({"name": "分类和主题节点必须填写名称。"})
+        if self.skill_id and self.tree_version_id:
+            if self.skill.skill_project_id != self.tree_version.skill_project_id:
+                raise ValidationError({"skill": "技能必须属于技能树对应的技能项目。"})
+            allowed_domain_ids = {self.skill.primary_domain_id}
+            if self.skill.pk:
+                allowed_domain_ids.update(self.skill.related_domains.values_list("pk", flat=True))
+            if self.technical_domain_id not in allowed_domain_ids:
+                raise ValidationError({"technical_domain": "树位置的技术领域必须是技能的主要或关联技术领域。"})
 
         if self.parent_id and self.pk and self.parent_id == self.pk:
             raise ValidationError({"parent": "父节点不能是当前节点自身。"})
@@ -362,30 +330,18 @@ class SkillTreeNode(models.Model):
                 raise ValidationError({"parent": "父节点必须属于同一技能树版本。"})
             if self.parent.technical_domain_id != self.technical_domain_id:
                 raise ValidationError({"parent": "父节点必须属于同一技术领域。"})
-            if self.parent.node_type == self.NodeType.SKILL:
-                raise ValidationError({"parent": "技能节点下不能创建子节点。"})
-            if self.parent.node_type == self.NodeType.TOPIC and self.node_type != self.NodeType.SKILL:
-                raise ValidationError({"node_type": "主题节点下只能创建技能节点。"})
-            if self.parent.node_type == self.NodeType.CATEGORY and self.node_type not in {
-                self.NodeType.TOPIC,
-                self.NodeType.SKILL,
-            }:
-                raise ValidationError({"node_type": "分类节点下只能创建主题或技能节点。"})
-        elif self.node_type != self.NodeType.CATEGORY:
-            raise ValidationError({"node_type": "根节点只能是技能分类。"})
 
         ancestor = self.parent if self.parent_id else None
+        seen = set()
         while ancestor is not None:
-            if self.pk and ancestor.pk == self.pk:
+            if ancestor.pk in seen or (self.pk and ancestor.pk == self.pk):
                 raise ValidationError({"parent": "父节点不能是当前节点的下级节点。"})
+            seen.add(ancestor.pk)
             ancestor = ancestor.parent
 
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
-
-    def is_skill(self):
-        return self.node_type == self.NodeType.SKILL
 
     def get_ancestors(self, include_self=False):
         ancestors = [self] if include_self else []
@@ -397,15 +353,13 @@ class SkillTreeNode(models.Model):
         return ancestors
 
     def get_full_path(self, separator=" / "):
-        return separator.join(f"{node.code} {node.display_name}" for node in self.get_ancestors(include_self=True))
+        return separator.join(node.skill.name for node in self.get_ancestors(include_self=True))
 
-    def get_descendants(self, include_self=False, active_only=False):
+    def get_descendants(self, include_self=False):
         descendants = [self] if include_self else []
 
         def append_children(node):
-            children = node.children.order_by("order", "code", "pk")
-            if active_only:
-                children = children.filter(is_active=True)
+            children = node.children.order_by("order", "pk")
             for child in children:
                 descendants.append(child)
                 append_children(child)
@@ -415,7 +369,7 @@ class SkillTreeNode(models.Model):
         return descendants
 
     def __str__(self):
-        return f"{self.code} - {self.display_name}"
+        return self.skill.name
 
 
 class WSOSVersion(models.Model):

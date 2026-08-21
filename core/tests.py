@@ -102,6 +102,26 @@ class PermissionBundleRegistryTests(TestCase):
             with self.assertRaisesRegex(PermissionBundleCatalogError, "不存在的权限"):
                 validate_declared_permissions()
 
+    def test_skill_tree_delete_permission_stays_with_standard_maintainers(self):
+        specs = permission_registry.get_permission_bundle_spec_map()
+
+        self.assertIn(
+            "standards.delete_skilltreenode",
+            specs["training.project_admin"].permissions,
+        )
+        self.assertIn(
+            "standards.delete_skilltreenode",
+            specs["standards.maintain_standard"].permissions,
+        )
+        self.assertNotIn(
+            "standards.delete_skilltreenode",
+            specs["training.coach"].permissions,
+        )
+        self.assertNotIn(
+            "standards.manage_all_technical_domains",
+            specs["standards.maintain_standard"].permissions,
+        )
+
 
 class SiteConfigSingletonTests(TestCase):
     def setUp(self):
@@ -273,7 +293,7 @@ class MobileNavigationTemplateTests(TestCase):
 
         self.assertIn("创建通知公告", html)
 
-    def test_render_mobile_navigation_shows_node_list_but_hides_new_permissioned_entries_without_permissions(self):
+    def test_render_mobile_navigation_hides_permissioned_entries_without_permissions(self):
         user = User.objects.create_user(username="menu-default-user", password="testpass123")
 
         html = self._render_menu_tag(
@@ -295,7 +315,6 @@ class MobileNavigationTemplateTests(TestCase):
             "录入评分结果",
             "新增技能项目",
             "新增标准技能树版本",
-            "新增技能节点",
             "新增 WSOS 版本",
             "新增考点证据",
             "上传会议记录",
@@ -320,7 +339,6 @@ class MobileNavigationTemplateTests(TestCase):
             "standards.add_technicaldomain",
             "standards.add_skill",
             "standards.add_skilltreeversion",
-            "standards.add_skilltreenode",
             "standards.add_wsosversion",
             "evidence.add_knowledgeevidence",
             "meetings.add_meeting",
@@ -345,8 +363,6 @@ class MobileNavigationTemplateTests(TestCase):
             "录入评分结果",
             "新增技能项目",
             "新增标准技能树版本",
-            "技能节点",
-            "新增技能节点",
             "新增 WSOS 版本",
             "新增考点证据",
             "上传会议记录",
@@ -873,9 +889,7 @@ class UploadSpecAdoptionTests(TestCase):
         class ExampleForm(forms.Form):
             name = forms.CharField()
 
-        html = Template('{% include "components/form.html" with form=form %}').render(
-            Context({"form": ExampleForm()})
-        )
+        html = Template('{% include "components/form.html" with form=form %}').render(Context({"form": ExampleForm()}))
 
         self.assertIn('class="flex flex-col gap-4"', html)
         self.assertNotIn('class="grid gap-4 md:grid-cols-2"', html)
