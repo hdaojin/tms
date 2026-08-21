@@ -1,21 +1,74 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-<div class="card bg-base-100 shadow-sm">
-  <div class="card-body">
-    <div class="flex flex-wrap items-center justify-between gap-3">
+<div class="space-y-6">
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-3">
       <div>
-        <h2 class="card-title">技能项目信息</h2>
-        <p class="flex flex-wrap items-center gap-2 text-sm text-base-content/70">
-          <span>{{ project.code }}{% if project.short_name %} / {{ project.short_name }}{% endif %}</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="card-title">{{ project.name }}</h2>
           {% if project.is_default %}<span class="badge badge-primary badge-sm">默认项目</span>{% endif %}
+        </div>
+        <p class="text-sm text-base-content/60">
+          {{ project.code }}{% if project.short_name %} · {{ project.short_name }}{% endif %}
         </p>
       </div>
-      {% if perms.standards.change_skillproject %}
-        <a href="{% url 'standards:project_edit' project.pk %}" class="btn btn-outline btn-sm">编辑</a>
-      {% endif %}
+      <p class="whitespace-pre-line">{{ project.description|default:"暂无描述" }}</p>
+      <div class="flex flex-wrap gap-2 text-sm">
+        {% if current_tree %}
+          <span class="badge badge-success badge-outline h-auto max-w-full break-words whitespace-normal py-1 text-left leading-snug">当前技能树：{{ current_tree.name }}（{{ current_tree.version }}）</span>
+        {% else %}
+          <span class="badge badge-warning badge-outline">尚未设置当前技能树版本</span>
+        {% endif %}
+        {% if current_wsos %}
+          <span class="badge badge-accent badge-outline">当前 WSOS：{{ current_wsos.name }}</span>
+        {% else %}
+          <span class="badge badge-ghost">未设置当前 WSOS</span>
+        {% endif %}
+      </div>
     </div>
-    <p class="whitespace-pre-line">{{ project.description|default:"暂无描述" }}</p>
-  </div>
+  </section>
+
+  <section class="space-y-4">
+    <div>
+      <h2 class="text-lg font-semibold">技术领域</h2>
+      <p class="text-sm text-base-content/60">选择技术领域，直接维护该领域的当前标准技能树。</p>
+    </div>
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {% for domain in domains %}
+        <article class="card border border-base-300 bg-base-100 shadow-sm">
+          <div class="card-body gap-3">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h3 class="card-title">{{ domain.name }}</h3>
+                  {% if not domain.is_active %}<span class="badge badge-warning badge-sm">已停用</span>{% endif %}
+                </div>
+                <p class="text-sm text-base-content/60">{{ domain.code }}</p>
+              </div>
+              {% if domain.can_edit_domain %}
+                <a class="btn btn-ghost btn-xs" href="{% url 'standards:domain_edit' project.pk domain.pk %}">编辑</a>
+              {% endif %}
+            </div>
+            {% if can_view_domain_management %}
+              <p class="line-clamp-3 text-sm text-base-content/70">{{ domain.description|default:"暂无描述" }}</p>
+            {% endif %}
+            <div class="mt-auto flex flex-wrap gap-2 text-sm">
+              <span class="badge badge-outline">当前树 {{ domain.tree_node_count }} 个节点</span>
+            </div>
+            {% if domain.can_view_tree %}
+              <div class="card-actions justify-end">
+                <a class="btn btn-primary btn-sm" href="{% url 'standards:domain_current_tree' project.pk domain.pk %}">进入技能树</a>
+              </div>
+            {% endif %}
+          </div>
+        </article>
+      {% empty %}
+        <div class="md:col-span-2 xl:col-span-3">
+          {% include "components/empty_state.html" with title="暂无技术领域" message="当前技能项目尚未建立可查看的技术领域。" %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
 </div>
 {% endblock %}

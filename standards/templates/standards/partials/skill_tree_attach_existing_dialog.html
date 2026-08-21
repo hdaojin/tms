@@ -1,0 +1,22 @@
+<dialog class="tms-side-dialog" data-skill-tree-dialog aria-labelledby="attach-existing-skill-title">
+  <section class="tms-side-dialog-panel flex min-h-0 flex-col">
+    <header class="flex items-start justify-between gap-4 border-b border-base-300 px-4 py-4 sm:px-6">
+      <div>
+        <h2 id="attach-existing-skill-title" class="text-xl font-bold">添加到当前技能树</h2>
+        <p class="text-sm text-base-content/60">{{ skill.name }} · {{ domain.name }}</p>
+      </div>
+      <button type="button" class="btn btn-square btn-ghost btn-sm" data-skill-tree-dialog-close aria-label="关闭"><span class="icon-[tabler--x] size-5"></span></button>
+    </header>
+    <form method="post" class="flex min-h-0 flex-1 flex-col" hx-post="{% url 'standards:tree_attach_existing_skill' tree.pk domain.pk skill.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML">
+      {% csrf_token %}
+      <div class="flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
+        {% include "components/form_errors.html" with form=attach_form %}
+        {% include "components/field.html" with field=attach_form.new_parent %}
+      </div>
+      <footer class="flex justify-end gap-3 border-t border-base-300 px-4 py-4 sm:px-6">
+        <button class="btn btn-ghost" type="button" data-skill-tree-dialog-close>取消</button>
+        <button class="btn btn-primary" type="submit">确认添加</button>
+      </footer>
+    </form>
+  </section>
+</dialog>

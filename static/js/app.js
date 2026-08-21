@@ -595,6 +595,22 @@
   document.addEventListener("DOMContentLoaded", function () {
     initAll(document);
   });
+  document.addEventListener("click", function (event) {
+    const selectedMenu = event.target.closest("[data-skill-tree-node-menu]");
+    document
+      .querySelectorAll("[data-skill-tree-node-menu][open]")
+      .forEach(function (menu) {
+        if (menu !== selectedMenu) menu.open = false;
+      });
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Escape") return;
+    document
+      .querySelectorAll("[data-skill-tree-node-menu][open]")
+      .forEach(function (menu) {
+        menu.open = false;
+      });
+  });
   document.body.addEventListener("htmx:beforeRequest", function (event) {
     const element = event.detail && event.detail.elt;
     if (!element || !element.closest) return;

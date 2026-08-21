@@ -5,7 +5,7 @@
     {% for project in projects %}
       <a
         class="card border border-base-300 bg-base-100 shadow-sm transition-shadow hover:shadow-md"
-        href="{% url 'standards:skill_list' project.pk %}"
+        href="{% url 'standards:project_detail' project.pk %}"
       >
         <div class="card-body">
           <h2 class="card-title">{{ project.name }}</h2>

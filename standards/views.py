@@ -1,11 +1,9 @@
 import json
-from urllib.parse import urlencode
 
 from django import forms
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import BooleanField, Case, Count, Exists, OuterRef, Q, Value, When
-from django.http import Http404, HttpResponseBadRequest
+from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -17,6 +15,7 @@ from core.utils.mixins import TitleMixin
 from .forms import (
     SkillForm,
     SkillProjectForm,
+    SkillTreeAttachExistingForm,
     SkillTreeMoveForm,
     SkillTreeQuickAddForm,
     SkillTreeRemoveForm,
@@ -28,13 +27,17 @@ from .models import Skill, SkillProject, SkillTreeNode, SkillTreeVersion, Techni
 from .selectors import (
     can_manage_domain,
     can_manage_skill,
+    current_skill_tree_for,
+    current_wsos_for,
     is_project_admin,
     manageable_domains_for,
     manageable_skills_for,
+    project_domains_for_view,
     skill_assessment_history,
     skill_assessment_performance,
     skill_tree_structure,
     skill_training_investment,
+    unmounted_primary_skills_for_tree_domain,
     visible_skills_for,
 )
 from .services import (
@@ -50,7 +53,6 @@ from .services import (
 )
 from .tables import (
     SkillProjectTable,
-    SkillTable,
     SkillTreeVersionTable,
     WSOSVersionTable,
 )
@@ -108,6 +110,58 @@ class SkillProjectDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{name}"
     permission_required = "standards.view_skillproject"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        current_tree = current_skill_tree_for(self.object)
+        domains = project_domains_for_view(
+            project=self.object,
+            user=self.request.user,
+            tree_version=current_tree,
+        )
+        can_view_tree = self.request.user.has_perm("standards.view_skilltreeversion")
+        for domain in domains:
+            domain.can_view_tree = can_view_tree
+        context.update(
+            current_tree=current_tree,
+            current_wsos=current_wsos_for(self.object),
+            domains=domains,
+            can_view_domain_management=self.request.user.has_perm("standards.view_technicaldomain"),
+        )
+        actions = []
+        if self.request.user.has_perm("standards.change_skillproject"):
+            actions.append(
+                {
+                    "label": "编辑项目",
+                    "href": reverse("standards:project_edit", args=[self.object.pk]),
+                    "icon": "icon-[tabler--edit]",
+                    "variant_class": "btn-outline",
+                    "size_class": "btn-sm",
+                }
+            )
+        if self.request.user.has_perm("standards.add_technicaldomain"):
+            actions.append(
+                {
+                    "label": "新增技术领域",
+                    "href": reverse("standards:domain_create", args=[self.object.pk]),
+                    "icon": "icon-[tabler--plus]",
+                    "variant_class": "btn-primary",
+                    "size_class": "btn-sm",
+                }
+            )
+        if current_tree is None and self.request.user.has_perm("standards.add_skilltreeversion"):
+            actions.append(
+                {
+                    "label": "新增技能树版本",
+                    "href": reverse("standards:tree_create"),
+                    "icon": "icon-[tabler--plus]",
+                    "variant_class": "btn-primary",
+                    "size_class": "btn-sm",
+                }
+            )
+        if actions:
+            context["page_actions"] = actions
+        return context
+
 
 class SkillProjectCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
     model = SkillProject
@@ -154,7 +208,7 @@ class TechnicalDomainCreateView(StandardCreateMixin, TitleMixin, PermissionRequi
 
     def get_success_url(self):
         return reverse(
-            "standards:domain_detail",
+            "standards:domain_current_tree",
             kwargs={"project_pk": self.project.pk, "domain_pk": self.object.pk},
         )
 
@@ -171,11 +225,11 @@ class TechnicalDomainUpdateView(TechnicalDomainCreateView, UpdateView):
         return manageable_domains_for(self.request.user, self.project).filter(pk=self.kwargs["domain_pk"])
 
 
-class SkillCatalogEntryView(TitleMixin, PermissionRequiredMixin, TemplateView):
-    template_name = "standards/skill_catalog_project_select.html"
+class CurrentSkillTreeEntryView(TitleMixin, PermissionRequiredMixin, TemplateView):
+    template_name = "standards/skill_project_select.html"
     title = "选择技能项目"
-    title_icon = "icon-[tabler--target]"
-    permission_required = "standards.view_skill"
+    title_icon = "icon-[tabler--hierarchy-3]"
+    permission_required = "standards.view_skillproject"
 
     def get(self, request, *args, **kwargs):
         projects = SkillProject.objects.filter(is_active=True)
@@ -183,7 +237,7 @@ class SkillCatalogEntryView(TitleMixin, PermissionRequiredMixin, TemplateView):
         if project is None and projects.count() == 1:
             project = projects.first()
         if project is not None:
-            return redirect("standards:skill_list", project_pk=project.pk)
+            return redirect("standards:project_detail", pk=project.pk)
         if not projects.exists():
             raise Http404
         self.projects = projects
@@ -195,292 +249,18 @@ class SkillCatalogEntryView(TitleMixin, PermissionRequiredMixin, TemplateView):
         return context
 
 
-class SkillCatalogView(TitleMixin, PermissionRequiredMixin, TemplateView):
-    template_name = "standards/skill_catalog.html"
-    title_icon = "icon-[tabler--target]"
-    permission_required = "standards.view_skill"
-
-    def dispatch(self, request, *args, **kwargs):
-        self.project = get_object_or_404(SkillProject, pk=kwargs["project_pk"], is_active=True)
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_title(self):
-        return f"{self.project.name}技能目录"
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        visible_skills = visible_skills_for(self.request.user).filter(
-            skill_project=self.project,
-            is_active=True,
-        )
-        domains = TechnicalDomain.objects.filter(skill_project=self.project).select_related("skill_project")
-        if self.request.user.has_perm("standards.change_technicaldomain"):
-            manageable_inactive = manageable_domains_for(self.request.user, self.project).filter(is_active=False)
-            domains = domains.filter(Q(is_active=True) | Q(pk__in=manageable_inactive))
-        else:
-            domains = domains.filter(is_active=True)
-        domains = domains.annotate(
-            visible_primary_skill_count=Count(
-                "primary_skills",
-                filter=Q(primary_skills__in=visible_skills),
-                distinct=True,
-            ),
-            visible_related_skill_count=Count(
-                "related_skills",
-                filter=Q(related_skills__in=visible_skills),
-                distinct=True,
-            ),
-        )
-        for domain in domains:
-            domain.can_edit_domain = can_manage_domain(self.request.user, domain)
-        context["project"] = self.project
-        context["domains"] = domains
-        context["can_view_domain_management"] = self.request.user.has_perm("standards.view_technicaldomain")
-        if self.request.user.has_perm("standards.add_technicaldomain"):
-            context["page_actions"] = [
-                {
-                    "label": "新增技术领域",
-                    "href": reverse("standards:domain_create", kwargs={"project_pk": self.project.pk}),
-                    "icon": "icon-[tabler--plus]",
-                    "variant_class": "btn-primary",
-                    "size_class": "btn-sm",
-                }
-            ]
-        return context
-
-
-class TechnicalDomainDetailView(TitleMixin, PermissionRequiredMixin, SingleTableView):
-    model = Skill
-    table_class = SkillTable
-    template_name = "standards/domain_detail.html"
-    title_icon = "icon-[tabler--target]"
-    permission_required = "standards.view_skill"
-    paginate_by = 25
-
-    filter_names = ("q", "active", "core", "assessable", "related")
-
-    def dispatch(self, request, *args, **kwargs):
-        self.project = get_object_or_404(SkillProject, pk=kwargs["project_pk"], is_active=True)
-        self.domain = get_object_or_404(
-            TechnicalDomain.objects.select_related("skill_project").prefetch_related("memberships__user"),
-            pk=kwargs["domain_pk"],
-            skill_project=self.project,
-        )
-        if not self.domain.is_active and not can_manage_domain(request.user, self.domain):
-            raise Http404
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_title(self):
-        return f"{self.domain.name}技术领域"
-
-    def get_filter_value(self, name):
-        if name == "active" and name not in self.request.GET:
-            return "1"
-        return (self.request.GET.get(name, "") or "").strip()
-
-    def get_queryset(self):
-        queryset = (
-            visible_skills_for(self.request.user)
-            .filter(skill_project=self.project)
-            .select_related("skill_project", "primary_domain")
-            .prefetch_related("related_domains", "terms")
-        )
-        if self.get_filter_value("related") == "1":
-            queryset = queryset.filter(Q(primary_domain=self.domain) | Q(related_domains=self.domain))
-        else:
-            queryset = queryset.filter(primary_domain=self.domain)
-        if is_project_admin(self.request.user):
-            queryset = queryset.annotate(can_edit_skill=Value(True, output_field=BooleanField()))
-        else:
-            queryset = queryset.annotate(
-                can_edit_skill=Exists(
-                    TechnicalDomain.objects.filter(
-                        pk=OuterRef("primary_domain_id"),
-                        memberships__user=self.request.user,
-                    )
-                )
-            )
-        if active := self.get_filter_value("active"):
-            queryset = queryset.filter(is_active=active == "1")
-        if core := self.get_filter_value("core"):
-            queryset = queryset.filter(is_core=core == "1")
-        if assessable := self.get_filter_value("assessable"):
-            queryset = queryset.filter(is_assessable=assessable == "1")
-        if query := self.get_filter_value("q"):
-            condition = Q(name__icontains=query) | Q(description__icontains=query) | Q(terms__term__icontains=query)
-            queryset = queryset.filter(condition)
-        queryset = queryset.annotate(
-            is_related_match=Case(
-                When(primary_domain=self.domain, then=Value(False)),
-                default=Value(True),
-                output_field=BooleanField(),
-            )
-        ).distinct()
-        highlight = self.request.GET.get("highlight") or getattr(self, "highlight_skill_id", None)
-        if highlight:
-            for skill in queryset:
-                skill.is_highlighted = str(skill.pk) == str(highlight)
-            return queryset
-        return queryset
-
-    def get_form(self, data=None):
-        if data is not None:
-            data = data.copy()
-            data["skill_project"] = self.project.pk
-            data["primary_domain"] = self.domain.pk
-        form = SkillForm(
-            data=data,
-            initial={"skill_project": self.project, "primary_domain": self.domain},
-            user=self.request.user,
-        )
-        form.fields["skill_project"].widget = forms.HiddenInput()
-        form.fields["primary_domain"].widget = forms.HiddenInput()
-        return form
-
-    def get_table_kwargs(self):
-        kwargs = super().get_table_kwargs()
-        if self.get_filter_value("related") != "1":
-            kwargs["exclude"] = ("relationship",)
-        return kwargs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["project"] = self.project
-        context["domain"] = self.domain
-        context["can_view_domain_management"] = self.request.user.has_perm("standards.view_technicaldomain")
-        context["can_edit_domain"] = can_manage_domain(self.request.user, self.domain)
-        context["can_add_skill"] = can_manage_domain(
-            self.request.user,
-            self.domain,
-            permission="standards.add_skill",
-        )
-        context["focus_create"] = self.request.GET.get("focus") == "create"
-        if context["can_add_skill"]:
-            create_query = self.request.GET.copy()
-            create_query["focus"] = "create"
-            context["page_actions"] = [
-                {
-                    "label": "新增技能",
-                    "href": f"{reverse('standards:domain_detail', kwargs={'project_pk': self.project.pk, 'domain_pk': self.domain.pk})}?{create_query.urlencode()}",
-                    "icon": "icon-[tabler--plus]",
-                    "variant_class": "btn-primary",
-                    "size_class": "btn-sm",
-                    "extra_class": "js-skill-drawer-open",
-                }
-            ]
-        context["skill_form"] = kwargs.get("skill_form") or self.get_form()
-        context["filter_values"] = {name: self.get_filter_value(name) for name in self.filter_names}
-        context["candidate_url"] = reverse("standards:skill_candidates")
-        context["domain_fields_url"] = reverse("standards:skill_domain_fields")
-        return context
-
-    def _highlight_page_if_requested(self):
-        highlight = self.request.GET.get("highlight")
-        if not highlight:
-            return
-        ids = list(self.object_list.values_list("pk", flat=True))
-        try:
-            position = ids.index(int(highlight))
-        except (ValueError, TypeError):
-            return
-        expected_page = position // self.paginate_by + 1
-        if self.request.GET.get("page") != str(expected_page):
-            query = self.request.GET.copy()
-            query["page"] = expected_page
-            self.request.GET = query
-
-    def _created_skill_url(self, skill, filtered_ids):
-        params = {name: self.get_filter_value(name) for name in self.filter_names}
-        if skill.pk not in filtered_ids:
-            params = {}
-        params["highlight"] = skill.pk
-        path = reverse(
-            "standards:domain_detail",
-            kwargs={"project_pk": self.project.pk, "domain_pk": self.domain.pk},
-        )
-        return f"{path}?{urlencode({key: value for key, value in params.items() if value})}"
-
-    def get(self, request, *args, **kwargs):
-        self.object_list = self.get_queryset()
-        self._highlight_page_if_requested()
-        context = self.get_context_data()
-        if request.htmx:
-            return render(request, "standards/partials/skill_results.html", context)
-        return self.render_to_response(context)
-
-    def post(self, request, *args, **kwargs):
-        if not request.user.has_perm("standards.add_skill"):
-            raise PermissionDenied
-        form = self.get_form(data=request.POST)
-        candidates = []
-        if form.is_valid():
-            candidates = _decorate_candidate_permissions(
-                request.user,
-                find_skill_candidates(
-                    skill_project=form.cleaned_data["skill_project"],
-                    query=form.cleaned_data["name"],
-                ),
-            )
-            high_similarity = [candidate for candidate in candidates if candidate.candidate_high_similarity]
-            if high_similarity and not form.cleaned_data.get("confirm_distinct"):
-                form.add_error("confirm_distinct", "请先确认候选技能与当前技能并非同一技能。")
-            if high_similarity and not form.cleaned_data.get("description", "").strip():
-                form.add_error("description", "存在高相似候选时，请填写描述说明技能边界。")
-        if form.is_valid():
-            skill = form.save(commit=False)
-            try:
-                save_skill(
-                    skill=skill,
-                    aliases=form._split_text(form.cleaned_data.get("aliases_text")),
-                    related_domains=form.cleaned_data.get("related_domains", ()),
-                )
-            except ValidationError as exc:
-                form.add_error(None, exc.message)
-            else:
-                self.highlight_skill_id = skill.pk
-                self.object_list = self.get_queryset()
-                filtered_ids = list(self.object_list.values_list("pk", flat=True))
-                try:
-                    current_page = int(request.GET.get("page", "1") or 1)
-                except ValueError:
-                    current_page = 1
-                target_page = filtered_ids.index(skill.pk) // self.paginate_by + 1 if skill.pk in filtered_ids else None
-                context = self.get_context_data(skill_form=self.get_form())
-                context["create_success"] = f"已新增技能「{skill.name}」。"
-                if target_page != current_page:
-                    context["created_catalog_url"] = self._created_skill_url(skill, filtered_ids)
-                    context["created_hidden_by_filters"] = target_page is None
-                response = render(request, "standards/partials/skill_create_response.html", context)
-                response.headers["HX-Trigger-After-Swap"] = json.dumps({"skillCreated": {"skillId": skill.pk}})
-                return response
-
-        self.object_list = self.get_queryset()
-        context = self.get_context_data(skill_form=form)
-        context["candidates"] = candidates
-        context["candidate_query"] = form.data.get("name", "")
-        context["has_high_similarity"] = any(
-            candidate.candidate_high_similarity and not candidate.candidate_exact for candidate in candidates
-        )
-        return render(request, "standards/partials/skill_form_panel.html", context)
-
-
-def skill_form_reset(request, project_pk, domain_pk):
-    if not request.user.has_perm("standards.add_skill"):
-        raise PermissionDenied
+def legacy_skill_list(request, project_pk):
     project = get_object_or_404(SkillProject, pk=project_pk, is_active=True)
-    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=project, is_active=True)
-    if not can_manage_domain(request.user, domain, permission="standards.add_skill"):
-        raise Http404
-    form = SkillForm(
-        user=request.user,
-        initial={"skill_project": project, "primary_domain": domain},
-    )
-    form.fields["skill_project"].widget = forms.HiddenInput()
-    form.fields["primary_domain"].widget = forms.HiddenInput()
-    return render(
-        request,
-        "standards/partials/skill_form_panel.html",
-        {"skill_form": form, "project": project, "domain": domain},
+    return redirect("standards:project_detail", pk=project.pk)
+
+
+def legacy_domain_detail(request, project_pk, domain_pk):
+    project = get_object_or_404(SkillProject, pk=project_pk, is_active=True)
+    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=project)
+    return redirect(
+        "standards:domain_current_tree",
+        project_pk=project.pk,
+        domain_pk=domain.pk,
     )
 
 
@@ -620,10 +400,111 @@ class SkillTreeVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView
     def get_queryset(self):
         return SkillTreeVersion.objects.select_related("skill_project")
 
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        domains = project_domains_for_view(
+            project=self.object.skill_project,
+            user=request.user,
+            tree_version=self.object,
+        )
+        if domains:
+            return redirect(
+                "standards:tree_domain_detail",
+                tree_pk=self.object.pk,
+                domain_pk=domains[0].pk,
+            )
+        return self.render_to_response(self.get_context_data(object=self.object))
+
+
+class DomainSkillTreeMixin(TitleMixin, PermissionRequiredMixin, TemplateView):
+    template_name = "standards/domain_tree.html"
+    title_icon = "icon-[tabler--hierarchy-3]"
+    permission_required = "standards.view_skilltreeversion"
+
+    def _set_tree_and_domain(self, *, tree, domain):
+        self.tree = tree
+        self.project = tree.skill_project
+        self.domain = domain
+
+    def get_title(self):
+        return f"{self.domain.name}技能树"
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["tree_domains"] = skill_tree_structure(tree_version=self.object, user=self.request.user)
+        tree_domains = project_domains_for_view(
+            project=self.project,
+            user=self.request.user,
+            tree_version=self.tree,
+        )
+        can_attach = can_manage_domain(
+            self.request.user,
+            self.domain,
+            permission="standards.add_skilltreenode",
+        )
+        context.update(
+            project=self.project,
+            tree=self.tree,
+            domain=skill_tree_structure(
+                tree_version=self.tree,
+                user=self.request.user,
+                domain=self.domain,
+            )[0],
+            tree_domains=tree_domains,
+            is_current_tree=self.tree.is_current,
+            unmounted_skill_count=unmounted_primary_skills_for_tree_domain(
+                tree_version=self.tree,
+                domain=self.domain,
+                user=self.request.user,
+            ).count(),
+            can_attach_unmounted_skills=can_attach,
+        )
         return context
+
+
+class CurrentDomainSkillTreeView(DomainSkillTreeMixin):
+    def dispatch(self, request, *args, **kwargs):
+        project = get_object_or_404(SkillProject, pk=kwargs["project_pk"], is_active=True)
+        domain = get_object_or_404(TechnicalDomain, pk=kwargs["domain_pk"], skill_project=project)
+        tree = current_skill_tree_for(project)
+        if tree is not None:
+            self._set_tree_and_domain(tree=tree, domain=domain)
+        else:
+            self.project = project
+            self.domain = domain
+            self.tree = None
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_title(self):
+        return f"{self.domain.name}当前技能树"
+
+    def get_context_data(self, **kwargs):
+        if self.tree is None:
+            context = TemplateView.get_context_data(self, **kwargs)
+            context.update(project=self.project, domain=self.domain, current_tree_missing=True)
+            if self.request.user.has_perm("standards.add_skilltreeversion"):
+                context["page_actions"] = [
+                    {
+                        "label": "新增技能树版本",
+                        "href": reverse("standards:tree_create"),
+                        "icon": "icon-[tabler--plus]",
+                        "variant_class": "btn-primary",
+                        "size_class": "btn-sm",
+                    }
+                ]
+            return context
+        return super().get_context_data(**kwargs)
+
+
+class VersionDomainSkillTreeView(DomainSkillTreeMixin):
+    def dispatch(self, request, *args, **kwargs):
+        tree = _tree_for_workbench(kwargs["tree_pk"])
+        domain = get_object_or_404(
+            TechnicalDomain,
+            pk=kwargs["domain_pk"],
+            skill_project=tree.skill_project,
+        )
+        self._set_tree_and_domain(tree=tree, domain=domain)
+        return super().dispatch(request, *args, **kwargs)
 
 
 class SkillTreeVersionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
@@ -672,13 +553,13 @@ def _tree_descendant_stats(tree, node):
     return direct_child_count, count
 
 
-def _render_tree_panel(request, tree, *, created_node_id=None, focused_node_id=None):
+def _render_tree_panel(request, tree, domain, *, created_node_id=None, focused_node_id=None):
     response = render(
         request,
-        "standards/partials/skill_tree_panel.html",
+        "standards/partials/skill_tree_domain_panel.html",
         {
             "tree": tree,
-            "tree_domains": skill_tree_structure(tree_version=tree, user=request.user),
+            "domain": skill_tree_structure(tree_version=tree, user=request.user, domain=domain)[0],
         },
     )
     events = {}
@@ -691,10 +572,12 @@ def _render_tree_panel(request, tree, *, created_node_id=None, focused_node_id=N
     return response
 
 
-def skill_tree_panel(request, tree_pk):
+def skill_tree_panel(request, tree_pk, domain_pk):
     if not request.user.has_perm("standards.view_skilltreeversion"):
         raise PermissionDenied
-    return _render_tree_panel(request, _tree_for_workbench(tree_pk))
+    tree = _tree_for_workbench(tree_pk)
+    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
+    return _render_tree_panel(request, tree, domain)
 
 
 def _root_placement(tree, domain_pk):
@@ -876,7 +759,7 @@ def _skill_tree_inline_editor(request, *, tree, domain, parent, kind, anchor):
             form.add_error(None, exc.message)
         else:
             if node is not None:
-                response = _render_tree_panel(request, tree, created_node_id=node.pk)
+                response = _render_tree_panel(request, tree, domain, created_node_id=node.pk)
                 response.headers["HX-Retarget"] = "#skill-tree-panel"
                 response.headers["HX-Reswap"] = "outerHTML"
                 return response
@@ -1075,7 +958,7 @@ def _skill_tree_detailed_create(request, *, tree, domain, parent, action_url):
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            response = _render_tree_panel(request, tree, created_node_id=node.pk)
+            response = _render_tree_panel(request, tree, domain, created_node_id=node.pk)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -1162,7 +1045,7 @@ def skill_tree_skill_edit(request, tree_pk, node_pk):
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            response = _render_tree_panel(request, tree, focused_node_id=node.pk)
+            response = _render_tree_panel(request, tree, node.technical_domain, focused_node_id=node.pk)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -1181,6 +1064,7 @@ def skill_tree_skill_edit(request, tree_pk, node_pk):
 def skill_tree_move(request, tree_pk, node_pk):
     tree = _tree_for_workbench(tree_pk)
     node = _tree_node(tree, node_pk)
+    source_domain = node.technical_domain
     if not can_manage_domain(request.user, node.technical_domain, permission="standards.change_skilltreenode"):
         raise PermissionDenied
     form_data = request.POST if request.method == "POST" else request.GET if request.GET else None
@@ -1211,7 +1095,18 @@ def skill_tree_move(request, tree_pk, node_pk):
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            response = _render_tree_panel(request, tree, focused_node_id=node.pk)
+            target_domain = form.cleaned_data["target_domain"]
+            if source_domain.pk != target_domain.pk:
+                destination = reverse(
+                    "standards:tree_domain_detail",
+                    kwargs={"tree_pk": tree.pk, "domain_pk": target_domain.pk},
+                )
+                if request.htmx:
+                    response = HttpResponse(status=200)
+                    response.headers["HX-Location"] = destination
+                    return response
+                return redirect(destination)
+            response = _render_tree_panel(request, tree, source_domain, focused_node_id=node.pk)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -1234,7 +1129,7 @@ def skill_tree_reorder(request, tree_pk, node_pk):
         )
     except ValidationError as exc:
         return HttpResponseBadRequest(exc.message)
-    return _render_tree_panel(request, tree)
+    return _render_tree_panel(request, tree, node.technical_domain)
 
 
 def skill_tree_remove(request, tree_pk, node_pk):
@@ -1265,7 +1160,7 @@ def skill_tree_remove(request, tree_pk, node_pk):
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            response = _render_tree_panel(request, tree)
+            response = _render_tree_panel(request, tree, node.technical_domain)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -1280,6 +1175,74 @@ def skill_tree_remove(request, tree_pk, node_pk):
             "descendant_count": descendant_count,
             "subtree_count": descendant_count + 1,
         },
+    )
+
+
+@require_GET
+def skill_tree_unmounted_skills(request, tree_pk, domain_pk):
+    tree = _tree_for_workbench(tree_pk)
+    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
+    if not request.user.has_perm("standards.view_skilltreeversion"):
+        raise PermissionDenied
+    return render(
+        request,
+        "standards/partials/skill_tree_unmounted_skills_dialog.html",
+        {
+            "tree": tree,
+            "domain": domain,
+            "skills": unmounted_primary_skills_for_tree_domain(
+                tree_version=tree,
+                domain=domain,
+                user=request.user,
+            ),
+            "can_attach_unmounted_skills": can_manage_domain(
+                request.user,
+                domain,
+                permission="standards.add_skilltreenode",
+            ),
+        },
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def skill_tree_attach_existing(request, tree_pk, domain_pk, skill_pk):
+    tree = _tree_for_workbench(tree_pk)
+    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
+    skill = get_object_or_404(
+        unmounted_primary_skills_for_tree_domain(
+            tree_version=tree,
+            domain=domain,
+            user=request.user,
+        ),
+        pk=skill_pk,
+    )
+    if not can_manage_domain(request.user, domain, permission="standards.add_skilltreenode"):
+        raise PermissionDenied
+    form = SkillTreeAttachExistingForm(
+        request.POST if request.method == "POST" else None,
+        tree_version=tree,
+        technical_domain=domain,
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            node = attach_existing_skill_to_tree(
+                tree_version=tree,
+                technical_domain=domain,
+                parent=form.cleaned_data["new_parent"],
+                skill=skill,
+                actor=request.user,
+            )
+        except ValidationError as exc:
+            form.add_error(None, exc.message)
+        else:
+            response = _render_tree_panel(request, tree, domain, created_node_id=node.pk)
+            response.headers["HX-Retarget"] = "#skill-tree-panel"
+            response.headers["HX-Reswap"] = "outerHTML"
+            return response
+    return render(
+        request,
+        "standards/partials/skill_tree_attach_existing_dialog.html",
+        {"tree": tree, "domain": domain, "skill": skill, "attach_form": form},
     )
 
 

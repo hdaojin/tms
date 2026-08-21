@@ -1,0 +1,35 @@
+<dialog class="tms-side-dialog" data-skill-tree-dialog aria-labelledby="unmounted-skills-title">
+  <section class="tms-side-dialog-panel flex min-h-0 flex-col">
+    <header class="flex items-start justify-between gap-4 border-b border-base-300 px-4 py-4 sm:px-6">
+      <div>
+        <h2 id="unmounted-skills-title" class="text-xl font-bold">未纳入当前技能树</h2>
+        <p class="text-sm text-base-content/60">{{ tree.name }} · {{ domain.name }}</p>
+      </div>
+      <button type="button" class="btn btn-square btn-ghost btn-sm" data-skill-tree-dialog-close aria-label="关闭"><span class="icon-[tabler--x] size-5"></span></button>
+    </header>
+    <div class="flex-1 space-y-3 overflow-y-auto px-4 py-5 sm:px-6">
+      {% for skill in skills %}
+        <article class="rounded-box border border-base-300 p-3">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="font-medium">{{ skill.name }}</p>
+              <p class="text-xs text-base-content/60">主要领域：{{ skill.primary_domain.name }}</p>
+              <div class="mt-2 flex gap-2">
+                {% if skill.is_core %}<span class="badge badge-primary badge-sm">核心技能</span>{% endif %}
+                {% if skill.is_assessable %}<span class="badge badge-outline badge-sm">可考核</span>{% endif %}
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <a class="btn btn-ghost btn-xs" href="{% url 'standards:skill_detail' skill.pk %}">查看</a>
+              {% if can_attach_unmounted_skills %}
+                <button type="button" class="btn btn-primary btn-xs" hx-get="{% url 'standards:tree_attach_existing_skill' tree.pk domain.pk skill.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML" data-skill-tree-dialog-trigger>添加到当前技能树</button>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+      {% empty %}
+        {% include "components/empty_state.html" with title="暂无未纳入技能" message="当前领域的启用主要技能都已纳入此版本技能树。" %}
+      {% endfor %}
+    </div>
+  </section>
+</dialog>
