@@ -3,16 +3,18 @@ from __future__ import annotations
 from django import forms
 from django.utils import timezone
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import models, transaction
+from django.urls import reverse
 
 from core.uploads import TRAINING_ATTACHMENT_UPLOAD_SPEC, TRAINING_LOG_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
 from standards.forms import DefaultSkillProjectFormMixin
-from standards.models import Skill, TechnicalDomain
+from standards.models import Skill, SkillProject, SkillTreeVersion, TechnicalDomain
 
 from .models import (
     TaskExecution,
     TrainingCycle,
+    TrainingCycleSkillTreeVersion,
     TrainingCycleMember,
     TrainingLog,
     TrainingPlan,
@@ -33,7 +35,6 @@ class TrainingCycleForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.Mod
         fields = [
             "skill_project",
             "parent",
-            "skill_tree_version",
             "code",
             "name",
             "start_date",
@@ -46,6 +47,175 @@ class TrainingCycleForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.Mod
             "end_date": forms.DateInput(attrs={"type": "date"}),
             "description": forms.Textarea(attrs={"rows": 4}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        project = None
+        if self.is_bound and self.data.get("skill_project"):
+            project = SkillProject.objects.filter(pk=self.data.get("skill_project")).first()
+        if project is None and self.instance.pk:
+            project = self.instance.skill_project
+        if project is None:
+            project = self.initial.get("skill_project")
+            if project and not getattr(project, "pk", None):
+                project = SkillProject.objects.filter(pk=project).first()
+        if getattr(project, "pk", None):
+            self.fields["parent"].queryset = TrainingCycle.objects.filter(skill_project=project).exclude(
+                pk=self.instance.pk or None
+            )
+        else:
+            self.fields["parent"].queryset = TrainingCycle.objects.none()
+        parent = None
+        parent_id = self.data.get("parent") if self.is_bound else self.initial.get("parent")
+        if parent_id:
+            parent_id = getattr(parent_id, "pk", parent_id)
+            parent = TrainingCycle.objects.filter(pk=parent_id, skill_project=project).first()
+        elif self.instance.parent_id:
+            parent = self.instance.parent
+
+        context_url = reverse("training:cycle_version_fields")
+        self.fields["skill_project"].widget.attrs.update(
+            {
+                "hx-get": context_url,
+                "hx-target": "#cycle-version-context",
+                "hx-trigger": "change",
+                "hx-include": "closest form",
+                "data-cycle-version-context-trigger": "true",
+            }
+        )
+        self.fields["parent"].widget.attrs.update(
+            {
+                "hx-get": context_url,
+                "hx-target": "#cycle-version-context",
+                "hx-trigger": "change",
+                "hx-include": "closest form",
+                "data-cycle-version-context-trigger": "true",
+            }
+        )
+
+        existing_links = {
+            link.technical_domain_id: link
+            for link in (
+                self.instance.skill_tree_version_links.select_related(
+                    "technical_domain", "skill_tree_version"
+                ).all()
+                if self.instance.pk
+                else ()
+            )
+        }
+        if parent is not None:
+            domains = TechnicalDomain.objects.filter(
+                pk__in=parent.skill_tree_version_links.values("technical_domain_id")
+            )
+        elif project is not None:
+            domains = TechnicalDomain.objects.filter(skill_project=project, is_active=True)
+            if existing_links:
+                domains = TechnicalDomain.objects.filter(
+                    models.Q(skill_project=project, is_active=True) | models.Q(pk__in=existing_links)
+                )
+        else:
+            domains = TechnicalDomain.objects.none()
+        self.version_fields = []
+        for domain in domains.order_by("order", "code", "pk"):
+            field_name = f"tree_version_{domain.pk}"
+            versions = SkillTreeVersion.objects.filter(technical_domain=domain).order_by(
+                "-is_current", "-created_at", "-pk"
+            )
+            current_version = versions.filter(is_current=True).first()
+            if current_version is not None:
+                empty_label = "不纳入当前周期"
+            elif versions.exists():
+                empty_label = "尚无当前技能树（可选择历史版本）"
+            else:
+                empty_label = "尚无技能树版本"
+            field = forms.ModelChoiceField(
+                label=f"{domain.name}技能树版本",
+                queryset=versions,
+                required=False,
+                empty_label=empty_label,
+            )
+            if field_name in self.initial:
+                field.initial = self.initial[field_name]
+            elif domain.pk in existing_links:
+                field.initial = existing_links[domain.pk].skill_tree_version
+            elif parent is not None:
+                parent_link = parent.skill_tree_version_links.filter(technical_domain=domain).first()
+                if parent_link:
+                    field.initial = parent_link.skill_tree_version
+            else:
+                field.initial = current_version
+            if self.instance.pk and self.instance.skill_tree_bindings_locked:
+                field.disabled = True
+            field.widget.attrs["data-cycle-version-field"] = "true"
+            self.fields[field_name] = field
+            self.version_fields.append((field_name, domain))
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self.instance.pk and cleaned.get("status") != TrainingCycle.Status.PLANNING:
+            self.add_error("status", "新建周期必须先保存为筹备中，再按顺序推进状态。")
+        selected = {
+            domain.pk: cleaned.get(field_name)
+            for field_name, domain in self.version_fields
+            if cleaned.get(field_name) is not None
+        }
+        if not selected:
+            raise forms.ValidationError("训练周期必须至少固定一个技术领域的技能树版本。")
+        if self.instance.pk:
+            existing = dict(
+                self.instance.skill_tree_version_links.values_list(
+                    "technical_domain_id", "skill_tree_version_id"
+                )
+            )
+            selected_ids = {domain_id: tree.pk for domain_id, tree in selected.items()}
+            if self.instance.skill_tree_bindings_locked and selected_ids != existing:
+                raise forms.ValidationError("训练周期的技能树版本快照已经锁定，不能再修改。")
+            removed_domain_ids = set(existing) - set(selected_ids)
+            used_domain = TrainingTaskDomain.objects.filter(
+                training_task__training_plan__training_cycle=self.instance,
+                technical_domain_id__in=removed_domain_ids,
+            ).select_related("technical_domain").first()
+            if used_domain:
+                raise forms.ValidationError(
+                    f"技术领域“{used_domain.technical_domain.name}”已被训练任务使用，不能从周期中移除。"
+                )
+            child_link = TrainingCycleSkillTreeVersion.objects.filter(
+                training_cycle__parent=self.instance,
+                technical_domain_id__in=removed_domain_ids,
+            ).select_related("technical_domain").first()
+            if child_link:
+                raise forms.ValidationError(
+                    f"技术领域“{child_link.technical_domain.name}”已被阶段周期使用，不能从父周期中移除。"
+                )
+        cleaned["selected_tree_versions"] = selected
+        return cleaned
+
+    @transaction.atomic
+    def save(self, commit=True):
+        cycle = super().save(commit=False)
+        if not commit:
+            return cycle
+        target_status = cycle.status
+        was_planning = not cycle.pk or TrainingCycle.objects.filter(
+            pk=cycle.pk, status=TrainingCycle.Status.PLANNING
+        ).exists()
+        if was_planning and target_status != TrainingCycle.Status.PLANNING:
+            cycle.status = TrainingCycle.Status.PLANNING
+        cycle.save()
+        if not cycle.skill_tree_bindings_locked:
+            selected = self.cleaned_data["selected_tree_versions"]
+            for domain_id, tree in selected.items():
+                TrainingCycleSkillTreeVersion.objects.update_or_create(
+                    training_cycle=cycle,
+                    technical_domain_id=domain_id,
+                    defaults={"skill_tree_version": tree},
+                )
+            for link in cycle.skill_tree_version_links.exclude(technical_domain_id__in=selected):
+                link.delete()
+        if cycle.status != target_status:
+            cycle.status = target_status
+            cycle.save(update_fields=["status", "updated_at"])
+        return cycle
 
 
 class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
@@ -104,7 +274,17 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.request_user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        plan = self.initial.get("training_plan") or getattr(self.instance, "training_plan", None)
+        plan = (
+            self.instance.training_plan
+            if self.instance.pk
+            else self.initial.get("training_plan")
+        )
+        if plan and not getattr(plan, "pk", None):
+            plan = (
+                TrainingPlan.objects.filter(pk=plan)
+                .select_related("training_cycle__skill_project")
+                .first()
+            )
         if self.is_bound and self.data.get("training_plan"):
             plan = (
                 TrainingPlan.objects.filter(pk=self.data.get("training_plan"))
@@ -113,7 +293,14 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
             )
         if plan:
             project = plan.training_cycle.skill_project
-            self.fields["domains"].queryset = TechnicalDomain.objects.filter(skill_project=project, is_active=True)
+            bound_domain_ids = plan.training_cycle.skill_tree_version_links.values("technical_domain_id")
+            domain_queryset = TechnicalDomain.objects.filter(pk__in=bound_domain_ids, is_active=True)
+            if self.instance.pk:
+                domain_queryset = TechnicalDomain.objects.filter(
+                    models.Q(pk__in=bound_domain_ids, is_active=True)
+                    | models.Q(pk__in=self.instance.domain_links.values("technical_domain_id"))
+                )
+            self.fields["domains"].queryset = domain_queryset.order_by("order", "code", "pk")
             self.fields["primary_domain"].queryset = self.fields["domains"].queryset
             self.fields["skills"].queryset = Skill.objects.filter(skill_project=project, is_active=True)
             self.fields["primary_skill"].queryset = self.fields["skills"].queryset

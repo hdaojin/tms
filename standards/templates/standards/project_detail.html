@@ -15,11 +15,6 @@
       </div>
       <p class="whitespace-pre-line">{{ project.description|default:"暂无描述" }}</p>
       <div class="flex flex-wrap gap-2 text-sm">
-        {% if current_tree %}
-          <span class="badge badge-success badge-outline h-auto max-w-full break-words whitespace-normal py-1 text-left leading-snug">当前技能树：{{ current_tree.name }}（{{ current_tree.version }}）</span>
-        {% else %}
-          <span class="badge badge-warning badge-outline">尚未设置当前技能树版本</span>
-        {% endif %}
         {% if current_wsos %}
           <span class="badge badge-accent badge-outline">当前 WSOS：{{ current_wsos.name }}</span>
         {% else %}
@@ -54,11 +49,17 @@
               <p class="line-clamp-3 text-sm text-base-content/70">{{ domain.description|default:"暂无描述" }}</p>
             {% endif %}
             <div class="mt-auto flex flex-wrap gap-2 text-sm">
-              <span class="badge badge-outline">当前树 {{ domain.tree_node_count }} 个节点</span>
+              {% if domain.current_tree %}
+                <span class="badge badge-success badge-outline h-auto max-w-full whitespace-normal py-1">
+                  当前技能树：{{ domain.current_tree.version }} · {{ domain.tree_node_count }} 个节点
+                </span>
+              {% else %}
+                <span class="badge badge-warning badge-outline">尚无当前技能树</span>
+              {% endif %}
             </div>
             {% if domain.can_view_tree %}
               <div class="card-actions justify-end">
-                <a class="btn btn-primary btn-sm" href="{% url 'standards:domain_current_tree' project.pk domain.pk %}">进入技能树</a>
+                <a class="btn btn-primary btn-sm" href="{% url 'standards:current_domain_tree' project.pk domain.pk %}">进入技能树</a>
               </div>
             {% endif %}
           </div>

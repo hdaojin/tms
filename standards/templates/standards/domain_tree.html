@@ -9,28 +9,40 @@
             <p class="text-sm text-base-content/60">{{ project.name }} · {{ domain.code }}</p>
             <h2 class="card-title">{{ domain.name }}技能树</h2>
             {% if current_tree_missing %}
-              <p class="text-sm text-base-content/60">当前技能项目尚未设置当前技能树版本。</p>
+              <p class="text-sm text-base-content/60">当前技术领域尚未设置当前技能树版本。</p>
             {% else %}
               <p class="text-sm text-base-content/60">
                 {{ tree.name }}（{{ tree.version }}）{% if is_current_tree %} · 当前版本{% else %} · 历史版本{% endif %}
               </p>
             {% endif %}
           </div>
-          {% if tree and perms.standards.change_skilltreeversion %}
-            <a class="btn btn-outline btn-sm" href="{% url 'standards:tree_edit' tree.pk %}">编辑版本</a>
-          {% endif %}
+          <div class="flex flex-wrap gap-2">
+            {% if tree and can_set_current %}
+              <a class="btn btn-outline btn-sm" href="{% url 'standards:tree_edit' tree.pk %}">编辑版本</a>
+              {% if not tree.is_current and can_set_current %}
+                <form method="post" action="{% url 'standards:tree_set_current' tree.pk %}">
+                  {% csrf_token %}
+                  <button class="btn btn-success btn-sm" type="submit">设为当前版本</button>
+                </form>
+              {% endif %}
+            {% endif %}
+            {% if can_create_tree_version %}
+              <a class="btn btn-primary btn-sm" href="{% url 'standards:domain_tree_create' project.pk domain.pk %}">新增版本</a>
+            {% endif %}
+          </div>
         </div>
 
-        {% if tree_domains %}
+        {% if tree %}
           <div class="tabs tabs-box tabs-sm self-start">
-            {% for tab_domain in tree_domains %}
-              {% if is_current_tree %}
-                {% url 'standards:domain_current_tree' project.pk tab_domain.pk as tab_url %}
-              {% else %}
-                {% url 'standards:tree_domain_detail' tree.pk tab_domain.pk as tab_url %}
-              {% endif %}
-              <a class="tab{% if tab_domain.pk == domain.pk %} tab-active{% endif %}" href="{{ tab_url }}">{{ tab_domain.name }}</a>
-            {% endfor %}
+            {% if not version_context %}
+              {% url 'standards:current_domain_tree' project.pk domain.pk as tree_url %}
+              {% url 'standards:current_domain_tree_list' project.pk domain.pk as list_url %}
+            {% else %}
+              {% url 'standards:tree_detail' tree.pk as tree_url %}
+              {% url 'standards:tree_node_list' tree.pk as list_url %}
+            {% endif %}
+            <a class="tab tab-active" href="{{ tree_url }}">树形视图</a>
+            <a class="tab" href="{{ list_url }}">列表视图</a>
           </div>
         {% endif %}
       </div>
@@ -43,11 +55,29 @@
         <button
           type="button"
           class="btn btn-outline btn-sm"
-          hx-get="{% url 'standards:tree_unmounted_skills' tree.pk domain.pk %}"
+          hx-get="{% url 'standards:tree_unmounted_skills' tree.pk %}"
           hx-target="#skill-tree-dialog"
           hx-swap="innerHTML"
           data-skill-tree-dialog-trigger
         >未纳入当前树：{{ unmounted_skill_count }}</button>
+      </div>
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-2 py-4">
+          <label class="input input-bordered flex w-full items-center gap-2">
+            <span class="icon-[tabler--search] size-4 text-base-content/60" aria-hidden="true"></span>
+            <input
+              class="grow"
+              type="search"
+              name="q"
+              placeholder="搜索技能名称、别名或描述"
+              hx-get="{% url 'standards:tree_search' tree.pk %}"
+              hx-trigger="input changed delay:350ms, search"
+              hx-target="#skill-tree-search-results"
+              autocomplete="off"
+            >
+          </label>
+          <div id="skill-tree-search-results"></div>
+        </div>
       </div>
       {% include "standards/partials/skill_tree_domain_panel.html" %}
     {% endif %}

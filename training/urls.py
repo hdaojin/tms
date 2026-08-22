@@ -5,6 +5,7 @@ app_name = "training"
 urlpatterns = [
     path("", views.TrainingCycleListView.as_view(), name="cycle_list"),
     path("cycles/create/", views.TrainingCycleCreateView.as_view(), name="cycle_create"),
+    path("cycles/version-fields/", views.training_cycle_version_fields, name="cycle_version_fields"),
     path("cycles/<int:pk>/", views.TrainingCycleDetailView.as_view(), name="cycle_detail"),
     path("cycles/<int:pk>/edit/", views.TrainingCycleUpdateView.as_view(), name="cycle_edit"),
     path("plans/", views.TrainingPlanListView.as_view(), name="plan_list"),

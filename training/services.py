@@ -16,6 +16,12 @@ def publish_training_task(task, competitor_ids, user=None):
     task = TrainingTask.objects.select_for_update().get(pk=task.pk)
     if not task.domain_links.exists():
         raise ValidationError("发布训练任务前必须至少关联一个技术领域。")
+    cycle_domain_ids = set(
+        task.training_plan.training_cycle.skill_tree_version_links.values_list("technical_domain_id", flat=True)
+    )
+    task_domain_ids = set(task.domain_links.values_list("technical_domain_id", flat=True))
+    if not task_domain_ids.issubset(cycle_domain_ids):
+        raise ValidationError("训练任务只能使用周期已固定技能树版本的技术领域。")
     if not task.skill_links.filter(role="primary").exists():
         raise ValidationError("发布训练任务前必须至少关联一个主要技能。")
     if not task.coach_links.exists():

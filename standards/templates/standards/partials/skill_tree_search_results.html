@@ -1,0 +1,16 @@
+{% if query %}
+  <div class="rounded-box border border-base-300 bg-base-100 p-2 shadow-sm">
+    {% for node in results %}
+      <button
+        type="button"
+        class="flex w-full items-start justify-between gap-3 rounded-box px-3 py-2 text-left hover:bg-base-200"
+        data-skill-tree-search-locate="{{ node.pk }}"
+      >
+        <span class="font-medium">{{ node.skill.name }}</span>
+        <span class="text-xs text-base-content/60">{{ node.full_path }}</span>
+      </button>
+    {% empty %}
+      <p class="px-3 py-2 text-sm text-base-content/60">当前技能树中没有匹配结果。</p>
+    {% endfor %}
+  </div>
+{% endif %}

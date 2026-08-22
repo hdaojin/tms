@@ -5,7 +5,7 @@
       class="btn btn-square btn-ghost btn-xs"
       aria-label="在“{{ node.skill.name }}”下添加子技能"
       title="添加子技能"
-      hx-get="{% url 'standards:tree_quick_add_child' tree.pk node.technical_domain_id node.pk %}"
+      hx-get="{% url 'standards:tree_quick_add_child' tree.pk node.pk %}"
       hx-target="#skill-tree-children-{{ node.pk }}"
       hx-swap="beforeend"
       data-skill-tree-add-child

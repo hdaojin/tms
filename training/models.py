@@ -52,10 +52,10 @@ class TrainingCycle(models.Model):
     parent = models.ForeignKey(
         "self", verbose_name="父周期", on_delete=models.PROTECT, related_name="stages", null=True, blank=True
     )
-    skill_tree_version = models.ForeignKey(
+    skill_tree_versions = models.ManyToManyField(
         "standards.SkillTreeVersion",
-        verbose_name="技能树版本",
-        on_delete=models.PROTECT,
+        verbose_name="各技术领域技能树版本",
+        through="TrainingCycleSkillTreeVersion",
         related_name="training_cycles",
     )
     code = models.CharField("周期代码", max_length=50, unique=True)
@@ -75,12 +75,20 @@ class TrainingCycle(models.Model):
         super().clean()
         if self.start_date and self.end_date and self.end_date < self.start_date:
             raise ValidationError({"end_date": "结束日期不能早于开始日期。"})
-        if (
-            self.skill_tree_version_id
-            and self.skill_project_id
-            and self.skill_tree_version.skill_project_id != self.skill_project_id
+        if self.status != self.Status.PLANNING and (
+            not self.pk or not self.skill_tree_version_links.exists()
         ):
-            raise ValidationError({"skill_tree_version": "技能树版本必须属于当前技能项目。"})
+            raise ValidationError({"status": "训练周期进入进行中前必须至少固定一个技术领域的技能树版本。"})
+        if self.pk:
+            previous_status = type(self).objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            allowed_transitions = {
+                self.Status.PLANNING: {self.Status.PLANNING, self.Status.ACTIVE},
+                self.Status.ACTIVE: {self.Status.ACTIVE, self.Status.COMPLETED},
+                self.Status.COMPLETED: {self.Status.COMPLETED, self.Status.ARCHIVED},
+                self.Status.ARCHIVED: {self.Status.ARCHIVED},
+            }
+            if previous_status and self.status not in allowed_transitions[previous_status]:
+                raise ValidationError({"status": "训练周期状态只能按筹备中、进行中、已完成、已归档依次推进。"})
         if self.parent_id:
             if self.pk and self.parent_id == self.pk:
                 raise ValidationError({"parent": "父周期不能是自身。"})
@@ -99,6 +107,105 @@ class TrainingCycle(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.code})"
+
+    @property
+    def skill_tree_bindings_locked(self):
+        if self.status != self.Status.PLANNING:
+            return True
+        return self.plans.filter(tasks__executions__started_at__isnull=False).exists()
+
+
+class TrainingCycleSkillTreeVersion(models.Model):
+    training_cycle = models.ForeignKey(
+        TrainingCycle,
+        verbose_name="训练周期",
+        on_delete=models.CASCADE,
+        related_name="skill_tree_version_links",
+    )
+    technical_domain = models.ForeignKey(
+        "standards.TechnicalDomain",
+        verbose_name="技术领域",
+        on_delete=models.PROTECT,
+        related_name="training_cycle_version_links",
+    )
+    skill_tree_version = models.ForeignKey(
+        "standards.SkillTreeVersion",
+        verbose_name="技能树版本",
+        on_delete=models.PROTECT,
+        related_name="training_cycle_links",
+    )
+
+    class Meta:
+        verbose_name = "训练周期领域技能树版本"
+        verbose_name_plural = "训练周期领域技能树版本"
+        ordering = ["training_cycle", "technical_domain__order", "technical_domain_id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["training_cycle", "technical_domain"],
+                name="uniq_trainingcycle_domain_tree",
+            ),
+            models.UniqueConstraint(
+                fields=["training_cycle", "skill_tree_version"],
+                name="uniq_trainingcycle_tree_version",
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        if self.training_cycle_id and not self.pk:
+            cycle = TrainingCycle.objects.get(pk=self.training_cycle_id)
+            if cycle.skill_tree_bindings_locked:
+                raise ValidationError("训练周期的技能树版本快照已经锁定，不能再新增。")
+        if self.training_cycle_id and self.technical_domain_id:
+            if self.training_cycle.skill_project_id != self.technical_domain.skill_project_id:
+                raise ValidationError({"technical_domain": "技术领域必须属于训练周期对应的技能项目。"})
+            if self.training_cycle.parent_id and not self.training_cycle.parent.skill_tree_version_links.filter(
+                technical_domain_id=self.technical_domain_id
+            ).exists():
+                raise ValidationError({"technical_domain": "阶段周期只能使用父周期已经包含的技术领域。"})
+        if self.skill_tree_version_id and self.technical_domain_id:
+            if self.skill_tree_version.technical_domain_id != self.technical_domain_id:
+                raise ValidationError({"skill_tree_version": "技能树版本必须属于所选技术领域。"})
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).values(
+                "training_cycle_id",
+                "technical_domain_id",
+                "skill_tree_version_id",
+            ).first()
+            binding_changed = previous and any(
+                previous[field] != getattr(self, field)
+                for field in (
+                    "training_cycle_id",
+                    "technical_domain_id",
+                    "skill_tree_version_id",
+                )
+            )
+            if binding_changed:
+                cycle = TrainingCycle.objects.get(pk=previous["training_cycle_id"])
+                if cycle.skill_tree_bindings_locked:
+                    raise ValidationError("训练周期的技能树版本快照已经锁定，不能再修改。")
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        cycle = TrainingCycle.objects.get(pk=self.training_cycle_id)
+        if cycle.skill_tree_bindings_locked:
+            raise ValidationError("训练周期的技能树版本快照已经锁定，不能再修改。")
+        if cycle.plans.filter(tasks__domain_links__technical_domain_id=self.technical_domain_id).exists():
+            raise ValidationError("该技术领域已被训练任务使用，不能从周期中移除。")
+        if type(self).objects.filter(
+            training_cycle__parent=cycle,
+            technical_domain_id=self.technical_domain_id,
+        ).exists():
+            raise ValidationError("该技术领域已被阶段周期使用，不能从父周期中移除。")
+        if not cycle.skill_tree_version_links.exclude(pk=self.pk).exists():
+            raise ValidationError("训练周期必须至少固定一个技术领域的技能树版本。")
+        return super().delete(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.training_cycle} / {self.technical_domain} / {self.skill_tree_version}"
 
 
 class TrainingCycleMember(models.Model):
@@ -277,6 +384,10 @@ class TrainingTaskDomain(models.Model):
             and self.training_task.skill_project.pk != self.technical_domain.skill_project_id
         ):
             raise ValidationError({"technical_domain": "技术领域必须属于训练任务对应的技能项目。"})
+        if self.training_task_id and self.technical_domain_id:
+            cycle = self.training_task.training_plan.training_cycle
+            if not cycle.skill_tree_version_links.filter(technical_domain_id=self.technical_domain_id).exists():
+                raise ValidationError({"technical_domain": "训练任务只能使用周期已固定技能树版本的技术领域。"})
         if self.training_task_id and self.training_task.is_locked:
             raise ValidationError("已有选手开始执行后不能修改任务技术领域。")
 

@@ -13,7 +13,6 @@
       {% csrf_token %}
       <div class="flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
         {% include "components/form_errors.html" with form=move_form %}
-        {% include "components/field.html" with field=move_form.target_domain %}
         {% include "components/field.html" with field=move_form.new_parent %}
         <p class="text-sm text-base-content/60">移动只调整当前版本中的树位置，不会修改长期技能属性，也不会自动增加关联技术领域。</p>
       </div>

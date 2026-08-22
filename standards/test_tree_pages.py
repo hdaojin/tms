@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
 from .models import Skill, SkillProject, SkillTreeNode, SkillTreeVersion, TechnicalDomain, WSOSVersion
 
@@ -14,10 +14,16 @@ class DomainSkillTreePageTests(TestCase):
         self.project = SkillProject.objects.create(code="NS", name="网络系统管理", is_default=True)
         self.linux = TechnicalDomain.objects.create(skill_project=self.project, code="LINUX", name="Linux")
         self.windows = TechnicalDomain.objects.create(skill_project=self.project, code="WINDOWS", name="Windows")
-        self.tree = SkillTreeVersion.objects.create(
-            skill_project=self.project,
+        self.linux_tree = SkillTreeVersion.objects.create(
+            technical_domain=self.linux,
             version="2026",
-            name="2026 技能树",
+            name="Linux 2026",
+            is_current=True,
+        )
+        self.windows_tree = SkillTreeVersion.objects.create(
+            technical_domain=self.windows,
+            version="2025",
+            name="Windows 2025",
             is_current=True,
         )
         self.user = User.objects.create_user(username="tree-page-admin")
@@ -31,36 +37,38 @@ class DomainSkillTreePageTests(TestCase):
                     "view_skill",
                     "add_skilltreenode",
                     "add_skill",
+                    "add_skilltreeversion",
+                    "change_skilltreeversion",
                     "change_skilltreenode",
                 ],
             )
         )
         self.client.force_login(self.user)
 
-    def node(self, skill, domain):
-        return SkillTreeNode.objects.create(
-            tree_version=self.tree,
-            technical_domain=domain,
-            skill=skill,
-        )
+    def node(self, skill, tree=None):
+        return SkillTreeNode.objects.create(tree_version=tree or self.linux_tree, skill=skill)
 
-    def test_project_detail_shows_current_versions_and_domain_tree_links(self):
-        WSOSVersion.objects.create(skill_project=self.project, code="WSOS-2026", name="WSOS 2026", is_current=True)
-        linux_skill = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="Linux 服务")
-        self.node(linux_skill, self.linux)
+    def test_project_detail_shows_each_domain_current_version(self):
+        WSOSVersion.objects.create(
+            skill_project=self.project,
+            code="WSOS-2026",
+            name="WSOS 2026",
+            is_current=True,
+        )
+        skill = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="Linux 服务")
+        self.node(skill)
 
         response = self.client.get(reverse("standards:project_detail", args=[self.project.pk]))
 
-        self.assertContains(response, "当前技能树：2026 技能树（2026）")
-        self.assertContains(response, "max-w-full break-words whitespace-normal")
+        self.assertContains(response, "当前技能树：2026 · 1 个节点")
+        self.assertContains(response, "当前技能树：2025 · 0 个节点")
         self.assertContains(response, "当前 WSOS：WSOS 2026")
         self.assertContains(
             response,
-            reverse("standards:domain_current_tree", args=[self.project.pk, self.linux.pk]),
+            reverse("standards:current_domain_tree", args=[self.project.pk, self.linux.pk]),
         )
-        self.assertContains(response, "当前树 1 个节点")
 
-    def test_current_tree_entry_uses_default_project_and_no_current_tree_has_empty_state(self):
+    def test_current_tree_entry_and_missing_domain_current_tree(self):
         response = self.client.get(reverse("standards:current_tree_entry"))
         self.assertRedirects(
             response,
@@ -68,86 +76,62 @@ class DomainSkillTreePageTests(TestCase):
             fetch_redirect_response=False,
         )
 
-        self.tree.delete()
+        self.linux_tree.is_current = False
+        self.linux_tree.save()
         response = self.client.get(
-            reverse("standards:domain_current_tree", args=[self.project.pk, self.linux.pk])
+            reverse("standards:current_domain_tree", args=[self.project.pk, self.linux.pk])
         )
-        self.assertContains(response, "当前技能项目尚未设置当前技能树版本。")
-
-    def test_current_domain_tree_renders_only_its_domain_and_real_tab_links(self):
-        linux_skill = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="Linux 服务")
-        windows_skill = Skill.objects.create(skill_project=self.project, primary_domain=self.windows, name="Windows 服务")
-        self.node(linux_skill, self.linux)
-        self.node(windows_skill, self.windows)
-
-        response = self.client.get(
-            reverse("standards:domain_current_tree", args=[self.project.pk, self.linux.pk])
-        )
-
-        self.assertContains(response, linux_skill.name)
-        self.assertNotContains(response, windows_skill.name)
+        self.assertContains(response, "当前技术领域尚未设置当前技能树版本")
         self.assertContains(
             response,
-            reverse("standards:domain_current_tree", args=[self.project.pk, self.windows.pk]),
+            reverse("standards:domain_tree_create", args=[self.project.pk, self.linux.pk]),
         )
 
-    def test_tree_detail_redirects_to_its_first_domain(self):
-        response = self.client.get(reverse("standards:tree_detail", args=[self.tree.pk]))
-
-        self.assertRedirects(
-            response,
-            reverse("standards:tree_domain_detail", args=[self.tree.pk, self.linux.pk]),
-            fetch_redirect_response=False,
+    def test_current_domain_pages_only_render_their_own_tree(self):
+        linux_skill = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="Linux 服务")
+        windows_skill = Skill.objects.create(
+            skill_project=self.project,
+            primary_domain=self.windows,
+            name="Windows 服务",
         )
+        self.node(linux_skill, self.linux_tree)
+        self.node(windows_skill, self.windows_tree)
 
-    def test_unmounted_skill_is_listed_then_can_be_attached(self):
+        response = self.client.get(
+            reverse("standards:current_domain_tree", args=[self.project.pk, self.linux.pk])
+        )
+        self.assertContains(response, linux_skill.name)
+        self.assertNotContains(response, windows_skill.name)
+
+        list_response = self.client.get(
+            reverse("standards:current_domain_tree_list", args=[self.project.pk, self.linux.pk])
+        )
+        self.assertContains(list_response, linux_skill.name)
+        self.assertNotContains(list_response, windows_skill.name)
+
+    def test_unmounted_skill_can_be_attached_without_domain_url_parameter(self):
         skill = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="未挂载技能")
-        unmounted_url = reverse("standards:tree_unmounted_skills", args=[self.tree.pk, self.linux.pk])
-        attach_url = reverse("standards:tree_attach_existing_skill", args=[self.tree.pk, self.linux.pk, skill.pk])
+        unmounted_url = reverse("standards:tree_unmounted_skills", args=[self.linux_tree.pk])
+        attach_url = reverse(
+            "standards:tree_attach_existing_skill",
+            args=[self.linux_tree.pk, skill.pk],
+        )
 
         listed = self.client.get(unmounted_url, HTTP_HX_REQUEST="true")
         attached = self.client.post(attach_url, {"new_parent": ""}, HTTP_HX_REQUEST="true")
 
         self.assertContains(listed, skill.name)
         self.assertEqual(attached.status_code, 200)
-        self.assertTrue(SkillTreeNode.objects.filter(tree_version=self.tree, skill=skill).exists())
-        self.assertContains(attached, skill.name)
+        self.assertTrue(SkillTreeNode.objects.filter(tree_version=self.linux_tree, skill=skill).exists())
         self.assertNotContains(self.client.get(unmounted_url), skill.name)
 
-    def test_unmounted_skill_already_mounted_in_related_domain_is_not_leaked(self):
-        skill = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="跨领域技能")
-        skill.related_domains.add(self.windows)
-        self.node(skill, self.windows)
-
-        response = self.client.get(
-            reverse("standards:tree_unmounted_skills", args=[self.tree.pk, self.linux.pk])
-        )
-
-        self.assertNotContains(response, skill.name)
-
-    def test_cross_domain_move_uses_hx_location_and_normal_redirect(self):
-        skill = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="跨领域技能")
-        skill.related_domains.add(self.windows)
-        node = self.node(skill, self.linux)
-        url = reverse("standards:tree_node_move", args=[self.tree.pk, node.pk])
-        destination = reverse("standards:tree_domain_detail", args=[self.tree.pk, self.windows.pk])
-
-        response = self.client.post(
-            url,
-            {"target_domain": self.windows.pk, "new_parent": ""},
-            HTTP_HX_REQUEST="true",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.headers["HX-Location"], destination)
-        node.refresh_from_db()
-        self.assertEqual(node.technical_domain, self.windows)
-
-        skill_2 = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="另一跨领域技能")
-        skill_2.related_domains.add(self.windows)
-        node_2 = self.node(skill_2, self.linux)
-        response = self.client.post(
-            reverse("standards:tree_node_move", args=[self.tree.pk, node_2.pk]),
-            {"target_domain": self.windows.pk, "new_parent": ""},
-        )
-        self.assertRedirects(response, destination, fetch_redirect_response=False)
+    def test_old_project_level_routes_are_hard_removed(self):
+        for name in (
+            "skill_catalog",
+            "skill_tree",
+            "skill_tree_create",
+            "domain_skill_tree",
+            "tree_domain_detail",
+        ):
+            with self.assertRaises(NoReverseMatch):
+                reverse(f"standards:{name}", args=[self.project.pk, self.linux.pk])

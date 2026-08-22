@@ -4,6 +4,7 @@ from .models import (
     TaskExecutionAttachment,
     TrainingCycle,
     TrainingCycleMember,
+    TrainingCycleSkillTreeVersion,
     TrainingLog,
     TrainingLogExecution,
     TrainingPlan,
@@ -17,6 +18,7 @@ from .models import (
 admin.site.register(
     [
         TrainingCycle,
+        TrainingCycleSkillTreeVersion,
         TrainingCycleMember,
         TrainingPlan,
         TrainingTask,

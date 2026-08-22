@@ -22,7 +22,7 @@
             <div class="flex gap-2">
               <a class="btn btn-ghost btn-xs" href="{% url 'standards:skill_detail' skill.pk %}">查看</a>
               {% if can_attach_unmounted_skills %}
-                <button type="button" class="btn btn-primary btn-xs" hx-get="{% url 'standards:tree_attach_existing_skill' tree.pk domain.pk skill.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML" data-skill-tree-dialog-trigger>添加到当前技能树</button>
+                <button type="button" class="btn btn-primary btn-xs" hx-get="{% url 'standards:tree_attach_existing_skill' tree.pk skill.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML" data-skill-tree-dialog-trigger>添加到当前技能树</button>
               {% endif %}
             </div>
           </div>

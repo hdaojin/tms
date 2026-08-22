@@ -225,8 +225,19 @@ class SkillTerm(models.Model):
 
 
 class SkillTreeVersion(models.Model):
-    skill_project = models.ForeignKey(
-        SkillProject, verbose_name="技能项目", on_delete=models.CASCADE, related_name="skill_tree_versions"
+    technical_domain = models.ForeignKey(
+        TechnicalDomain,
+        verbose_name="技术领域",
+        on_delete=models.PROTECT,
+        related_name="skill_tree_versions",
+    )
+    based_on = models.ForeignKey(
+        "self",
+        verbose_name="基于版本",
+        on_delete=models.SET_NULL,
+        related_name="derived_versions",
+        null=True,
+        blank=True,
     )
     version = models.CharField("版本", max_length=50)
     name = models.CharField("版本名称", max_length=120)
@@ -246,35 +257,74 @@ class SkillTreeVersion(models.Model):
     class Meta:
         verbose_name = "标准技能树版本"
         verbose_name_plural = "标准技能树版本"
-        ordering = ["skill_project", "-is_current", "-created_at", "version"]
+        ordering = ["technical_domain", "-is_current", "-created_at", "version"]
         constraints = [
-            models.UniqueConstraint(fields=["skill_project", "version"], name="uniq_skilltreeversion_project_version"),
             models.UniqueConstraint(
-                fields=["skill_project"],
+                fields=["technical_domain", "version"],
+                name="uniq_skilltreeversion_domain_version",
+            ),
+            models.UniqueConstraint(
+                fields=["technical_domain"],
                 condition=Q(is_current=True),
-                name="uniq_current_skilltreeversion_per_project",
+                name="uniq_current_skilltreeversion_per_domain",
             ),
         ]
 
+    @property
+    def skill_project(self):
+        return self.technical_domain.skill_project
+
+    @property
+    def skill_project_id(self):
+        return self.technical_domain.skill_project_id
+
+    def clean(self):
+        super().clean()
+        if self.pk:
+            previous = type(self).objects.filter(pk=self.pk).values(
+                "technical_domain_id", "based_on_id"
+            ).first()
+            if previous and previous["technical_domain_id"] != self.technical_domain_id:
+                raise ValidationError({"technical_domain": "技能树版本创建后不能更改所属技术领域。"})
+            if previous and previous["based_on_id"] != self.based_on_id:
+                raise ValidationError({"based_on": "技能树版本创建后不能更改基于版本。"})
+        if not self.based_on_id:
+            return
+        if self.pk and self.based_on_id == self.pk:
+            raise ValidationError({"based_on": "基于版本不能是当前版本自身。"})
+        if self.technical_domain_id and self.based_on.technical_domain_id != self.technical_domain_id:
+            raise ValidationError({"based_on": "基于版本必须属于同一技术领域。"})
+        ancestor = self.based_on
+        seen = set()
+        while ancestor is not None:
+            if ancestor.pk in seen or (self.pk and ancestor.pk == self.pk):
+                raise ValidationError({"based_on": "基于版本不能形成循环。"})
+            seen.add(ancestor.pk)
+            ancestor = ancestor.based_on
+
     def save(self, *args, **kwargs):
+        self.clean()
         with transaction.atomic():
-            if self.is_current and self.skill_project_id:
-                type(self).objects.filter(skill_project_id=self.skill_project_id, is_current=True).exclude(
+            if self.is_current and self.technical_domain_id:
+                list(
+                    type(self)
+                    .objects.select_for_update()
+                    .filter(technical_domain_id=self.technical_domain_id)
+                    .values_list("pk", flat=True)
+                )
+                type(self).objects.filter(technical_domain_id=self.technical_domain_id, is_current=True).exclude(
                     pk=self.pk
                 ).update(is_current=False)
             super().save(*args, **kwargs)
 
     def __str__(self):
         suffix = "（当前）" if self.is_current else ""
-        return f"{self.skill_project.code} / {self.name} {self.version}{suffix}"
+        return f"{self.technical_domain} / {self.name} {self.version}{suffix}"
 
 
 class SkillTreeNode(models.Model):
     tree_version = models.ForeignKey(
         SkillTreeVersion, verbose_name="技能树版本", on_delete=models.CASCADE, related_name="nodes"
-    )
-    technical_domain = models.ForeignKey(
-        TechnicalDomain, verbose_name="技术领域", on_delete=models.PROTECT, related_name="skill_tree_nodes"
     )
     parent = models.ForeignKey(
         "self",
@@ -297,7 +347,7 @@ class SkillTreeNode(models.Model):
     class Meta:
         verbose_name = "技能树节点"
         verbose_name_plural = "技能树节点"
-        ordering = ["tree_version", "technical_domain__order", "order", "pk"]
+        ordering = ["tree_version", "order", "pk"]
         constraints = [
             models.UniqueConstraint(
                 fields=["tree_version", "skill"],
@@ -309,28 +359,30 @@ class SkillTreeNode(models.Model):
     def skill_project(self):
         return self.tree_version.skill_project
 
+    @property
+    def technical_domain(self):
+        return self.tree_version.technical_domain
+
+    @property
+    def technical_domain_id(self):
+        return self.tree_version.technical_domain_id
+
     def clean(self):
         super().clean()
-        if self.technical_domain_id and self.tree_version_id:
-            if self.technical_domain.skill_project_id != self.tree_version.skill_project_id:
-                raise ValidationError({"technical_domain": "技术领域必须属于技能树对应的技能项目。"})
         if self.skill_id and self.tree_version_id:
             if self.skill.skill_project_id != self.tree_version.skill_project_id:
                 raise ValidationError({"skill": "技能必须属于技能树对应的技能项目。"})
             allowed_domain_ids = {self.skill.primary_domain_id}
             if self.skill.pk:
                 allowed_domain_ids.update(self.skill.related_domains.values_list("pk", flat=True))
-            if self.technical_domain_id not in allowed_domain_ids:
-                raise ValidationError({"technical_domain": "树位置的技术领域必须是技能的主要或关联技术领域。"})
+            if self.tree_version.technical_domain_id not in allowed_domain_ids:
+                raise ValidationError({"skill": "技能未关联技能树所属技术领域。"})
 
         if self.parent_id and self.pk and self.parent_id == self.pk:
             raise ValidationError({"parent": "父节点不能是当前节点自身。"})
         if self.parent_id:
             if self.parent.tree_version_id != self.tree_version_id:
                 raise ValidationError({"parent": "父节点必须属于同一技能树版本。"})
-            if self.parent.technical_domain_id != self.technical_domain_id:
-                raise ValidationError({"parent": "父节点必须属于同一技术领域。"})
-
         ancestor = self.parent if self.parent_id else None
         seen = set()
         while ancestor is not None:
@@ -441,7 +493,7 @@ class WSOSSection(models.Model):
 class SkillWSOSMap(models.Model):
     skill = models.ForeignKey(Skill, verbose_name="技能", on_delete=models.CASCADE, related_name="wsos_mappings")
     wsos_section = models.ForeignKey(
-        WSOSSection, verbose_name="WSOS 章节", on_delete=models.CASCADE, related_name="skill_mappings"
+        WSOSSection, verbose_name="WSOS 章节", on_delete=models.PROTECT, related_name="skill_mappings"
     )
     note = models.TextField("说明", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)

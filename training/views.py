@@ -3,7 +3,9 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from pathlib import Path
 
 from django.http import FileResponse, HttpResponse
+from django.shortcuts import render
 from django.urls import reverse
+from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, DetailView, FormView, UpdateView
 from django_tables2 import SingleTableView
 
@@ -56,14 +58,31 @@ class TrainingCycleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{name}"
     permission_required = "training.view_trainingcycle"
 
+    def get_queryset(self):
+        return TrainingCycle.objects.select_related("skill_project", "parent").prefetch_related(
+            "skill_tree_version_links__technical_domain",
+            "skill_tree_version_links__skill_tree_version",
+        )
+
 
 class TrainingCycleCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingCycle
     form_class = TrainingCycleForm
-    template_name = "common/form.html"
+    template_name = "training/cycle_form.html"
     extra_context = {"grid_class": "grid gap-4 md:grid-cols-2"}
     title = "新增训练周期"
     permission_required = "training.add_trainingcycle"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = context["form"]
+        version_field_names = {name for name, _domain in form.version_fields}
+        context["base_fields"] = [
+            field for field in form.visible_fields() if field.name not in version_field_names and field.name != "parent"
+        ]
+        context["parent_field"] = form["parent"]
+        context["version_fields"] = [form[name] for name, _domain in form.version_fields]
+        return context
 
     def get_success_url(self):
         return reverse("training:cycle_detail", args=[self.object.pk])
@@ -72,6 +91,36 @@ class TrainingCycleCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
 class TrainingCycleUpdateView(TrainingCycleCreateView, UpdateView):
     title = "编辑训练周期"
     permission_required = "training.change_trainingcycle"
+
+
+@require_GET
+def training_cycle_version_fields(request):
+    if not (
+        request.user.has_perm("training.add_trainingcycle")
+        or request.user.has_perm("training.change_trainingcycle")
+    ):
+        from django.core.exceptions import PermissionDenied
+
+        raise PermissionDenied
+    initial = {
+        "skill_project": request.GET.get("skill_project"),
+        "parent": request.GET.get("parent"),
+    }
+    preserved = set(filter(None, request.GET.getlist("preserved")))
+    for name in preserved:
+        initial[name] = request.GET.get(name)
+    form = TrainingCycleForm(initial=initial)
+    for name, _domain in form.version_fields:
+        if name in preserved:
+            form.fields[name].widget.attrs["data-cycle-version-touched"] = "true"
+    return render(
+        request,
+        "training/partials/cycle_version_fields.html",
+        {
+            "parent_field": form["parent"],
+            "version_fields": [form[name] for name, _domain in form.version_fields],
+        },
+    )
 
 
 class TrainingPlanListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):

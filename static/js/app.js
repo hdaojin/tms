@@ -596,12 +596,21 @@
     initAll(document);
   });
   document.addEventListener("click", function (event) {
+    const searchResult = event.target.closest("[data-skill-tree-search-locate]");
+    if (searchResult) {
+      focusSkillTreeNode(searchResult.dataset.skillTreeSearchLocate);
+      return;
+    }
     const selectedMenu = event.target.closest("[data-skill-tree-node-menu]");
     document
       .querySelectorAll("[data-skill-tree-node-menu][open]")
       .forEach(function (menu) {
         if (menu !== selectedMenu) menu.open = false;
       });
+  });
+  document.addEventListener("change", function (event) {
+    const field = event.target.closest("[data-cycle-version-field]");
+    if (field) field.dataset.cycleVersionTouched = "true";
   });
   document.addEventListener("keydown", function (event) {
     if (event.key !== "Escape") return;
@@ -628,6 +637,22 @@
         ? menu.querySelector("summary")
         : element;
     if (menu) menu.open = false;
+  });
+  document.body.addEventListener("htmx:configRequest", function (event) {
+    const element = event.detail && event.detail.elt;
+    if (!element || !element.matches("[data-cycle-version-context-trigger]"))
+      return;
+    const preserved = [];
+    document
+      .querySelectorAll(
+        "[data-cycle-version-field][data-cycle-version-touched='true']",
+      )
+      .forEach(function (field) {
+        if (!field.name) return;
+        preserved.push(field.name);
+        event.detail.parameters[field.name] = field.value;
+      });
+    event.detail.parameters.preserved = preserved;
   });
   document.body.addEventListener("htmx:afterSwap", function (event) {
     initAll(event.target);
