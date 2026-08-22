@@ -1,12 +1,21 @@
-{% extends "common/table_page.html" %}
+{% extends "layouts/app.html" %}
+
+{% partialdef results %}
+  {% include "components/table_wrapper.html" with table=table %}
+{% endpartialdef results %}
 
 {% block content %}
-  {% if create_url_name %}
-    <div class="mb-3 flex justify-end">
-      <a href="{% url create_url_name %}" class="btn btn-primary btn-sm">
-        <span class="icon-[tabler--plus] size-4"></span>{{ create_label }}
-      </a>
+  <div class="space-y-4">
+    {% if create_url_name %}
+      <div class="flex justify-end">
+        <a href="{% url create_url_name %}" class="btn btn-primary btn-sm">
+          <span class="icon-[tabler--plus] size-4"></span>{{ create_label }}
+        </a>
+      </div>
+    {% endif %}
+    {% if list_filter_controls %}{% include "components/list_filter_toolbar.html" %}{% endif %}
+    <div id="list-results">
+      {% partial results %}
     </div>
-  {% endif %}
-  {{ block.super }}
+  </div>
 {% endblock %}

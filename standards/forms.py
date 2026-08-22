@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django import forms
+from django.db import models
 from django.urls import reverse
 
 from core.utils.forms import StyledFormMixin
@@ -196,11 +197,103 @@ class SkillForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
         return super().save(commit=commit)
 
 
-class SkillTreeVersionForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
+class SkillTreeVersionForm(StyledFormMixin, forms.ModelForm):
+    class CreationMode(models.TextChoices):
+        CURRENT = "current", "基于当前版本创建"
+        EXISTING = "existing", "基于已有版本创建"
+        BLANK = "blank", "创建空白版本"
+
+    creation_mode = forms.ChoiceField(
+        label="创建方式",
+        choices=CreationMode.choices,
+        widget=forms.RadioSelect,
+        required=False,
+    )
+    source_version = forms.ModelChoiceField(
+        label="基于版本",
+        queryset=SkillTreeVersion.objects.none(),
+        required=False,
+    )
+
     class Meta:
         model = SkillTreeVersion
-        fields = ["skill_project", "version", "name", "description", "is_current"]
+        fields = ["version", "name", "description"]
         widgets = {"description": forms.Textarea(attrs={"rows": 4})}
+
+    def __init__(self, *args, technical_domain=None, actor=None, **kwargs):
+        self.actor = actor
+        super().__init__(*args, **kwargs)
+        self.technical_domain = technical_domain or getattr(self.instance, "technical_domain", None)
+        if self.instance.pk:
+            self.fields.pop("creation_mode")
+            self.fields.pop("source_version")
+            return
+        versions = SkillTreeVersion.objects.filter(technical_domain=self.technical_domain).order_by(
+            "-is_current", "-created_at", "-pk"
+        )
+        self.fields["source_version"].queryset = versions
+        current = versions.filter(is_current=True).first()
+        latest = versions.first()
+        if current:
+            self.initial.setdefault("creation_mode", self.CreationMode.CURRENT)
+            self.initial.setdefault("source_version", current)
+        elif latest:
+            self.initial.setdefault("creation_mode", self.CreationMode.EXISTING)
+            self.initial.setdefault("source_version", latest)
+        else:
+            self.initial.setdefault("creation_mode", self.CreationMode.BLANK)
+
+    def clean(self):
+        cleaned = super().clean()
+        version = cleaned.get("version")
+        if self.technical_domain and version:
+            duplicate = SkillTreeVersion.objects.filter(
+                technical_domain=self.technical_domain,
+                version=version,
+            )
+            if self.instance.pk:
+                duplicate = duplicate.exclude(pk=self.instance.pk)
+            if duplicate.exists():
+                self.add_error("version", "该技术领域已存在相同版本号。")
+        if self.instance.pk:
+            return cleaned
+        mode = cleaned.get("creation_mode") or self.CreationMode.BLANK
+        source = cleaned.get("source_version")
+        if mode == self.CreationMode.CURRENT:
+            source = SkillTreeVersion.objects.filter(
+                technical_domain=self.technical_domain,
+                is_current=True,
+            ).first()
+            if source is None:
+                self.add_error("creation_mode", "当前技术领域尚无当前版本，请选择历史版本或创建空白版本。")
+        elif mode == self.CreationMode.EXISTING and source is None:
+            self.add_error("source_version", "请选择一个已有版本。")
+        elif mode == self.CreationMode.BLANK:
+            source = None
+        if source is not None and source.technical_domain_id != self.technical_domain.pk:
+            self.add_error("source_version", "基于版本必须属于当前技术领域。")
+        cleaned["resolved_source_version"] = source
+        return cleaned
+
+    def save(self, commit=True):
+        if self.instance.pk:
+            return super().save(commit=commit)
+        source = self.cleaned_data.get("resolved_source_version")
+        if source is not None:
+            from .services import clone_skill_tree_version
+
+            self.instance = clone_skill_tree_version(
+                source_version=source,
+                version=self.cleaned_data["version"],
+                name=self.cleaned_data["name"],
+                description=self.cleaned_data.get("description", ""),
+                actor=self.actor,
+            )
+            return self.instance
+        self.instance.technical_domain = self.technical_domain
+        self.instance.created_by = self.actor
+        self.instance.is_current = False
+        return super().save(commit=commit)
 
 
 class SkillTreeQuickAddForm(StyledFormMixin, forms.Form):
@@ -216,12 +309,11 @@ class SkillTreeAttachExistingForm(StyledFormMixin, forms.Form):
         empty_label="作为当前技术领域的根技能",
     )
 
-    def __init__(self, *args, tree_version, technical_domain, **kwargs):
+    def __init__(self, *args, tree_version, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["new_parent"].queryset = (
             SkillTreeNode.objects.filter(
                 tree_version=tree_version,
-                technical_domain=technical_domain,
             )
             .select_related("skill")
             .order_by("order", "pk")
@@ -233,24 +325,13 @@ class SkillTreeAttachExistingForm(StyledFormMixin, forms.Form):
 
 
 class SkillTreeMoveForm(StyledFormMixin, forms.Form):
-    target_domain = forms.ModelChoiceField(label="目标技术领域", queryset=TechnicalDomain.objects.none())
     new_parent = forms.ChoiceField(label="目标父技能", required=False)
 
-    def __init__(self, *args, tree_version, node, user, **kwargs):
+    def __init__(self, *args, tree_version, node, **kwargs):
         super().__init__(*args, **kwargs)
-        allowed_domains = manageable_domains_for(user, tree_version.skill_project).filter(is_active=True)
-        self.fields["target_domain"].queryset = allowed_domains
-        selected_domain_id = self.data.get("target_domain") if self.is_bound else node.technical_domain_id
-        try:
-            selected_domain_id = int(selected_domain_id)
-        except (TypeError, ValueError):
-            selected_domain_id = node.technical_domain_id
-        allowed_domain_ids = set(allowed_domains.values_list("pk", flat=True))
-        if selected_domain_id not in allowed_domain_ids:
-            selected_domain_id = node.technical_domain_id
         nodes = list(
-            SkillTreeNode.objects.filter(tree_version=tree_version, technical_domain_id=selected_domain_id)
-            .select_related("skill", "technical_domain")
+            SkillTreeNode.objects.filter(tree_version=tree_version)
+            .select_related("skill")
             .order_by("order", "pk")
         )
         node_by_id = {item.pk: item for item in nodes}
@@ -279,14 +360,13 @@ class SkillTreeMoveForm(StyledFormMixin, forms.Form):
             return path_cache[item.pk]
 
         self.fields["new_parent"].choices = [
-            ("", "作为目标技术领域的根技能"),
+            ("", "作为根技能"),
             *[
-                (str(item.pk), f"{item.technical_domain.name} / {path_for(item)}")
+                (str(item.pk), path_for(item))
                 for item in nodes
                 if item.pk not in excluded_ids
             ],
         ]
-        self.fields["target_domain"].initial = node.technical_domain
 
 
 class SkillTreeRemoveForm(StyledFormMixin, forms.Form):
@@ -317,7 +397,7 @@ class WSOSVersionForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.Model
 class WSOSSectionForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = WSOSSection
-        fields = ["wsos_version", "code", "name", "description", "weight", "order"]
+        fields = ["code", "name", "description", "weight", "order"]
         widgets = {"description": forms.Textarea(attrs={"rows": 4})}
 
 
@@ -325,4 +405,11 @@ class SkillWSOSMapForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = SkillWSOSMap
         fields = ["skill", "wsos_section", "note"]
+        widgets = {"note": forms.Textarea(attrs={"rows": 3})}
+
+
+class SkillWSOSMapNoteForm(StyledFormMixin, forms.ModelForm):
+    class Meta:
+        model = SkillWSOSMap
+        fields = ["note"]
         widgets = {"note": forms.Textarea(attrs={"rows": 3})}

@@ -1,0 +1,35 @@
+{% extends "layouts/app.html" %}
+
+{% partialdef results %}
+  {% include "components/table_wrapper.html" with table=table %}
+{% endpartialdef results %}
+
+{% block content %}
+  <div class="space-y-4">
+    <section class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="text-sm text-base-content/60">{{ project.name }} · {{ domain.code }}</p>
+            <h2 class="card-title">{{ domain.name }}技能列表</h2>
+            <p class="text-sm text-base-content/60">{{ tree.name }}（{{ tree.version }}）{% if tree.is_current %} · 当前版本{% else %} · 历史版本{% endif %}</p>
+          </div>
+          {% if can_edit_version %}<a class="btn btn-outline btn-sm" href="{% url 'standards:tree_edit' tree.pk %}">编辑版本</a>{% endif %}
+        </div>
+        <div class="tabs tabs-box tabs-sm self-start">
+          {% if not version_context %}
+            {% url 'standards:current_domain_tree' project.pk domain.pk as tree_url %}
+            {% url 'standards:current_domain_tree_list' project.pk domain.pk as list_url %}
+          {% else %}
+            {% url 'standards:tree_detail' tree.pk as tree_url %}
+            {% url 'standards:tree_node_list' tree.pk as list_url %}
+          {% endif %}
+          <a class="tab" href="{{ tree_url }}">树形视图</a>
+          <a class="tab tab-active" href="{{ list_url }}">列表视图</a>
+        </div>
+      </div>
+    </section>
+    {% include "components/list_filter_toolbar.html" %}
+    <div id="list-results">{% partial results %}</div>
+  </div>
+{% endblock %}

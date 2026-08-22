@@ -53,39 +53,48 @@ def can_manage_skill(user, skill) -> bool:
     return manageable_skills_for(user).filter(pk=skill.pk).exists()
 
 
-def current_skill_tree_for(project):
-    return SkillTreeVersion.objects.filter(skill_project=project, is_current=True).first()
+def current_skill_tree_for(domain):
+    return (
+        SkillTreeVersion.objects.select_related("technical_domain", "technical_domain__skill_project")
+        .filter(technical_domain=domain, is_current=True)
+        .first()
+    )
 
 
 def current_wsos_for(project):
     return WSOSVersion.objects.filter(skill_project=project, is_current=True).first()
 
 
-def project_domains_for_view(*, project, user, tree_version=None):
+def project_domains_for_view(*, project, user):
     """返回当前用户可在项目页或技能树页看到的技术领域。"""
 
     domains = TechnicalDomain.objects.filter(skill_project=project)
     manageable_inactive = manageable_domains_for(user, project).filter(is_active=False)
-    visible_condition = Q(is_active=True) | Q(pk__in=manageable_inactive)
-    if tree_version is not None:
-        domains = domains.annotate(
-            tree_node_count=Count(
-                "skill_tree_nodes",
-                filter=Q(skill_tree_nodes__tree_version=tree_version),
-            )
-        )
-        visible_condition |= Q(tree_node_count__gt=0)
-    else:
-        domains = domains.annotate(tree_node_count=Count("skill_tree_nodes", filter=Q(pk__isnull=True)))
+    current_tree_domain_ids = SkillTreeVersion.objects.filter(
+        technical_domain__skill_project=project,
+        is_current=True,
+    ).values("technical_domain_id")
+    visible_condition = Q(is_active=True) | Q(pk__in=manageable_inactive) | Q(pk__in=current_tree_domain_ids)
     domains = domains.filter(visible_condition).order_by("order", "code", "name", "pk")
     manageable_ids = set(manageable_domains_for(user, project).values_list("pk", flat=True))
+    current_trees = {
+        tree.technical_domain_id: tree
+        for tree in SkillTreeVersion.objects.filter(
+            technical_domain__skill_project=project,
+            is_current=True,
+        )
+        .select_related("technical_domain")
+        .annotate(tree_node_count=Count("nodes"))
+    }
     for domain in domains:
+        domain.current_tree = current_trees.get(domain.pk)
+        domain.tree_node_count = domain.current_tree.tree_node_count if domain.current_tree else 0
         domain.can_edit_domain = can_manage_domain(user, domain)
         domain.can_manage_tree = domain.pk in manageable_ids
     return list(domains)
 
 
-def unmounted_primary_skills_for_tree_domain(*, tree_version, domain, user):
+def unmounted_primary_skills_for_tree(*, tree_version, user):
     """返回当前版本尚无树位置、且主要归属当前领域的启用技能。"""
 
     mounted_in_tree = SkillTreeNode.objects.filter(tree_version=tree_version, skill_id=OuterRef("pk"))
@@ -93,7 +102,7 @@ def unmounted_primary_skills_for_tree_domain(*, tree_version, domain, user):
         visible_skills_for(user)
         .filter(
             skill_project=tree_version.skill_project,
-            primary_domain=domain,
+            primary_domain=tree_version.technical_domain,
             is_active=True,
         )
         .annotate(is_mounted_in_tree=Exists(mounted_in_tree))
@@ -104,24 +113,15 @@ def unmounted_primary_skills_for_tree_domain(*, tree_version, domain, user):
     )
 
 
-def skill_tree_structure(*, tree_version, user, domain=None):
-    """一次读取技能树，并在内存中构造模板所需的领域与 children 结构。"""
+def skill_tree_structure(*, tree_version, user):
+    """一次读取单领域技能树，并在内存中构造模板所需的 children 结构。"""
 
-    if domain is not None and domain.skill_project_id != tree_version.skill_project_id:
-        raise ValueError("技术领域必须属于技能树版本所属技能项目。")
-
+    domain = tree_version.technical_domain
     node_queryset = SkillTreeNode.objects.filter(tree_version=tree_version)
-    if domain is not None:
-        node_queryset = node_queryset.filter(technical_domain=domain)
     nodes = list(
         node_queryset
-        .select_related("skill", "skill__primary_domain", "technical_domain", "parent")
-        .order_by("technical_domain__order", "technical_domain_id", "order", "pk")
-    )
-    domains = [domain] if domain is not None else project_domains_for_view(
-        project=tree_version.skill_project,
-        user=user,
-        tree_version=tree_version,
+        .select_related("skill", "skill__primary_domain", "tree_version__technical_domain", "parent")
+        .order_by("order", "pk")
     )
     manageable_domain_ids = set(manageable_domains_for(user, tree_version.skill_project).values_list("pk", flat=True))
     children_by_parent = defaultdict(list)
@@ -165,17 +165,73 @@ def skill_tree_structure(*, tree_version, user, domain=None):
             node.can_move_up = node.can_move and index > 0
             node.can_move_down = node.can_move and index < len(siblings) - 1
 
-    roots_by_domain = defaultdict(list)
-    for root in children_by_parent.get(None, []):
-        roots_by_domain[root.technical_domain_id].append(root)
+    domain.tree_roots = children_by_parent.get(None, [])
+    decorate_siblings(domain.tree_roots, [])
+    domain.can_add_tree_position = can_add_node and domain.is_active and domain.pk in manageable_domain_ids
+    domain.can_create_skill = can_add_skill and domain.is_active and domain.pk in manageable_domain_ids
+    domain.can_manage_tree = domain.pk in manageable_domain_ids
+    return domain
 
-    for domain in domains:
-        domain.tree_roots = roots_by_domain.get(domain.pk, [])
-        decorate_siblings(domain.tree_roots, [])
-        domain.can_add_tree_position = can_add_node and domain.is_active and domain.pk in manageable_domain_ids
-        domain.can_create_skill = can_add_skill and domain.is_active and domain.pk in manageable_domain_ids
-        domain.can_manage_tree = domain.pk in manageable_domain_ids
-    return domains
+
+def decorate_skill_tree_paths(*, tree_version, nodes):
+    """为列表/搜索结果批量补充完整路径，不在逐行处理中查询数据库。"""
+
+    all_nodes = list(
+        SkillTreeNode.objects.filter(tree_version=tree_version)
+        .select_related("skill")
+        .only("pk", "parent_id", "skill__name")
+    )
+    node_by_id = {node.pk: node for node in all_nodes}
+    path_cache = {}
+
+    def path_for(node):
+        if node.pk in path_cache:
+            return path_cache[node.pk]
+        parts = [node.skill.name]
+        parent_id = node.parent_id
+        while parent_id is not None:
+            parent = node_by_id[parent_id]
+            parts.append(parent.skill.name)
+            parent_id = parent.parent_id
+        path_cache[node.pk] = " / ".join(reversed(parts))
+        return path_cache[node.pk]
+
+    for node in nodes:
+        node.full_path = path_for(node_by_id[node.pk])
+    return nodes
+
+
+def search_skill_tree_nodes(*, tree_version, user, query, limit=20):
+    if not user.has_perm("standards.view_skilltreeversion") or not query.strip():
+        return []
+    nodes = list(
+        SkillTreeNode.objects.filter(tree_version=tree_version)
+        .filter(
+            Q(skill__name__icontains=query)
+            | Q(skill__description__icontains=query)
+            | Q(skill__terms__term__icontains=query)
+        )
+        .select_related("skill")
+        .distinct()
+        .order_by("skill__name", "pk")[:limit]
+    )
+    return decorate_skill_tree_paths(tree_version=tree_version, nodes=nodes)
+
+
+def wsos_skill_candidates(*, section, query="", domain=None):
+    queryset = Skill.objects.filter(
+        skill_project=section.wsos_version.skill_project,
+        is_active=True,
+    ).exclude(wsos_mappings__wsos_section=section)
+    if query.strip():
+        queryset = queryset.filter(
+            Q(name__icontains=query)
+            | Q(description__icontains=query)
+            | Q(terms__term__icontains=query)
+        )
+    if domain is not None:
+        queryset = queryset.filter(Q(primary_domain=domain) | Q(related_domains=domain))
+    return queryset.select_related("primary_domain").prefetch_related("terms").distinct().order_by("name", "pk")[:20]
 
 
 def skill_assessment_history(skill):

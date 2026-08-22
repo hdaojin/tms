@@ -1,9 +1,11 @@
 import json
 
 from django import forms
+from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import Http404, HttpResponse, HttpResponseBadRequest
+from django.db.models import Count, Exists, OuterRef, Sum
+from django.http import Http404, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
@@ -11,6 +13,7 @@ from django.views.generic import CreateView, DetailView, TemplateView, UpdateVie
 from django_tables2 import SingleTableView
 
 from core.utils.mixins import TitleMixin
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 
 from .forms import (
     SkillForm,
@@ -20,10 +23,21 @@ from .forms import (
     SkillTreeQuickAddForm,
     SkillTreeRemoveForm,
     SkillTreeVersionForm,
+    SkillWSOSMapNoteForm,
     TechnicalDomainForm,
+    WSOSSectionForm,
     WSOSVersionForm,
 )
-from .models import Skill, SkillProject, SkillTreeNode, SkillTreeVersion, TechnicalDomain, WSOSVersion
+from .models import (
+    Skill,
+    SkillProject,
+    SkillTreeNode,
+    SkillTreeVersion,
+    SkillWSOSMap,
+    TechnicalDomain,
+    WSOSSection,
+    WSOSVersion,
+)
 from .selectors import (
     can_manage_domain,
     can_manage_skill,
@@ -36,23 +50,32 @@ from .selectors import (
     skill_assessment_history,
     skill_assessment_performance,
     skill_tree_structure,
+    search_skill_tree_nodes,
     skill_training_investment,
-    unmounted_primary_skills_for_tree_domain,
+    unmounted_primary_skills_for_tree,
     visible_skills_for,
+    wsos_skill_candidates,
+    decorate_skill_tree_paths,
 )
 from .services import (
     add_skill_alias,
     attach_existing_skill_to_tree,
     create_detailed_skill_in_tree,
     create_skill_in_tree,
+    delete_wsos_section,
     find_skill_candidates,
+    map_skill_to_wsos_section,
     move_skill_tree_node,
     remove_skill_tree_node,
     reorder_skill_tree_node,
     save_skill,
+    set_current_skill_tree_version,
+    unmap_skill_from_wsos_section,
+    update_skill_wsos_map_note,
 )
 from .tables import (
     SkillProjectTable,
+    SkillTreeNodeTable,
     SkillTreeVersionTable,
     WSOSVersionTable,
 )
@@ -112,17 +135,14 @@ class SkillProjectDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        current_tree = current_skill_tree_for(self.object)
         domains = project_domains_for_view(
             project=self.object,
             user=self.request.user,
-            tree_version=current_tree,
         )
         can_view_tree = self.request.user.has_perm("standards.view_skilltreeversion")
         for domain in domains:
             domain.can_view_tree = can_view_tree
         context.update(
-            current_tree=current_tree,
             current_wsos=current_wsos_for(self.object),
             domains=domains,
             can_view_domain_management=self.request.user.has_perm("standards.view_technicaldomain"),
@@ -143,16 +163,6 @@ class SkillProjectDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
                 {
                     "label": "新增技术领域",
                     "href": reverse("standards:domain_create", args=[self.object.pk]),
-                    "icon": "icon-[tabler--plus]",
-                    "variant_class": "btn-primary",
-                    "size_class": "btn-sm",
-                }
-            )
-        if current_tree is None and self.request.user.has_perm("standards.add_skilltreeversion"):
-            actions.append(
-                {
-                    "label": "新增技能树版本",
-                    "href": reverse("standards:tree_create"),
                     "icon": "icon-[tabler--plus]",
                     "variant_class": "btn-primary",
                     "size_class": "btn-sm",
@@ -208,7 +218,7 @@ class TechnicalDomainCreateView(StandardCreateMixin, TitleMixin, PermissionRequi
 
     def get_success_url(self):
         return reverse(
-            "standards:domain_current_tree",
+            "standards:current_domain_tree",
             kwargs={"project_pk": self.project.pk, "domain_pk": self.object.pk},
         )
 
@@ -247,21 +257,6 @@ class CurrentSkillTreeEntryView(TitleMixin, PermissionRequiredMixin, TemplateVie
         context = super().get_context_data(**kwargs)
         context["projects"] = self.projects
         return context
-
-
-def legacy_skill_list(request, project_pk):
-    project = get_object_or_404(SkillProject, pk=project_pk, is_active=True)
-    return redirect("standards:project_detail", pk=project.pk)
-
-
-def legacy_domain_detail(request, project_pk, domain_pk):
-    project = get_object_or_404(SkillProject, pk=project_pk, is_active=True)
-    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=project)
-    return redirect(
-        "standards:domain_current_tree",
-        project_pk=project.pk,
-        domain_pk=domain.pk,
-    )
 
 
 class SkillDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -381,39 +376,101 @@ def skill_alias_add(request, pk):
     return response
 
 
-class SkillTreeVersionListView(StandardListMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
+class SkillTreeVersionListView(
+    FilterableListMixin,
+    StandardListMixin,
+    TitleMixin,
+    PermissionRequiredMixin,
+    SingleTableView,
+):
     model = SkillTreeVersion
     table_class = SkillTreeVersionTable
-    title = "技能树"
+    title = "技能树版本"
     permission_required = "standards.view_skilltreeversion"
-    create_url_name = "standards:tree_create"
-    create_label = "新增技能树版本"
+    list_filter_specs = (
+        ListFilterSpec("project", "技能项目", "select"),
+        ListFilterSpec("domain", "技术领域", "select"),
+        ListFilterSpec(
+            "current",
+            "当前版本",
+            "select",
+            choices=(("1", "是"), ("0", "否")),
+        ),
+    )
+
+    def get_list_filter_specs(self):
+        projects = SkillProject.objects.order_by("order", "code", "pk")
+        domains = TechnicalDomain.objects.select_related("skill_project").order_by(
+            "skill_project__order", "order", "code", "pk"
+        )
+        return (
+            ListFilterSpec("project", "技能项目", "select", choices=[(item.pk, item) for item in projects]),
+            ListFilterSpec("domain", "技术领域", "select", choices=[(item.pk, item) for item in domains]),
+            self.list_filter_specs[2],
+        )
+
+    def get_base_queryset(self):
+        return SkillTreeVersion.objects.select_related(
+            "technical_domain",
+            "technical_domain__skill_project",
+            "based_on",
+        )
+
+    def apply_custom_filters(self, queryset):
+        if project_id := self.request.GET.get("project"):
+            queryset = queryset.filter(technical_domain__skill_project_id=project_id)
+        if domain_id := self.request.GET.get("domain"):
+            queryset = queryset.filter(technical_domain_id=domain_id)
+        if current := self.request.GET.get("current"):
+            queryset = queryset.filter(is_current=current == "1")
+        return queryset
 
 
 class SkillTreeVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = SkillTreeVersion
     context_object_name = "tree"
-    template_name = "standards/tree_detail.html"
+    template_name = "standards/domain_tree.html"
     title = "{name}"
     permission_required = "standards.view_skilltreeversion"
 
     def get_queryset(self):
-        return SkillTreeVersion.objects.select_related("skill_project")
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        domains = project_domains_for_view(
-            project=self.object.skill_project,
-            user=request.user,
-            tree_version=self.object,
+        return SkillTreeVersion.objects.select_related(
+            "technical_domain",
+            "technical_domain__skill_project",
+            "based_on",
         )
-        if domains:
-            return redirect(
-                "standards:tree_domain_detail",
-                tree_pk=self.object.pk,
-                domain_pk=domains[0].pk,
-            )
-        return self.render_to_response(self.get_context_data(object=self.object))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        tree = self.object
+        domain = skill_tree_structure(tree_version=tree, user=self.request.user)
+        context.update(
+            project=tree.skill_project,
+            tree=tree,
+            domain=domain,
+            is_current_tree=tree.is_current,
+            unmounted_skill_count=unmounted_primary_skills_for_tree(
+                tree_version=tree,
+                user=self.request.user,
+            ).count(),
+            can_attach_unmounted_skills=can_manage_domain(
+                self.request.user,
+                domain,
+                permission="standards.add_skilltreenode",
+            ),
+            can_create_tree_version=can_manage_domain(
+                self.request.user,
+                domain,
+                permission="standards.add_skilltreeversion",
+            ),
+            can_set_current=can_manage_domain(
+                self.request.user,
+                domain,
+                permission="standards.change_skilltreeversion",
+            ),
+            version_context=True,
+        )
+        return context
 
 
 class DomainSkillTreeMixin(TitleMixin, PermissionRequiredMixin, TemplateView):
@@ -421,21 +478,16 @@ class DomainSkillTreeMixin(TitleMixin, PermissionRequiredMixin, TemplateView):
     title_icon = "icon-[tabler--hierarchy-3]"
     permission_required = "standards.view_skilltreeversion"
 
-    def _set_tree_and_domain(self, *, tree, domain):
+    def _set_tree_and_domain(self, *, tree):
         self.tree = tree
         self.project = tree.skill_project
-        self.domain = domain
+        self.domain = tree.technical_domain
 
     def get_title(self):
         return f"{self.domain.name}技能树"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        tree_domains = project_domains_for_view(
-            project=self.project,
-            user=self.request.user,
-            tree_version=self.tree,
-        )
         can_attach = can_manage_domain(
             self.request.user,
             self.domain,
@@ -444,19 +496,23 @@ class DomainSkillTreeMixin(TitleMixin, PermissionRequiredMixin, TemplateView):
         context.update(
             project=self.project,
             tree=self.tree,
-            domain=skill_tree_structure(
-                tree_version=self.tree,
-                user=self.request.user,
-                domain=self.domain,
-            )[0],
-            tree_domains=tree_domains,
+            domain=skill_tree_structure(tree_version=self.tree, user=self.request.user),
             is_current_tree=self.tree.is_current,
-            unmounted_skill_count=unmounted_primary_skills_for_tree_domain(
+            unmounted_skill_count=unmounted_primary_skills_for_tree(
                 tree_version=self.tree,
-                domain=self.domain,
                 user=self.request.user,
             ).count(),
             can_attach_unmounted_skills=can_attach,
+            can_create_tree_version=can_manage_domain(
+                self.request.user,
+                self.domain,
+                permission="standards.add_skilltreeversion",
+            ),
+            can_set_current=can_manage_domain(
+                self.request.user,
+                self.domain,
+                permission="standards.change_skilltreeversion",
+            ),
         )
         return context
 
@@ -465,9 +521,9 @@ class CurrentDomainSkillTreeView(DomainSkillTreeMixin):
     def dispatch(self, request, *args, **kwargs):
         project = get_object_or_404(SkillProject, pk=kwargs["project_pk"], is_active=True)
         domain = get_object_or_404(TechnicalDomain, pk=kwargs["domain_pk"], skill_project=project)
-        tree = current_skill_tree_for(project)
+        tree = current_skill_tree_for(domain)
         if tree is not None:
-            self._set_tree_and_domain(tree=tree, domain=domain)
+            self._set_tree_and_domain(tree=tree)
         else:
             self.project = project
             self.domain = domain
@@ -480,12 +536,22 @@ class CurrentDomainSkillTreeView(DomainSkillTreeMixin):
     def get_context_data(self, **kwargs):
         if self.tree is None:
             context = TemplateView.get_context_data(self, **kwargs)
-            context.update(project=self.project, domain=self.domain, current_tree_missing=True)
-            if self.request.user.has_perm("standards.add_skilltreeversion"):
+            can_create_tree = can_manage_domain(
+                self.request.user,
+                self.domain,
+                permission="standards.add_skilltreeversion",
+            )
+            context.update(
+                project=self.project,
+                domain=self.domain,
+                current_tree_missing=True,
+                can_create_tree_version=can_create_tree,
+            )
+            if can_create_tree:
                 context["page_actions"] = [
                     {
                         "label": "新增技能树版本",
-                        "href": reverse("standards:tree_create"),
+                        "href": reverse("standards:domain_tree_create", args=[self.project.pk, self.domain.pk]),
                         "icon": "icon-[tabler--plus]",
                         "variant_class": "btn-primary",
                         "size_class": "btn-sm",
@@ -495,33 +561,197 @@ class CurrentDomainSkillTreeView(DomainSkillTreeMixin):
         return super().get_context_data(**kwargs)
 
 
-class VersionDomainSkillTreeView(DomainSkillTreeMixin):
-    def dispatch(self, request, *args, **kwargs):
-        tree = _tree_for_workbench(kwargs["tree_pk"])
-        domain = get_object_or_404(
-            TechnicalDomain,
-            pk=kwargs["domain_pk"],
-            skill_project=tree.skill_project,
-        )
-        self._set_tree_and_domain(tree=tree, domain=domain)
-        return super().dispatch(request, *args, **kwargs)
-
-
 class SkillTreeVersionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
     model = SkillTreeVersion
     form_class = SkillTreeVersionForm
     title = "新增技能树版本"
     permission_required = "standards.add_skilltreeversion"
-    success_url_name = "standards:tree_detail"
+    def dispatch(self, request, *args, **kwargs):
+        self.project = get_object_or_404(SkillProject, pk=kwargs["project_pk"])
+        self.domain = get_object_or_404(
+            TechnicalDomain,
+            pk=kwargs["domain_pk"],
+            skill_project=self.project,
+        )
+        if not can_manage_domain(request.user, self.domain, permission=self.permission_required):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update(technical_domain=self.domain, actor=self.request.user)
+        return kwargs
+
+    def get_success_url(self):
+        return reverse("standards:tree_detail", args=[self.object.pk])
 
 
-class SkillTreeVersionUpdateView(SkillTreeVersionCreateView, UpdateView):
+class SkillTreeVersionUpdateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, UpdateView):
+    model = SkillTreeVersion
+    form_class = SkillTreeVersionForm
     title = "编辑技能树版本"
     permission_required = "standards.change_skilltreeversion"
 
+    def get_queryset(self):
+        return SkillTreeVersion.objects.select_related("technical_domain")
+
+    def dispatch(self, request, *args, **kwargs):
+        tree = self.get_object()
+        if not can_manage_domain(request.user, tree.technical_domain, permission=self.permission_required):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update(technical_domain=self.object.technical_domain, actor=self.request.user)
+        return kwargs
+
+    def get_success_url(self):
+        return reverse("standards:tree_detail", args=[self.object.pk])
+
+
+@require_POST
+def skill_tree_set_current(request, tree_pk):
+    tree = _tree_for_workbench(tree_pk)
+    set_current_skill_tree_version(tree_version=tree, actor=request.user)
+    messages.success(request, f"已将 {tree.technical_domain.name} / {tree.version} 设为当前技能树版本。")
+    return redirect("standards:tree_detail", pk=tree.pk)
+
+
+class SkillTreeNodeListView(
+    FilterableListMixin,
+    TitleMixin,
+    PermissionRequiredMixin,
+    SingleTableView,
+):
+    table_class = SkillTreeNodeTable
+    template_name = "standards/tree_node_list.html"
+    title_icon = "icon-[tabler--list-details]"
+    permission_required = "standards.view_skilltreeversion"
+    search_fields = ("skill__name", "skill__description", "skill__terms__term")
+    search_requires_distinct = True
+    list_filter_specs = (
+        ListFilterSpec("q", "搜索", "search", placeholder="搜索技能名称、别名或描述"),
+        ListFilterSpec("difficulty", "难度", "select", choices=tuple((value, value) for value in range(1, 6))),
+        ListFilterSpec("core", "核心技能", "select", choices=(("1", "是"), ("0", "否"))),
+        ListFilterSpec("assessable", "可考核", "select", choices=(("1", "是"), ("0", "否"))),
+        ListFilterSpec("active", "启用状态", "select", choices=(("1", "启用"), ("0", "停用"))),
+    )
+
+    def dispatch(self, request, *args, **kwargs):
+        if "tree_pk" in kwargs:
+            self.tree = _tree_for_workbench(kwargs["tree_pk"])
+            self.version_context = True
+        else:
+            project = get_object_or_404(SkillProject, pk=kwargs["project_pk"], is_active=True)
+            domain = get_object_or_404(TechnicalDomain, pk=kwargs["domain_pk"], skill_project=project)
+            self.tree = current_skill_tree_for(domain)
+            if self.tree is None:
+                return redirect("standards:current_domain_tree", project_pk=project.pk, domain_pk=domain.pk)
+            self.version_context = False
+        self.domain = self.tree.technical_domain
+        self.project = self.tree.skill_project
+        self.current_wsos = current_wsos_for(self.project)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_title(self):
+        return f"{self.domain.name}技能列表"
+
+    def get_list_filter_specs(self):
+        specs = list(self.list_filter_specs)
+        if self.current_wsos is not None:
+            specs.append(
+                ListFilterSpec(
+                    "wsos",
+                    "当前 WSOS 映射",
+                    "select",
+                    choices=(("mapped", "已映射"), ("unmapped", "未映射")),
+                )
+            )
+        return specs
+
+    def get_base_queryset(self):
+        queryset = SkillTreeNode.objects.filter(tree_version=self.tree).select_related(
+            "tree_version",
+            "tree_version__technical_domain",
+            "skill",
+            "skill__primary_domain",
+        )
+        if self.current_wsos is not None:
+            mapping = SkillWSOSMap.objects.filter(
+                skill_id=OuterRef("skill_id"),
+                wsos_section__wsos_version=self.current_wsos,
+            )
+            queryset = queryset.annotate(has_current_wsos_mapping=Exists(mapping))
+        return queryset
+
+    def apply_custom_filters(self, queryset):
+        direct_filters = {
+            "difficulty": "skill__difficulty",
+            "core": "skill__is_core",
+            "assessable": "skill__is_assessable",
+            "active": "skill__is_active",
+        }
+        for parameter, lookup in direct_filters.items():
+            if value := self.request.GET.get(parameter):
+                queryset = queryset.filter(**{lookup: value if parameter == "difficulty" else value == "1"})
+        if self.current_wsos is not None:
+            if self.request.GET.get("wsos") == "mapped":
+                queryset = queryset.filter(has_current_wsos_mapping=True)
+            elif self.request.GET.get("wsos") == "unmapped":
+                queryset = queryset.filter(has_current_wsos_mapping=False)
+        return queryset
+
+    def get_table_data(self):
+        nodes = list(super().get_table_data())
+        decorate_skill_tree_paths(tree_version=self.tree, nodes=nodes)
+        for node in nodes:
+            node.current_wsos_unavailable = self.current_wsos is None
+            node.has_current_wsos_mapping = bool(getattr(node, "has_current_wsos_mapping", False))
+            node.can_edit_skill = can_manage_skill(self.request.user, node.skill)
+        return nodes
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            tree=self.tree,
+            project=self.project,
+            domain=self.domain,
+            is_current_tree=self.tree.is_current,
+            current_wsos=self.current_wsos,
+            version_context=self.version_context,
+            can_edit_version=can_manage_domain(
+                self.request.user,
+                self.domain,
+                permission="standards.change_skilltreeversion",
+            ),
+        )
+        return context
+
+
+@require_GET
+def skill_tree_search(request, tree_pk):
+    if not request.user.has_perm("standards.view_skilltreeversion"):
+        raise PermissionDenied
+    tree = _tree_for_workbench(tree_pk)
+    query = request.GET.get("q", "").strip()
+    results = search_skill_tree_nodes(
+        tree_version=tree,
+        user=request.user,
+        query=query,
+    )
+    return render(
+        request,
+        "standards/partials/skill_tree_search_results.html",
+        {"tree": tree, "query": query, "results": results},
+    )
+
 
 def _tree_for_workbench(tree_pk):
-    return get_object_or_404(SkillTreeVersion.objects.select_related("skill_project"), pk=tree_pk)
+    return get_object_or_404(
+        SkillTreeVersion.objects.select_related("technical_domain", "technical_domain__skill_project"),
+        pk=tree_pk,
+    )
 
 
 def _tree_node(tree, node_pk):
@@ -529,8 +759,8 @@ def _tree_node(tree, node_pk):
         SkillTreeNode.objects.select_related(
             "skill",
             "skill__primary_domain",
-            "technical_domain",
             "tree_version",
+            "tree_version__technical_domain",
             "parent",
             "parent__skill",
         ),
@@ -553,13 +783,13 @@ def _tree_descendant_stats(tree, node):
     return direct_child_count, count
 
 
-def _render_tree_panel(request, tree, domain, *, created_node_id=None, focused_node_id=None):
+def _render_tree_panel(request, tree, *, created_node_id=None, focused_node_id=None):
     response = render(
         request,
         "standards/partials/skill_tree_domain_panel.html",
         {
             "tree": tree,
-            "domain": skill_tree_structure(tree_version=tree, user=request.user, domain=domain)[0],
+            "domain": skill_tree_structure(tree_version=tree, user=request.user),
         },
     )
     events = {}
@@ -572,23 +802,19 @@ def _render_tree_panel(request, tree, domain, *, created_node_id=None, focused_n
     return response
 
 
-def skill_tree_panel(request, tree_pk, domain_pk):
+def skill_tree_panel(request, tree_pk):
     if not request.user.has_perm("standards.view_skilltreeversion"):
         raise PermissionDenied
     tree = _tree_for_workbench(tree_pk)
-    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
-    return _render_tree_panel(request, tree, domain)
+    return _render_tree_panel(request, tree)
 
 
-def _root_placement(tree, domain_pk):
-    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
-    return domain, None, None
+def _root_placement(tree):
+    return tree.technical_domain, None, None
 
 
-def _child_placement(tree, parent_pk, domain_pk=None):
+def _child_placement(tree, parent_pk):
     parent = _tree_node(tree, parent_pk)
-    if domain_pk is not None and parent.technical_domain_id != domain_pk:
-        raise Http404
     return parent.technical_domain, parent, parent
 
 
@@ -600,19 +826,19 @@ def _sibling_placement(tree, node_pk):
 def _tree_editor_urls(*, tree, domain, kind, anchor):
     if kind == "root":
         return {
-            "submit_url": reverse("standards:tree_quick_add_root", args=[tree.pk, domain.pk]),
-            "candidates_url": reverse("standards:tree_candidates_root", args=[tree.pk, domain.pk]),
-            "full_create_url": reverse("standards:tree_skill_create_root", args=[tree.pk, domain.pk]),
+            "submit_url": reverse("standards:tree_quick_add_root", args=[tree.pk]),
+            "candidates_url": reverse("standards:tree_candidates_root", args=[tree.pk]),
+            "full_create_url": reverse("standards:tree_skill_create_root", args=[tree.pk]),
         }
     if kind == "child":
         return {
             "submit_url": reverse(
                 "standards:tree_quick_add_child",
-                args=[tree.pk, domain.pk, anchor.pk],
+                args=[tree.pk, anchor.pk],
             ),
             "candidates_url": reverse(
                 "standards:tree_candidates_child",
-                args=[tree.pk, domain.pk, anchor.pk],
+                args=[tree.pk, anchor.pk],
             ),
             "full_create_url": reverse("standards:tree_skill_create_child", args=[tree.pk, anchor.pk]),
         }
@@ -709,7 +935,6 @@ def _skill_tree_inline_editor(request, *, tree, domain, parent, kind, anchor):
                 skill = get_object_or_404(Skill, pk=skill_id, skill_project=tree.skill_project)
                 node = attach_existing_skill_to_tree(
                     tree_version=tree,
-                    technical_domain=domain,
                     parent=parent,
                     skill=skill,
                     actor=request.user,
@@ -724,7 +949,6 @@ def _skill_tree_inline_editor(request, *, tree, domain, parent, kind, anchor):
                 if exact is not None and exact.can_attach_to_domain:
                     node = attach_existing_skill_to_tree(
                         tree_version=tree,
-                        technical_domain=domain,
                         parent=parent,
                         skill=exact,
                         actor=request.user,
@@ -738,7 +962,6 @@ def _skill_tree_inline_editor(request, *, tree, domain, parent, kind, anchor):
                     else:
                         node = create_skill_in_tree(
                             tree_version=tree,
-                            technical_domain=domain,
                             parent=parent,
                             name=form.cleaned_data["name"],
                             actor=request.user,
@@ -759,7 +982,7 @@ def _skill_tree_inline_editor(request, *, tree, domain, parent, kind, anchor):
             form.add_error(None, exc.message)
         else:
             if node is not None:
-                response = _render_tree_panel(request, tree, domain, created_node_id=node.pk)
+                response = _render_tree_panel(request, tree, created_node_id=node.pk)
                 response.headers["HX-Retarget"] = "#skill-tree-panel"
                 response.headers["HX-Reswap"] = "outerHTML"
                 return response
@@ -778,13 +1001,13 @@ def _skill_tree_inline_editor(request, *, tree, domain, parent, kind, anchor):
 
 
 @require_http_methods(["GET", "POST"])
-def skill_tree_quick_add(request, tree_pk, domain_pk, parent_pk=None):
+def skill_tree_quick_add(request, tree_pk, parent_pk=None):
     tree = _tree_for_workbench(tree_pk)
     if parent_pk is None:
-        domain, parent, anchor = _root_placement(tree, domain_pk)
+        domain, parent, anchor = _root_placement(tree)
         kind = "root"
     else:
-        domain, parent, anchor = _child_placement(tree, parent_pk, domain_pk)
+        domain, parent, anchor = _child_placement(tree, parent_pk)
         kind = "child"
     return _skill_tree_inline_editor(
         request,
@@ -833,13 +1056,13 @@ def _skill_tree_candidate_fragment(request, *, tree, domain, parent, kind, ancho
 
 
 @require_GET
-def skill_tree_candidates(request, tree_pk, domain_pk, parent_pk=None):
+def skill_tree_candidates(request, tree_pk, parent_pk=None):
     tree = _tree_for_workbench(tree_pk)
     if parent_pk is None:
-        domain, parent, anchor = _root_placement(tree, domain_pk)
+        domain, parent, anchor = _root_placement(tree)
         kind = "root"
     else:
-        domain, parent, anchor = _child_placement(tree, parent_pk, domain_pk)
+        domain, parent, anchor = _child_placement(tree, parent_pk)
         kind = "child"
     return _skill_tree_candidate_fragment(
         request,
@@ -948,7 +1171,6 @@ def _skill_tree_detailed_create(request, *, tree, domain, parent, action_url):
         try:
             node = create_detailed_skill_in_tree(
                 tree_version=tree,
-                technical_domain=domain,
                 parent=parent,
                 skill=skill,
                 aliases=form._split_text(form.cleaned_data.get("aliases_text")),
@@ -958,7 +1180,7 @@ def _skill_tree_detailed_create(request, *, tree, domain, parent, action_url):
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            response = _render_tree_panel(request, tree, domain, created_node_id=node.pk)
+            response = _render_tree_panel(request, tree, created_node_id=node.pk)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -976,10 +1198,10 @@ def _skill_tree_detailed_create(request, *, tree, domain, parent, action_url):
 
 
 @require_http_methods(["GET", "POST"])
-def skill_tree_detailed_create_root(request, tree_pk, domain_pk):
+def skill_tree_detailed_create_root(request, tree_pk):
     tree = _tree_for_workbench(tree_pk)
-    domain, parent, _ = _root_placement(tree, domain_pk)
-    action_url = reverse("standards:tree_skill_create_root", args=[tree.pk, domain.pk])
+    domain, parent, _ = _root_placement(tree)
+    action_url = reverse("standards:tree_skill_create_root", args=[tree.pk])
     return _skill_tree_detailed_create(
         request,
         tree=tree,
@@ -1045,7 +1267,7 @@ def skill_tree_skill_edit(request, tree_pk, node_pk):
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            response = _render_tree_panel(request, tree, node.technical_domain, focused_node_id=node.pk)
+            response = _render_tree_panel(request, tree, focused_node_id=node.pk)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -1064,7 +1286,6 @@ def skill_tree_skill_edit(request, tree_pk, node_pk):
 def skill_tree_move(request, tree_pk, node_pk):
     tree = _tree_for_workbench(tree_pk)
     node = _tree_node(tree, node_pk)
-    source_domain = node.technical_domain
     if not can_manage_domain(request.user, node.technical_domain, permission="standards.change_skilltreenode"):
         raise PermissionDenied
     form_data = request.POST if request.method == "POST" else request.GET if request.GET else None
@@ -1072,15 +1293,6 @@ def skill_tree_move(request, tree_pk, node_pk):
         form_data,
         tree_version=tree,
         node=node,
-        user=request.user,
-    )
-    form.fields["target_domain"].widget.attrs.update(
-        {
-            "hx-get": reverse("standards:tree_node_move", args=[tree.pk, node.pk]),
-            "hx-target": "#skill-tree-dialog",
-            "hx-trigger": "change",
-            "hx-include": "this",
-        }
     )
     if request.method == "POST" and form.is_valid():
         parent_id = form.cleaned_data.get("new_parent")
@@ -1089,24 +1301,12 @@ def skill_tree_move(request, tree_pk, node_pk):
             move_skill_tree_node(
                 node=node,
                 new_parent=new_parent,
-                target_domain=form.cleaned_data["target_domain"],
                 actor=request.user,
             )
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            target_domain = form.cleaned_data["target_domain"]
-            if source_domain.pk != target_domain.pk:
-                destination = reverse(
-                    "standards:tree_domain_detail",
-                    kwargs={"tree_pk": tree.pk, "domain_pk": target_domain.pk},
-                )
-                if request.htmx:
-                    response = HttpResponse(status=200)
-                    response.headers["HX-Location"] = destination
-                    return response
-                return redirect(destination)
-            response = _render_tree_panel(request, tree, source_domain, focused_node_id=node.pk)
+            response = _render_tree_panel(request, tree, focused_node_id=node.pk)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -1129,7 +1329,7 @@ def skill_tree_reorder(request, tree_pk, node_pk):
         )
     except ValidationError as exc:
         return HttpResponseBadRequest(exc.message)
-    return _render_tree_panel(request, tree, node.technical_domain)
+    return _render_tree_panel(request, tree)
 
 
 def skill_tree_remove(request, tree_pk, node_pk):
@@ -1160,7 +1360,7 @@ def skill_tree_remove(request, tree_pk, node_pk):
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            response = _render_tree_panel(request, tree, node.technical_domain)
+            response = _render_tree_panel(request, tree)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -1179,9 +1379,9 @@ def skill_tree_remove(request, tree_pk, node_pk):
 
 
 @require_GET
-def skill_tree_unmounted_skills(request, tree_pk, domain_pk):
+def skill_tree_unmounted_skills(request, tree_pk):
     tree = _tree_for_workbench(tree_pk)
-    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
+    domain = tree.technical_domain
     if not request.user.has_perm("standards.view_skilltreeversion"):
         raise PermissionDenied
     return render(
@@ -1190,9 +1390,8 @@ def skill_tree_unmounted_skills(request, tree_pk, domain_pk):
         {
             "tree": tree,
             "domain": domain,
-            "skills": unmounted_primary_skills_for_tree_domain(
+            "skills": unmounted_primary_skills_for_tree(
                 tree_version=tree,
-                domain=domain,
                 user=request.user,
             ),
             "can_attach_unmounted_skills": can_manage_domain(
@@ -1205,13 +1404,12 @@ def skill_tree_unmounted_skills(request, tree_pk, domain_pk):
 
 
 @require_http_methods(["GET", "POST"])
-def skill_tree_attach_existing(request, tree_pk, domain_pk, skill_pk):
+def skill_tree_attach_existing(request, tree_pk, skill_pk):
     tree = _tree_for_workbench(tree_pk)
-    domain = get_object_or_404(TechnicalDomain, pk=domain_pk, skill_project=tree.skill_project)
+    domain = tree.technical_domain
     skill = get_object_or_404(
-        unmounted_primary_skills_for_tree_domain(
+        unmounted_primary_skills_for_tree(
             tree_version=tree,
-            domain=domain,
             user=request.user,
         ),
         pk=skill_pk,
@@ -1221,13 +1419,11 @@ def skill_tree_attach_existing(request, tree_pk, domain_pk, skill_pk):
     form = SkillTreeAttachExistingForm(
         request.POST if request.method == "POST" else None,
         tree_version=tree,
-        technical_domain=domain,
     )
     if request.method == "POST" and form.is_valid():
         try:
             node = attach_existing_skill_to_tree(
                 tree_version=tree,
-                technical_domain=domain,
                 parent=form.cleaned_data["new_parent"],
                 skill=skill,
                 actor=request.user,
@@ -1235,7 +1431,7 @@ def skill_tree_attach_existing(request, tree_pk, domain_pk, skill_pk):
         except ValidationError as exc:
             form.add_error(None, exc.message)
         else:
-            response = _render_tree_panel(request, tree, domain, created_node_id=node.pk)
+            response = _render_tree_panel(request, tree, created_node_id=node.pk)
             response.headers["HX-Retarget"] = "#skill-tree-panel"
             response.headers["HX-Reswap"] = "outerHTML"
             return response
@@ -1262,6 +1458,23 @@ class WSOSVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{name}"
     permission_required = "standards.view_wsosversion"
 
+    def get_queryset(self):
+        return WSOSVersion.objects.select_related("skill_project")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sections = self.object.sections.annotate(
+            mapped_skill_count=Count("skill_mappings", distinct=True)
+        ).prefetch_related("skill_mappings__skill")
+        context.update(
+            sections=sections,
+            weight_total=sections.aggregate(total=Sum("weight"))["total"] or 0,
+            mapping_domains=TechnicalDomain.objects.filter(skill_project=self.object.skill_project).order_by(
+                "order", "code", "pk"
+            ),
+        )
+        return context
+
 
 class WSOSVersionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
     model = WSOSVersion
@@ -1274,3 +1487,173 @@ class WSOSVersionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredM
 class WSOSVersionUpdateView(WSOSVersionCreateView, UpdateView):
     title = "编辑 WSOS 版本"
     permission_required = "standards.change_wsosversion"
+
+
+class WSOSSectionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
+    model = WSOSSection
+    form_class = WSOSSectionForm
+    title = "新增 WSOS 章节"
+    permission_required = "standards.add_wsossection"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.wsos = get_object_or_404(WSOSVersion, pk=kwargs["wsos_pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        form.instance.wsos_version = self.wsos
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return f"{reverse('standards:wsos_detail', args=[self.wsos.pk])}#section-{self.object.pk}"
+
+
+class WSOSSectionUpdateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, UpdateView):
+    model = WSOSSection
+    form_class = WSOSSectionForm
+    title = "编辑 WSOS 章节"
+    permission_required = "standards.change_wsossection"
+
+    def get_queryset(self):
+        return WSOSSection.objects.select_related("wsos_version")
+
+    def get_success_url(self):
+        return f"{reverse('standards:wsos_detail', args=[self.object.wsos_version_id])}#section-{self.object.pk}"
+
+
+@require_http_methods(["GET", "POST"])
+def wsos_section_delete(request, section_pk):
+    section = get_object_or_404(WSOSSection.objects.select_related("wsos_version"), pk=section_pk)
+    if not request.user.has_perm("standards.delete_wsossection"):
+        raise PermissionDenied
+    if request.method == "POST":
+        try:
+            wsos_pk = section.wsos_version_id
+            delete_wsos_section(section=section, actor=request.user)
+        except ValidationError as exc:
+            messages.error(request, exc.message)
+        else:
+            messages.success(request, "WSOS 章节已删除。")
+        return redirect("standards:wsos_detail", pk=wsos_pk)
+    return render(
+        request,
+        "standards/confirm_delete.html",
+        {
+            "object": section,
+            "title": "删除 WSOS 章节",
+            "message": "删除前必须先解除该章节的全部技能映射。",
+            "cancel_url": reverse("standards:wsos_detail", args=[section.wsos_version_id]),
+        },
+    )
+
+
+@require_GET
+def wsos_section_skill_candidates(request, section_pk):
+    if not (
+        request.user.has_perm("standards.view_skillwsosmap")
+        or request.user.has_perm("standards.add_skillwsosmap")
+    ):
+        raise PermissionDenied
+    section = get_object_or_404(WSOSSection.objects.select_related("wsos_version"), pk=section_pk)
+    domain = None
+    if domain_id := request.GET.get("domain"):
+        domain = get_object_or_404(
+            TechnicalDomain,
+            pk=domain_id,
+            skill_project=section.wsos_version.skill_project,
+        )
+    query = request.GET.get("q", "").strip()
+    return render(
+        request,
+        "standards/partials/wsos_skill_candidates.html",
+        {
+            "section": section,
+            "query": query,
+            "selected_domain": domain,
+            "candidates": wsos_skill_candidates(section=section, query=query, domain=domain),
+        },
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def wsos_section_map_skill(request, section_pk, skill_pk):
+    section = get_object_or_404(WSOSSection.objects.select_related("wsos_version"), pk=section_pk)
+    skill = get_object_or_404(
+        Skill.objects.filter(skill_project=section.wsos_version.skill_project, is_active=True),
+        pk=skill_pk,
+    )
+    if not request.user.has_perm("standards.add_skillwsosmap"):
+        raise PermissionDenied
+    existing = SkillWSOSMap.objects.filter(skill=skill, wsos_section=section).first()
+    if existing is not None:
+        messages.info(request, "该技能已关联当前 WSOS 章节，原说明未被修改。")
+        return redirect(f"{reverse('standards:wsos_detail', args=[section.wsos_version_id])}#section-{section.pk}")
+    form = SkillWSOSMapNoteForm(request.POST if request.method == "POST" else None)
+    if request.method == "POST" and form.is_valid():
+        mapping, _ = map_skill_to_wsos_section(
+            skill=skill,
+            section=section,
+            actor=request.user,
+            note=form.cleaned_data.get("note", ""),
+        )
+        messages.success(request, f"已关联技能“{mapping.skill.name}”。")
+        return redirect(f"{reverse('standards:wsos_detail', args=[section.wsos_version_id])}#section-{section.pk}")
+    return render(
+        request,
+        "standards/partials/wsos_mapping_form.html",
+        {"section": section, "skill": skill, "mapping_form": form},
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def wsos_mapping_note_edit(request, mapping_pk):
+    mapping = get_object_or_404(
+        SkillWSOSMap.objects.select_related("skill", "wsos_section", "wsos_section__wsos_version"),
+        pk=mapping_pk,
+    )
+    if not request.user.has_perm("standards.change_skillwsosmap"):
+        raise PermissionDenied
+    form = SkillWSOSMapNoteForm(request.POST if request.method == "POST" else None, instance=mapping)
+    if request.method == "POST" and form.is_valid():
+        update_skill_wsos_map_note(
+            mapping=mapping,
+            note=form.cleaned_data.get("note", ""),
+            actor=request.user,
+        )
+        messages.success(request, "映射说明已更新。")
+        return redirect(
+            f"{reverse('standards:wsos_detail', args=[mapping.wsos_section.wsos_version_id])}"
+            f"#section-{mapping.wsos_section_id}"
+        )
+    return render(
+        request,
+        "standards/partials/wsos_mapping_form.html",
+        {"section": mapping.wsos_section, "skill": mapping.skill, "mapping": mapping, "mapping_form": form},
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def wsos_mapping_delete(request, mapping_pk):
+    mapping = get_object_or_404(
+        SkillWSOSMap.objects.select_related("skill", "wsos_section", "wsos_section__wsos_version"),
+        pk=mapping_pk,
+    )
+    if not request.user.has_perm("standards.delete_skillwsosmap"):
+        raise PermissionDenied
+    if request.method == "POST":
+        wsos_pk = mapping.wsos_section.wsos_version_id
+        section_pk = mapping.wsos_section_id
+        skill_name = mapping.skill.name
+        unmap_skill_from_wsos_section(mapping=mapping, actor=request.user)
+        messages.success(request, f"已解除技能“{skill_name}”的映射。")
+        return redirect(f"{reverse('standards:wsos_detail', args=[wsos_pk])}#section-{section_pk}")
+    return render(
+        request,
+        "standards/confirm_delete.html",
+        {
+            "object": mapping,
+            "title": "解除技能映射",
+            "message": "只会删除当前 Skill 与 WSOS 章节之间的这一条映射。",
+            "cancel_url": f"{reverse('standards:wsos_detail', args=[mapping.wsos_section.wsos_version_id])}"
+            f"#section-{mapping.wsos_section_id}",
+        },
+    )

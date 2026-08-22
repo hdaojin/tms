@@ -9,7 +9,7 @@ from evidence.forms import KnowledgeEvidenceForm
 from glossary.forms import ProfessionalGlossaryForm
 from training.forms import TrainingCycleForm
 
-from .forms import SkillForm, SkillProjectForm, SkillTreeVersionForm, TechnicalDomainForm, WSOSVersionForm
+from .forms import SkillForm, SkillProjectForm, TechnicalDomainForm, WSOSVersionForm
 from .models import (
     Skill,
     SkillProject,
@@ -106,7 +106,6 @@ class DefaultSkillProjectFormTests(TestCase):
     form_classes = (
         TechnicalDomainForm,
         SkillForm,
-        SkillTreeVersionForm,
         WSOSVersionForm,
         AssessmentForm,
         TrainingCycleForm,
@@ -170,16 +169,14 @@ class StableSkillAndWSOSTests(TestCase):
         self.skill = Skill.objects.create(skill_project=self.project, primary_domain=self.domain, name="Linux 服务")
 
     def test_same_skill_can_be_mounted_in_multiple_tree_versions(self):
-        first = SkillTreeVersion.objects.create(skill_project=self.project, version="V1", name="第一版")
-        second = SkillTreeVersion.objects.create(skill_project=self.project, version="V2", name="第二版")
+        first = SkillTreeVersion.objects.create(technical_domain=self.domain, version="V1", name="第一版")
+        second = SkillTreeVersion.objects.create(technical_domain=self.domain, version="V2", name="第二版")
         SkillTreeNode.objects.create(
             tree_version=first,
-            technical_domain=self.domain,
             skill=self.skill,
         )
         SkillTreeNode.objects.create(
             tree_version=second,
-            technical_domain=self.domain,
             skill=self.skill,
         )
         self.assertEqual(self.skill.tree_nodes.count(), 2)

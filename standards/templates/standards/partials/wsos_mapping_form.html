@@ -1,0 +1,15 @@
+<dialog class="modal" open>
+  <div class="modal-box">
+    <h3 class="text-lg font-semibold">{% if mapping %}编辑映射说明{% else %}关联技能{% endif %}</h3>
+    <p class="mt-1 text-sm text-base-content/60">{{ section.code }} {{ section.name }} · {{ skill.name }}</p>
+    <form class="mt-4 space-y-4" method="post" action="{% if mapping %}{% url 'standards:wsos_mapping_edit' mapping.pk %}{% else %}{% url 'standards:wsos_section_map_skill' section.pk skill.pk %}{% endif %}">
+      {% csrf_token %}
+      {% for field in mapping_form.visible_fields %}{% include "components/field.html" with field=field %}{% endfor %}
+      <div class="modal-action">
+        <button class="btn btn-ghost" type="button" onclick="this.closest('dialog').close()">取消</button>
+        <button class="btn btn-primary" type="submit">保存</button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>关闭</button></form>
+</dialog>

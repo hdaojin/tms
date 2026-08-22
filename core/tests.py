@@ -315,7 +315,7 @@ class MobileNavigationTemplateTests(TestCase):
             "录入评分结果",
             "标准技能树",
             "技能树版本",
-            "技能项目管理",
+            "技能项目",
             "新增考点证据",
             "上传会议记录",
             "录入奖惩记录",
@@ -365,7 +365,7 @@ class MobileNavigationTemplateTests(TestCase):
             "录入评分结果",
             "标准技能树",
             "技能树版本",
-            "技能项目管理",
+            "技能项目",
             "新增考点证据",
             "上传会议记录",
             "录入奖惩记录",
@@ -423,6 +423,20 @@ class MobileNavigationTemplateTests(TestCase):
                 )
 
                 self.assertIn(f"当前位于“{label}”", html)
+
+    def test_standard_tree_entry_is_active_on_project_detail(self):
+        user = User.objects.create_user(username="standards-nav-user", password="testpass123")
+        user = self._grant_permissions(user, "standards.view_skillproject")
+        project_detail_path = reverse("standards:project_detail", args=[1])
+        request = self.factory.get(project_detail_path)
+        request.user = user
+        request.resolver_match = resolve(request.path)
+
+        items = navigation.get_section_items("standards", user, request=request)
+        children = {item.label: item for item in items[0].children}
+
+        self.assertTrue(children["标准技能树"].active)
+        self.assertFalse(children["技能项目"].active)
 
     def test_authenticated_page_header_includes_mobile_navigation_trigger_and_panel(self):
         user = User.objects.create_user(username="mobile-nav-header", password="testpass123")

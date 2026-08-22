@@ -11,7 +11,7 @@
           <button
             type="button"
             class="btn btn-primary btn-sm"
-            hx-get="{% url 'standards:tree_quick_add_root' tree.pk domain.pk %}"
+            hx-get="{% url 'standards:tree_quick_add_root' tree.pk %}"
             hx-target="#skill-tree-roots-{{ domain.pk }}"
             hx-swap="beforeend"
             data-skill-tree-editor-trigger

@@ -1,0 +1,13 @@
+<div class="mt-2 rounded-box border border-base-300 bg-base-100 p-2 shadow-sm">
+  {% for skill in candidates %}
+    <div class="flex flex-wrap items-center justify-between gap-2 rounded-box px-3 py-2 hover:bg-base-200">
+      <div>
+        <p class="font-medium">{{ skill.name }}</p>
+        <p class="text-xs text-base-content/60">{{ skill.primary_domain.name }}{% if skill.aliases %} · 别名：{{ skill.aliases|join:"、" }}{% endif %}</p>
+      </div>
+      <button class="btn btn-primary btn-xs" type="button" hx-get="{% url 'standards:wsos_section_map_skill' section.pk skill.pk %}" hx-target="#wsos-mapping-dialog">关联</button>
+    </div>
+  {% empty %}
+    <p class="px-3 py-2 text-sm text-base-content/60">没有可关联的启用技能。</p>
+  {% endfor %}
+</div>

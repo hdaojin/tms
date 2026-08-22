@@ -11,7 +11,7 @@
       <span class="px-2">/</span>
       <a
         class="link"
-        href="{% url 'standards:domain_current_tree' skill.skill_project_id skill.primary_domain_id %}"
+        href="{% url 'standards:current_domain_tree' skill.skill_project_id skill.primary_domain_id %}"
         >{{ skill.primary_domain.name }}</a
       >
       <span class="px-2">/</span>
@@ -62,7 +62,9 @@
         <div class="card-body">
           <h3 class="card-title">WSOS 映射</h3>
           {% for mapping in skill.wsos_mappings.all %}
-            <span>{{ mapping.wsos_section }}</span>{% empty %}
+            <a class="link link-primary" href="{% url 'standards:wsos_detail' mapping.wsos_section.wsos_version_id %}#section-{{ mapping.wsos_section_id }}">
+              {{ mapping.wsos_section.wsos_version.name }} · {{ mapping.wsos_section.code }} {{ mapping.wsos_section.name }}
+            </a>{% empty %}
             <p>暂无映射</p>
           {% endfor %}
         </div>

@@ -8,7 +8,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Max
 from django.utils import timezone
 
-from .models import Skill, SkillTerm, SkillTreeNode, SkillTreeVersion
+from .models import Skill, SkillTerm, SkillTreeNode, SkillTreeVersion, SkillWSOSMap, WSOSSection
 from .selectors import can_manage_domain
 
 
@@ -185,8 +185,8 @@ def set_skill_related_domains(skill, domains):
             raise ValidationError("主要技术领域不能重复加入关联技术领域。")
     allowed_domain_ids = {skill.primary_domain_id, *(domain.pk for domain in domains)}
     invalid_position = (
-        skill.tree_nodes.exclude(technical_domain_id__in=allowed_domain_ids)
-        .select_related("tree_version", "technical_domain")
+        skill.tree_nodes.exclude(tree_version__technical_domain_id__in=allowed_domain_ids)
+        .select_related("tree_version", "tree_version__technical_domain")
         .first()
         if skill.pk
         else None
@@ -213,31 +213,29 @@ def _skill_allows_domain(skill, domain):
     return skill.primary_domain_id == domain.pk or skill.related_domains.filter(pk=domain.pk).exists()
 
 
-def _validate_parent(*, tree_version, technical_domain, parent):
+def _validate_parent(*, tree_version, parent):
     if parent is None:
         return
     if parent.tree_version_id != tree_version.pk:
         raise ValidationError("父技能必须属于当前技能树版本。")
-    if parent.technical_domain_id != technical_domain.pk:
-        raise ValidationError("父技能必须属于当前技术领域。")
 
 
-def _next_sibling_order(*, tree_version, technical_domain, parent):
+def _next_sibling_order(*, tree_version, parent):
     maximum = SkillTreeNode.objects.filter(
         tree_version=tree_version,
-        technical_domain=technical_domain,
         parent=parent,
     ).aggregate(maximum=Max("order"))["maximum"]
     return (maximum or 0) + 10
 
 
 @transaction.atomic
-def attach_existing_skill_to_tree(*, tree_version, technical_domain, parent, skill, actor):
+def attach_existing_skill_to_tree(*, tree_version, parent, skill, actor):
     _lock_tree(tree_version)
+    technical_domain = tree_version.technical_domain
     _require_domain_scope(actor=actor, domain=technical_domain, permission="standards.add_skilltreenode")
     if not technical_domain.is_active:
         raise ValidationError("已停用的技术领域不能新增树位置。")
-    _validate_parent(tree_version=tree_version, technical_domain=technical_domain, parent=parent)
+    _validate_parent(tree_version=tree_version, parent=parent)
     if skill.skill_project_id != tree_version.skill_project_id:
         raise ValidationError("技能与技能树必须属于同一技能项目。")
     if not skill.is_active:
@@ -253,12 +251,10 @@ def attach_existing_skill_to_tree(*, tree_version, technical_domain, parent, ski
         raise ValidationError(f"该技能已存在于当前版本：{existing.get_full_path()}。")
     node = SkillTreeNode(
         tree_version=tree_version,
-        technical_domain=technical_domain,
         parent=parent,
         skill=skill,
         order=_next_sibling_order(
             tree_version=tree_version,
-            technical_domain=technical_domain,
             parent=parent,
         ),
     )
@@ -273,7 +269,6 @@ def attach_existing_skill_to_tree(*, tree_version, technical_domain, parent, ski
 def create_skill_in_tree(
     *,
     tree_version,
-    technical_domain,
     parent,
     name,
     actor,
@@ -281,12 +276,12 @@ def create_skill_in_tree(
     confirm_distinct=False,
 ):
     _lock_tree(tree_version)
+    technical_domain = tree_version.technical_domain
     candidates = find_skill_candidates(skill_project=tree_version.skill_project, query=name)
     exact = next((candidate for candidate in candidates if candidate.candidate_exact), None)
     if exact is not None:
         return attach_existing_skill_to_tree(
             tree_version=tree_version,
-            technical_domain=technical_domain,
             parent=parent,
             skill=exact,
             actor=actor,
@@ -312,7 +307,6 @@ def create_skill_in_tree(
     )
     return attach_existing_skill_to_tree(
         tree_version=tree_version,
-        technical_domain=technical_domain,
         parent=parent,
         skill=skill,
         actor=actor,
@@ -323,7 +317,6 @@ def create_skill_in_tree(
 def create_detailed_skill_in_tree(
     *,
     tree_version,
-    technical_domain,
     parent,
     skill,
     aliases,
@@ -333,11 +326,12 @@ def create_detailed_skill_in_tree(
     """保存完整 SkillForm 数据，并原子挂入服务端确定的树位置。"""
 
     _lock_tree(tree_version)
+    technical_domain = tree_version.technical_domain
     _require_domain_scope(actor=actor, domain=technical_domain, permission="standards.add_skill")
     _require_domain_scope(actor=actor, domain=technical_domain, permission="standards.add_skilltreenode")
     if not technical_domain.is_active:
         raise ValidationError("已停用的技术领域不能新增技能。")
-    _validate_parent(tree_version=tree_version, technical_domain=technical_domain, parent=parent)
+    _validate_parent(tree_version=tree_version, parent=parent)
 
     skill.skill_project = tree_version.skill_project
     skill.primary_domain = technical_domain
@@ -348,7 +342,6 @@ def create_detailed_skill_in_tree(
     )
     return attach_existing_skill_to_tree(
         tree_version=tree_version,
-        technical_domain=technical_domain,
         parent=parent,
         skill=saved_skill,
         actor=actor,
@@ -359,7 +352,7 @@ def _locked_tree_nodes(tree_version):
     return list(
         SkillTreeNode.objects.select_for_update()
         .filter(tree_version=tree_version)
-        .select_related("skill", "technical_domain", "parent")
+        .select_related("skill", "tree_version__technical_domain", "parent")
         .order_by("order", "pk")
     )
 
@@ -378,62 +371,28 @@ def _subtree_ids(nodes, root_id):
 
 
 @transaction.atomic
-def move_skill_tree_node(*, node, new_parent, target_domain, actor):
+def move_skill_tree_node(*, node, new_parent, actor):
     _lock_tree(node.tree_version)
     nodes = _locked_tree_nodes(node.tree_version)
     node_by_id = {item.pk: item for item in nodes}
     locked_node = node_by_id[node.pk]
-    _require_domain_scope(
-        actor=actor,
-        domain=locked_node.technical_domain,
-        permission="standards.change_skilltreenode",
-    )
-    _require_domain_scope(actor=actor, domain=target_domain, permission="standards.change_skilltreenode")
-    if not target_domain.is_active:
-        raise ValidationError("不能将技能移入已停用的技术领域。")
+    technical_domain = locked_node.tree_version.technical_domain
+    _require_domain_scope(actor=actor, domain=technical_domain, permission="standards.change_skilltreenode")
     locked_parent = node_by_id.get(new_parent.pk) if new_parent is not None else None
     if new_parent is not None and locked_parent is None:
         raise ValidationError("目标父技能必须属于当前技能树版本。")
-    if locked_parent is not None and locked_parent.technical_domain_id != target_domain.pk:
-        raise ValidationError("目标父技能必须属于目标技术领域。")
     subtree_ids = _subtree_ids(nodes, locked_node.pk)
     if locked_parent is not None and locked_parent.pk in subtree_ids:
         raise ValidationError("不能把技能移动到自身或其下级技能中。")
 
-    subtree = [node_by_id[item_id] for item_id in subtree_ids]
-    skill_ids = [item.skill_id for item in subtree]
-    related_skill_ids = set(
-        Skill.related_domains.through.objects.filter(
-            skill_id__in=skill_ids,
-            technicaldomain_id=target_domain.pk,
-        ).values_list("skill_id", flat=True)
-    )
-    blocked = [
-        item.skill.name
-        for item in subtree
-        if item.skill.primary_domain_id != target_domain.pk and item.skill_id not in related_skill_ids
-    ]
-    if blocked:
-        raise ValidationError(f"以下技能未关联目标技术领域：{'、'.join(blocked)}。")
-
     locked_node.parent = locked_parent
-    locked_node.technical_domain = target_domain
     locked_node.order = _next_sibling_order(
         tree_version=locked_node.tree_version,
-        technical_domain=target_domain,
         parent=locked_parent,
     )
-    locked_node.save(update_fields=["parent", "technical_domain", "order", "updated_at"])
-    descendant_ids = subtree_ids[1:]
-    if descendant_ids:
-        SkillTreeNode.objects.filter(pk__in=descendant_ids).update(
-            technical_domain=target_domain,
-            updated_at=timezone.now(),
-        )
+    locked_node.save(update_fields=["parent", "order", "updated_at"])
     node.parent = locked_parent
     node.parent_id = locked_parent.pk if locked_parent else None
-    node.technical_domain = target_domain
-    node.technical_domain_id = target_domain.pk
     node.order = locked_node.order
     return node
 
@@ -443,7 +402,7 @@ def reorder_skill_tree_node(*, node, direction, actor):
     if direction not in {"up", "down"}:
         raise ValidationError("不支持的排序方向。")
     _lock_tree(node.tree_version)
-    locked_node = SkillTreeNode.objects.select_related("technical_domain").get(pk=node.pk)
+    locked_node = SkillTreeNode.objects.select_related("tree_version__technical_domain").get(pk=node.pk)
     _require_domain_scope(
         actor=actor,
         domain=locked_node.technical_domain,
@@ -453,7 +412,6 @@ def reorder_skill_tree_node(*, node, direction, actor):
         SkillTreeNode.objects.select_for_update()
         .filter(
             tree_version=locked_node.tree_version,
-            technical_domain=locked_node.technical_domain,
             parent_id=locked_node.parent_id,
         )
         .order_by("order", "pk")
@@ -493,7 +451,7 @@ def remove_skill_tree_node(*, node, mode, actor):
         (
             item
             for item in nodes
-            if item.parent_id == locked_node.parent_id and item.technical_domain_id == locked_node.technical_domain_id
+            if item.parent_id == locked_node.parent_id
         ),
         key=lambda item: (item.order, item.pk),
     )
@@ -514,3 +472,112 @@ def remove_skill_tree_node(*, node, mode, actor):
         SkillTreeNode.objects.bulk_update(expanded, ["parent", "order", "updated_at"])
     locked_node.delete()
     return 1
+
+
+@transaction.atomic
+def clone_skill_tree_version(*, source_version, version, name, description, actor):
+    source_version = (
+        SkillTreeVersion.objects.select_for_update()
+        .select_related("technical_domain", "technical_domain__skill_project")
+        .get(pk=source_version.pk)
+    )
+    _require_domain_scope(
+        actor=actor,
+        domain=source_version.technical_domain,
+        permission="standards.add_skilltreeversion",
+    )
+    if SkillTreeVersion.objects.filter(
+        technical_domain=source_version.technical_domain,
+        version=version,
+    ).exists():
+        raise ValidationError({"version": "该技术领域已存在相同版本号。"})
+    target = SkillTreeVersion.objects.create(
+        technical_domain=source_version.technical_domain,
+        based_on=source_version,
+        version=version,
+        name=name,
+        description=description,
+        is_current=False,
+        created_by=actor,
+    )
+    source_nodes = list(
+        SkillTreeNode.objects.filter(tree_version=source_version)
+        .select_related("parent")
+        .order_by("order", "pk")
+    )
+    new_nodes = SkillTreeNode.objects.bulk_create(
+        [
+            SkillTreeNode(
+                tree_version=target,
+                skill_id=node.skill_id,
+                order=node.order,
+            )
+            for node in source_nodes
+        ]
+    )
+    old_to_new = {old.pk: new for old, new in zip(source_nodes, new_nodes, strict=True)}
+    for old, new in zip(source_nodes, new_nodes, strict=True):
+        if old.parent_id:
+            new.parent = old_to_new[old.parent_id]
+    SkillTreeNode.objects.bulk_update(new_nodes, ["parent"])
+    return target
+
+
+@transaction.atomic
+def set_current_skill_tree_version(*, tree_version, actor):
+    tree_version = (
+        SkillTreeVersion.objects.select_for_update()
+        .select_related("technical_domain")
+        .get(pk=tree_version.pk)
+    )
+    _require_domain_scope(
+        actor=actor,
+        domain=tree_version.technical_domain,
+        permission="standards.change_skilltreeversion",
+    )
+    SkillTreeVersion.objects.filter(
+        technical_domain=tree_version.technical_domain,
+        is_current=True,
+    ).exclude(pk=tree_version.pk).update(is_current=False)
+    if not tree_version.is_current:
+        tree_version.is_current = True
+        tree_version.save(update_fields=["is_current", "updated_at"])
+    return tree_version
+
+
+@transaction.atomic
+def map_skill_to_wsos_section(*, skill, section, actor, note=""):
+    if not actor.has_perm("standards.add_skillwsosmap"):
+        raise PermissionDenied
+    if skill.skill_project_id != section.wsos_version.skill_project_id:
+        raise ValidationError("技能与 WSOS 章节必须属于同一技能项目。")
+    mapping = SkillWSOSMap.objects.filter(skill=skill, wsos_section=section).first()
+    if mapping is not None:
+        return mapping, False
+    mapping = SkillWSOSMap.objects.create(skill=skill, wsos_section=section, note=note.strip())
+    return mapping, True
+
+
+@transaction.atomic
+def update_skill_wsos_map_note(*, mapping, note, actor):
+    if not actor.has_perm("standards.change_skillwsosmap"):
+        raise PermissionDenied
+    mapping.note = note.strip()
+    mapping.save(update_fields=["note"])
+    return mapping
+
+
+@transaction.atomic
+def unmap_skill_from_wsos_section(*, mapping, actor):
+    if not actor.has_perm("standards.delete_skillwsosmap"):
+        raise PermissionDenied
+    mapping.delete()
+
+
+@transaction.atomic
+def delete_wsos_section(*, section: WSOSSection, actor):
+    if not actor.has_perm("standards.delete_wsossection"):
+        raise PermissionDenied
+    if section.skill_mappings.exists():
+        raise ValidationError("该章节已有技能映射，请先解除映射后再删除。")
+    section.delete()

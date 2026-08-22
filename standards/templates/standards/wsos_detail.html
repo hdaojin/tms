@@ -1,2 +1,93 @@
 {% extends "layouts/app.html" %}
-{% block content %}<div class="card border border-base-300 bg-base-100"><div class="card-body"><div class="flex justify-between"><h2 class="card-title">{{ wsos.name }}（{{ wsos.code }}）</h2>{% if perms.standards.change_wsosversion %}<a class="btn btn-outline btn-sm" href="{% url 'standards:wsos_edit' wsos.pk %}">编辑</a>{% endif %}</div><p>{{ wsos.description|default:"暂无描述" }}</p><div class="divider">章节</div>{% for section in wsos.sections.all %}<div class="flex justify-between border-b border-base-200 py-2"><span>{{ section.code }} · {{ section.name }}</span><span>{{ section.weight }}%</span></div>{% empty %}<p>暂无章节</p>{% endfor %}</div></div>{% endblock %}
+
+{% block content %}
+  <div class="space-y-5">
+    <section class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <h2 class="card-title">{{ wsos.name }}（{{ wsos.code }}）</h2>
+              {% if wsos.is_current %}<span class="badge badge-success">当前版本</span>{% else %}<span class="badge badge-ghost">历史版本</span>{% endif %}
+            </div>
+            <p class="mt-2 whitespace-pre-line text-sm text-base-content/70">{{ wsos.description|default:"暂无描述" }}</p>
+          </div>
+          <div class="flex gap-2">
+            {% if perms.standards.add_wsossection %}<a class="btn btn-primary btn-sm" href="{% url 'standards:wsos_section_create' wsos.pk %}">新增章节</a>{% endif %}
+            {% if perms.standards.change_wsosversion %}<a class="btn btn-outline btn-sm" href="{% url 'standards:wsos_edit' wsos.pk %}">编辑版本</a>{% endif %}
+          </div>
+        </div>
+        <div class="stat rounded-box border border-base-300 bg-base-200/40 py-3">
+          <div class="stat-title">章节权重合计</div>
+          <div class="stat-value text-2xl">{{ weight_total }}%</div>
+        </div>
+        {% if weight_total != 100 %}<div class="alert alert-warning py-2 text-sm"><span>当前章节权重合计不是 100%，可继续编辑补充。</span></div>{% endif %}
+      </div>
+    </section>
+
+    <div class="space-y-4">
+      {% for section in sections %}
+        <section id="section-{{ section.pk }}" class="card scroll-mt-24 border border-base-300 bg-base-100 shadow-sm">
+          <div class="card-body gap-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="badge badge-primary badge-outline">{{ section.code }}</span>
+                  <h3 class="card-title text-lg">{{ section.name }}</h3>
+                  <span class="badge badge-ghost">{{ section.weight }}%</span>
+                  <span class="badge badge-ghost">{{ section.mapped_skill_count }} 个技能</span>
+                </div>
+                <p class="mt-2 whitespace-pre-line text-sm text-base-content/70">{{ section.description|default:"暂无描述" }}</p>
+              </div>
+              <div class="flex gap-2">
+                {% if perms.standards.change_wsossection %}<a class="btn btn-ghost btn-xs" href="{% url 'standards:wsos_section_edit' section.pk %}">编辑</a>{% endif %}
+                {% if perms.standards.delete_wsossection %}<a class="btn btn-ghost btn-xs text-error" href="{% url 'standards:wsos_section_delete' section.pk %}">删除</a>{% endif %}
+              </div>
+            </div>
+
+            <div>
+              <h4 class="mb-2 font-semibold">已关联技能</h4>
+              <div class="space-y-2">
+                {% for mapping in section.skill_mappings.all %}
+                  <div class="flex flex-wrap items-start justify-between gap-3 rounded-box border border-base-300 px-3 py-2">
+                    <div>
+                      <a class="link link-primary font-medium" href="{% url 'standards:skill_detail' mapping.skill_id %}">{{ mapping.skill.name }}</a>
+                      {% if not mapping.skill.is_active %}<span class="badge badge-warning badge-sm">已停用</span>{% endif %}
+                      {% if mapping.note %}<p class="mt-1 text-sm text-base-content/60">{{ mapping.note }}</p>{% endif %}
+                    </div>
+                    <div class="flex gap-1">
+                      {% if perms.standards.change_skillwsosmap %}<button class="btn btn-ghost btn-xs" type="button" hx-get="{% url 'standards:wsos_mapping_edit' mapping.pk %}" hx-target="#wsos-mapping-dialog">编辑说明</button>{% endif %}
+                      {% if perms.standards.delete_skillwsosmap %}<a class="btn btn-ghost btn-xs text-error" href="{% url 'standards:wsos_mapping_delete' mapping.pk %}">解除关联</a>{% endif %}
+                    </div>
+                  </div>
+                {% empty %}
+                  <p class="text-sm text-base-content/60">尚未关联技能。</p>
+                {% endfor %}
+              </div>
+            </div>
+
+            {% if perms.standards.add_skillwsosmap %}
+              <form
+                class="grid gap-2 rounded-box border border-dashed border-base-300 p-3 md:grid-cols-[minmax(0,1fr)_12rem_auto]"
+                hx-get="{% url 'standards:wsos_section_skill_candidates' section.pk %}"
+                hx-trigger="submit, input changed delay:350ms from:input[name='q'], change from:select[name='domain']"
+                hx-target="#wsos-candidates-{{ section.pk }}"
+              >
+                <input class="input input-sm w-full" type="search" name="q" placeholder="搜索技能名称、别名或描述">
+                <select class="select select-sm w-full" name="domain">
+                  <option value="">全部技术领域</option>
+                  {% for domain in mapping_domains %}<option value="{{ domain.pk }}">{{ domain.name }}</option>{% endfor %}
+                </select>
+                <button class="btn btn-primary btn-sm" type="submit">添加技能映射</button>
+              </form>
+              <div id="wsos-candidates-{{ section.pk }}"></div>
+            {% endif %}
+          </div>
+        </section>
+      {% empty %}
+        {% include "components/empty_state.html" with title="暂无 WSOS 章节" message="请新增章节并逐步完善权重与技能映射。" %}
+      {% endfor %}
+    </div>
+    <div id="wsos-mapping-dialog"></div>
+  </div>
+{% endblock %}

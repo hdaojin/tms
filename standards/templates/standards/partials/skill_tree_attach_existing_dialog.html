@@ -7,7 +7,7 @@
       </div>
       <button type="button" class="btn btn-square btn-ghost btn-sm" data-skill-tree-dialog-close aria-label="关闭"><span class="icon-[tabler--x] size-5"></span></button>
     </header>
-    <form method="post" class="flex min-h-0 flex-1 flex-col" hx-post="{% url 'standards:tree_attach_existing_skill' tree.pk domain.pk skill.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML">
+    <form method="post" class="flex min-h-0 flex-1 flex-col" hx-post="{% url 'standards:tree_attach_existing_skill' tree.pk skill.pk %}" hx-target="#skill-tree-dialog" hx-swap="innerHTML">
       {% csrf_token %}
       <div class="flex-1 space-y-4 overflow-y-auto px-4 py-5 sm:px-6">
         {% include "components/form_errors.html" with form=attach_form %}

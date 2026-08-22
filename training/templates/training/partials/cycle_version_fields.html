@@ -1,0 +1,14 @@
+<div class="grid gap-4 md:grid-cols-2">
+  {% include "components/field.html" with field=parent_field %}
+</div>
+<fieldset class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
+  <legend class="px-2 font-semibold">各技术领域技能树版本</legend>
+  <p class="text-sm text-base-content/60">每个领域最多选择一个版本，且整个周期至少选择一个领域。</p>
+  <div class="grid gap-4 md:grid-cols-2">
+    {% for field in version_fields %}
+      {% include "components/field.html" with field=field %}
+    {% empty %}
+      <p class="text-sm text-base-content/60 md:col-span-2">当前上下文没有可选择的技术领域技能树版本。</p>
+    {% endfor %}
+  </div>
+</fieldset>

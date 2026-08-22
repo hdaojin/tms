@@ -72,7 +72,7 @@ admin.site.register(
 @admin.register(SkillTreeNode)
 class SkillTreeNodeAdmin(admin.ModelAdmin):
     list_display = ("tree_version", "technical_domain", "skill", "parent", "order")
-    list_filter = ("tree_version", "technical_domain")
+    list_filter = ("tree_version", "tree_version__technical_domain")
     search_fields = ("skill__name",)
     readonly_fields = (
         "tree_version",
