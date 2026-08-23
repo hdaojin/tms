@@ -623,7 +623,7 @@ class PermissionBundleAdminFormTests(TestCase):
 		form = UserPermissionBundleAdminForm(instance=user)
 
 		self.assertEqual(form.initial['selected_permission_bundles'], ['training.manage_all_logs'])
-		self.assertEqual(form.fields['selected_permission_bundles'].help_text, '')
+		self.assertIn('同一个用户组', form.fields['selected_permission_bundles'].help_text)
 		self.assertQuerySetEqual(
 			form.initial['explicit_permissions'].order_by('pk'),
 			Permission.objects.filter(pk=extra_permission.pk),
@@ -644,6 +644,8 @@ class PermissionBundleAdminPageTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '业务权限包')
 		self.assertContains(response, '额外原生 Django 权限')
+		self.assertContains(response, '技术领域范围')
+		self.assertContains(response, 'id="technical_domain_scopes-group"')
 		self.assertNotContains(response, '勾选业务权限包后，系统会自动补齐底层 Django 权限。')
 
 	def test_user_admin_change_page_shows_business_permission_bundle_field(self):
@@ -654,6 +656,8 @@ class PermissionBundleAdminPageTests(TestCase):
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '业务权限包')
 		self.assertContains(response, '额外原生 Django 权限')
+		self.assertContains(response, '同一个用户组')
+		self.assertNotContains(response, 'id="technical_domain_scopes-group"')
 		self.assertNotContains(response, '勾选业务权限包后，系统会自动补齐底层 Django 权限。')
 
 
@@ -743,3 +747,32 @@ class RetiredTrainingMainlineBundleMigrationTests(TestCase):
 			group.profile.selected_permission_bundles,
 			['meetings.view_meetings'],
 		)
+
+
+class RetiredRoleBundleMigrationTests(TestCase):
+	def test_cleanup_removes_role_bundles_for_groups_and_users_without_guessing_replacements(self):
+		group = Group.objects.create(name='旧角色权限组')
+		group_profile = GroupProfile.objects.create(
+			group=group,
+			selected_permission_bundles=[
+				'training.coach',
+				'standards.maintain_standard',
+				'meetings.view_meetings',
+			],
+		)
+		user = User.objects.create_user('old-role-user')
+		user_profile = UserProfile.objects.create(
+			user=user,
+			selected_permission_bundles=[
+				'training.project_admin',
+				'training.competitor',
+			],
+		)
+
+		migration = import_module('accounts.migrations.0023_remove_retired_role_bundle_codes')
+		migration.remove_retired_bundle_codes(django_apps, None)
+
+		group_profile.refresh_from_db()
+		user_profile.refresh_from_db()
+		self.assertEqual(group_profile.selected_permission_bundles, ['meetings.view_meetings'])
+		self.assertEqual(user_profile.selected_permission_bundles, ['training.competitor'])

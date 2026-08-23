@@ -10,7 +10,6 @@ layouts:
   header:
     - home
     - assessments
-    - feedback
     - worldskills_forum
     - standards
     - training

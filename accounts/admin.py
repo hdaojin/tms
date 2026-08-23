@@ -4,6 +4,7 @@ from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin, GroupAdmin 
 from django.utils.translation import gettext_lazy as _
 
 from core.utils.admin_deletion import discard_registered_delete_permissions
+from standards.models import TechnicalDomainGroupScope
 from .admin_forms import GroupPermissionBundleAdminForm, UserPermissionBundleAdminForm
 from .models import UserProfile, GroupProfile
 from .services.permission_assignments import (
@@ -80,9 +81,17 @@ class GroupProfileInline(admin.StackedInline):
     exclude = ('selected_permission_bundles', 'explicit_permissions')
 
 
+class TechnicalDomainGroupScopeInline(admin.TabularInline):
+    model = TechnicalDomainGroupScope
+    fields = ('technical_domain',)
+    extra = 1
+    verbose_name = '技术领域范围'
+    verbose_name_plural = '技术领域范围'
+
+
 class CustomGroupAdmin(DefaultGroupAdmin):
     list_display = DefaultGroupAdmin.list_display + ('codename', 'description',)  # type: ignore[assignment]
-    inlines = (GroupProfileInline,)
+    inlines = (GroupProfileInline, TechnicalDomainGroupScopeInline)
     form = GroupPermissionBundleAdminForm
     fieldsets = (
         ('基本信息', {'fields': ('name',)}),

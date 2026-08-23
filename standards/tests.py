@@ -1,6 +1,10 @@
+from importlib import import_module
+
+from django.apps import apps as django_apps
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
-from django.core.exceptions import ValidationError
+from django.contrib.auth.models import Group, Permission
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 
@@ -18,11 +22,11 @@ from .models import (
     SkillTreeVersion,
     SkillWSOSMap,
     TechnicalDomain,
-    TechnicalDomainMembership,
+    TechnicalDomainGroupScope,
     WSOSSection,
     WSOSVersion,
 )
-from .selectors import manageable_skills_for
+from .selectors import can_manage_domain, manageable_skills_for, visible_skills_for
 from .services import find_skill_candidates, normalize_skill_term, save_skill
 from .tables import SkillProjectTable
 
@@ -209,34 +213,109 @@ class TechnicalDomainPermissionTests(TestCase):
             skill_project=self.project, primary_domain=self.windows, name="Windows"
         )
         self.coach = User.objects.create_user(username="linux-coach")
-        self.admin = User.objects.create_user(username="project-admin")
-        TechnicalDomainMembership.objects.create(
-            technical_domain=self.linux, user=self.coach, role=TechnicalDomainMembership.Role.COACH
-        )
+        self.linux_group = Group.objects.create(name="Linux 教练")
+        self.windows_group = Group.objects.create(name="Windows 查看者")
         change_skill = Permission.objects.get(content_type__app_label="standards", codename="change_skill")
-        global_scope = Permission.objects.get(
-            content_type__app_label="standards", codename="manage_all_technical_domains"
-        )
-        self.coach.user_permissions.add(change_skill)
-        self.admin.user_permissions.add(change_skill, global_scope)
+        view_skill = Permission.objects.get(content_type__app_label="standards", codename="view_skill")
+        self.linux_group.permissions.add(change_skill)
+        self.windows_group.permissions.add(view_skill)
+        TechnicalDomainGroupScope.objects.create(group=self.linux_group, technical_domain=self.linux)
+        TechnicalDomainGroupScope.objects.create(group=self.windows_group, technical_domain=self.windows)
+        self.coach.groups.add(self.linux_group, self.windows_group)
+        self.coach = User.objects.get(pk=self.coach.pk)
 
     def test_domain_coach_only_manages_primary_domain_skills(self):
         self.assertQuerySetEqual(manageable_skills_for(self.coach), [self.linux_skill])
 
-    def test_project_admin_manages_all_skills(self):
-        self.assertSetEqual(set(manageable_skills_for(self.admin)), {self.linux_skill, self.windows_skill})
+    def test_view_permission_makes_all_project_skills_visible(self):
+        self.assertSetEqual(set(visible_skills_for(self.coach)), {self.linux_skill, self.windows_skill})
+
+    def test_permission_and_scope_from_different_groups_do_not_chain(self):
+        self.assertTrue(can_manage_domain(self.coach, self.linux, "standards.change_skill"))
+        self.assertFalse(can_manage_domain(self.coach, self.windows, "standards.change_skill"))
+        self.assertTrue(can_manage_domain(self.coach, self.windows, "standards.view_skill"))
+
+    def test_direct_user_permission_without_same_group_scope_is_rejected(self):
+        direct_user = User.objects.create_user(username="direct-user")
+        change_skill = Permission.objects.get(content_type__app_label="standards", codename="change_skill")
+        direct_user.user_permissions.add(change_skill)
+        direct_user = User.objects.get(pk=direct_user.pk)
+
+        self.assertFalse(can_manage_domain(direct_user, self.linux, "standards.change_skill"))
+
+    def test_related_domain_does_not_grant_skill_maintenance(self):
+        self.windows_skill.related_domains.add(self.linux)
+
+        self.assertNotIn(self.windows_skill, manageable_skills_for(self.coach))
+
+    def test_superuser_manages_all_skills_and_domains(self):
+        admin = User.objects.create_superuser(username="admin")
+
+        self.assertSetEqual(set(manageable_skills_for(admin)), {self.linux_skill, self.windows_skill})
+        self.assertTrue(can_manage_domain(admin, self.windows, "standards.change_skill"))
+
+    def test_group_scope_is_unique_per_group_and_domain(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            TechnicalDomainGroupScope.objects.create(group=self.linux_group, technical_domain=self.linux)
+
+    def test_skill_move_requires_source_and_target_domain_scope(self):
+        windows_group = Group.objects.create(name="Windows 修改者")
+        windows_group.permissions.add(
+            Permission.objects.get(content_type__app_label="standards", codename="change_skill")
+        )
+        TechnicalDomainGroupScope.objects.create(group=windows_group, technical_domain=self.windows)
+        windows_user = User.objects.create_user(username="windows-maintainer")
+        windows_user.groups.add(windows_group)
+        windows_user = User.objects.get(pk=windows_user.pk)
+        self.linux_skill.primary_domain = self.windows
+
+        with self.assertRaises(PermissionDenied):
+            save_skill(
+                skill=self.linux_skill,
+                aliases=(),
+                related_domains=(),
+                actor=windows_user,
+            )
+
+
+class RetiredStandardPermissionMigrationTests(TestCase):
+    def test_cleanup_removes_global_scope_and_membership_permissions(self):
+        project_type = ContentType.objects.get_for_model(SkillProject)
+        retired_global, _created = Permission.objects.get_or_create(
+            content_type=project_type,
+            codename="manage_all_technical_domains",
+            defaults={"name": "旧全局技术领域权限"},
+        )
+        membership_type, _created = ContentType.objects.get_or_create(
+            app_label="standards",
+            model="technicaldomainmembership",
+        )
+        membership_permission = Permission.objects.create(
+            content_type=membership_type,
+            codename="view_technicaldomainmembership",
+            name="旧技术领域成员查看权限",
+        )
+
+        migration = import_module("standards.migrations.0008_technicaldomaingroupscope_and_more")
+        migration.remove_retired_permission_rows(django_apps, None)
+
+        self.assertFalse(Permission.objects.filter(pk=retired_global.pk).exists())
+        self.assertFalse(Permission.objects.filter(pk=membership_permission.pk).exists())
+        self.assertFalse(ContentType.objects.filter(pk=membership_type.pk).exists())
 
 
 class SkillTermServiceTests(TestCase):
     def setUp(self):
         self.project = SkillProject.objects.create(code="NS", name="网络系统管理")
         self.domain = TechnicalDomain.objects.create(skill_project=self.project, code="LINUX", name="Linux")
+        self.actor = User.objects.create_superuser(username="skill-service-admin")
 
     def create_skill(self, name="Linux 用户和组管理", aliases=()):
         return save_skill(
             skill=Skill(skill_project=self.project, primary_domain=self.domain, name=name),
             aliases=aliases,
             related_domains=(),
+            actor=self.actor,
         )
 
     def test_normalization_ignores_width_case_and_spaces_but_keeps_technical_symbols(self):
@@ -273,6 +352,7 @@ class SkillTermServiceTests(TestCase):
             skill=skill,
             aliases=[],
             related_domains=(),
+            actor=self.actor,
             preserve_old_name=True,
             old_name=old_name,
         )

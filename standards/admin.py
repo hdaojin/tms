@@ -9,22 +9,36 @@ from .models import (
     SkillTreeVersion,
     SkillWSOSMap,
     TechnicalDomain,
-    TechnicalDomainMembership,
     WSOSSection,
     WSOSVersion,
 )
 from .services import save_skill
 
 
+class StandardsGovernanceAdminMixin:
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+class StandardsGovernanceAdmin(StandardsGovernanceAdminMixin, admin.ModelAdmin):
+    pass
+
+
 @admin.register(SkillProject)
-class SkillProjectAdmin(admin.ModelAdmin):
+class SkillProjectAdmin(StandardsGovernanceAdminMixin, admin.ModelAdmin):
     form = SkillProjectForm
     list_display = ("code", "name", "is_default", "is_active", "order")
     list_filter = ("is_default", "is_active")
 
 
 @admin.register(Skill)
-class SkillAdmin(admin.ModelAdmin):
+class SkillAdmin(StandardsGovernanceAdminMixin, admin.ModelAdmin):
     form = SkillForm
     list_display = ("name", "skill_project", "primary_domain", "is_active")
     list_filter = ("skill_project", "primary_domain", "is_active", "is_core", "is_assessable")
@@ -35,6 +49,7 @@ class SkillAdmin(admin.ModelAdmin):
             skill=obj,
             aliases=form._split_text(form.cleaned_data.get("aliases_text")),
             related_domains=form.cleaned_data.get("related_domains", ()),
+            actor=request.user,
             preserve_old_name=form.cleaned_data.get("preserve_old_name", False),
             old_name=form.old_name,
         )
@@ -60,12 +75,12 @@ class SkillTermAdmin(admin.ModelAdmin):
 admin.site.register(
     [
         TechnicalDomain,
-        TechnicalDomainMembership,
         SkillTreeVersion,
         WSOSVersion,
         WSOSSection,
         SkillWSOSMap,
-    ]
+    ],
+    StandardsGovernanceAdmin,
 )
 
 

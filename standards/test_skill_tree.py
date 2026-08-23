@@ -1,5 +1,5 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
@@ -14,6 +14,7 @@ from .models import (
     SkillTreeVersion,
     SkillWSOSMap,
     TechnicalDomain,
+    TechnicalDomainGroupScope,
     WSOSSection,
     WSOSVersion,
 )
@@ -82,21 +83,20 @@ class SkillTreeFixtureMixin:
         return User.objects.get(pk=user.pk)
 
     def project_admin(self):
-        return self.user_with_permissions(
-            "project-admin",
-            "manage_all_technical_domains",
-            "view_skillproject",
-            "view_skilltreeversion",
-            "view_skilltreenode",
-            "view_skill",
-            "add_skill",
-            "change_skill",
-            "add_skilltreeversion",
-            "change_skilltreeversion",
-            "add_skilltreenode",
-            "change_skilltreenode",
-            "delete_skilltreenode",
+        return User.objects.create_superuser(username="project-admin")
+
+    def domain_user(self, username="domain-maintainer", *codenames, domain=None):
+        user = User.objects.create_user(username=username)
+        group = Group.objects.create(name=f"{username}-group")
+        group.permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="standards",
+                codename__in=codenames,
+            )
         )
+        TechnicalDomainGroupScope.objects.create(group=group, technical_domain=domain or self.linux)
+        user.groups.add(group)
+        return User.objects.get(pk=user.pk)
 
 
 class DomainOwnedSkillTreeModelTests(SkillTreeFixtureMixin, TestCase):
@@ -285,6 +285,22 @@ class SkillTreeServiceTests(SkillTreeFixtureMixin, TestCase):
                 actor=outsider,
             )
 
+    def test_same_group_scope_allows_tree_node_maintenance(self):
+        maintainer = self.domain_user(
+            "linux-maintainer",
+            "add_skill",
+            "add_skilltreenode",
+        )
+
+        node = create_skill_in_tree(
+            tree_version=self.tree,
+            parent=None,
+            name="受控技能",
+            actor=maintainer,
+        )
+
+        self.assertEqual(node.technical_domain, self.linux)
+
 
 class SkillTreeCloneTests(SkillTreeFixtureMixin, TestCase):
     def setUp(self):
@@ -313,6 +329,24 @@ class SkillTreeCloneTests(SkillTreeFixtureMixin, TestCase):
         cloned_child.save()
         self.child.refresh_from_db()
         self.assertEqual(self.child.order, 20)
+
+    def test_domain_group_cannot_govern_versions(self):
+        maintainer = self.domain_user(
+            "version-outsider",
+            "add_skilltreeversion",
+            "change_skilltreeversion",
+        )
+
+        with self.assertRaises(PermissionDenied):
+            clone_skill_tree_version(
+                source_version=self.tree,
+                version="2028",
+                name="2028",
+                description="",
+                actor=maintainer,
+            )
+        with self.assertRaises(PermissionDenied):
+            set_current_skill_tree_version(tree_version=self.tree, actor=maintainer)
 
     def test_form_supports_current_history_and_blank_modes(self):
         history = SkillTreeVersion.objects.create(

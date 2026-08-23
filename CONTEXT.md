@@ -28,9 +28,9 @@ Skill performance → Coach review → 人工调整后续计划
 
 训练组织与权限范围轴，例如 Linux、Windows、Network。技术领域不是比赛模块，也不是技能本体。
 
-### TechnicalDomainMembership（技术领域成员）
+### 技术领域角色范围
 
-用户在技术领域内的负责关系。技术教练先满足 Django action permission，再按此关系收窄对象范围；跨领域模块或任务需要显式教练分配。
+一个业务角色可负责一个或多个 TechnicalDomain；领域内能力与领域范围必须由同一个角色同时提供，不能把不同角色的能力和范围交叉组合。跨领域模块或任务仍需要显式教练分配。
 
 ### Skill（技能）
 

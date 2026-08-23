@@ -61,9 +61,7 @@ class AssessmentUpdateView(AssessmentCreateView, UpdateView):
     permission_required = "assessments.change_assessment"
 
     def get_queryset(self):
-        from standards.selectors import is_project_admin
-
-        if not is_project_admin(self.request.user):
+        if not self.request.user.is_superuser:
             raise Http404
         return Assessment.objects.all()
 

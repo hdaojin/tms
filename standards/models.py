@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django.conf import settings
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
@@ -28,7 +29,6 @@ class SkillProject(models.Model):
         verbose_name = "技能项目"
         verbose_name_plural = "技能项目"
         ordering = ["order", "code", "name"]
-        permissions = [("manage_all_technical_domains", "管理全部训练主线技术领域")]
         constraints = [
             models.UniqueConstraint(
                 fields=["is_default"],
@@ -86,34 +86,34 @@ class TechnicalDomain(models.Model):
         return f"{self.skill_project.code} / {self.code} - {self.name}"
 
 
-class TechnicalDomainMembership(models.Model):
-    class Role(models.TextChoices):
-        LEAD_COACH = "lead_coach", "主教练"
-        COACH = "coach", "教练"
-
-    technical_domain = models.ForeignKey(
-        TechnicalDomain, verbose_name="技术领域", on_delete=models.CASCADE, related_name="memberships"
-    )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        verbose_name="用户",
+class TechnicalDomainGroupScope(models.Model):
+    group = models.ForeignKey(
+        Group,
+        verbose_name="用户组",
         on_delete=models.CASCADE,
-        related_name="technical_domain_memberships",
+        related_name="technical_domain_scopes",
     )
-    role = models.CharField("职责", max_length=20, choices=Role.choices, default=Role.COACH)
+    technical_domain = models.ForeignKey(
+        TechnicalDomain,
+        verbose_name="技术领域",
+        on_delete=models.CASCADE,
+        related_name="group_scopes",
+    )
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
-    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
-        verbose_name = "技术领域教练"
-        verbose_name_plural = "技术领域教练"
-        ordering = ["technical_domain", "role", "user"]
+        verbose_name = "技术领域用户组范围"
+        verbose_name_plural = "技术领域用户组范围"
+        ordering = ["group", "technical_domain"]
         constraints = [
-            models.UniqueConstraint(fields=["technical_domain", "user"], name="uniq_technicaldomain_membership_user")
+            models.UniqueConstraint(
+                fields=["group", "technical_domain"],
+                name="uniq_technicaldomain_group_scope",
+            )
         ]
 
     def __str__(self):
-        return f"{self.technical_domain} / {self.user}"
+        return f"{self.group} / {self.technical_domain}"
 
 
 class Skill(models.Model):
@@ -281,9 +281,7 @@ class SkillTreeVersion(models.Model):
     def clean(self):
         super().clean()
         if self.pk:
-            previous = type(self).objects.filter(pk=self.pk).values(
-                "technical_domain_id", "based_on_id"
-            ).first()
+            previous = type(self).objects.filter(pk=self.pk).values("technical_domain_id", "based_on_id").first()
             if previous and previous["technical_domain_id"] != self.technical_domain_id:
                 raise ValidationError({"technical_domain": "技能树版本创建后不能更改所属技术领域。"})
             if previous and previous["based_on_id"] != self.based_on_id:

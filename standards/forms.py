@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django import forms
+from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.urls import reverse
 
@@ -13,11 +14,10 @@ from .models import (
     SkillTreeVersion,
     SkillWSOSMap,
     TechnicalDomain,
-    TechnicalDomainMembership,
     WSOSSection,
     WSOSVersion,
 )
-from .selectors import is_project_admin, manageable_domains_for
+from .selectors import can_manage_domain, scoped_domains_for
 from .services import find_skill_term_conflicts, normalize_skill_term, split_skill_terms
 
 
@@ -51,12 +51,6 @@ class TechnicalDomainForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.M
         model = TechnicalDomain
         fields = ["skill_project", "code", "name", "description", "order", "is_active"]
         widgets = {"description": forms.Textarea(attrs={"rows": 4})}
-
-
-class TechnicalDomainMembershipForm(StyledFormMixin, forms.ModelForm):
-    class Meta:
-        model = TechnicalDomainMembership
-        fields = ["technical_domain", "user", "role"]
 
 
 class SkillForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
@@ -97,25 +91,30 @@ class SkillForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
         else:
             self.fields.pop("preserve_old_name")
 
-        allowed_domains = TechnicalDomain.objects.all()
+        permission = "standards.change_skill" if self.instance.pk else "standards.add_skill"
+        primary_domains = TechnicalDomain.objects.all()
+        related_domains = TechnicalDomain.objects.all()
         if user is not None:
-            allowed_domains = manageable_domains_for(user)
+            primary_domains = scoped_domains_for(user, permission)
+            related_domains = primary_domains
             if self.instance.pk:
-                allowed_domains = (
-                    allowed_domains
+                primary_domains = (
+                    primary_domains | TechnicalDomain.objects.filter(pk=self.instance.primary_domain_id)
+                ).distinct()
+                related_domains = (
+                    related_domains
                     | self.instance.related_domains.all()
                     | TechnicalDomain.objects.filter(pk=self.instance.primary_domain_id)
                 ).distinct()
-        selectable_domains = allowed_domains if self.instance.pk else allowed_domains.filter(is_active=True)
-        self.fields["primary_domain"].queryset = selectable_domains
-        self.fields["related_domains"].queryset = selectable_domains
+        selectable_primary_domains = primary_domains if self.instance.pk else primary_domains.filter(is_active=True)
+        selectable_related_domains = related_domains if self.instance.pk else related_domains.filter(is_active=True)
+        self.fields["primary_domain"].queryset = selectable_primary_domains
+        self.fields["related_domains"].queryset = selectable_related_domains
 
         allowed_projects = SkillProject.objects.filter(
-            pk__in=allowed_domains.values("skill_project_id"),
+            pk__in=primary_domains.values("skill_project_id"),
             is_active=True,
         ).distinct()
-        if user is not None and is_project_admin(user):
-            allowed_projects = SkillProject.objects.filter(is_active=True)
         if self.instance.pk:
             allowed_projects = (
                 allowed_projects | SkillProject.objects.filter(pk=self.instance.skill_project_id)
@@ -171,6 +170,16 @@ class SkillForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
         aliases = self._split_text(cleaned.get("aliases_text", ""))
         if project and primary and primary.skill_project_id != project.pk:
             self.add_error("primary_domain", "主要技术领域必须属于当前技能项目。")
+        if (
+            self.user is not None
+            and primary
+            and not can_manage_domain(
+                self.user,
+                primary,
+                "standards.change_skill" if self.instance.pk else "standards.add_skill",
+            )
+        ):
+            self.add_error("primary_domain", "你没有在该技术领域维护技能的权限。")
         for domain in related or []:
             if project and domain.skill_project_id != project.pk:
                 self.add_error("related_domains", "关联技术领域必须属于当前技能项目。")
@@ -276,6 +285,8 @@ class SkillTreeVersionForm(StyledFormMixin, forms.ModelForm):
         return cleaned
 
     def save(self, commit=True):
+        if self.actor is None or not self.actor.is_superuser:
+            raise PermissionDenied
         if self.instance.pk:
             return super().save(commit=commit)
         source = self.cleaned_data.get("resolved_source_version")
@@ -330,9 +341,7 @@ class SkillTreeMoveForm(StyledFormMixin, forms.Form):
     def __init__(self, *args, tree_version, node, **kwargs):
         super().__init__(*args, **kwargs)
         nodes = list(
-            SkillTreeNode.objects.filter(tree_version=tree_version)
-            .select_related("skill")
-            .order_by("order", "pk")
+            SkillTreeNode.objects.filter(tree_version=tree_version).select_related("skill").order_by("order", "pk")
         )
         node_by_id = {item.pk: item for item in nodes}
         children_by_parent = {}
@@ -361,11 +370,7 @@ class SkillTreeMoveForm(StyledFormMixin, forms.Form):
 
         self.fields["new_parent"].choices = [
             ("", "作为根技能"),
-            *[
-                (str(item.pk), path_for(item))
-                for item in nodes
-                if item.pk not in excluded_ids
-            ],
+            *[(str(item.pk), path_for(item)) for item in nodes if item.pk not in excluded_ids],
         ]
 
 

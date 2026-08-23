@@ -109,6 +109,8 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - 全局登录由 `LoginRequiredMiddleware` 强制；公开 view 必须显式使用 `login_not_required`。
 - Django Permission 是运行时唯一授权事实来源；业务权限包只用于部署期授权配置与原生权限投影。
 - Group 名称和 `GroupProfile.codename` 不用于业务授权；codename 只保留给 Samba 等技术集成。
+- TechnicalDomain 是 Group 级对象范围；领域权限必须由同一个 Group 同时提供对应 Django Permission 与 `TechnicalDomainGroupScope`，不得把不同 Group 的权限和范围串联。
+- superuser 是唯一可绕过 TechnicalDomain Group Scope 的全局管理员；普通用户的直接权限不能绕过 Group Scope。
 - 对象范围统一由 selector/policy 收窄；基础 Permission 表示默认或本人范围，`*_all` 只扩大范围。
 - 对象级访问复用 `OwnerRequiredMixin`、`PermissionRequiredMixin`、`SuperuserRequiredMixin`，或在 service/view 中实现更明确的权限入口。
 - 模板与兼容层可显示 `user.display_name` / `user.full_info`；新增 Python 逻辑优先使用 `accounts.services.users.get_user_display_name()` / `get_user_full_info()`。

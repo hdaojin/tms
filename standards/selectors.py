@@ -9,44 +9,46 @@ from django.db.models.functions import Coalesce
 from .models import Skill, SkillTreeNode, SkillTreeVersion, TechnicalDomain, WSOSVersion
 
 
-def is_project_admin(user) -> bool:
-    return bool(
-        user.is_authenticated and (user.is_superuser or user.has_perm("standards.manage_all_technical_domains"))
-    )
+def _permission_parts(permission: str) -> tuple[str, str]:
+    parts = permission.split(".")
+    if len(parts) != 2 or not all(parts):
+        raise ValueError(f"权限必须使用 app_label.codename 格式：{permission!r}")
+    return parts[0], parts[1]
 
 
-def manageable_domains_for(user, skill_project=None):
+def scoped_domains_for(user, permission: str, skill_project=None):
+    """返回由同一 Group 同时提供指定权限与领域范围的技术领域。"""
+
     queryset = TechnicalDomain.objects.all()
     if skill_project is not None:
         queryset = queryset.filter(skill_project=skill_project)
-    if is_project_admin(user):
-        return queryset
     if not user.is_authenticated:
         return queryset.none()
-    return queryset.filter(memberships__user=user).distinct()
+    if user.is_superuser:
+        return queryset
+    app_label, codename = _permission_parts(permission)
+    scoped_groups = user.groups.filter(
+        permissions__content_type__app_label=app_label,
+        permissions__codename=codename,
+    )
+    return queryset.filter(group_scopes__group__in=scoped_groups).distinct()
 
 
-def can_manage_domain(user, domain, permission="standards.change_technicaldomain") -> bool:
-    return bool(user.has_perm(permission) and manageable_domains_for(user).filter(pk=domain.pk).exists())
+def can_manage_domain(user, domain, permission: str) -> bool:
+    return scoped_domains_for(user, permission).filter(pk=domain.pk).exists()
 
 
 def visible_skills_for(user, queryset=None):
     queryset = queryset if queryset is not None else Skill.objects.all()
     if not user.is_authenticated or not user.has_perm("standards.view_skill"):
         return queryset.none()
-    if is_project_admin(user):
-        return queryset
-    domain_ids = manageable_domains_for(user).values("pk")
-    return queryset.filter(Q(primary_domain_id__in=domain_ids) | Q(related_domains__in=domain_ids)).distinct()
+    return queryset
 
 
 def manageable_skills_for(user, queryset=None):
     queryset = queryset if queryset is not None else Skill.objects.all()
-    if not user.has_perm("standards.change_skill"):
-        return queryset.none()
-    if is_project_admin(user):
-        return queryset
-    return queryset.filter(primary_domain__memberships__user=user).distinct()
+    domain_ids = scoped_domains_for(user, "standards.change_skill").values("pk")
+    return queryset.filter(primary_domain_id__in=domain_ids)
 
 
 def can_manage_skill(user, skill) -> bool:
@@ -69,14 +71,15 @@ def project_domains_for_view(*, project, user):
     """返回当前用户可在项目页或技能树页看到的技术领域。"""
 
     domains = TechnicalDomain.objects.filter(skill_project=project)
-    manageable_inactive = manageable_domains_for(user, project).filter(is_active=False)
-    current_tree_domain_ids = SkillTreeVersion.objects.filter(
-        technical_domain__skill_project=project,
-        is_current=True,
-    ).values("technical_domain_id")
-    visible_condition = Q(is_active=True) | Q(pk__in=manageable_inactive) | Q(pk__in=current_tree_domain_ids)
-    domains = domains.filter(visible_condition).order_by("order", "code", "name", "pk")
-    manageable_ids = set(manageable_domains_for(user, project).values_list("pk", flat=True))
+    domains = domains.order_by("order", "code", "name", "pk")
+    tree_permissions = (
+        "standards.add_skilltreenode",
+        "standards.change_skilltreenode",
+        "standards.delete_skilltreenode",
+    )
+    manageable_ids = set()
+    for permission in tree_permissions:
+        manageable_ids.update(scoped_domains_for(user, permission, project).values_list("pk", flat=True))
     current_trees = {
         tree.technical_domain_id: tree
         for tree in SkillTreeVersion.objects.filter(
@@ -89,7 +92,7 @@ def project_domains_for_view(*, project, user):
     for domain in domains:
         domain.current_tree = current_trees.get(domain.pk)
         domain.tree_node_count = domain.current_tree.tree_node_count if domain.current_tree else 0
-        domain.can_edit_domain = can_manage_domain(user, domain)
+        domain.can_edit_domain = bool(user.is_authenticated and user.is_superuser)
         domain.can_manage_tree = domain.pk in manageable_ids
     return list(domains)
 
@@ -119,41 +122,43 @@ def skill_tree_structure(*, tree_version, user):
     domain = tree_version.technical_domain
     node_queryset = SkillTreeNode.objects.filter(tree_version=tree_version)
     nodes = list(
-        node_queryset
-        .select_related("skill", "skill__primary_domain", "tree_version__technical_domain", "parent")
-        .order_by("order", "pk")
+        node_queryset.select_related(
+            "skill", "skill__primary_domain", "tree_version__technical_domain", "parent"
+        ).order_by("order", "pk")
     )
-    manageable_domain_ids = set(manageable_domains_for(user, tree_version.skill_project).values_list("pk", flat=True))
+    permission_scopes = {
+        permission: set(scoped_domains_for(user, permission, tree_version.skill_project).values_list("pk", flat=True))
+        for permission in (
+            "standards.add_skilltreenode",
+            "standards.add_skill",
+            "standards.change_skilltreenode",
+            "standards.delete_skilltreenode",
+            "standards.change_skill",
+        )
+    }
     children_by_parent = defaultdict(list)
     for node in nodes:
         children_by_parent[node.parent_id].append(node)
 
-    can_add_node = user.has_perm("standards.add_skilltreenode")
-    can_add_skill = user.has_perm("standards.add_skill")
-    can_change_node = user.has_perm("standards.change_skilltreenode")
-    can_delete_node = user.has_perm("standards.delete_skilltreenode")
-    can_change_skill = user.has_perm("standards.change_skill")
     can_view_skill = user.has_perm("standards.view_skill")
-    project_admin = is_project_admin(user)
 
     def decorate_branch(node, ancestors):
         node.tree_children = children_by_parent.get(node.pk, [])
         node.full_path = " / ".join([*ancestors, node.skill.name])
         node.descendant_count = 0
         node.can_view_skill = can_view_skill
-        node.can_edit_skill = can_change_skill and (
-            project_admin or node.skill.primary_domain_id in manageable_domain_ids
-        )
+        node.can_edit_skill = node.skill.primary_domain_id in permission_scopes["standards.change_skill"]
         node.can_add_tree_position = (
-            can_add_node and node.technical_domain.is_active and node.technical_domain_id in manageable_domain_ids
+            node.technical_domain.is_active
+            and node.technical_domain_id in permission_scopes["standards.add_skilltreenode"]
         )
         node.can_create_skill = (
-            can_add_skill and node.technical_domain.is_active and node.technical_domain_id in manageable_domain_ids
+            node.technical_domain.is_active and node.technical_domain_id in permission_scopes["standards.add_skill"]
         )
-        node.can_move = can_change_node and node.technical_domain_id in manageable_domain_ids
+        node.can_move = node.technical_domain_id in permission_scopes["standards.change_skilltreenode"]
         node.can_move_up = False
         node.can_move_down = False
-        node.can_remove = can_delete_node and node.technical_domain_id in manageable_domain_ids
+        node.can_remove = node.technical_domain_id in permission_scopes["standards.delete_skilltreenode"]
         decorate_siblings(node.tree_children, [*ancestors, node.skill.name])
         for child in node.tree_children:
             node.descendant_count += child.descendant_count + 1
@@ -167,9 +172,9 @@ def skill_tree_structure(*, tree_version, user):
 
     domain.tree_roots = children_by_parent.get(None, [])
     decorate_siblings(domain.tree_roots, [])
-    domain.can_add_tree_position = can_add_node and domain.is_active and domain.pk in manageable_domain_ids
-    domain.can_create_skill = can_add_skill and domain.is_active and domain.pk in manageable_domain_ids
-    domain.can_manage_tree = domain.pk in manageable_domain_ids
+    domain.can_add_tree_position = domain.is_active and domain.pk in permission_scopes["standards.add_skilltreenode"]
+    domain.can_create_skill = domain.is_active and domain.pk in permission_scopes["standards.add_skill"]
+    domain.can_manage_tree = any(domain.pk in scope_ids for scope_ids in permission_scopes.values())
     return domain
 
 
@@ -225,9 +230,7 @@ def wsos_skill_candidates(*, section, query="", domain=None):
     ).exclude(wsos_mappings__wsos_section=section)
     if query.strip():
         queryset = queryset.filter(
-            Q(name__icontains=query)
-            | Q(description__icontains=query)
-            | Q(terms__term__icontains=query)
+            Q(name__icontains=query) | Q(description__icontains=query) | Q(terms__term__icontains=query)
         )
     if domain is not None:
         queryset = queryset.filter(Q(primary_domain=domain) | Q(related_domains=domain))

@@ -1,9 +1,17 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.test import TestCase
 from django.urls import NoReverseMatch, reverse
 
-from .models import Skill, SkillProject, SkillTreeNode, SkillTreeVersion, TechnicalDomain, WSOSVersion
+from .models import (
+    Skill,
+    SkillProject,
+    SkillTreeNode,
+    SkillTreeVersion,
+    TechnicalDomain,
+    TechnicalDomainGroupScope,
+    WSOSVersion,
+)
 
 
 User = get_user_model()
@@ -26,23 +34,7 @@ class DomainSkillTreePageTests(TestCase):
             name="Windows 2025",
             is_current=True,
         )
-        self.user = User.objects.create_user(username="tree-page-admin")
-        self.user.user_permissions.add(
-            *Permission.objects.filter(
-                content_type__app_label="standards",
-                codename__in=[
-                    "manage_all_technical_domains",
-                    "view_skillproject",
-                    "view_skilltreeversion",
-                    "view_skill",
-                    "add_skilltreenode",
-                    "add_skill",
-                    "add_skilltreeversion",
-                    "change_skilltreeversion",
-                    "change_skilltreenode",
-                ],
-            )
-        )
+        self.user = User.objects.create_superuser(username="tree-page-admin")
         self.client.force_login(self.user)
 
     def node(self, skill, tree=None):
@@ -78,9 +70,7 @@ class DomainSkillTreePageTests(TestCase):
 
         self.linux_tree.is_current = False
         self.linux_tree.save()
-        response = self.client.get(
-            reverse("standards:current_domain_tree", args=[self.project.pk, self.linux.pk])
-        )
+        response = self.client.get(reverse("standards:current_domain_tree", args=[self.project.pk, self.linux.pk]))
         self.assertContains(response, "当前技术领域尚未设置当前技能树版本")
         self.assertContains(
             response,
@@ -97,9 +87,7 @@ class DomainSkillTreePageTests(TestCase):
         self.node(linux_skill, self.linux_tree)
         self.node(windows_skill, self.windows_tree)
 
-        response = self.client.get(
-            reverse("standards:current_domain_tree", args=[self.project.pk, self.linux.pk])
-        )
+        response = self.client.get(reverse("standards:current_domain_tree", args=[self.project.pk, self.linux.pk]))
         self.assertContains(response, linux_skill.name)
         self.assertNotContains(response, windows_skill.name)
 
@@ -108,6 +96,39 @@ class DomainSkillTreePageTests(TestCase):
         )
         self.assertContains(list_response, linux_skill.name)
         self.assertNotContains(list_response, windows_skill.name)
+
+    def test_domain_group_cannot_create_or_edit_skill_tree_versions(self):
+        ordinary = User.objects.create_user(username="ordinary-tree-maintainer")
+        group = Group.objects.create(name="Linux 当前树维护")
+        group.permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="standards",
+                codename__in=[
+                    "view_skillproject",
+                    "view_skilltreeversion",
+                    "view_skilltreenode",
+                    "add_skilltreeversion",
+                    "change_skilltreeversion",
+                    "add_skilltreenode",
+                    "change_skilltreenode",
+                ],
+            )
+        )
+        TechnicalDomainGroupScope.objects.create(group=group, technical_domain=self.linux)
+        ordinary.groups.add(group)
+        self.client.force_login(ordinary)
+
+        page = self.client.get(reverse("standards:current_domain_tree", args=[self.project.pk, self.linux.pk]))
+        self.assertNotContains(page, "新增版本")
+        self.assertNotContains(page, "编辑版本")
+        self.assertEqual(
+            self.client.get(reverse("standards:domain_tree_create", args=[self.project.pk, self.linux.pk])).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.client.get(reverse("standards:tree_edit", args=[self.linux_tree.pk])).status_code,
+            403,
+        )
 
     def test_unmounted_skill_can_be_attached_without_domain_url_parameter(self):
         skill = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="未挂载技能")

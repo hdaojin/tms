@@ -58,10 +58,8 @@ def update_execution_facts(execution, *, user, **values):
 def record_coach_feedback(execution, *, user, feedback):
     execution = TaskExecution.objects.select_for_update().get(pk=execution.pk)
     task = execution.training_task
-    from standards.selectors import is_project_admin
-
-    if not is_project_admin(user) and not task.coach_links.filter(user=user).exists():
-        raise ValidationError("只有任务教练或项目管理员可以填写教练反馈。")
+    if not user.is_superuser and not task.coach_links.filter(user=user).exists():
+        raise ValidationError("只有任务教练或超级管理员可以填写教练反馈。")
     execution.coach_feedback = feedback
     execution.feedback_by = user
     execution.feedback_at = timezone.now()

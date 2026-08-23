@@ -12,7 +12,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from django.views.generic import CreateView, DetailView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
 
-from core.utils.mixins import TitleMixin
+from core.utils.mixins import SuperuserRequiredMixin, TitleMixin
 from core.utils.listing import FilterableListMixin, ListFilterSpec
 
 from .forms import (
@@ -43,10 +43,9 @@ from .selectors import (
     can_manage_skill,
     current_skill_tree_for,
     current_wsos_for,
-    is_project_admin,
-    manageable_domains_for,
     manageable_skills_for,
     project_domains_for_view,
+    scoped_domains_for,
     skill_assessment_history,
     skill_assessment_performance,
     skill_tree_structure,
@@ -98,7 +97,7 @@ class StandardListMixin:
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["create_url_name"] = self.create_url_name
+        context["create_url_name"] = self.create_url_name if self.request.user.is_superuser else None
         context["create_label"] = self.create_label
         return context
 
@@ -148,7 +147,7 @@ class SkillProjectDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
             can_view_domain_management=self.request.user.has_perm("standards.view_technicaldomain"),
         )
         actions = []
-        if self.request.user.has_perm("standards.change_skillproject"):
+        if self.request.user.is_superuser:
             actions.append(
                 {
                     "label": "编辑项目",
@@ -158,7 +157,7 @@ class SkillProjectDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
                     "size_class": "btn-sm",
                 }
             )
-        if self.request.user.has_perm("standards.add_technicaldomain"):
+        if self.request.user.is_superuser:
             actions.append(
                 {
                     "label": "新增技术领域",
@@ -173,7 +172,7 @@ class SkillProjectDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
         return context
 
 
-class SkillProjectCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
+class SkillProjectCreateView(StandardCreateMixin, TitleMixin, SuperuserRequiredMixin, CreateView):
     model = SkillProject
     form_class = SkillProjectForm
     title = "新增技能项目"
@@ -186,7 +185,7 @@ class SkillProjectUpdateView(SkillProjectCreateView, UpdateView):
     permission_required = "standards.change_skillproject"
 
 
-class TechnicalDomainCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
+class TechnicalDomainCreateView(StandardCreateMixin, TitleMixin, SuperuserRequiredMixin, CreateView):
     model = TechnicalDomain
     form_class = TechnicalDomainForm
     title = "新增技术领域"
@@ -232,7 +231,7 @@ class TechnicalDomainUpdateView(TechnicalDomainCreateView, UpdateView):
         return f"编辑{self.project.name}技术领域"
 
     def get_queryset(self):
-        return manageable_domains_for(self.request.user, self.project).filter(pk=self.kwargs["domain_pk"])
+        return TechnicalDomain.objects.filter(skill_project=self.project, pk=self.kwargs["domain_pk"])
 
 
 class CurrentSkillTreeEntryView(TitleMixin, PermissionRequiredMixin, TemplateView):
@@ -304,6 +303,7 @@ class SkillUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
                 skill=skill,
                 aliases=form._split_text(form.cleaned_data.get("aliases_text")),
                 related_domains=form.cleaned_data.get("related_domains", ()),
+                actor=self.request.user,
                 preserve_old_name=form.cleaned_data.get("preserve_old_name", False),
                 old_name=form.old_name,
             )
@@ -321,7 +321,7 @@ def skill_candidates(request):
     if not project_id:
         return render(request, "standards/partials/skill_candidates.html", {})
     project = get_object_or_404(SkillProject, pk=project_id, is_active=True)
-    if not manageable_domains_for(request.user, project).exists() and not is_project_admin(request.user):
+    if not scoped_domains_for(request.user, "standards.add_skill", project).exists():
         raise Http404
     query = request.GET.get("name", "")
     candidates = _decorate_candidate_permissions(
@@ -360,7 +360,11 @@ def skill_alias_add(request, pk):
     if not can_manage_skill(request.user, skill):
         raise Http404
     try:
-        _, created = add_skill_alias(skill=skill, term=request.POST.get("term", ""))
+        _, created = add_skill_alias(
+            skill=skill,
+            term=request.POST.get("term", ""),
+            actor=request.user,
+        )
     except ValidationError as exc:
         return render(
             request,
@@ -458,16 +462,8 @@ class SkillTreeVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView
                 domain,
                 permission="standards.add_skilltreenode",
             ),
-            can_create_tree_version=can_manage_domain(
-                self.request.user,
-                domain,
-                permission="standards.add_skilltreeversion",
-            ),
-            can_set_current=can_manage_domain(
-                self.request.user,
-                domain,
-                permission="standards.change_skilltreeversion",
-            ),
+            can_create_tree_version=self.request.user.is_superuser,
+            can_set_current=self.request.user.is_superuser,
             version_context=True,
         )
         return context
@@ -503,16 +499,8 @@ class DomainSkillTreeMixin(TitleMixin, PermissionRequiredMixin, TemplateView):
                 user=self.request.user,
             ).count(),
             can_attach_unmounted_skills=can_attach,
-            can_create_tree_version=can_manage_domain(
-                self.request.user,
-                self.domain,
-                permission="standards.add_skilltreeversion",
-            ),
-            can_set_current=can_manage_domain(
-                self.request.user,
-                self.domain,
-                permission="standards.change_skilltreeversion",
-            ),
+            can_create_tree_version=self.request.user.is_superuser,
+            can_set_current=self.request.user.is_superuser,
         )
         return context
 
@@ -536,11 +524,7 @@ class CurrentDomainSkillTreeView(DomainSkillTreeMixin):
     def get_context_data(self, **kwargs):
         if self.tree is None:
             context = TemplateView.get_context_data(self, **kwargs)
-            can_create_tree = can_manage_domain(
-                self.request.user,
-                self.domain,
-                permission="standards.add_skilltreeversion",
-            )
+            can_create_tree = self.request.user.is_superuser
             context.update(
                 project=self.project,
                 domain=self.domain,
@@ -561,11 +545,12 @@ class CurrentDomainSkillTreeView(DomainSkillTreeMixin):
         return super().get_context_data(**kwargs)
 
 
-class SkillTreeVersionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
+class SkillTreeVersionCreateView(StandardCreateMixin, TitleMixin, SuperuserRequiredMixin, CreateView):
     model = SkillTreeVersion
     form_class = SkillTreeVersionForm
     title = "新增技能树版本"
     permission_required = "standards.add_skilltreeversion"
+
     def dispatch(self, request, *args, **kwargs):
         self.project = get_object_or_404(SkillProject, pk=kwargs["project_pk"])
         self.domain = get_object_or_404(
@@ -573,8 +558,6 @@ class SkillTreeVersionCreateView(StandardCreateMixin, TitleMixin, PermissionRequ
             pk=kwargs["domain_pk"],
             skill_project=self.project,
         )
-        if not can_manage_domain(request.user, self.domain, permission=self.permission_required):
-            raise PermissionDenied
         return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
@@ -586,7 +569,7 @@ class SkillTreeVersionCreateView(StandardCreateMixin, TitleMixin, PermissionRequ
         return reverse("standards:tree_detail", args=[self.object.pk])
 
 
-class SkillTreeVersionUpdateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, UpdateView):
+class SkillTreeVersionUpdateView(StandardCreateMixin, TitleMixin, SuperuserRequiredMixin, UpdateView):
     model = SkillTreeVersion
     form_class = SkillTreeVersionForm
     title = "编辑技能树版本"
@@ -594,12 +577,6 @@ class SkillTreeVersionUpdateView(StandardCreateMixin, TitleMixin, PermissionRequ
 
     def get_queryset(self):
         return SkillTreeVersion.objects.select_related("technical_domain")
-
-    def dispatch(self, request, *args, **kwargs):
-        tree = self.get_object()
-        if not can_manage_domain(request.user, tree.technical_domain, permission=self.permission_required):
-            raise PermissionDenied
-        return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -720,11 +697,7 @@ class SkillTreeNodeListView(
             is_current_tree=self.tree.is_current,
             current_wsos=self.current_wsos,
             version_context=self.version_context,
-            can_edit_version=can_manage_domain(
-                self.request.user,
-                self.domain,
-                permission="standards.change_skilltreeversion",
-            ),
+            can_edit_version=self.request.user.is_superuser,
         )
         return context
 
@@ -852,15 +825,13 @@ def _tree_editor_urls(*, tree, domain, kind, anchor):
 def _tree_candidates(*, tree, domain, query):
     candidates = find_skill_candidates(skill_project=tree.skill_project, query=query)
     candidate_ids = [candidate.pk for candidate in candidates]
-    tree_nodes = list(
-        SkillTreeNode.objects.filter(tree_version=tree)
-        .select_related("skill")
-        .order_by("order", "pk")
-    ) if candidate_ids else []
+    tree_nodes = (
+        list(SkillTreeNode.objects.filter(tree_version=tree).select_related("skill").order_by("order", "pk"))
+        if candidate_ids
+        else []
+    )
     node_by_id = {node.pk: node for node in tree_nodes}
-    existing_by_skill = {
-        node.skill_id: node for node in tree_nodes if node.skill_id in candidate_ids
-    }
+    existing_by_skill = {node.skill_id: node for node in tree_nodes if node.skill_id in candidate_ids}
 
     def path_for(node):
         parts = [node.skill.name]
@@ -880,9 +851,7 @@ def _tree_candidates(*, tree, domain, query):
             item.pk == domain.pk for item in candidate.related_domains.all()
         )
         candidate.can_attach_to_domain = (
-            candidate.is_active
-            and candidate.existing_tree_node is None
-            and candidate.domain_compatible
+            candidate.is_active and candidate.existing_tree_node is None and candidate.domain_compatible
         )
     return candidates
 
@@ -1261,6 +1230,7 @@ def skill_tree_skill_edit(request, tree_pk, node_pk):
                 skill=skill,
                 aliases=form._split_text(form.cleaned_data.get("aliases_text")),
                 related_domains=form.cleaned_data.get("related_domains", ()),
+                actor=request.user,
                 preserve_old_name=form.cleaned_data.get("preserve_old_name", False),
                 old_name=form.old_name,
             )
@@ -1476,7 +1446,7 @@ class WSOSVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
         return context
 
 
-class WSOSVersionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
+class WSOSVersionCreateView(StandardCreateMixin, TitleMixin, SuperuserRequiredMixin, CreateView):
     model = WSOSVersion
     form_class = WSOSVersionForm
     title = "新增 WSOS 版本"
@@ -1489,7 +1459,7 @@ class WSOSVersionUpdateView(WSOSVersionCreateView, UpdateView):
     permission_required = "standards.change_wsosversion"
 
 
-class WSOSSectionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
+class WSOSSectionCreateView(StandardCreateMixin, TitleMixin, SuperuserRequiredMixin, CreateView):
     model = WSOSSection
     form_class = WSOSSectionForm
     title = "新增 WSOS 章节"
@@ -1507,7 +1477,7 @@ class WSOSSectionCreateView(StandardCreateMixin, TitleMixin, PermissionRequiredM
         return f"{reverse('standards:wsos_detail', args=[self.wsos.pk])}#section-{self.object.pk}"
 
 
-class WSOSSectionUpdateView(StandardCreateMixin, TitleMixin, PermissionRequiredMixin, UpdateView):
+class WSOSSectionUpdateView(StandardCreateMixin, TitleMixin, SuperuserRequiredMixin, UpdateView):
     model = WSOSSection
     form_class = WSOSSectionForm
     title = "编辑 WSOS 章节"
@@ -1523,7 +1493,7 @@ class WSOSSectionUpdateView(StandardCreateMixin, TitleMixin, PermissionRequiredM
 @require_http_methods(["GET", "POST"])
 def wsos_section_delete(request, section_pk):
     section = get_object_or_404(WSOSSection.objects.select_related("wsos_version"), pk=section_pk)
-    if not request.user.has_perm("standards.delete_wsossection"):
+    if not request.user.is_superuser:
         raise PermissionDenied
     if request.method == "POST":
         try:
@@ -1548,10 +1518,7 @@ def wsos_section_delete(request, section_pk):
 
 @require_GET
 def wsos_section_skill_candidates(request, section_pk):
-    if not (
-        request.user.has_perm("standards.view_skillwsosmap")
-        or request.user.has_perm("standards.add_skillwsosmap")
-    ):
+    if not request.user.is_superuser:
         raise PermissionDenied
     section = get_object_or_404(WSOSSection.objects.select_related("wsos_version"), pk=section_pk)
     domain = None
@@ -1581,7 +1548,7 @@ def wsos_section_map_skill(request, section_pk, skill_pk):
         Skill.objects.filter(skill_project=section.wsos_version.skill_project, is_active=True),
         pk=skill_pk,
     )
-    if not request.user.has_perm("standards.add_skillwsosmap"):
+    if not request.user.is_superuser:
         raise PermissionDenied
     existing = SkillWSOSMap.objects.filter(skill=skill, wsos_section=section).first()
     if existing is not None:
@@ -1610,7 +1577,7 @@ def wsos_mapping_note_edit(request, mapping_pk):
         SkillWSOSMap.objects.select_related("skill", "wsos_section", "wsos_section__wsos_version"),
         pk=mapping_pk,
     )
-    if not request.user.has_perm("standards.change_skillwsosmap"):
+    if not request.user.is_superuser:
         raise PermissionDenied
     form = SkillWSOSMapNoteForm(request.POST if request.method == "POST" else None, instance=mapping)
     if request.method == "POST" and form.is_valid():
@@ -1637,7 +1604,7 @@ def wsos_mapping_delete(request, mapping_pk):
         SkillWSOSMap.objects.select_related("skill", "wsos_section", "wsos_section__wsos_version"),
         pk=mapping_pk,
     )
-    if not request.user.has_perm("standards.delete_skillwsosmap"):
+    if not request.user.is_superuser:
         raise PermissionDenied
     if request.method == "POST":
         wsos_pk = mapping.wsos_section.wsos_version_id

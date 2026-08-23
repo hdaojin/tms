@@ -8,7 +8,15 @@ from django.db import IntegrityError, transaction
 from django.db.models import Max
 from django.utils import timezone
 
-from .models import Skill, SkillTerm, SkillTreeNode, SkillTreeVersion, SkillWSOSMap, WSOSSection
+from .models import (
+    Skill,
+    SkillTerm,
+    SkillTreeNode,
+    SkillTreeVersion,
+    SkillWSOSMap,
+    TechnicalDomain,
+    WSOSSection,
+)
 from .selectors import can_manage_domain
 
 
@@ -121,7 +129,22 @@ def _replace_skill_terms(*, skill, aliases):
 
 
 @transaction.atomic
-def save_skill(*, skill, aliases, related_domains, preserve_old_name=False, old_name=""):
+def save_skill(*, skill, aliases, related_domains, actor, preserve_old_name=False, old_name=""):
+    permission = "standards.change_skill" if skill.pk else "standards.add_skill"
+    if skill.pk:
+        previous_primary_domain = (
+            Skill.objects.filter(pk=skill.pk)
+            .select_related("primary_domain")
+            .values_list("primary_domain_id", flat=True)
+            .first()
+        )
+        if previous_primary_domain and previous_primary_domain != skill.primary_domain_id:
+            _require_domain_scope(
+                actor=actor,
+                domain=TechnicalDomain.objects.get(pk=previous_primary_domain),
+                permission=permission,
+            )
+    _require_domain_scope(actor=actor, domain=skill.primary_domain, permission=permission)
     aliases = list(aliases)
     if preserve_old_name and old_name and normalize_skill_term(old_name) != normalize_skill_term(skill.name):
         aliases.append(old_name)
@@ -145,7 +168,12 @@ def save_skill(*, skill, aliases, related_domains, preserve_old_name=False, old_
 
 
 @transaction.atomic
-def add_skill_alias(*, skill, term):
+def add_skill_alias(*, skill, term, actor):
+    _require_domain_scope(
+        actor=actor,
+        domain=skill.primary_domain,
+        permission="standards.change_skill",
+    )
     term = term.strip()
     normalized_term = normalize_skill_term(term)
     if not normalized_term:
@@ -304,6 +332,7 @@ def create_skill_in_tree(
         ),
         aliases=(),
         related_domains=(),
+        actor=actor,
     )
     return attach_existing_skill_to_tree(
         tree_version=tree_version,
@@ -339,6 +368,7 @@ def create_detailed_skill_in_tree(
         skill=skill,
         aliases=aliases,
         related_domains=related_domains,
+        actor=actor,
     )
     return attach_existing_skill_to_tree(
         tree_version=tree_version,
@@ -476,15 +506,12 @@ def remove_skill_tree_node(*, node, mode, actor):
 
 @transaction.atomic
 def clone_skill_tree_version(*, source_version, version, name, description, actor):
+    if not actor.is_superuser:
+        raise PermissionDenied
     source_version = (
         SkillTreeVersion.objects.select_for_update()
         .select_related("technical_domain", "technical_domain__skill_project")
         .get(pk=source_version.pk)
-    )
-    _require_domain_scope(
-        actor=actor,
-        domain=source_version.technical_domain,
-        permission="standards.add_skilltreeversion",
     )
     if SkillTreeVersion.objects.filter(
         technical_domain=source_version.technical_domain,
@@ -525,15 +552,12 @@ def clone_skill_tree_version(*, source_version, version, name, description, acto
 
 @transaction.atomic
 def set_current_skill_tree_version(*, tree_version, actor):
+    if not actor.is_superuser:
+        raise PermissionDenied
     tree_version = (
         SkillTreeVersion.objects.select_for_update()
         .select_related("technical_domain")
         .get(pk=tree_version.pk)
-    )
-    _require_domain_scope(
-        actor=actor,
-        domain=tree_version.technical_domain,
-        permission="standards.change_skilltreeversion",
     )
     SkillTreeVersion.objects.filter(
         technical_domain=tree_version.technical_domain,
@@ -547,7 +571,7 @@ def set_current_skill_tree_version(*, tree_version, actor):
 
 @transaction.atomic
 def map_skill_to_wsos_section(*, skill, section, actor, note=""):
-    if not actor.has_perm("standards.add_skillwsosmap"):
+    if not actor.is_superuser:
         raise PermissionDenied
     if skill.skill_project_id != section.wsos_version.skill_project_id:
         raise ValidationError("技能与 WSOS 章节必须属于同一技能项目。")
@@ -560,7 +584,7 @@ def map_skill_to_wsos_section(*, skill, section, actor, note=""):
 
 @transaction.atomic
 def update_skill_wsos_map_note(*, mapping, note, actor):
-    if not actor.has_perm("standards.change_skillwsosmap"):
+    if not actor.is_superuser:
         raise PermissionDenied
     mapping.note = note.strip()
     mapping.save(update_fields=["note"])
@@ -569,14 +593,14 @@ def update_skill_wsos_map_note(*, mapping, note, actor):
 
 @transaction.atomic
 def unmap_skill_from_wsos_section(*, mapping, actor):
-    if not actor.has_perm("standards.delete_skillwsosmap"):
+    if not actor.is_superuser:
         raise PermissionDenied
     mapping.delete()
 
 
 @transaction.atomic
 def delete_wsos_section(*, section: WSOSSection, actor):
-    if not actor.has_perm("standards.delete_wsossection"):
+    if not actor.is_superuser:
         raise PermissionDenied
     if section.skill_mappings.exists():
         raise ValidationError("该章节已有技能映射，请先解除映射后再删除。")

@@ -102,25 +102,47 @@ class PermissionBundleRegistryTests(TestCase):
             with self.assertRaisesRegex(PermissionBundleCatalogError, "不存在的权限"):
                 validate_declared_permissions()
 
-    def test_skill_tree_delete_permission_stays_with_standard_maintainers(self):
+    def test_standard_and_training_bundles_are_small_app_local_capability_sets(self):
         specs = permission_registry.get_permission_bundle_spec_map()
 
-        self.assertIn(
-            "standards.delete_skilltreenode",
-            specs["training.project_admin"].permissions,
+        self.assertNotIn("training.coach", specs)
+        self.assertNotIn("training.project_admin", specs)
+        self.assertNotIn("standards.maintain_standard", specs)
+        self.assertSetEqual(
+            set(specs["standards.view_standard"].permissions),
+            {
+                "standards.view_skillproject",
+                "standards.view_technicaldomain",
+                "standards.view_skill",
+                "standards.view_skilltreeversion",
+                "standards.view_skilltreenode",
+                "standards.view_wsosversion",
+                "standards.view_wsossection",
+                "standards.view_skillwsosmap",
+            },
         )
-        self.assertIn(
-            "standards.delete_skilltreenode",
-            specs["standards.maintain_standard"].permissions,
+        self.assertEqual(
+            specs["standards.maintain_skills"].permissions,
+            ("standards.view_skill", "standards.add_skill", "standards.change_skill"),
         )
-        self.assertNotIn(
-            "standards.delete_skilltreenode",
-            specs["training.coach"].permissions,
+        self.assertSetEqual(
+            set(specs["standards.maintain_current_tree"].permissions),
+            {
+                "standards.view_skilltreeversion",
+                "standards.view_skilltreenode",
+                "standards.add_skilltreenode",
+                "standards.change_skilltreenode",
+                "standards.delete_skilltreenode",
+            },
         )
-        self.assertNotIn(
-            "standards.manage_all_technical_domains",
-            specs["standards.maintain_standard"].permissions,
-        )
+        for code in (
+            "standards.view_standard",
+            "standards.maintain_skills",
+            "standards.maintain_current_tree",
+        ):
+            self.assertTrue(all(permission.startswith("standards.") for permission in specs[code].permissions))
+        for code in ("training.view_training", "training.maintain_plans", "training.maintain_tasks"):
+            self.assertTrue(all(permission.startswith("training.") for permission in specs[code].permissions))
 
 
 class SiteConfigSingletonTests(TestCase):

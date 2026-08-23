@@ -577,16 +577,11 @@ TMS 中供教练和选手浏览的技能树应主要按技术领域组织，例�
 
 ---
 
-## 17. 权限分为“角色权限”和“领域范围”
+## 17. 权限由 Group 角色能力与领域范围共同组成
 
-### 17.1 全局角色权限
+### 17.1 Group 角色能力
 
-继续使用 Django 原生 Group / Permission 表达：
-
-- 项目管理员；
-- 技术教练；
-- 选手；
-- 其他角色。
+继续使用 Django 原生 Group / Permission 表达管理员定义的业务角色。Group 名称不参与代码授权；Permission Bundle 只提供单个 APP 内的小粒度能力集合。
 
 它回答：
 
@@ -599,29 +594,25 @@ TMS 中供教练和选手浏览的技能树应主要按技术领域组织，例�
 - 能否导入评分表；
 - 能否查看全部评分结果。
 
-### 17.2 TechnicalDomainMembership
+### 17.2 TechnicalDomainGroupScope
 
-再通过技术领域成员关系表达：
+再通过用户组与技术领域的范围关系表达：
 
 > 用户可以在哪些技术领域执行这些操作？
 
 例如：
 
 ```text
-张三
-domain = Linux
-role = LEAD_COACH
+Linux 技术教练组
+permission = standards.change_skill
+scope = Linux
 
-李四
-domain = Windows
-role = LEAD_COACH
-
-王五
-domain = Network
-role = LEAD_COACH
+Windows 技术教练组
+permission = standards.change_skill
+scope = Windows
 ```
 
-项目管理员可以拥有全局管理能力，无须逐个领域绑定。
+领域能力必须由同一个 Group 同时提供 Permission 与 Scope，不能把不同 Group 的两部分串联。superuser 是唯一全局绕过者；不配置 User 级 Scope。
 
 这样最终形成：
 
@@ -1430,7 +1421,7 @@ WSOS 标准
 - WSOSVersion；
 - WSOSSection；
 - Skill 与 WSOS 映射；
-- TechnicalDomainMembership。
+- TechnicalDomainGroupScope。
 
 ### assessments
 

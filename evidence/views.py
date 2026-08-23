@@ -7,7 +7,6 @@ from django.views.generic import CreateView, DeleteView, DetailView, FormView, U
 from django_tables2 import SingleTableView
 from assessments.selectors import manageable_assessment_modules_for, visible_assessments_for
 from core.utils.mixins import TitleMixin
-from standards.selectors import is_project_admin
 from .forms import EvidenceSkillMapForm, KnowledgeEvidenceForm, KnowledgeEvidenceRejectForm
 from .models import EvidenceSkillMap, KnowledgeEvidence
 from .services import approve_evidence, approve_mapping, reject_evidence
@@ -16,13 +15,13 @@ from .tables import KnowledgeEvidenceTable
 
 def visible_evidences_for(user):
     queryset = KnowledgeEvidence.objects.all()
-    if is_project_admin(user):
+    if user.is_superuser:
         return queryset
     return queryset.filter(assessment_module__assessment__in=visible_assessments_for(user)).distinct()
 
 
 def manageable_evidences_for(user):
-    if is_project_admin(user):
+    if user.is_superuser:
         return KnowledgeEvidence.objects.all()
     return KnowledgeEvidence.objects.filter(assessment_module__in=manageable_assessment_modules_for(user)).distinct()
 
@@ -60,7 +59,7 @@ class KnowledgeEvidenceCreateView(TitleMixin, PermissionRequiredMixin, CreateVie
         form.instance.created_by = self.request.user
         form.instance.extraction_source = KnowledgeEvidence.ExtractionSource.MANUAL
         module = form.cleaned_data.get("assessment_module")
-        direct = is_project_admin(self.request.user) or (
+        direct = self.request.user.is_superuser or (
             module and manageable_assessment_modules_for(self.request.user).filter(pk=module.pk).exists()
         )
         form.instance.review_status = (

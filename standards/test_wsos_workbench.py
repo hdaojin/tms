@@ -44,24 +44,7 @@ class WSOSWorkbenchTests(TestCase):
             primary_domain=self.linux,
             name="DNS 服务",
         )
-        self.user = User.objects.create_user(username="wsos-admin")
-        self.user.user_permissions.add(
-            *Permission.objects.filter(
-                content_type__app_label="standards",
-                codename__in=[
-                    "view_wsosversion",
-                    "add_wsossection",
-                    "change_wsossection",
-                    "delete_wsossection",
-                    "view_skillwsosmap",
-                    "add_skillwsosmap",
-                    "change_skillwsosmap",
-                    "delete_skillwsosmap",
-                    "view_skill",
-                ],
-            )
-        )
-        self.user = User.objects.get(pk=self.user.pk)
+        self.user = User.objects.create_superuser(username="wsos-admin")
         self.client.force_login(self.user)
 
     def test_detail_shows_sections_mapping_count_and_weight_warning(self):
@@ -76,6 +59,17 @@ class WSOSWorkbenchTests(TestCase):
         self.assertContains(response, "DNS 服务")
         self.assertContains(response, "重点")
         self.assertContains(response, "已停用")
+
+    def test_direct_model_permission_does_not_grant_wsos_governance(self):
+        ordinary = User.objects.create_user(username="ordinary-wsos-maintainer")
+        ordinary.user_permissions.add(
+            Permission.objects.get(content_type__app_label="standards", codename="add_wsossection")
+        )
+        self.client.force_login(ordinary)
+
+        response = self.client.get(reverse("standards:wsos_section_create", args=[self.wsos.pk]))
+
+        self.assertEqual(response.status_code, 403)
 
     def test_candidate_search_filters_domain_and_excludes_mapped_and_inactive(self):
         windows_skill = Skill.objects.create(

@@ -467,9 +467,7 @@ class TrainingTaskCoach(models.Model):
                 user_id=self.user_id, role=TrainingCycleMember.Role.COACH
             ).exists()
         ):
-            from standards.selectors import is_project_admin
-
-            if not is_project_admin(self.user):
+            if not self.user.is_superuser:
                 raise ValidationError({"user": "任务教练必须是当前训练周期的教练成员。"})
 
     def save(self, *args, **kwargs):

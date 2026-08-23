@@ -70,6 +70,14 @@ class UserPermissionBundleAdminForm(UserChangeForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields.pop("user_permissions", None)
+        self.fields["selected_permission_bundles"].help_text = (
+            "需要技术领域范围的写权限必须由同一个用户组同时提供权限与技术领域范围；"
+            "直接分配给用户的权限包不能绕过该限制。"
+        )
+        self.fields["explicit_permissions"].help_text = (
+            "仅选择业务权限包之外确实需要的权限。原始 User.user_permissions 是自动生成的投影。"
+            "技术领域写权限仍必须由同一个用户组同时提供权限与范围。"
+        )
         if self.instance.pk:
             self.initial["selected_permission_bundles"] = get_user_permission_bundle_codes(self.instance)
             self.initial["explicit_permissions"] = get_user_explicit_permissions(self.instance)

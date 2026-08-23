@@ -1,13 +1,19 @@
 from datetime import date
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
-from standards.models import Skill, SkillProject, SkillTreeVersion, TechnicalDomain, TechnicalDomainMembership
+from standards.models import (
+    Skill,
+    SkillProject,
+    SkillTreeVersion,
+    TechnicalDomain,
+    TechnicalDomainGroupScope,
+)
 
 from .forms import TrainingCycleForm, TrainingTaskForm
 from .models import (
@@ -23,7 +29,7 @@ from .models import (
     TrainingTaskDomain,
     TrainingTaskSkill,
 )
-from .selectors import manageable_training_tasks_for
+from .selectors import manageable_training_tasks_for, visible_training_tasks_for
 from .services import publish_training_task
 
 
@@ -194,9 +200,7 @@ class TrainingCycleVersionBindingTests(TrainingFixtureMixin, TestCase):
     def test_form_parent_choices_prefill_but_saved_child_is_independent(self):
         parent = self.cycle("PARENT")
         self.bind(parent)
-        form = TrainingCycleForm(
-            initial={"skill_project": self.project.pk, "parent": parent.pk}
-        )
+        form = TrainingCycleForm(initial={"skill_project": self.project.pk, "parent": parent.pk})
         field_name = f"tree_version_{self.linux.pk}"
         self.assertIn(field_name, form.fields)
         self.assertEqual(form.fields[field_name].initial, self.linux_tree)
@@ -411,14 +415,23 @@ class TrainingWorkflowTests(TrainingFixtureMixin, TestCase):
     def test_cross_domain_task_requires_cycle_binding_and_explicit_coach(self):
         self.bind(self.cycle, self.windows, self.windows_tree)
         change = Permission.objects.get(content_type__app_label="training", codename="change_trainingtask")
-        self.coach.user_permissions.add(change)
-        TechnicalDomainMembership.objects.create(
-            technical_domain=self.linux,
-            user=self.coach,
-            role=TechnicalDomainMembership.Role.COACH,
-        )
+        group = Group.objects.create(name="Linux 训练任务维护")
+        group.permissions.add(change)
+        TechnicalDomainGroupScope.objects.create(group=group, technical_domain=self.linux)
+        self.coach.groups.add(group)
+        self.coach = User.objects.get(pk=self.coach.pk)
         TrainingTaskDomain.objects.create(training_task=self.task, technical_domain=self.windows)
         self.task.coach_links.all().delete()
         self.assertFalse(manageable_training_tasks_for(self.coach).filter(pk=self.task.pk).exists())
         TrainingTaskCoach.objects.create(training_task=self.task, user=self.coach)
         self.assertTrue(manageable_training_tasks_for(self.coach).filter(pk=self.task.pk).exists())
+
+    def test_group_view_permission_and_scope_make_single_domain_task_visible(self):
+        viewer = User.objects.create_user(username="linux-training-viewer")
+        group = Group.objects.create(name="Linux 训练查看")
+        group.permissions.add(Permission.objects.get(content_type__app_label="training", codename="view_trainingtask"))
+        TechnicalDomainGroupScope.objects.create(group=group, technical_domain=self.linux)
+        viewer.groups.add(group)
+        viewer = User.objects.get(pk=viewer.pk)
+
+        self.assertIn(self.task, visible_training_tasks_for(viewer))

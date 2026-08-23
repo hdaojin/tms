@@ -5,13 +5,22 @@ from core.tables import ActionsColumn, BaseDateTimeColumn, BaseTable
 from .models import SkillProject, SkillTreeNode, SkillTreeVersion, WSOSVersion
 
 
+class SuperuserActionsColumn(ActionsColumn):
+    """查看操作保持原样，治理类编辑操作仅向 superuser 展示。"""
+
+    def _has_perm(self, user, perm):
+        if perm is None:
+            return True
+        return bool(user and user.is_superuser)
+
+
 class SkillProjectTable(BaseTable):
     is_default = tables.TemplateColumn(
         template_code='{% if record.is_default %}<span class="badge badge-primary">默认</span>{% else %}—{% endif %}',
         verbose_name="默认项目",
         orderable=False,
     )
-    actions = ActionsColumn(
+    actions = SuperuserActionsColumn(
         "standards:project_detail", "standards:project_edit", edit_perm="standards.change_skillproject"
     )
 
@@ -28,7 +37,7 @@ class SkillTreeVersionTable(BaseTable):
     )
     technical_domain = tables.Column(verbose_name="技术领域")
     updated_at = BaseDateTimeColumn(verbose_name="更新时间")
-    actions = ActionsColumn(
+    actions = SuperuserActionsColumn(
         "standards:tree_detail", "standards:tree_edit", edit_perm="standards.change_skilltreeversion"
     )
 
@@ -52,7 +61,9 @@ class SkillTreeNodeTable(BaseTable):
         verbose_name="可考核",
         order_by=("skill__is_assessable",),
     )
-    is_active = tables.BooleanColumn(accessor="skill__is_active", verbose_name="启用状态", order_by=("skill__is_active",))
+    is_active = tables.BooleanColumn(
+        accessor="skill__is_active", verbose_name="启用状态", order_by=("skill__is_active",)
+    )
     current_wsos_mapping = tables.TemplateColumn(
         template_code=(
             '{% if record.current_wsos_unavailable %}尚未设置当前 WSOS'
@@ -96,7 +107,11 @@ class SkillTreeNodeTable(BaseTable):
 
 
 class WSOSVersionTable(BaseTable):
-    actions = ActionsColumn("standards:wsos_detail", "standards:wsos_edit", edit_perm="standards.change_wsosversion")
+    actions = SuperuserActionsColumn(
+        "standards:wsos_detail",
+        "standards:wsos_edit",
+        edit_perm="standards.change_wsosversion",
+    )
 
     class Meta(BaseTable.Meta):
         model = WSOSVersion

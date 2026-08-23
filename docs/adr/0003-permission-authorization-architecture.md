@@ -29,3 +29,5 @@
 ## 后果
 
 Catalog 缺失、重复、未知 code、无效或模糊 Permission 都会在 system check 或同步时失败。Catalog 更新后需先检查，再运行 reconciliation 的 dry-run 与 `--apply`，最后重启应用进程。管理员不能直接编辑原生权限投影。
+
+TechnicalDomain 的 Group 级范围授权由 [ADR 0007](0007-group-domain-scope-authorization.md) 补充，本 ADR 的 Django Permission 运行时事实与对象范围分层原则保持不变。
