@@ -350,3 +350,5 @@ testsql-fixtures/
 *.tmp
 .npm-cache/
 .ruff_cache/
+.ruff-cache/
+.npm-cache*
