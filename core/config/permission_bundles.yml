@@ -31,18 +31,18 @@ bundles:
     description: 删除会议记录。
     permissions: [meetings.view_meeting, meetings.delete_meeting]
 
-  - code: training.view_cycles
-    name: 训练管理 | 查看训练周期
-    description: 查看训练周期。
-    permissions: [training.view_trainingcycle]
-  - code: training.manage_cycles
-    name: 训练管理 | 管理训练周期
-    description: 新增和修改训练周期。
-    permissions: [training.view_trainingcycle, training.add_trainingcycle, training.change_trainingcycle]
-  - code: training.submit_logs
-    name: 训练管理 | 提交训练日志
-    description: 查看并维护本人提交的训练日志。
-    permissions: [training.view_trainingcycle, training.view_traininglog, training.add_traininglog, training.change_traininglog]
+  - code: training.competitor
+    name: 训练管理 | 选手训练
+    description: 查看本人任务、维护执行记录和训练日志。
+    permissions: [training.view_trainingcycle, training.view_trainingplan, training.view_trainingtask, training.view_taskexecution, training.change_taskexecution, training.view_traininglog, training.add_traininglog, training.change_traininglog]
+  - code: training.coach
+    name: 训练管理 | 技术教练
+    description: 在负责技术领域内维护标准、评测、考点、评分和训练任务。
+    permissions: [standards.view_skillproject, standards.view_technicaldomain, standards.view_skill, standards.add_skill, standards.change_skill, standards.view_skilltreeversion, standards.view_skilltreenode, standards.view_wsosversion, standards.view_wsossection, assessments.view_assessment, assessments.view_assessmentmodule, assessments.add_assessmentmodule, assessments.change_assessmentmodule, assessments.view_assessmentparticipant, assessments.add_assessmentparticipant, assessments.change_assessmentparticipant, assessments.view_assessmentdocument, assessments.add_assessmentdocument, scoring.view_scoringscheme, scoring.add_scoringscheme, scoring.change_scoringscheme, scoring.view_scoringparserconfig, scoring.view_scoringschemeimport, scoring.add_scoringschemeimport, scoring.change_scoringschemeimport, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption, scoring.view_scoringparticipant, scoring.add_scoringparticipant, scoring.change_scoringparticipant, scoring.view_scoringresult, scoring.add_scoringresult, scoring.change_scoringresult, evidence.view_knowledgeevidence, evidence.add_knowledgeevidence, evidence.change_knowledgeevidence, evidence.view_evidenceskillmap, evidence.add_evidenceskillmap, evidence.change_evidenceskillmap, evidence.delete_evidenceskillmap, training.view_trainingcycle, training.view_trainingcyclemember, training.view_trainingplan, training.add_trainingplan, training.change_trainingplan, training.view_trainingtask, training.add_trainingtask, training.change_trainingtask, training.view_taskexecution, training.change_taskexecution, training.view_traininglog]
+  - code: training.project_admin
+    name: 训练管理 | 项目管理员
+    description: 管理全部技能项目的训练主线，仍由各 APP 原生权限执行授权。
+    permissions: [standards.manage_all_technical_domains, standards.view_skillproject, standards.add_skillproject, standards.change_skillproject, standards.view_technicaldomain, standards.add_technicaldomain, standards.change_technicaldomain, standards.view_technicaldomainmembership, standards.add_technicaldomainmembership, standards.change_technicaldomainmembership, standards.delete_technicaldomainmembership, standards.view_skill, standards.add_skill, standards.change_skill, standards.view_skilltreeversion, standards.add_skilltreeversion, standards.change_skilltreeversion, standards.view_skilltreenode, standards.add_skilltreenode, standards.change_skilltreenode, standards.delete_skilltreenode, standards.view_wsosversion, standards.add_wsosversion, standards.change_wsosversion, standards.view_wsossection, standards.add_wsossection, standards.change_wsossection, standards.view_skillwsosmap, standards.add_skillwsosmap, standards.change_skillwsosmap, standards.delete_skillwsosmap, assessments.view_assessmentseries, assessments.add_assessmentseries, assessments.change_assessmentseries, assessments.view_assessmentlevel, assessments.add_assessmentlevel, assessments.change_assessmentlevel, assessments.view_assessment, assessments.add_assessment, assessments.change_assessment, assessments.view_assessmentmodule, assessments.add_assessmentmodule, assessments.change_assessmentmodule, assessments.view_assessmentmoduledomain, assessments.add_assessmentmoduledomain, assessments.change_assessmentmoduledomain, assessments.delete_assessmentmoduledomain, assessments.view_assessmentmodulecoach, assessments.add_assessmentmodulecoach, assessments.change_assessmentmodulecoach, assessments.delete_assessmentmodulecoach, assessments.view_assessmentparticipant, assessments.add_assessmentparticipant, assessments.change_assessmentparticipant, assessments.view_assessmentresultsummary, assessments.add_assessmentresultsummary, assessments.change_assessmentresultsummary, assessments.view_assessmentdocument, assessments.add_assessmentdocument, assessments.change_assessmentdocument, scoring.view_scoringscheme, scoring.add_scoringscheme, scoring.change_scoringscheme, scoring.view_scoringparserconfig, scoring.view_scoringschemeimport, scoring.add_scoringschemeimport, scoring.change_scoringschemeimport, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption, scoring.view_scoringparticipant, scoring.add_scoringparticipant, scoring.change_scoringparticipant, scoring.view_all_scoringparticipant, scoring.view_scoringresult, scoring.add_scoringresult, scoring.change_scoringresult, scoring.view_all_scoringresult, evidence.view_knowledgeevidence, evidence.add_knowledgeevidence, evidence.change_knowledgeevidence, evidence.view_evidenceskillmap, evidence.add_evidenceskillmap, evidence.change_evidenceskillmap, evidence.delete_evidenceskillmap, training.view_trainingcycle, training.add_trainingcycle, training.change_trainingcycle, training.view_trainingcyclemember, training.add_trainingcyclemember, training.change_trainingcyclemember, training.view_trainingplan, training.add_trainingplan, training.change_trainingplan, training.view_trainingtask, training.add_trainingtask, training.change_trainingtask, training.view_trainingtaskdomain, training.view_trainingtaskskill, training.view_trainingtaskcoach, training.view_trainingtaskattachment, training.add_trainingtaskattachment, training.view_taskexecution, training.change_taskexecution, training.view_taskexecutionattachment, training.view_traininglog, training.add_traininglog, training.change_traininglog, training.view_all_traininglog, training.change_all_traininglog, training.view_traininglog_statistics, training.export_traininglog_archive]
   - code: training.view_all_logs
     name: 训练管理 | 查看全部训练日志
     description: 将训练日志查看范围扩大到全部人员。
@@ -79,34 +79,21 @@ bundles:
 
   - code: standards.view_standard
     name: 标准体系 | 查看标准体系
-    description: 查看技能项目、能力领域和技能树。
-    permissions: [standards.view_skillproject, standards.view_capabilitydomain, standards.view_skilltreeversion, standards.view_skillnode]
+    description: 查看技能项目、技术领域、稳定技能、技能树和 WSOS。
+    permissions: [standards.view_skillproject, standards.view_technicaldomain, standards.view_skill, standards.view_skilltreeversion, standards.view_skilltreenode, standards.view_wsosversion, standards.view_wsossection, standards.view_skillwsosmap]
   - code: standards.maintain_standard
     name: 标准体系 | 维护标准体系
-    description: 新增和修改技能项目、能力领域和技能树。
-    permissions: [standards.view_skillproject, standards.add_skillproject, standards.change_skillproject, standards.view_capabilitydomain, standards.add_capabilitydomain, standards.change_capabilitydomain, standards.view_skilltreeversion, standards.add_skilltreeversion, standards.change_skilltreeversion, standards.view_skillnode, standards.add_skillnode, standards.change_skillnode]
+    description: 新增和修改技能项目、技术领域、稳定技能、技能树和 WSOS。
+    permissions: [standards.view_skillproject, standards.add_skillproject, standards.change_skillproject, standards.view_technicaldomain, standards.add_technicaldomain, standards.change_technicaldomain, standards.view_skill, standards.add_skill, standards.change_skill, standards.view_skilltreeversion, standards.add_skilltreeversion, standards.change_skilltreeversion, standards.view_skilltreenode, standards.add_skilltreenode, standards.change_skilltreenode, standards.delete_skilltreenode, standards.view_wsosversion, standards.add_wsosversion, standards.change_wsosversion, standards.view_wsossection, standards.add_wsossection, standards.change_wsossection, standards.view_skillwsosmap, standards.add_skillwsosmap, standards.change_skillwsosmap, standards.delete_skillwsosmap]
 
-  - code: events.view_event_catalog
-    name: 事件 | 查看事件目录
-    description: 查看赛事系列、级别、事件和模块。
-    permissions: [events.view_competitionseries, events.view_competitionlevel, events.view_event, events.view_eventmodule, events.view_eventmodulecapabilitydomainmap]
-  - code: events.view_event_participants
-    name: 事件 | 查看事件参与人员
-    description: 查看事件参与人员和结果摘要。
-    permissions: [events.view_event, events.view_eventparticipant, events.view_eventresultsummary]
-  - code: events.maintain_event
-    name: 事件 | 维护事件
-    description: 新增和修改事件目录、模块映射和参与人员。
-    permissions: [events.view_competitionseries, events.add_competitionseries, events.change_competitionseries, events.view_competitionlevel, events.add_competitionlevel, events.change_competitionlevel, events.view_event, events.add_event, events.change_event, events.view_eventmodule, events.add_eventmodule, events.change_eventmodule, events.view_eventmodulecapabilitydomainmap, events.add_eventmodulecapabilitydomainmap, events.change_eventmodulecapabilitydomainmap, events.delete_eventmodulecapabilitydomainmap, events.view_eventparticipant, events.add_eventparticipant, events.change_eventparticipant]
-
-  - code: examcontent.view_examcontent
-    name: 试题结构 | 查看试题结构
-    description: 查看试题和结构化要求。
-    permissions: [examcontent.view_exampaper, examcontent.view_examrequirement]
-  - code: examcontent.maintain_examcontent
-    name: 试题结构 | 维护试题结构
-    description: 新增和修改试题及结构化要求。
-    permissions: [examcontent.view_exampaper, examcontent.add_exampaper, examcontent.change_exampaper, examcontent.view_examrequirement, examcontent.add_examrequirement, examcontent.change_examrequirement]
+  - code: assessments.view_assessments
+    name: 竞赛与考核 | 查看
+    description: 按业务范围查看竞赛、考核、模块、人员和资料。
+    permissions: [assessments.view_assessmentseries, assessments.view_assessmentlevel, assessments.view_assessment, assessments.view_assessmentmodule, assessments.view_assessmentmoduledomain, assessments.view_assessmentmodulecoach, assessments.view_assessmentparticipant, assessments.view_assessmentresultsummary, assessments.view_assessmentdocument]
+  - code: assessments.maintain_assessments
+    name: 竞赛与考核 | 维护
+    description: 按技术领域维护模块、人员和业务资料。
+    permissions: [assessments.view_assessment, assessments.add_assessment, assessments.change_assessment, assessments.view_assessmentmodule, assessments.add_assessmentmodule, assessments.change_assessmentmodule, assessments.view_assessmentparticipant, assessments.add_assessmentparticipant, assessments.change_assessmentparticipant, assessments.view_assessmentdocument, assessments.add_assessmentdocument, assessments.change_assessmentdocument]
 
   - code: scoring.view_schemes
     name: 评分 | 查看评分方案
@@ -125,23 +112,14 @@ bundles:
     description: 导入评分表并维护参评对象和评分结果。
     permissions: [scoring.view_scoringscheme, scoring.add_scoringscheme, scoring.change_scoringscheme, scoring.view_scoringparserconfig, scoring.view_scoringschemeimport, scoring.add_scoringschemeimport, scoring.change_scoringschemeimport, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption, scoring.view_scoringparticipant, scoring.add_scoringparticipant, scoring.change_scoringparticipant, scoring.view_all_scoringparticipant, scoring.view_scoringresult, scoring.add_scoringresult, scoring.change_scoringresult, scoring.view_all_scoringresult, scoring.view_scoringresultimport, scoring.add_scoringresultimport, scoring.change_scoringresultimport]
 
-  - code: knowledge.view_knowledge
-    name: 考点知识 | 查看考点知识
-    description: 查看考点证据和技能映射。
-    permissions: [knowledge.view_knowledgeevidence, knowledge.view_knowledgeevidenceskillmap]
-  - code: knowledge.maintain_knowledge
-    name: 考点知识 | 维护考点知识
-    description: 新增、审核和维护考点证据及技能映射。
-    permissions: [knowledge.view_knowledgeevidence, knowledge.add_knowledgeevidence, knowledge.change_knowledgeevidence, knowledge.view_knowledgeevidenceskillmap, knowledge.add_knowledgeevidenceskillmap, knowledge.change_knowledgeevidenceskillmap, knowledge.delete_knowledgeevidenceskillmap]
-
-  - code: archives.view_archive
-    name: 资料资产 | 查看资料资产
-    description: 查看并下载有权访问的资料资产。
-    permissions: [archives.view_archiveasset]
-  - code: archives.maintain_archive
-    name: 资料资产 | 维护资料资产
-    description: 新增和修改资料资产及业务绑定。
-    permissions: [archives.view_archiveasset, archives.add_archiveasset, archives.change_archiveasset]
+  - code: evidence.view_evidence
+    name: 考点证据 | 查看
+    description: 查看有权访问的考点证据和技能映射。
+    permissions: [evidence.view_knowledgeevidence, evidence.view_evidenceskillmap]
+  - code: evidence.maintain_evidence
+    name: 考点证据 | 维护
+    description: 按技术领域创建、审核和映射考点证据。
+    permissions: [evidence.view_knowledgeevidence, evidence.add_knowledgeevidence, evidence.change_knowledgeevidence, evidence.view_evidenceskillmap, evidence.add_evidenceskillmap, evidence.change_evidenceskillmap, evidence.delete_evidenceskillmap]
 
   - code: worldskills_forum.view_forum
     name: 世赛论坛 | 查看世赛论坛

@@ -6,16 +6,16 @@
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
         <h2 class="card-title">训练日志信息</h2>
-        <p class="text-sm text-base-content/70">{{ log.training_date }} / {{ log.uploaded_by }}</p>
+        <p class="text-sm text-base-content/70">{{ log.training_date }} / {{ log.author }}</p>
       </div>
       {% if perms.training.change_traininglog %}
         <a href="{% url 'training:log_edit' log.pk %}" class="btn btn-outline btn-sm">编辑</a>
       {% endif %}
     </div>
-    <p>{{ log.training_cycle }}{% if log.capability_domain %} / {{ log.capability_domain.name }}{% endif %}</p>
+    <p>{{ log.training_cycle }}</p>
     <p class="whitespace-pre-line">{{ log.summary|default:"暂无摘要" }}</p>
-    {% if log.primary_asset %}
-      <a href="{% url 'archives:asset_download' log.primary_asset.pk %}" class="btn btn-primary btn-sm">下载日志文件</a>
+    {% if log.document %}
+      <a href="{% url 'training:log_download' log.pk %}" class="btn btn-primary btn-sm">下载日志文件</a>
     {% endif %}
   </div>
 </div>

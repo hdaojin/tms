@@ -352,3 +352,8 @@ testsql-fixtures/
 .ruff_cache/
 .ruff-cache/
 .npm-cache*
+.ruff_cache*/
+.mimocode/
+.ruff-cache*/
+.npm-cache*/
+.uv-cache*/

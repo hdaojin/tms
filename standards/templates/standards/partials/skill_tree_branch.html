@@ -1,0 +1,48 @@
+<li
+  id="skill-tree-node-{{ node.pk }}"
+  class="scroll-mt-24 rounded-box"
+  role="treeitem"
+  data-skill-tree-node
+>
+  {% if node.tree_children %}
+    <div class="relative" data-skill-tree-branch-wrapper>
+      <details class="group" open data-skill-tree-branch>
+        <summary
+          class="flex cursor-pointer list-none items-center gap-2 rounded-box py-2 pr-24 pl-2 hover:bg-base-200 focus-visible:outline-2 focus-visible:outline-primary"
+          data-skill-tree-node-row
+        >
+          <span class="icon-[tabler--chevron-right] size-4 shrink-0 text-base-content/60 transition-transform group-open:rotate-90" aria-hidden="true"></span>
+          {% include "standards/partials/skill_tree_node_label.html" %}
+        </summary>
+        <ul
+          id="skill-tree-children-{{ node.pk }}"
+          class="ml-4 space-y-1 border-l border-base-300 py-1 pl-3 empty:hidden"
+          role="group"
+          data-skill-tree-children
+        >
+          {% for child in node.tree_children %}
+            {% include "standards/partials/skill_tree_branch.html" with node=child %}
+          {% endfor %}
+        </ul>
+      </details>
+      {% include "standards/partials/skill_tree_node_actions.html" %}
+    </div>
+  {% else %}
+    <div class="relative">
+      <div
+        class="flex items-center gap-2 rounded-box py-2 pr-24 pl-2 hover:bg-base-200"
+        data-skill-tree-node-row
+      >
+        <span class="icon-[tabler--point] size-4 shrink-0 text-base-content/40" aria-hidden="true"></span>
+        {% include "standards/partials/skill_tree_node_label.html" %}
+      </div>
+      {% include "standards/partials/skill_tree_node_actions.html" %}
+    </div>
+    <ul
+      id="skill-tree-children-{{ node.pk }}"
+      class="ml-4 space-y-1 border-l border-base-300 py-1 pl-3 empty:hidden"
+      role="group"
+      data-skill-tree-children
+    ></ul>
+  {% endif %}
+</li>

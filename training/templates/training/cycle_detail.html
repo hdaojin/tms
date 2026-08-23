@@ -14,6 +14,19 @@
     </div>
     <p>{{ cycle.start_date }}{% if cycle.end_date %} - {{ cycle.end_date }}{% endif %}</p>
     <p class="whitespace-pre-line">{{ cycle.description|default:"暂无描述" }}</p>
+    <div class="divider">领域技能树版本快照</div>
+    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {% for link in cycle.skill_tree_version_links.all %}
+        <div class="rounded-box border border-base-300 p-3">
+          <p class="font-semibold">{{ link.technical_domain.name }}</p>
+          <a class="link link-primary text-sm" href="{% url 'standards:tree_detail' link.skill_tree_version_id %}">
+            {{ link.skill_tree_version.name }}（{{ link.skill_tree_version.version }}）
+          </a>
+        </div>
+      {% empty %}
+        <p class="text-sm text-base-content/60">尚未固定领域技能树版本。</p>
+      {% endfor %}
+    </div>
   </div>
 </div>
 {% endblock %}

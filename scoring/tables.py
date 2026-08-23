@@ -8,7 +8,7 @@ class ScoringSchemeTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = ScoringScheme
-        fields = ("event_module", "module_code", "module_name", "total_mark", "parser_version", "actions")
+        fields = ("assessment_module", "module_code", "module_name", "total_mark", "parser_version", "actions")
 
 
 class ScoringAspectTable(BaseTable):

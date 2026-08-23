@@ -1,0 +1,22 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    {% for project in projects %}
+      <a
+        class="card border border-base-300 bg-base-100 shadow-sm transition-shadow hover:shadow-md"
+        href="{% url 'standards:project_detail' project.pk %}"
+      >
+        <div class="card-body">
+          <h2 class="card-title">{{ project.name }}</h2>
+          <p class="text-sm text-base-content/60">
+            {{ project.code }}{% if project.short_name %}
+              · {{ project.short_name }}
+            {% endif %}
+          </p>
+          <p>{{ project.description|default:"暂无描述"|truncatechars:120 }}</p>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% endblock %}

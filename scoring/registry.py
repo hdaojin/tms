@@ -46,4 +46,3 @@ def get_parser_definition(parser_key: str) -> ParserDefinition:
 
 def default_parser_key() -> str:
     return CMP_SINGLE_MODULE_V1
-

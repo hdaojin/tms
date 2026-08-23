@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,8 +15,8 @@ from django.http import HttpResponse, JsonResponse
 from django.utils.deconstruct import deconstructible
 
 from core.constants import (
-    ARCHIVE_ALLOWED_EXTENSIONS,
-    ARCHIVE_UPLOAD_MAX_SIZE_MB,
+    BUSINESS_DOCUMENT_ALLOWED_EXTENSIONS,
+    BUSINESS_DOCUMENT_UPLOAD_MAX_SIZE_MB,
     CONDUCT_ALLOWED_EXTENSIONS,
     CONDUCT_UPLOAD_MAX_SIZE_MB,
     DEFAULT_UPLOAD_MAX_SIZE_MB,
@@ -71,11 +72,7 @@ def _html_error_items(errors: Iterable[str]) -> str:
 
 
 def _normalize_extensions(extensions: Iterable[str] | None) -> tuple[str, ...]:
-    return tuple(
-        str(ext).lower().lstrip(".")
-        for ext in (extensions or ())
-        if str(ext).strip(".")
-    )
+    return tuple(str(ext).lower().lstrip(".") for ext in (extensions or ()) if str(ext).strip("."))
 
 
 def _read_file_header(file: UploadedFile, size: int = 512) -> bytes:
@@ -95,6 +92,27 @@ def _read_file_header(file: UploadedFile, size: int = 512) -> bytes:
                 file.seek(position)
             except (AttributeError, OSError):
                 pass
+
+
+def compute_file_sha256(file) -> str:
+    """计算文件 SHA256，并尽量恢复文件指针。"""
+    position = None
+    try:
+        position = file.tell()
+    except (AttributeError, OSError):
+        pass
+    digest = hashlib.sha256()
+    try:
+        file.seek(0)
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    finally:
+        if position is not None:
+            try:
+                file.seek(position)
+            except (AttributeError, OSError):
+                pass
+    return digest.hexdigest()
 
 
 def _starts_with_any(header: bytes, signatures: Iterable[bytes]) -> bool:
@@ -193,10 +211,7 @@ class UploadSizeValidator:
             raise ValidationError(f"上传文件大小不能超过 {self.max_size_mb}MB。")
 
     def __eq__(self, other: Any) -> bool:
-        return (
-            isinstance(other, UploadSizeValidator)
-            and self.max_size_mb == other.max_size_mb
-        )
+        return isinstance(other, UploadSizeValidator) and self.max_size_mb == other.max_size_mb
 
 
 @deconstructible
@@ -214,9 +229,7 @@ class UploadSignatureValidator:
             return
 
         if not any(matcher(header) for matcher in matchers):
-            raise ValidationError(
-                f"文件扩展名与实际文件类型不一致，请检查 {ext} 文件内容。"
-            )
+            raise ValidationError(f"文件扩展名与实际文件类型不一致，请检查 {ext} 文件内容。")
 
     def __eq__(self, other: Any) -> bool:
         return isinstance(other, UploadSignatureValidator)
@@ -272,10 +285,7 @@ class UploadSpec:
         return attrs
 
     def help_text(self, action_text: str = "上传文件") -> str:
-        return (
-            f"{action_text}，支持 {self.extensions_display}，"
-            f"大小不超过 {self.max_size_mb}MB"
-        )
+        return f"{action_text}，支持 {self.extensions_display}，大小不超过 {self.max_size_mb}MB"
 
     def validators(self) -> list[Any]:
         validators: list[Any] = []
@@ -433,10 +443,12 @@ CONDUCT_ATTACHMENT_UPLOAD_SPEC = UploadSpec(
     CONDUCT_UPLOAD_MAX_SIZE_MB,
 )
 MEETING_FILE_UPLOAD_SPEC = UploadSpec(["pdf"], DEFAULT_UPLOAD_MAX_SIZE_MB)
-ARCHIVE_ASSET_UPLOAD_SPEC = UploadSpec(
-    ARCHIVE_ALLOWED_EXTENSIONS,
-    ARCHIVE_UPLOAD_MAX_SIZE_MB,
+BUSINESS_DOCUMENT_UPLOAD_SPEC = UploadSpec(
+    BUSINESS_DOCUMENT_ALLOWED_EXTENSIONS,
+    BUSINESS_DOCUMENT_UPLOAD_MAX_SIZE_MB,
 )
+ASSESSMENT_DOCUMENT_UPLOAD_SPEC = BUSINESS_DOCUMENT_UPLOAD_SPEC
+TRAINING_ATTACHMENT_UPLOAD_SPEC = BUSINESS_DOCUMENT_UPLOAD_SPEC
 SCORING_WORKBOOK_UPLOAD_SPEC = UploadSpec(
     SCORING_WORKBOOK_ALLOWED_EXTENSIONS,
     SCORING_WORKBOOK_UPLOAD_MAX_SIZE_MB,

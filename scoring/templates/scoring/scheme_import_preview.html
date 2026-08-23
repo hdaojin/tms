@@ -8,7 +8,7 @@
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 class="card-title">{{ scheme_import.title }}</h2>
-            <p class="text-sm text-base-content/60">{{ scheme_import.event_module }}</p>
+            <p class="text-sm text-base-content/60">{{ scheme_import.assessment_module }}</p>
           </div>
           <span class="badge {% if scheme_import.status == 'confirmed' %}badge-success{% else %}badge-info{% endif %}">{{ scheme_import.get_status_display }}</span>
         </div>
@@ -112,7 +112,7 @@
       <div class="card-body">
         <h2 class="card-title text-base">源文件</h2>
         <div class="space-y-1 text-sm text-base-content/70">
-          <p>{{ scheme_import.source_asset.filename }}</p>
+          <p>{{ scheme_import.source_document.filename }}</p>
           <p>导入人：{{ scheme_import.imported_by|default:"-" }}</p>
           <p>导入时间：{{ scheme_import.imported_at }}</p>
         </div>

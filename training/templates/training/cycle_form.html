@@ -1,0 +1,20 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <form method="post" class="space-y-6">
+        {% csrf_token %}
+        {% include "components/form_errors.html" with form=form %}
+        <div class="grid gap-4 md:grid-cols-2">
+          {% for field in base_fields %}{% include "components/field.html" with field=field %}{% endfor %}
+        </div>
+        <div id="cycle-version-context">{% include "training/partials/cycle_version_fields.html" %}</div>
+        <div class="flex justify-end gap-3">
+          <button class="btn btn-ghost" type="reset">重置</button>
+          <button class="btn btn-primary" type="submit">保存</button>
+        </div>
+      </form>
+    </div>
+  </section>
+{% endblock %}

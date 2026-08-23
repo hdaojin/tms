@@ -12,7 +12,7 @@ from .forms import ScoringImportForm, ScoringParticipantForm, ScoringResultForm
 from .models import ScoringParticipant, ScoringResult, ScoringScheme, ScoringSchemeImport
 from .parser import WorkbookParseError
 from .registry import PARSER_DEFINITIONS
-from .services import confirm_scheme_import, enabled_parser_configs, parse_scheme_upload
+from .services import confirm_scheme_import, enabled_parser_configs, parse_scheme_document
 from .selectors import scoring_participants_visible_to
 from .tables import ScoringAspectTable, ScoringParticipantTable, ScoringSchemeTable
 
@@ -26,7 +26,7 @@ class ScoringSchemeListView(TitleMixin, PermissionRequiredMixin, SingleTableView
     permission_required = "scoring.view_scoringscheme"
 
     def get_queryset(self):
-        return super().get_queryset().select_related("event_module", "event_module__event")
+        return super().get_queryset().select_related("assessment_module", "assessment_module__assessment")
 
 
 class ScoringSchemeDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -42,9 +42,7 @@ class ScoringSchemeDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
         aspect_table = ScoringAspectTable(self.object.aspects.select_related("subcriterion"))
         participants = ScoringParticipant.objects.none()
         if self.request.user.has_perm("scoring.view_scoringparticipant"):
-            participants = scoring_participants_visible_to(
-                self.request.user, self.object.participants.all()
-            )
+            participants = scoring_participants_visible_to(self.request.user, self.object.participants.all())
         participant_table = ScoringParticipantTable(participants)
         context["aspect_table"] = aspect_table
         context["participant_table"] = participant_table
@@ -60,9 +58,8 @@ class ScoringImportView(TitleMixin, PermissionRequiredMixin, FormView):
 
     def form_valid(self, form):
         try:
-            self.object = parse_scheme_upload(
-                form.cleaned_data["event_module"],
-                form.cleaned_data["file"],
+            self.object = parse_scheme_document(
+                form.cleaned_data["source_document"],
                 form.cleaned_data["parser_config"],
                 user=self.request.user,
             )
@@ -90,7 +87,11 @@ class ScoringSchemeImportPreviewView(TitleMixin, PermissionRequiredMixin, Detail
     title_icon = "icon-[tabler--clipboard-check]"
 
     def get_queryset(self):
-        return super().get_queryset().select_related("event_module", "event_module__event", "source_asset", "scheme")
+        return (
+            super()
+            .get_queryset()
+            .select_related("assessment_module", "assessment_module__assessment", "source_document", "scheme")
+        )
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -128,6 +129,7 @@ class ScoringParticipantCreateView(TitleMixin, PermissionRequiredMixin, CreateVi
     model = ScoringParticipant
     form_class = ScoringParticipantForm
     template_name = "common/form.html"
+    extra_context = {"grid_class": "grid gap-4 md:grid-cols-2"}
     permission_required = "scoring.add_scoringparticipant"
     title = "新增参评对象"
     title_icon = "icon-[tabler--plus]"
@@ -152,6 +154,7 @@ class ScoringParticipantUpdateView(TitleMixin, PermissionRequiredMixin, UpdateVi
     model = ScoringParticipant
     form_class = ScoringParticipantForm
     template_name = "common/form.html"
+    extra_context = {"grid_class": "grid gap-4 md:grid-cols-2"}
     permission_required = "scoring.change_scoringparticipant"
     title = "编辑参评对象"
     title_icon = "icon-[tabler--edit]"
@@ -170,4 +173,3 @@ class ScoringResultCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse("scoring:participant_detail", args=[self.object.participant_id])
-

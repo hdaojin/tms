@@ -9,7 +9,7 @@ themes:
 layouts:
   header:
     - home
-    - events
+    - assessments
     - feedback
     - worldskills_forum
     - standards
@@ -22,7 +22,7 @@ layouts:
     - worldskills_forum
     - standards
     - training
-    - events
+    - assessments
     - resources
     - behaviors
     - meetings
@@ -124,7 +124,7 @@ sections:
 
   - key: training
     label: 训练
-    description: 训练周期与训练日志
+    description: 训练周期、计划、任务、执行与日志
     icon_class: icon-[tabler--run] size-5 text-success
     items:
       - key: training_group
@@ -142,22 +142,32 @@ sections:
             icon_class: icon-[tabler--plus] size-5 text-success
             permissions:
               - training.add_trainingcycle
+          - key: training_plans
+            label: 训练计划
+            url_name: training:plan_list
+            icon_class: icon-[tabler--calendar-stats] size-5 text-success
+            permissions: [training.view_trainingplan]
+          - key: training_tasks
+            label: 训练任务
+            url_name: training:task_list
+            icon_class: icon-[tabler--list-check] size-5 text-success
+            permissions: [training.view_trainingtask]
+          - key: my_training
+            label: 我的训练
+            url_name: training:my_training
+            icon_class: icon-[tabler--run] size-5 text-success
+            permissions: [training.view_trainingtask]
           - key: training_logs
             label: 训练日志
             url_name: training:log_list
             icon_class: icon-[tabler--file-text] size-5 text-success
             permissions: [training.view_traininglog]
-          - key: training_log_upload
-            label: 上传训练日志
-            url_name: training:log_upload
+          - key: training_log_create
+            label: 新增训练日志
+            url_name: training:log_create
             icon_class: icon-[tabler--upload] size-5 text-success
             permissions:
               - training.add_traininglog
-          - key: training_stats
-            label: 提交统计
-            url_name: training:monthly_stats
-            icon_class: icon-[tabler--chart-bar] size-5 text-info
-            permissions: [training.view_traininglog_statistics]
       - key: glossary_learning_group
         label: 专业词汇学习
         icon_class: icon-[tabler--language] size-5 text-accent
@@ -206,100 +216,67 @@ sections:
             permissions:
               - glossary.view_all_study_statistics
 
-  - key: events
-    label: 竞赛
-    description: 赛事、模块、试题与评分
+  - key: assessments
+    label: 竞赛与考核
+    description: 竞赛、考核、模块、资料与评分
     icon_class: icon-[tabler--trophy] size-5 text-warning
     items:
-      - key: event_catalog
-        label: 赛事基础
+      - key: assessment_catalog
+        label: 竞赛与考核
         icon_class: icon-[tabler--trophy] size-5 text-warning
         children:
-          - key: event_series
-            label: 赛事系列
-            url_name: events:series_list
+          - key: assessments
+            label: 竞赛与考核列表
+            url_name: assessments:assessment_list
             icon_class: icon-[tabler--trophy] size-5 text-warning
-            permissions: [events.view_competitionseries]
-          - key: event_series_create
-            label: 新增赛事系列
-            url_name: events:series_create
+            permissions: [assessments.view_assessment]
+          - key: assessment_create
+            label: 新增竞赛与考核
+            url_name: assessments:assessment_create
             icon_class: icon-[tabler--plus] size-5 text-warning
             permissions:
-              - events.add_competitionseries
-          - key: event_levels
-            label: 赛事级别
-            url_name: events:level_list
+              - assessments.add_assessment
+          - key: assessment_modules
+            label: 评测模块
+            url_name: assessments:module_list
             icon_class: icon-[tabler--stairs] size-5 text-warning
-            permissions: [events.view_competitionlevel]
-          - key: event_level_create
-            label: 新增赛事级别
-            url_name: events:level_create
+            permissions: [assessments.view_assessmentmodule]
+          - key: assessment_module_create
+            label: 新增评测模块
+            url_name: assessments:module_create
             icon_class: icon-[tabler--plus] size-5 text-warning
             permissions:
-              - events.add_competitionlevel
-      - key: event_operations
-        label: 竞赛执行
+              - assessments.add_assessmentmodule
+      - key: assessment_operations
+        label: 评测资料与人员
         icon_class: icon-[tabler--calendar-event] size-5 text-warning
         children:
-          - key: events
-            label: 事件
-            url_name: events:event_list
+          - key: assessment_documents
+            label: 上传评测资料
+            url_name: assessments:document_upload
             icon_class: icon-[tabler--calendar-event] size-5 text-warning
-            permissions: [events.view_event]
-          - key: event_create
-            label: 新增事件
-            url_name: events:event_create
-            icon_class: icon-[tabler--plus] size-5 text-warning
-            permissions:
-              - events.add_event
-          - key: event_modules
-            label: 事件模块
-            url_name: events:module_list
-            icon_class: icon-[tabler--layout-grid] size-5 text-warning
-            permissions: [events.view_eventmodule]
-          - key: event_module_create
-            label: 新增事件模块
-            url_name: events:module_create
-            icon_class: icon-[tabler--plus] size-5 text-warning
-            permissions:
-              - events.add_eventmodule
-          - key: event_participants
-            label: 参与人员
-            url_name: events:participant_list
-            icon_class: icon-[tabler--users-group] size-5 text-info
-            permissions: [events.view_eventparticipant]
-          - key: event_participant_create
+            permissions: [assessments.add_assessmentdocument]
+          - key: assessment_participant_create
             label: 新增参与人员
-            url_name: events:participant_create
-            icon_class: icon-[tabler--plus] size-5 text-info
+            url_name: assessments:participant_create
+            icon_class: icon-[tabler--plus] size-5 text-warning
             permissions:
-              - events.add_eventparticipant
-      - key: exam_group
-        label: 试题内容
+              - assessments.add_assessmentparticipant
+      - key: evidence_group
+        label: 考点证据
         icon_class: icon-[tabler--file-analytics] size-5 text-warning
         children:
-          - key: examcontent
-            label: 试题
-            url_name: examcontent:paper_list
+          - key: evidence
+            label: 考点证据列表
+            url_name: evidence:evidence_list
             icon_class: icon-[tabler--file-analytics] size-5 text-warning
-            permissions: [examcontent.view_exampaper]
-          - key: examcontent_create
-            label: 新增试题
-            url_name: examcontent:paper_create
+            permissions: [evidence.view_knowledgeevidence]
+          - key: evidence_create
+            label: 新增考点证据
+            url_name: evidence:evidence_create
             icon_class: icon-[tabler--plus] size-5 text-warning
             permissions:
-              - examcontent.add_exampaper
-          - key: exam_requirements
-            label: 试题要求
-            url_name: examcontent:requirement_list
-            icon_class: icon-[tabler--list-check] size-5 text-warning
-            permissions: [examcontent.view_examrequirement]
-          - key: exam_requirements_create
-            label: 新增试题要求
-            url_name: examcontent:requirement_create
-            icon_class: icon-[tabler--plus] size-5 text-warning
-            permissions:
-              - examcontent.add_examrequirement
+              - evidence.add_knowledgeevidence
       - key: scoring_group
         label: 评分管理
         icon_class: icon-[tabler--clipboard-check] size-5 text-primary
@@ -337,97 +314,32 @@ sections:
         label: 标准体系
         icon_class: icon-[tabler--target-arrow] size-5 text-info
         children:
-          - key: standards
+          - key: standards_projects
             label: 技能项目
             url_name: standards:project_list
-            icon_class: icon-[tabler--target-arrow] size-5 text-info
+            icon_class: icon-[tabler--schema] size-5 text-info
             permissions: [standards.view_skillproject]
-          - key: standards_create
-            label: 新增技能项目
-            url_name: standards:project_create
-            icon_class: icon-[tabler--plus] size-5 text-info
-            permissions:
-              - standards.add_skillproject
-          - key: standards_domains
-            label: 能力领域
-            url_name: standards:domain_list
-            icon_class: icon-[tabler--category] size-5 text-info
-            permissions: [standards.view_capabilitydomain]
-          - key: standards_domain_create
-            label: 新增能力领域
-            url_name: standards:domain_create
-            icon_class: icon-[tabler--plus] size-5 text-info
-            permissions:
-              - standards.add_capabilitydomain
+          - key: standards_wsos
+            label: WSOS
+            url_name: standards:wsos_list
+            icon_class: icon-[tabler--list-details] size-5 text-accent
+            permissions: [standards.view_wsosversion]
+          - key: standards_current_tree
+            label: 标准技能树
+            url_name: standards:current_tree_entry
+            icon_class: icon-[tabler--hierarchy-3] size-5 text-success
+            permissions: [standards.view_skillproject]
           - key: standards_trees
-            label: 标准技能树版本
+            label: 技能树版本
             url_name: standards:tree_list
             icon_class: icon-[tabler--hierarchy-3] size-5 text-success
             permissions: [standards.view_skilltreeversion]
-          - key: standards_tree_create
-            label: 新增标准技能树版本
-            url_name: standards:tree_create
-            icon_class: icon-[tabler--plus] size-5 text-success
-            permissions:
-              - standards.add_skilltreeversion
-          - key: standards_nodes
-            label: 技能节点
-            url_name: standards:node_list
-            icon_class: icon-[tabler--hierarchy-2] size-5 text-info
-            permissions: [standards.view_skillnode]
-          - key: standards_node_create
-            label: 新增技能节点
-            url_name: standards:node_create
-            icon_class: icon-[tabler--plus] size-5 text-info
-            permissions:
-              - standards.add_skillnode
-      - key: knowledge_group
-        label: 考点知识
-        icon_class: icon-[tabler--clipboard-list] size-5 text-accent
-        children:
-          - key: knowledge
-            label: 考点证据
-            url_name: knowledge:evidence_list
-            icon_class: icon-[tabler--clipboard-list] size-5 text-accent
-            permissions: [knowledge.view_knowledgeevidence]
-          - key: knowledge_create
-            label: 新增考点证据
-            url_name: knowledge:evidence_create
-            icon_class: icon-[tabler--plus] size-5 text-accent
-            permissions:
-              - knowledge.add_knowledgeevidence
-          - key: knowledge_mapping_create
-            label: 新增技能映射
-            url_name: knowledge:mapping_create
-            icon_class: icon-[tabler--git-merge] size-5 text-accent
-            permissions:
-              - knowledge.add_knowledgeevidenceskillmap
-          - key: knowledge_unmapped
-            label: 未映射考点
-            url_name: knowledge:unmapped
-            icon_class: icon-[tabler--map-question] size-5 text-error
-            permissions: [knowledge.view_knowledgeevidence]
 
   - key: resources
     label: 资料
-    description: 资料资产与教学笔记
+    description: 教学笔记
     icon_class: icon-[tabler--files] size-5 text-primary
     items:
-      - key: archive_group
-        label: 资料资产
-        icon_class: icon-[tabler--files] size-5 text-primary
-        children:
-          - key: archives
-            label: 资料资产
-            url_name: archives:asset_list
-            icon_class: icon-[tabler--files] size-5 text-primary
-            permissions: [archives.view_archiveasset]
-          - key: archive_upload
-            label: 上传资料资产
-            url_name: archives:asset_upload
-            icon_class: icon-[tabler--upload] size-5 text-primary
-            permissions:
-              - archives.add_archiveasset
       - key: notes_group
         label: 教学笔记
         icon_class: icon-[tabler--book] size-5 text-warning

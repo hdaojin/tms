@@ -1,0 +1,99 @@
+{% if candidates %}
+  <div class="space-y-3 rounded-box border border-warning/40 bg-warning/5 p-4">
+    <div class="flex items-start gap-2">
+      <span
+        class="mt-0.5 icon-[tabler--alert-triangle] size-5 text-warning"
+        aria-hidden="true"
+      ></span>
+      <div>
+        <h3 class="font-semibold">发现可能重复的技能</h3>
+        <p class="text-sm text-base-content/60">
+          请核对名称、别名、领域和描述。精确命中不能重复创建。
+        </p>
+      </div>
+    </div>
+    <div class="grid gap-3">
+      {% for candidate in candidates %}
+        <article class="rounded-box border border-base-300 bg-base-100 p-3">
+          <div class="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p class="font-medium">
+                {{ candidate.name }}
+              </p>
+              <p class="text-xs text-base-content/60">
+                {{ candidate.skill_project.name }} /
+                {{ candidate.primary_domain.name }}
+              </p>
+            </div>
+            {% if candidate.candidate_exact %}
+              <span class="badge badge-sm badge-error">精确命中</span>
+            {% elif candidate.candidate_high_similarity %}
+              <span class="badge badge-sm badge-warning">高度相似</span>
+            {% else %}
+              <span class="badge badge-ghost badge-sm">相关候选</span>
+            {% endif %}
+          </div>
+          {% if candidate.aliases %}<p class="mt-2 text-xs">
+            别名：{{ candidate.aliases|join:"、" }}
+          </p>{% endif %}
+          <p class="mt-2 text-sm text-base-content/70">
+            {{ candidate.description|default:"暂无描述"|truncatechars:100 }}
+          </p>
+          <div class="mt-3 flex flex-wrap justify-end gap-2">
+            {% if candidate.can_view_detail %}
+              <a
+                class="btn btn-ghost btn-xs"
+                href="{% url 'standards:skill_detail' candidate.pk %}"
+                >查看详情</a
+              >
+            {% endif %}
+            {% if candidate.can_register_alias and not candidate.candidate_exact and candidate_query %}
+              <button
+                type="button"
+                class="btn btn-outline btn-xs"
+                hx-post="{% url 'standards:skill_alias_add' candidate.pk %}"
+                hx-vals='{"term": "{{ candidate_query|escapejs }}"}'
+                hx-target="#skill-candidates"
+                hx-swap="innerHTML"
+              >
+                这是同一技能，登记为别名
+              </button>
+            {% endif %}
+          </div>
+          {% if not candidate.can_register_alias and candidate.candidate_high_similarity %}
+            <p class="mt-2 text-right text-xs text-base-content/50">
+              如确认是同一技能，请联系其负责教练或项目管理员登记别名。
+            </p>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </div>
+    {% if has_high_similarity %}
+      <div>
+        {% if skill_form %}
+          {% include "components/field.html" with field=skill_form.confirm_distinct %}
+        {% else %}
+          <fieldset class="fieldset">
+            <label class="label cursor-pointer justify-start gap-3">
+              <input
+                class="checkbox checkbox-primary"
+                type="checkbox"
+                name="confirm_distinct"
+                value="on"
+              />
+              <span class="label-text">我已确认这不是同一技能</span>
+            </label>
+          </fieldset>
+        {% endif %}
+        <p class="text-xs text-base-content/60">
+          继续创建高度相似的技能时，必须填写描述说明两者边界。
+        </p>
+      </div>
+    {% endif %}
+  </div>
+{% elif candidate_query %}
+  <div class="alert py-2 text-sm alert-success">
+    <span class="icon-[tabler--circle-check] size-4" aria-hidden="true"></span>
+    <span>未发现明显重复候选。</span>
+  </div>
+{% endif %}

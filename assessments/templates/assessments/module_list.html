@@ -1,0 +1,1 @@
+{% extends "common/table_page.html" %}{% block content %}<div class="mb-3 flex justify-end">{% if perms.assessments.add_assessmentmodule %}<a class="btn btn-primary btn-sm" href="{% url 'assessments:module_create' %}">新增评测模块</a>{% endif %}</div>{{ block.super }}{% endblock %}

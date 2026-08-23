@@ -1,124 +1,290 @@
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 
-from knowledge.models import KnowledgeEvidence, KnowledgeEvidenceSkillMap
-from knowledge.selectors import get_skill_tree_coverage_summary
+from assessments.forms import AssessmentForm
+from evidence.forms import KnowledgeEvidenceForm
+from glossary.forms import ProfessionalGlossaryForm
+from training.forms import TrainingCycleForm
 
-from .models import CapabilityDomain, SkillNode, SkillProject, SkillTreeVersion
+from .forms import SkillForm, SkillProjectForm, TechnicalDomainForm, WSOSVersionForm
+from .models import (
+    Skill,
+    SkillProject,
+    SkillTerm,
+    SkillTreeNode,
+    SkillTreeVersion,
+    SkillWSOSMap,
+    TechnicalDomain,
+    TechnicalDomainMembership,
+    WSOSSection,
+    WSOSVersion,
+)
+from .selectors import manageable_skills_for
+from .services import find_skill_candidates, normalize_skill_term, save_skill
+from .tables import SkillProjectTable
+
+User = get_user_model()
 
 
-class SkillTreeModelTests(TestCase):
+class SkillProjectDefaultTests(TestCase):
+    def test_saving_new_default_project_unsets_previous_default(self):
+        previous = SkillProject.objects.create(code="OLD", name="原默认项目", is_default=True)
+        current = SkillProject.objects.create(code="NEW", name="新默认项目", is_default=True)
+
+        previous.refresh_from_db()
+        self.assertFalse(previous.is_default)
+        self.assertTrue(current.is_default)
+
+    def test_inactive_project_cannot_be_default(self):
+        project = SkillProject(code="OFF", name="停用项目", is_active=False, is_default=True)
+
+        with self.assertRaisesMessage(ValidationError, "默认技能项目必须处于启用状态"):
+            project.save()
+
+    def test_database_constraint_rejects_second_default_from_queryset_update(self):
+        SkillProject.objects.create(code="ONE", name="默认项目", is_default=True)
+        other = SkillProject.objects.create(code="TWO", name="其他项目")
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            SkillProject.objects.filter(pk=other.pk).update(is_default=True)
+
+    def test_project_form_can_switch_default_project(self):
+        previous = SkillProject.objects.create(code="OLD", name="原默认项目", is_default=True)
+        current = SkillProject.objects.create(code="NEW", name="新默认项目")
+        form = SkillProjectForm(
+            data={
+                "code": current.code,
+                "name": current.name,
+                "short_name": "",
+                "description": "",
+                "order": 0,
+                "is_active": "on",
+                "is_default": "on",
+            },
+            instance=current,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        previous.refresh_from_db()
+        current.refresh_from_db()
+        self.assertFalse(previous.is_default)
+        self.assertTrue(current.is_default)
+
+    def test_project_form_can_leave_system_without_default(self):
+        project = SkillProject.objects.create(code="DEF", name="默认项目", is_default=True)
+        form = SkillProjectForm(
+            data={
+                "code": project.code,
+                "name": project.name,
+                "short_name": "",
+                "description": "",
+                "order": 0,
+                "is_active": "on",
+            },
+            instance=project,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        project.refresh_from_db()
+        self.assertFalse(project.is_default)
+
+    def test_project_table_marks_default_project(self):
+        project = SkillProject.objects.create(code="DEF", name="默认项目", is_default=True)
+
+        html = SkillProjectTable([project]).rows[0].get_cell("is_default")
+
+        self.assertIn("默认", html)
+        self.assertIn("badge badge-primary", html)
+
+
+class DefaultSkillProjectFormTests(TestCase):
+    form_classes = (
+        TechnicalDomainForm,
+        SkillForm,
+        WSOSVersionForm,
+        AssessmentForm,
+        TrainingCycleForm,
+        ProfessionalGlossaryForm,
+        KnowledgeEvidenceForm,
+    )
+
     def setUp(self):
-        self.project = SkillProject.objects.create(code="NSM", name="网络系统管理")
-        self.linux = CapabilityDomain.objects.create(skill_project=self.project, code="LINUX", name="Linux")
-        self.tree = SkillTreeVersion.objects.create(
-            skill_project=self.project,
-            version="v1",
-            name="标准技能树 v1",
-            is_current=True,
+        self.default_project = SkillProject.objects.create(code="DEF", name="默认项目", is_default=True)
+        self.other_project = SkillProject.objects.create(code="OTHER", name="其他项目")
+
+    def test_all_direct_project_forms_use_explicit_default_for_new_objects(self):
+        for form_class in self.form_classes:
+            with self.subTest(form=form_class.__name__):
+                self.assertEqual(form_class().initial["skill_project"], self.default_project)
+
+    def test_explicit_initial_takes_precedence_over_default_project(self):
+        form = AssessmentForm(initial={"skill_project": self.other_project})
+
+        self.assertEqual(form.initial["skill_project"], self.other_project)
+
+    def test_edit_form_preserves_instance_project(self):
+        domain = TechnicalDomain.objects.create(
+            skill_project=self.other_project,
+            code="OTHER",
+            name="其他领域",
         )
 
-    def test_project_is_not_duplicated_by_competition_level(self):
-        SkillTreeVersion.objects.create(
-            skill_project=self.project,
-            version="v2",
-            name="标准技能树 v2",
-            is_current=True,
-        )
+        form = TechnicalDomainForm(instance=domain)
 
-        self.tree.refresh_from_db()
-        self.assertEqual(SkillProject.objects.count(), 1)
-        self.assertFalse(self.tree.is_current)
-        self.assertTrue(SkillTreeVersion.objects.get(version="v2").is_current)
+        self.assertEqual(form.initial["skill_project"], self.other_project.pk)
 
-    def test_node_path_helpers_and_level_rules(self):
-        category = SkillNode.objects.create(
-            tree_version=self.tree,
-            capability_domain=self.linux,
-            node_type=SkillNode.NodeType.CATEGORY,
+    def test_bound_form_does_not_fill_missing_project(self):
+        form = AssessmentForm(data={})
+
+        self.assertFalse(form.is_valid())
+        self.assertIn("skill_project", form.errors)
+
+    def test_skill_form_filters_domains_using_default_project(self):
+        expected = TechnicalDomain.objects.create(
+            skill_project=self.default_project,
             code="LINUX",
             name="Linux",
         )
-        topic = SkillNode.objects.create(
-            tree_version=self.tree,
-            capability_domain=self.linux,
-            parent=category,
-            node_type=SkillNode.NodeType.TOPIC,
-            code="USER",
-            name="用户与权限",
-        )
-        skill = SkillNode.objects.create(
-            tree_version=self.tree,
-            capability_domain=self.linux,
-            parent=topic,
-            node_type=SkillNode.NodeType.SKILL,
-            code="USER-ADD",
-            name="创建本地用户",
+        TechnicalDomain.objects.create(
+            skill_project=self.other_project,
+            code="WINDOWS",
+            name="Windows",
         )
 
-        self.assertTrue(skill.is_skill())
-        self.assertEqual(skill.get_ancestors(), [category, topic])
-        self.assertEqual(skill.get_descendants(), [])
-        self.assertIn("LINUX Linux", skill.get_full_path())
-        self.assertEqual(category.get_descendants(), [topic, skill])
+        form = SkillForm()
 
+        self.assertEqual(list(form.fields["primary_domain"].queryset), [expected])
+        self.assertEqual(list(form.fields["related_domains"].queryset), [expected])
+
+
+class StableSkillAndWSOSTests(TestCase):
+    def setUp(self):
+        self.project = SkillProject.objects.create(code="NS", name="网络系统管理")
+        self.domain = TechnicalDomain.objects.create(skill_project=self.project, code="LINUX", name="Linux")
+        self.skill = Skill.objects.create(skill_project=self.project, primary_domain=self.domain, name="Linux 服务")
+
+    def test_same_skill_can_be_mounted_in_multiple_tree_versions(self):
+        first = SkillTreeVersion.objects.create(technical_domain=self.domain, version="V1", name="第一版")
+        second = SkillTreeVersion.objects.create(technical_domain=self.domain, version="V2", name="第二版")
+        SkillTreeNode.objects.create(
+            tree_version=first,
+            skill=self.skill,
+        )
+        SkillTreeNode.objects.create(
+            tree_version=second,
+            skill=self.skill,
+        )
+        self.assertEqual(self.skill.tree_nodes.count(), 2)
+        self.assertEqual({node.skill_id for node in self.skill.tree_nodes.all()}, {self.skill.pk})
+
+    def test_skill_can_map_multiple_wsos_sections_and_empty_section_is_valid(self):
+        version = WSOSVersion.objects.create(skill_project=self.project, code="2026", name="WSOS 2026")
+        first = WSOSSection.objects.create(wsos_version=version, code="1", name="工作组织", weight=20)
+        second = WSOSSection.objects.create(wsos_version=version, code="2", name="沟通", weight=20)
+        WSOSSection.objects.create(wsos_version=version, code="3", name="空章节", weight=0)
+        SkillWSOSMap.objects.create(skill=self.skill, wsos_section=first)
+        SkillWSOSMap.objects.create(skill=self.skill, wsos_section=second)
+        self.assertEqual(self.skill.wsos_mappings.count(), 2)
+
+    def test_cross_project_wsos_mapping_is_rejected(self):
+        other = SkillProject.objects.create(code="OTHER", name="其他项目")
+        version = WSOSVersion.objects.create(skill_project=other, code="2026", name="其他 WSOS")
+        section = WSOSSection.objects.create(wsos_version=version, code="1", name="其他", weight=100)
         with self.assertRaises(ValidationError):
-            SkillNode.objects.create(
-                tree_version=self.tree,
-                capability_domain=self.linux,
-                node_type=SkillNode.NodeType.TOPIC,
-                code="BAD",
-                name="错误根节点",
-            )
+            SkillWSOSMap.objects.create(skill=self.skill, wsos_section=section)
 
-    def test_coverage_summary_counts_only_approved_evidence_and_mapping(self):
-        category = SkillNode.objects.create(
-            tree_version=self.tree,
-            capability_domain=self.linux,
-            node_type=SkillNode.NodeType.CATEGORY,
-            code="LINUX",
-            name="Linux",
+
+class TechnicalDomainPermissionTests(TestCase):
+    def setUp(self):
+        self.project = SkillProject.objects.create(code="NS", name="网络系统管理")
+        self.linux = TechnicalDomain.objects.create(skill_project=self.project, code="LINUX", name="Linux")
+        self.windows = TechnicalDomain.objects.create(skill_project=self.project, code="WINDOWS", name="Windows")
+        self.linux_skill = Skill.objects.create(skill_project=self.project, primary_domain=self.linux, name="Linux")
+        self.windows_skill = Skill.objects.create(
+            skill_project=self.project, primary_domain=self.windows, name="Windows"
         )
-        skill = SkillNode.objects.create(
-            tree_version=self.tree,
-            capability_domain=self.linux,
-            parent=category,
-            node_type=SkillNode.NodeType.SKILL,
-            code="SSH",
-            name="SSH 服务",
+        self.coach = User.objects.create_user(username="linux-coach")
+        self.admin = User.objects.create_user(username="project-admin")
+        TechnicalDomainMembership.objects.create(
+            technical_domain=self.linux, user=self.coach, role=TechnicalDomainMembership.Role.COACH
         )
-        evidence = KnowledgeEvidence.objects.create(
-            skill_project=self.project,
-            capability_domain=self.linux,
-            source_type=KnowledgeEvidence.SourceType.MANUAL,
-            title="配置 SSH 服务",
-            estimated_mark="4.00",
-            review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
+        change_skill = Permission.objects.get(content_type__app_label="standards", codename="change_skill")
+        global_scope = Permission.objects.get(
+            content_type__app_label="standards", codename="manage_all_technical_domains"
         )
-        KnowledgeEvidenceSkillMap.objects.create(
-            evidence=evidence,
-            skill_node=skill,
-            weight="0.50",
-            review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
-        )
-        draft = KnowledgeEvidence.objects.create(
-            skill_project=self.project,
-            capability_domain=self.linux,
-            source_type=KnowledgeEvidence.SourceType.MANUAL,
-            title="待审核考点",
-            estimated_mark="8.00",
-            review_status=KnowledgeEvidence.ReviewStatus.PENDING,
-        )
-        KnowledgeEvidenceSkillMap.objects.create(
-            evidence=draft,
-            skill_node=skill,
-            weight="1.00",
-            review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
+        self.coach.user_permissions.add(change_skill)
+        self.admin.user_permissions.add(change_skill, global_scope)
+
+    def test_domain_coach_only_manages_primary_domain_skills(self):
+        self.assertQuerySetEqual(manageable_skills_for(self.coach), [self.linux_skill])
+
+    def test_project_admin_manages_all_skills(self):
+        self.assertSetEqual(set(manageable_skills_for(self.admin)), {self.linux_skill, self.windows_skill})
+
+
+class SkillTermServiceTests(TestCase):
+    def setUp(self):
+        self.project = SkillProject.objects.create(code="NS", name="网络系统管理")
+        self.domain = TechnicalDomain.objects.create(skill_project=self.project, code="LINUX", name="Linux")
+
+    def create_skill(self, name="Linux 用户和组管理", aliases=()):
+        return save_skill(
+            skill=Skill(skill_project=self.project, primary_domain=self.domain, name=name),
+            aliases=aliases,
+            related_domains=(),
         )
 
-        summary = get_skill_tree_coverage_summary(self.tree)
+    def test_normalization_ignores_width_case_and_spaces_but_keeps_technical_symbols(self):
+        self.assertEqual(normalize_skill_term(" Ｌｉｎｕｘ 用户 管理 "), "linux用户管理")
+        self.assertNotEqual(normalize_skill_term("C++"), normalize_skill_term("C#"))
 
-        self.assertEqual(summary["covered_skill_count"], 1)
-        self.assertEqual(summary["uncovered_skill_count"], 0)
-        self.assertEqual(summary["evidence_count"], 1)
-        self.assertEqual(summary["weighted_mark"], 2)
+    def test_save_skill_registers_primary_name_and_aliases(self):
+        skill = self.create_skill(aliases=["Linux 账号管理", "用户与用户组管理"])
+
+        self.assertEqual(str(skill), skill.name)
+        self.assertSetEqual(
+            set(skill.terms.values_list("kind", "term")),
+            {
+                (SkillTerm.Kind.NAME, "Linux 用户和组管理"),
+                (SkillTerm.Kind.ALIAS, "Linux 账号管理"),
+                (SkillTerm.Kind.ALIAS, "用户与用户组管理"),
+            },
+        )
+
+    def test_normalized_name_or_alias_cannot_belong_to_another_skill(self):
+        self.create_skill(aliases=["Linux 账号管理"])
+
+        with self.assertRaisesMessage(ValidationError, "已属于技能"):
+            self.create_skill(name=" LINUX账号管理 ")
+
+        self.assertEqual(Skill.objects.count(), 1)
+
+    def test_renaming_can_keep_old_name_as_alias(self):
+        skill = self.create_skill()
+        old_name = skill.name
+        skill.name = "Linux 本地身份管理"
+
+        save_skill(
+            skill=skill,
+            aliases=[],
+            related_domains=(),
+            preserve_old_name=True,
+            old_name=old_name,
+        )
+
+        self.assertTrue(skill.terms.filter(kind=SkillTerm.Kind.ALIAS, term=old_name).exists())
+
+    def test_candidates_include_inactive_skills_and_rank_exact_alias_first(self):
+        skill = self.create_skill(aliases=["Linux 账号管理"])
+        skill.is_active = False
+        skill.save(update_fields=["is_active"])
+
+        candidates = find_skill_candidates(skill_project=self.project, query="LINUX账号管理")
+
+        self.assertEqual(candidates[0], skill)
+        self.assertTrue(candidates[0].candidate_exact)

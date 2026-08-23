@@ -15,7 +15,7 @@ hx_attrs 为后端构造的完整属性字符串，避免在模板中拼接复�
     {{ hidden }}
   {% endfor %}
   {% include "components/form_errors.html" with form=form %}
-  <div class="{{ grid_class|default:'grid gap-4 md:grid-cols-2' }}">
+  <div class="{{ grid_class|default:'flex flex-col gap-4' }}">
     {% for field in form.visible_fields %}
       {% include "components/field.html" with field=field use_fancy_upload=use_fancy_upload|default:True %}
     {% endfor %}

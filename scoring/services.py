@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from archives.models import ArchiveAsset
-from knowledge.services import create_evidence_from_scoring_aspect
+from assessments.models import AssessmentDocument
+from evidence.services import create_evidence_from_scoring_aspect
 
 from .models import (
     JudgementOption,
@@ -52,39 +51,22 @@ def enabled_parser_configs():
 
 def default_parser_config():
     sync_parser_configs()
-    config = ScoringParserConfig.objects.filter(is_enabled=True, is_default=True).first()
-    if config:
-        return config
-    return ScoringParserConfig.objects.filter(is_enabled=True).order_by("order", "display_name", "parser_key").first()
+    return (
+        ScoringParserConfig.objects.filter(is_enabled=True, is_default=True).first()
+        or ScoringParserConfig.objects.filter(is_enabled=True).order_by("order", "display_name").first()
+    )
 
 
 @transaction.atomic
-def parse_scheme_upload(event_module, uploaded_file, parser_config, user=None):
+def parse_scheme_document(document, parser_config, user=None):
+    if document.document_type != AssessmentDocument.DocumentType.MARKING_SCHEME or not document.module_id:
+        raise ValidationError("只能解析绑定评测模块的评分表资料。")
     definition = get_parser_definition(parser_config.parser_key)
-    parsed = definition.parse(uploaded_file, expected_module_code=event_module.code)
-    try:
-        uploaded_file.seek(0)
-    except (AttributeError, OSError):
-        pass
-    asset = ArchiveAsset.objects.create(
-        target_content_type=ContentType.objects.get_for_model(event_module),
-        target_object_id=event_module.pk,
-        skill_project=event_module.event.skill_project,
-        asset_type=ArchiveAsset.AssetType.MARKING_SCHEME,
-        title=f"{event_module} 评分表",
-        file=uploaded_file,
-        original_filename=getattr(uploaded_file, "name", ""),
-        business_date=event_module.event.start_date,
-        uploaded_by=user,
-        metadata={
-            "parser_key": parser_config.parser_key,
-            "parser_display_name": parser_config.display_name,
-            "parser_alias": parser_config.alias,
-        },
-    )
+    with document.file.open("rb") as source:
+        parsed = definition.parse(source, expected_module_code=document.module.code)
     return ScoringSchemeImport.objects.create(
-        event_module=event_module,
-        source_asset=asset,
+        assessment_module=document.module,
+        source_document=document,
         parser_key=parser_config.parser_key,
         parser_display_name=parser_config.display_name,
         parser_alias=parser_config.alias,
@@ -104,21 +86,20 @@ def parse_scheme_upload(event_module, uploaded_file, parser_config, user=None):
 
 @transaction.atomic
 def confirm_scheme_import(scheme_import: ScoringSchemeImport, user=None):
+    scheme_import = ScoringSchemeImport.objects.select_for_update().get(pk=scheme_import.pk)
     if scheme_import.status == ScoringSchemeImport.Status.CONFIRMED and scheme_import.scheme_id:
         return scheme_import.scheme
-
     existing_scheme = ScoringScheme.objects.filter(
-        event_module=scheme_import.event_module,
+        assessment_module=scheme_import.assessment_module,
         module_code=scheme_import.module_code,
     ).first()
     if existing_scheme and ScoringResult.objects.filter(aspect__scheme=existing_scheme).exists():
-        raise ValidationError("当前事件模块已存在评分结果，不能覆盖评分方案。")
-
+        raise ValidationError("当前评测模块已存在评分结果，不能覆盖评分方案。")
     scheme, created = ScoringScheme.objects.update_or_create(
-        event_module=scheme_import.event_module,
+        assessment_module=scheme_import.assessment_module,
         module_code=scheme_import.module_code,
         defaults={
-            "source_asset": scheme_import.source_asset,
+            "source_document": scheme_import.source_document,
             "title": scheme_import.title,
             "module_name": scheme_import.module_name,
             "total_mark": scheme_import.total_mark,
@@ -129,7 +110,6 @@ def confirm_scheme_import(scheme_import: ScoringSchemeImport, user=None):
     if not created:
         scheme.aspects.all().delete()
         scheme.subcriteria.all().delete()
-
     for subcriterion_payload in scheme_import.parsed_payload.get("subcriteria", []):
         subcriterion = ScoringSubCriterion.objects.create(
             scheme=scheme,
@@ -161,14 +141,11 @@ def confirm_scheme_import(scheme_import: ScoringSchemeImport, user=None):
                     order=option_payload.get("order", 0),
                 )
             create_evidence_from_scoring_aspect(aspect, created_by=user or scheme_import.imported_by)
-
     scheme_import.confirm(scheme)
     return scheme
 
 
 @transaction.atomic
-def create_scheme_from_upload(event_module, uploaded_file, user=None, parser_config=None):
-    parser_config = parser_config or default_parser_config()
-    scheme_import = parse_scheme_upload(event_module, uploaded_file, parser_config, user=user)
+def create_scheme_from_document(document, user=None, parser_config=None):
+    scheme_import = parse_scheme_document(document, parser_config or default_parser_config(), user=user)
     return confirm_scheme_import(scheme_import, user=user)
-

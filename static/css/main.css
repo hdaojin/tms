@@ -17,6 +17,22 @@
 }
 @plugin "@iconify/tailwind4";
 
+@layer base {
+  :root,
+  [data-theme] {
+    --tms-border-color: color-mix(
+      in oklab,
+      var(--color-base-content) 30%,
+      transparent
+    );
+    --tms-table-border-color: color-mix(
+      in oklab,
+      var(--color-base-content) 10%,
+      transparent
+    );
+  }
+}
+
 @layer components {
   .btn,
   .badge {
@@ -37,6 +53,50 @@
     max-width: 88rem;
     margin-inline: auto;
     padding-inline: 1rem;
+  }
+
+  .tms-container-full {
+    max-width: none;
+  }
+
+  .tms-side-dialog {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-base-content);
+  }
+
+  .tms-side-dialog[open] {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .tms-side-dialog::backdrop {
+    background: color-mix(in srgb, black 45%, transparent);
+  }
+
+  .tms-side-dialog-panel {
+    width: 100%;
+    height: 100dvh;
+    background: var(--color-base-100);
+    box-shadow: var(--shadow-2xl);
+  }
+
+  [data-skill-tree-node-actions]:has([data-skill-tree-node-menu][open]) {
+    z-index: 40;
+  }
+
+  @media (min-width: 1024px) {
+    .tms-side-dialog-panel {
+      width: 40rem;
+      border-left: 1px solid var(--tms-border-color);
+    }
   }
 
   .tms-toolbar {
@@ -136,7 +196,7 @@
     color: var(--color-base-content);
     --tms-upload-border-color: color-mix(
       in oklab,
-      var(--color-base-content) 20%,
+      var(--color-base-content) 30%,
       transparent
     );
     transition:
@@ -334,6 +394,70 @@
 }
 
 @layer utilities {
+  .border-base-300 {
+    border-color: var(--tms-border-color);
+  }
+
+  .border-base-200 {
+    border-color: var(--tms-table-border-color);
+  }
+
+  .input:where(
+    :not(.input-ghost):not(.input-neutral):not(.input-primary):not(
+        .input-secondary
+      ):not(.input-accent):not(.input-info):not(.input-success):not(
+        .input-warning
+      ):not(.input-error)
+  ),
+  .select:where(
+    :not(.select-ghost):not(.select-neutral):not(.select-primary):not(
+        .select-secondary
+      ):not(.select-accent):not(.select-info):not(.select-success):not(
+        .select-warning
+      ):not(.select-error)
+  ),
+  .textarea:where(
+    :not(.textarea-ghost):not(.textarea-neutral):not(.textarea-primary):not(
+        .textarea-secondary
+      ):not(.textarea-accent):not(.textarea-info):not(.textarea-success):not(
+        .textarea-warning
+      ):not(.textarea-error)
+  ),
+  .file-input:where(
+    :not(.file-input-ghost):not(.file-input-neutral):not(
+        .file-input-primary
+      ):not(.file-input-secondary):not(.file-input-accent):not(
+        .file-input-info
+      ):not(.file-input-success):not(.file-input-warning):not(
+        .file-input-error
+      )
+  ) {
+    --input-color: var(--tms-border-color);
+  }
+
+  .table:not(.tms-print-table)
+    :where(tfoot tr:first-child :is(td, th)) {
+    border-top-color: var(--tms-table-border-color);
+  }
+
+  .table:not(.tms-print-table)
+    :where(thead tr :is(td, th), tbody tr:not(:last-child) :is(td, th)) {
+    border-bottom-color: var(--tms-table-border-color);
+  }
+
+  .card-border {
+    border-color: var(--tms-border-color);
+  }
+
+  .tabs-border {
+    --tab-border-color: var(--tms-border-color);
+  }
+
+  .tms-print-table,
+  .tms-print-table :is(th, td) {
+    border-color: var(--color-black);
+  }
+
   .menu .menu-active {
     --menu-active-bg: var(--color-base-200);
     --menu-active-fg: var(--color-base-content);
