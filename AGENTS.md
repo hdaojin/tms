@@ -74,6 +74,27 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - 不要为新模型机械复制 `save() -> clean()`。Django 的 `save()` 不会自动执行 `full_clean()`；在非 ModelForm 写入边界需要完整模型校验时，应由调用方显式校验，或由 service 提供明确入口。保留既有模式时不要无关重构，触碰时必须用测试保护。
 - 对并发下必须成立的业务唯一性，不能只依赖 `clean()` 中的 `.exists()` 检查；应尽可能有数据库约束兜底。
 
+### 业务目录、Enum、Registry 与 Bootstrap
+
+**业务目录数据用 Model；程序状态和语义用 Enum。默认业务目录通过 Bootstrap 初始化。**
+
+**如果管理员合理地可以增加一个值，而程序无需因此增加代码，那么它就不应该是 `TextChoices`。**
+
+**如果增加一个值以后程序必须知道“这个值意味着什么、应该怎么处理”，它就应该继续是 Enum 或代码 Registry。**
+
+具体约束：
+
+- 赛事系列、级别、业务类型、可配置角色、反馈分类、来源身份等可运营维护的目录数据使用具体业务 APP 自己的数据库 Model，不使用全局泛型“字典表”。常见字段可包括稳定 `code`、显示 `name`、`order`、`is_active` 以及该目录自身需要的业务属性；不要为了字段相似强行建立跨 APP 的通用目录模型。
+- 目录项的 `code` 是机器身份和迁移映射键。已有记录引用后应保持稳定；管理员需要改展示文案时修改 `name`，需要停止新业务使用时优先设置 `is_active=False`，历史对象继续保留外键引用。涉及历史数据的外键通常优先 `PROTECT`，除非该领域已有更明确的删除语义。
+- 生命周期状态、审核状态、协议类型、数据来源、结构关系角色（如 primary/related）、实现模式等有限且由程序理解的值域继续使用 `TextChoices` / Enum。新增这类值必须连同状态流转、校验、查询、统计、模板或外部协议处理一起评审，不通过后台“配置一个新值”绕过代码语义。
+- Parser、主题、权限包等背后存在 Python 实现、模板/CSS/静态资源或 Django Permission 定义的能力使用代码 Registry/受版本控制的配置。数据库可以保存“启用、默认、显示名、排序”等运行时配置并以稳定 key 引用 Registry，但数据库不得创造代码中不存在的实现。
+- `bootstrap_tms` 是生产/新环境默认业务数据的统一显式初始化入口。Bootstrap 必须幂等、可测试、不会覆盖已存在记录的管理员修改；默认使用稳定 key/code `get_or_create(..., defaults=...)` 创建缺失的出厂数据。不要在 request、selector、普通读取 service、`AppConfig.ready()` 或 signal 中通过 `get_or_create()` 隐式补种子。
+- Bootstrap 只创建已经有明确业务依据的出厂数据；“模型可配置”不等于“必须预置默认行”。仓库没有权威默认值时保持空目录，由管理员按业务建立，不得由 Agent 自行发明。
+- 正常部署不得自动反复执行 Bootstrap。README 的新环境初始化流程可以显式执行一次；后续如确需新增强制基础数据，应通过明确的数据迁移或发布说明处理，不能依靠每次启动时偷偷同步。
+- 历史 `RunPython` 数据迁移继续作为迁移历史快照保留。数据迁移使用 `apps.get_model()` 的历史模型，不直接导入当前 bootstrap 定义；旧迁移里曾经写过的 seed 不代表今后继续以 migration 维护业务目录默认值。
+- Fixture 可以用于测试、演示或显式数据交换，但不再作为生产默认业务数据的权威初始化机制。生产 README 不应要求通过多个 `loaddata .../default` 拼装系统初始状态。
+- Django `auth.Group` / `GroupProfile` 本身就是数据库角色模型，不新增平行 Role Enum/Model。`core/config/permission_bundles.yml` 描述随代码版本发布的业务能力到 Django Permission 的映射，继续留在代码配置；Group 只是选择和组合这些能力。
+
 ### Services
 
 跨模型写操作、导入确认、状态迁移、文件归档联动和跨 APP 业务流程优先放到 `<app>/services.py` 或清晰命名的 service 模块。
