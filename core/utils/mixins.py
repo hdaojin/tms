@@ -10,7 +10,6 @@ from typing import Any
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404
-from django.urls import reverse
 
 class SuperuserRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     """
@@ -122,24 +121,6 @@ class UploadedDocumentCreateMixin:
         if self.success_message:
             messages.success(self.request, self.success_message)  # type: ignore[attr-defined]
         return response
-
-
-class PdfPreviewDetailMixin:
-    """为文档详情页补充统一的 PDF 预览上下文。"""
-
-    document_context_name: str = 'document'
-    pdf_preview_url_name: str | None = None
-
-    def get_pdf_preview_url(self) -> str | None:
-        if not self.pdf_preview_url_name:
-            return None
-        return reverse(self.pdf_preview_url_name, args=[self.object.pk])  # type: ignore[attr-defined]
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)  # type: ignore[misc]
-        context[self.document_context_name] = self.object  # type: ignore[attr-defined]
-        context['pdf_preview_url'] = self.get_pdf_preview_url()
-        return context
 
 
 class CreatedUpdatedAdminMixin:

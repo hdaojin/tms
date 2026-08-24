@@ -1,0 +1,120 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <div class="space-y-5">
+    <div class="flex flex-col gap-4 rounded-box border border-base-300 bg-base-100 p-4 sm:flex-row sm:items-start sm:justify-between">
+      <div class="min-w-0">
+        <a class="link link-hover inline-flex items-center gap-1 text-sm text-base-content/70"
+           href="{{ file_preview.source_url }}">
+          <span class="icon-[tabler--arrow-left] size-4" aria-hidden="true"></span>
+          返回{{ file_preview.source_label }}
+        </a>
+        <h2 class="mt-2 break-all text-xl font-semibold">{{ file_preview.filename }}</h2>
+        {% if file_preview.title %}
+          <p class="mt-1 break-words text-sm text-base-content/70">{{ file_preview.title }}</p>
+        {% endif %}
+      </div>
+      {% if file_preview.file_available %}
+        <a class="btn btn-primary shrink-0" href="{{ file_preview.download_url }}">
+          <span class="icon-[tabler--download] size-5" aria-hidden="true"></span>
+          下载文件
+        </a>
+      {% else %}
+        <button class="btn shrink-0" type="button" disabled>
+          <span class="icon-[tabler--file-off] size-5" aria-hidden="true"></span>
+          文件不可用
+        </button>
+      {% endif %}
+    </div>
+
+    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <section class="min-w-0 overflow-hidden rounded-box border border-base-300 bg-base-100" aria-labelledby="file-preview-heading">
+        <div class="flex items-center justify-between border-b border-base-300 px-4 py-3">
+          <h3 id="file-preview-heading" class="flex items-center gap-2 font-semibold">
+            <span class="icon-[tabler--eye] size-5 text-primary" aria-hidden="true"></span>
+            文件预览
+          </h3>
+          <span class="badge badge-ghost">{{ file_preview.type_label }}</span>
+        </div>
+
+        {% if file_preview.preview_kind.value == "pdf" %}
+          <iframe class="h-[75vh] min-h-96 w-full bg-white"
+                  src="{{ file_preview.preview_url }}"
+                  title="{{ file_preview.filename }} PDF 预览"></iframe>
+        {% elif file_preview.preview_kind.value == "image" %}
+          <div class="flex min-h-80 items-center justify-center overflow-auto bg-base-200/40 p-4">
+            <img class="max-h-[75vh] max-w-full object-contain"
+                 src="{{ file_preview.preview_url }}"
+                 alt="{{ file_preview.filename }}">
+          </div>
+        {% elif file_preview.preview_kind.value == "text" %}
+          {% if file_preview.text_truncated %}
+            <div class="alert alert-warning m-4 mb-0 rounded-box" role="status">
+              <span class="icon-[tabler--alert-triangle] size-5" aria-hidden="true"></span>
+              <span>文件较大，仅展示前 1 MiB；请下载文件查看完整内容。</span>
+            </div>
+          {% endif %}
+          <pre class="max-h-[75vh] min-h-80 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-sm"><code>{{ file_preview.text_content }}</code></pre>
+        {% else %}
+          <div class="flex min-h-80 flex-col items-center justify-center gap-3 p-8 text-center">
+            <span class="icon-[tabler--file-off] size-12 text-base-content/40" aria-hidden="true"></span>
+            {% if file_preview.file_available %}
+              <p class="font-medium">该文件暂不支持在线预览</p>
+              <p class="max-w-lg text-sm text-base-content/60">可下载后使用本地应用打开。系统不会内联展示 Office、压缩包、HTML 或 SVG 文件。</p>
+            {% else %}
+              <p class="font-medium">文件不可用</p>
+              <p class="max-w-lg text-sm text-base-content/60">文件记录仍然保留，但存储中的实际文件无法读取。</p>
+            {% endif %}
+          </div>
+        {% endif %}
+      </section>
+
+      <aside class="h-fit rounded-box border border-base-300 bg-base-100 p-4" aria-labelledby="file-info-heading">
+        <h3 id="file-info-heading" class="flex items-center gap-2 font-semibold">
+          <span class="icon-[tabler--file-info] size-5 text-primary" aria-hidden="true"></span>
+          文件信息
+        </h3>
+        <dl class="mt-4 divide-y divide-base-300 text-sm">
+          <div class="py-3 first:pt-0">
+            <dt class="text-base-content/60">文件名</dt>
+            <dd class="mt-1 break-all font-medium">{{ file_preview.filename }}</dd>
+          </div>
+          <div class="py-3">
+            <dt class="text-base-content/60">文件类型</dt>
+            <dd class="mt-1">{{ file_preview.type_label }}</dd>
+          </div>
+          <div class="py-3">
+            <dt class="text-base-content/60">文件大小</dt>
+            <dd class="mt-1">
+              {% if file_preview.file_size == 0 %}0 B{% elif file_preview.file_size %}{{ file_preview.file_size|filesizeformat }}{% else %}未知{% endif %}
+            </dd>
+          </div>
+          <div class="py-3">
+            <dt class="text-base-content/60">上传者</dt>
+            <dd class="mt-1 break-words">{{ file_preview.uploader_name|default:"—" }}</dd>
+          </div>
+          <div class="py-3">
+            <dt class="text-base-content/60">上传时间</dt>
+            <dd class="mt-1">{% if file_preview.uploaded_at %}{{ file_preview.uploaded_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</dd>
+          </div>
+          <div class="py-3">
+            <dt class="text-base-content/60">业务归属</dt>
+            <dd class="mt-1"><a class="link link-primary break-words" href="{{ file_preview.source_url }}">{{ file_preview.source_label }}</a></dd>
+          </div>
+          {% for item in file_preview.metadata %}
+            <div class="py-3">
+              <dt class="text-base-content/60">{{ item.label }}</dt>
+              <dd class="mt-1 break-words">{{ item.value|default:"—" }}</dd>
+            </div>
+          {% endfor %}
+          {% if file_preview.description %}
+            <div class="py-3 last:pb-0">
+              <dt class="text-base-content/60">说明</dt>
+              <dd class="mt-1 whitespace-pre-wrap break-words">{{ file_preview.description }}</dd>
+            </div>
+          {% endif %}
+        </dl>
+      </aside>
+    </div>
+  </div>
+{% endblock %}

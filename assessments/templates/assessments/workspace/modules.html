@@ -1,24 +1,98 @@
 <section class="space-y-4">
   <div class="flex flex-wrap justify-end gap-2">
-    {% if perms.assessments.add_assessmentdocument %}<a class="btn btn-outline btn-sm" href="{% url 'assessments:document_upload' %}?assessment={{ assessment.pk }}">上传公共资料</a>{% endif %}
-    {% if perms.assessments.add_assessmentmodule %}<a class="btn btn-primary btn-sm" href="{% url 'assessments:module_create' %}?assessment={{ assessment.pk }}">新增模块</a>{% endif %}
+    {% if perms.assessments.add_assessmentdocument %}
+      <a class="btn btn-outline btn-sm" href="{% url 'assessments:document_upload' %}?assessment={{ assessment.pk }}">上传公共资料</a>
+    {% endif %}
+    {% if perms.assessments.add_assessmentmodule %}
+      <a class="btn btn-primary btn-sm" href="{% url 'assessments:module_create' %}?assessment={{ assessment.pk }}">新增模块</a>
+    {% endif %}
   </div>
-  {% if general_documents %}
-    <div class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body"><h3 class="card-title text-base">公共资料</h3><div class="flex flex-wrap gap-2">{% for document in general_documents %}<a class="btn btn-ghost btn-sm" href="{% url 'assessments:document_download' document.pk %}">{{ document.get_document_type_display }} · {{ document.title }}</a>{% endfor %}</div></div></div>
-  {% endif %}
-  <div class="grid gap-4 xl:grid-cols-2">
+
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <h3 class="card-title text-base">公共资料</h3>
+      {% include "assessments/workspace/_document_list.html" with documents=general_documents empty_message="暂无公共资料" %}
+    </div>
+  </section>
+
+  <div class="space-y-4">
     {% for module in workspace_modules %}
       <article class="card min-w-0 border border-base-300 bg-base-100 shadow-sm">
         <div class="card-body gap-4">
-          <div class="flex flex-wrap items-start justify-between gap-3"><div class="min-w-0"><h3 class="card-title break-words text-base"><a class="link-hover" href="{% url 'assessments:module_detail' module.pk %}">{{ module.code }} - {{ module.name }}</a></h3><p class="mt-1 break-words text-sm text-base-content/60">{{ module.description|default:"暂无说明" }}</p></div>{% if module.can_manage %}<a class="btn btn-ghost btn-sm" href="{% url 'assessments:module_edit' module.pk %}">编辑</a>{% endif %}</div>
-          <dl class="grid gap-3 text-sm sm:grid-cols-2">
-            <div><dt class="text-base-content/60">计划时间</dt><dd>{{ module.scheduled_start_at|default:"-" }}{% if module.scheduled_end_at %} 至 {{ module.scheduled_end_at }}{% endif %}</dd></div>
-            <div><dt class="text-base-content/60">时长 / 总分</dt><dd>{{ module.duration_minutes|default:"-" }} 分钟 · {{ module.total_mark }}</dd></div>
-            <div><dt class="text-base-content/60">技术领域</dt><dd class="flex flex-wrap gap-1">{% for mapping in module.domain_mappings.all %}<span class="badge badge-outline h-auto whitespace-normal">{{ mapping.technical_domain.name }} · {{ mapping.get_role_display }}</span>{% empty %}-{% endfor %}</dd></div>
-            <div><dt class="text-base-content/60">负责教练</dt><dd class="flex flex-wrap gap-1">{% for assignment in module.coach_assignments.all %}<span class="badge badge-outline h-auto whitespace-normal">{{ assignment.user }} · {{ assignment.get_role_display }}</span>{% empty %}-{% endfor %}</dd></div>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="card-title break-words text-base">
+                <a class="link-hover" href="{% url 'assessments:module_detail' module.pk %}">{{ module.code }} - {{ module.name }}</a>
+              </h3>
+              <p class="mt-1 break-words text-sm text-base-content/60">{{ module.description|default:"暂无说明" }}</p>
+            </div>
+            {% if module.can_manage %}
+              <a class="btn btn-ghost btn-sm" href="{% url 'assessments:module_edit' module.pk %}">编辑</a>
+            {% endif %}
+          </div>
+
+          <dl class="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+            <div>
+              <dt class="text-base-content/60">计划时间</dt>
+              <dd>{{ module.scheduled_start_at|default:"-" }}{% if module.scheduled_end_at %} 至 {{ module.scheduled_end_at }}{% endif %}</dd>
+            </div>
+            <div>
+              <dt class="text-base-content/60">时长 / 总分</dt>
+              <dd>{{ module.duration_minutes|default:"-" }} 分钟 · {{ module.total_mark }}</dd>
+            </div>
+            <div>
+              <dt class="text-base-content/60">技术领域</dt>
+              <dd class="flex flex-wrap gap-1">
+                {% for mapping in module.domain_mappings.all %}
+                  <span class="badge badge-outline h-auto whitespace-normal">{{ mapping.technical_domain.name }} · {{ mapping.get_role_display }}</span>
+                {% empty %}
+                  -
+                {% endfor %}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-base-content/60">负责教练</dt>
+              <dd class="flex flex-wrap gap-1">
+                {% for assignment in module.coach_assignments.all %}
+                  <span class="badge badge-outline h-auto whitespace-normal">{{ assignment.user }} · {{ assignment.get_role_display }}</span>
+                {% empty %}
+                  -
+                {% endfor %}
+              </dd>
+            </div>
           </dl>
-          <div><div class="mb-2 flex flex-wrap items-center justify-between gap-2"><h4 class="font-semibold">资料</h4>{% if perms.assessments.add_assessmentdocument %}<a class="link text-sm" href="{% url 'assessments:document_upload' %}?assessment={{ assessment.pk }}&module={{ module.pk }}">上传</a>{% endif %}</div><div class="flex flex-wrap gap-2">{% for document in module.workspace_documents %}<a class="badge badge-ghost h-auto whitespace-normal py-2" href="{% url 'assessments:document_download' document.pk %}">{{ document.get_document_type_display }} · {{ document.title }}</a>{% empty %}<span class="text-sm text-base-content/60">暂无资料</span>{% endfor %}</div></div>
-          <div class="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 pt-3"><span class="text-sm">评分方案：{% if module.workspace_scheme %}<a class="link" href="{% url 'scoring:scheme_detail' module.workspace_scheme.pk %}">{{ module.workspace_scheme.title }}</a>{% else %}未生成{% endif %}</span><div class="flex flex-wrap gap-2">{% if module.can_import_scheme %}<a class="btn btn-outline btn-sm" href="{% url 'scoring:scheme_import' %}?module={{ module.pk }}">导入评分表</a>{% endif %}{% if module.can_open_online_scoring %}<a class="btn btn-primary btn-sm" href="{% url 'scoring:online_scoring' module.pk %}">在线评分</a>{% endif %}</div></div>
+
+          <section class="space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h4 class="font-semibold">模块资料</h4>
+              {% if perms.assessments.add_assessmentdocument %}
+                <a class="btn btn-primary btn-sm" href="{% url 'assessments:document_upload' %}?assessment={{ assessment.pk }}&module={{ module.pk }}">
+                  <span class="icon-[tabler--upload] size-4" aria-hidden="true"></span>
+                  上传模块资料
+                </a>
+              {% endif %}
+            </div>
+            {% include "assessments/workspace/_document_list.html" with documents=module.workspace_documents empty_message="暂无模块资料" %}
+          </section>
+
+          <div class="flex flex-wrap items-center justify-between gap-2 border-t border-base-300 pt-3">
+            <span class="text-sm">
+              评分方案：
+              {% if module.workspace_scheme %}
+                <a class="link" href="{% url 'scoring:scheme_detail' module.workspace_scheme.pk %}">{{ module.workspace_scheme.title }}</a>
+              {% else %}
+                未生成
+              {% endif %}
+            </span>
+            <div class="flex flex-wrap gap-2">
+              {% if module.can_import_scheme %}
+                <a class="btn btn-outline btn-sm" href="{% url 'scoring:scheme_import' %}?module={{ module.pk }}">导入评分表</a>
+              {% endif %}
+              {% if module.can_open_online_scoring %}
+                <a class="btn btn-primary btn-sm" href="{% url 'scoring:online_scoring' module.pk %}">在线评分</a>
+              {% endif %}
+            </div>
+          </div>
         </div>
       </article>
     {% empty %}
