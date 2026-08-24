@@ -1,22 +1,27 @@
 # meetings/views.py
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404
 from django.views.generic import CreateView, DetailView, DeleteView
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django_tables2 import SingleTableView
 
+from accounts.services.users import get_user_display_name
+from core.file_preview import (
+    FilePreviewMetadata,
+    build_download_response,
+    build_file_preview_descriptor,
+    build_inline_preview_response,
+)
+from core.utils.mixins import TitleMixin, UploadedDocumentCreateMixin
 from .forms import MeetingUploadForm
 from .models import Meeting
 from .permissions import (
     ADD_MEETING_PERMISSION,
     DELETE_MEETING_PERMISSION,
     can_view_meeting,
-    can_view_meeting_request,
 )
 from .services import prepare_meeting_for_save
 from .tables import MeetingTable
-from core.utils.mixins import PdfPreviewDetailMixin, TitleMixin, UploadedDocumentCreateMixin
-from core.utils.pdf_response import create_pdf_preview_view
 
 
 class MeetingUploadView(UploadedDocumentCreateMixin, TitleMixin, PermissionRequiredMixin, CreateView):
@@ -49,46 +54,57 @@ class MeetingListView(PermissionRequiredMixin, TitleMixin, SingleTableView):
         return queryset
 
 
-# 使用工厂函数创建 PDF 预览视图（会议记录登录后即可预览）
-meeting_pdf_inline = create_pdf_preview_view(Meeting, permission_checker=can_view_meeting_request)
+def meeting_queryset_for(user):
+    queryset = Meeting.objects.select_related("uploaded_by")
+    if not can_view_meeting(user):
+        return queryset.none()
+    return queryset
 
 
-class MeetingDetailView(PermissionRequiredMixin, PdfPreviewDetailMixin, TitleMixin, DetailView):
+class MeetingAccessMixin:
     model = Meeting
-    template_name = 'common/document_detail_with_pdf.html'
-    context_object_name = 'meeting'
-    pdf_preview_url_name = 'meetings:meeting_pdf_inline'
-    title = "{date_chinese}的{title}会议记录"
-    title_icon = "icon-[tabler--file-text]"
-    permission_required = "meetings.view_meeting"
 
     def get_queryset(self):
-        queryset = super().get_queryset().select_related('uploaded_by')
-        if not can_view_meeting(self.request.user):
-            return queryset.none()
-        return queryset
+        return meeting_queryset_for(self.request.user)
+
+
+def meeting_pdf_inline(request, pk):
+    meeting = get_object_or_404(meeting_queryset_for(request.user), pk=pk)
+    return build_inline_preview_response(meeting.file, meeting.filename)
+
+
+class MeetingDetailView(TitleMixin, MeetingAccessMixin, DetailView):
+    model = Meeting
+    template_name = "common/file_preview_detail.html"
+    context_object_name = "meeting"
+    title = "{date_chinese}的{title}会议记录"
+    title_icon = "icon-[tabler--file-text]"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["document_download_url"] = reverse_lazy(
-            "meetings:meeting_file", args=[self.object.pk]
+        meeting = self.object
+        context["file_preview"] = build_file_preview_descriptor(
+            file=meeting.file,
+            filename=meeting.filename,
+            download_url=reverse("meetings:meeting_file", args=[meeting.pk]),
+            preview_url=reverse("meetings:meeting_pdf_inline", args=[meeting.pk]),
+            uploader_name=(
+                get_user_display_name(meeting.uploaded_by) if meeting.uploaded_by_id else "—"
+            ),
+            uploaded_at=meeting.uploaded_at,
+            source_label="会议记录列表",
+            source_url=reverse("meetings:meeting_list"),
+            title=meeting.title,
+            metadata=(FilePreviewMetadata("会议日期", meeting.date_chinese),),
         )
         return context
 
 
-class MeetingFileContentView(PermissionRequiredMixin, DetailView):
-    model = Meeting
-    permission_required = "meetings.view_meeting"
+class MeetingFileContentView(MeetingAccessMixin, DetailView):
 
     def get(self, request, *args, **kwargs):
         meeting = self.get_object()
-        if not meeting.file:
-            raise Http404
-        return FileResponse(
-            meeting.file.open("rb"),
-            as_attachment=True,
-            filename=meeting.filename,
-        )
+        return build_download_response(meeting.file, meeting.filename)
 
 
 class MeetingDeleteView(PermissionRequiredMixin, DeleteView):

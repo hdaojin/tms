@@ -224,6 +224,7 @@ SECURE_CSP = {
     'media-src': [CSP.SELF],
     'worker-src': [CSP.SELF, 'blob:'],
     'object-src': [CSP.NONE],
+    'frame-src': [CSP.SELF],
     'base-uri': [CSP.SELF],
     'form-action': [CSP.SELF],
     'frame-ancestors': [CSP.SELF],

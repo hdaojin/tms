@@ -327,6 +327,30 @@ hx-encoding="multipart/form-data"
 
 这样可避免临时队列状态与数据库状态混在一起。
 
+## 已保存文件的通用预览
+
+已保存文件继续由各业务 APP 拥有。公共预览能力只统一页面数据、模板、文件类型判定和受控响应，不建立全局文件模型、统一主键或 `GenericForeignKey`。
+
+业务 APP 接入时必须：
+
+1. 先使用自身 selector / permission policy 取得当前用户可查看的业务对象；
+2. 在业务 view 中创建 `core.file_preview.FilePreviewDescriptor`；
+3. 由业务 APP 自己提供详情、内联预览和下载 URL；
+4. 对无权限对象返回 404，公共层不得根据模型名和主键重新查询业务对象。
+
+`FilePreviewDescriptor` 的公共信息包括文件名、大小、类型、上传者、上传时间、标题、说明、业务来源和可选的纯文本元数据。各 APP 可以通过 `FilePreviewMetadata` 增加版本、资料类型、会议日期等字段，但字段值必须是普通文本，不能注入 HTML。
+
+当前在线预览白名单为：
+
+- PDF：同源 `iframe`；
+- JPEG、PNG、GIF、WebP：`img`；
+- `txt`、`md`、`csv`、`json`、`yaml`、`yml`、`log`：服务端按 UTF-8 / UTF-8 BOM 解码并自动转义，最多读取前 1 MiB；
+- Office、压缩包、HTML、SVG 和类型校验失败的文件：只展示元数据和下载入口。
+
+PDF 和图片必须同时通过扩展名白名单与服务端文件头校验，不能信任浏览器上传时提交的 MIME。受控文件响应统一设置 `X-Content-Type-Options: nosniff` 和 `Cache-Control: private, no-store`；下载使用 `attachment`，PDF 内联响应使用 `inline` 和 `X-Frame-Options: SAMEORIGIN`。CSP 保持 `object-src 'none'`，PDF 只允许通过同源 `frame-src` 嵌入。
+
+数据库记录存在但物理文件丢失时，详情页仍展示业务元数据和“文件不可用”，内联预览及下载入口返回 404。
+
 ## 样式与 DaisyUI
 
 FilePond v5 使用 Web Component / Shadow DOM。TMS 不试图向 Shadow DOM 内部注入 Tailwind class。

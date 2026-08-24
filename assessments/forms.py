@@ -45,10 +45,28 @@ class AssessmentForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelF
             "description",
         ]
         widgets = {
-            "start_date": forms.DateInput(attrs={"type": "date"}),
-            "end_date": forms.DateInput(attrs={"type": "date"}),
+            "start_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "end_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "description": forms.Textarea(attrs={"rows": 4}),
         }
+
+
+class AssessmentUpdateForm(AssessmentForm):
+    class Meta(AssessmentForm.Meta):
+        fields = [
+            "skill_project",
+            "series",
+            "level",
+            "training_cycle",
+            "assessment_type",
+            "status",
+            "name",
+            "code",
+            "start_date",
+            "end_date",
+            "location",
+            "description",
+        ]
 
 
 class CompetitionPersonForm(StyledFormMixin, forms.ModelForm):

@@ -59,11 +59,73 @@ class MeetingViewPermissionTests(TestCase):
         list_response = self.client.get(reverse("meetings:meeting_list"))
         detail_response = self.client.get(reverse("meetings:meeting_detail", args=[self.meeting.pk]))
         pdf_response = self.client.get(reverse("meetings:meeting_pdf_inline", args=[self.meeting.pk]))
+        file_response = self.client.get(reverse("meetings:meeting_file", args=[self.meeting.pk]))
+        self.addCleanup(pdf_response.close)
+        self.addCleanup(file_response.close)
 
         self.assertEqual(list_response.status_code, 200)
         self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, self.meeting.filename)
+        self.assertContains(detail_response, "会议日期")
+        self.assertContains(
+            detail_response,
+            f'src="{reverse("meetings:meeting_pdf_inline", args=[self.meeting.pk])}"',
+        )
         self.assertEqual(pdf_response.status_code, 200)
+        self.assertEqual(pdf_response["Content-Type"], "application/pdf")
+        self.assertIn("inline", pdf_response["Content-Disposition"])
+        self.assertEqual(pdf_response["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(pdf_response["Cache-Control"], "private, no-store")
+        self.assertEqual(pdf_response["X-Frame-Options"], "SAMEORIGIN")
+        self.assertEqual(file_response.status_code, 200)
+        self.assertIn("attachment", file_response["Content-Disposition"])
+        self.assertEqual(file_response["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(file_response["Cache-Control"], "private, no-store")
         pdf_response.close()
+        file_response.close()
+
+    def test_user_without_view_permission_gets_404_from_meeting_file_routes(self):
+        self.client.force_login(self.uploader)
+
+        for url_name in ["meeting_detail", "meeting_pdf_inline", "meeting_file"]:
+            response = self.client.get(reverse(f"meetings:{url_name}", args=[self.meeting.pk]))
+            self.assertEqual(response.status_code, 404)
+
+    def test_missing_file_keeps_meeting_metadata_but_file_routes_return_404(self):
+        missing = Meeting.objects.create(
+            title="缺失文件会议",
+            date=date(2026, 1, 2),
+            file="missing.pdf",
+            uploaded_by=self.uploader,
+        )
+        self.client.force_login(self.viewer)
+
+        detail_response = self.client.get(reverse("meetings:meeting_detail", args=[missing.pk]))
+        preview_response = self.client.get(reverse("meetings:meeting_pdf_inline", args=[missing.pk]))
+        download_response = self.client.get(reverse("meetings:meeting_file", args=[missing.pk]))
+
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, "文件不可用")
+        self.assertEqual(preview_response.status_code, 404)
+        self.assertEqual(download_response.status_code, 404)
+
+    def test_fake_pdf_is_not_rendered_inline(self):
+        fake_pdf = Meeting.objects.create(
+            title="伪造 PDF",
+            date=date(2026, 1, 2),
+            file=SimpleUploadedFile("fake.pdf", b"not a pdf", content_type="application/pdf"),
+            uploaded_by=self.uploader,
+        )
+        self.addCleanup(fake_pdf.file.delete, False)
+        self.client.force_login(self.viewer)
+
+        detail_response = self.client.get(reverse("meetings:meeting_detail", args=[fake_pdf.pk]))
+        preview_response = self.client.get(reverse("meetings:meeting_pdf_inline", args=[fake_pdf.pk]))
+        self.addCleanup(preview_response.close)
+
+        self.assertContains(detail_response, "该文件暂不支持在线预览")
+        self.assertNotContains(detail_response, "<iframe", html=False)
+        self.assertEqual(preview_response.status_code, 404)
 
     def test_meeting_upload_requires_add_permission(self):
         self.client.force_login(self.viewer)

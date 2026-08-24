@@ -4,12 +4,18 @@ from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db.models import Prefetch
-from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.generic import CreateView, DetailView, FormView, UpdateView, View
 from django_tables2 import SingleTableView
 
+from accounts.services.users import get_user_display_name
+from core.file_preview import (
+    FilePreviewMetadata,
+    build_download_response,
+    build_file_preview_descriptor,
+    build_inline_preview_response,
+)
 from core.utils.mixins import TitleMixin
 from evidence.selectors import visible_evidences_for
 from scoring.selectors import (
@@ -26,6 +32,7 @@ from .forms import (
     AssessmentFinalResultForm,
     AssessmentFinalScoreFormSet,
     AssessmentForm,
+    AssessmentUpdateForm,
     AssessmentModuleForm,
     AssessmentParticipantForm,
     CompetitionPersonForm,
@@ -62,6 +69,21 @@ from .services import (
     update_final_result_details,
 )
 from .tables import AssessmentModuleTable, AssessmentTable, CompetitionPersonTable, CompetitionRoleTable
+
+
+WORKSPACE_DOCUMENT_KINDS = {
+    ".pdf": "pdf",
+    ".doc": "word",
+    ".docx": "word",
+    ".xls": "excel",
+    ".xlsx": "excel",
+    ".csv": "excel",
+    ".zip": "archive",
+    ".rar": "archive",
+    ".7z": "archive",
+    ".tar": "archive",
+    ".gz": "archive",
+}
 
 
 class AssessmentListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
@@ -173,7 +195,11 @@ class AssessmentDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
             "user",
             "competition_person",
         )
-        documents = visible_documents_for(self.request.user).select_related("module")
+        documents = (
+            visible_documents_for(self.request.user)
+            .select_related("module", "uploaded_by")
+            .order_by("-created_at", "-pk")
+        )
         return visible_assessments_for(self.request.user).select_related(
             "skill_project",
             "series",
@@ -209,6 +235,16 @@ class AssessmentDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
         documents = list(self.object.documents.all())
         documents_by_module = {}
         for document in documents:
+            if active_tab == "modules":
+                document.workspace_file_kind = WORKSPACE_DOCUMENT_KINDS.get(
+                    Path(document.filename).suffix.lower(),
+                    "file",
+                )
+                try:
+                    document.workspace_file_size = document.file.size
+                except Exception:
+                    # 历史记录的实体文件可能已缺失，列表页仍应正常显示其余元数据。
+                    document.workspace_file_size = None
             documents_by_module.setdefault(document.module_id, []).append(document)
         manageable_module_ids = set(
             manageable_assessment_modules_for(self.request.user, AssessmentModule.objects.filter(assessment=self.object))
@@ -365,7 +401,6 @@ class AssessmentCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = Assessment
     form_class = AssessmentForm
     template_name = "common/form.html"
-    extra_context = {"grid_class": "grid gap-4 md:grid-cols-2"}
     title = "新增竞赛与考核"
     permission_required = "assessments.add_assessment"
 
@@ -378,6 +413,7 @@ class AssessmentCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
 
 
 class AssessmentUpdateView(AssessmentCreateView, UpdateView):
+    form_class = AssessmentUpdateForm
     title = "编辑竞赛与考核"
     permission_required = "assessments.change_assessment"
 
@@ -674,23 +710,72 @@ class AssessmentDocumentCreateView(TitleMixin, PermissionRequiredMixin, CreateVi
         return super().form_valid(form)
 
     def get_success_url(self):
-        return (
-            reverse("assessments:module_detail", args=[self.object.module_id])
-            if self.object.module_id
-            else reverse("assessments:assessment_detail", args=[self.object.assessment_id])
+        if self.object.module_id:
+            return reverse("assessments:module_detail", args=[self.object.module_id])
+        assessment_url = reverse("assessments:assessment_detail", args=[self.object.assessment_id])
+        return f"{assessment_url}?tab=modules"
+
+
+class AssessmentDocumentAccessMixin:
+    model = AssessmentDocument
+
+    def get_queryset(self):
+        return visible_documents_for(self.request.user).select_related(
+            "assessment",
+            "module",
+            "uploaded_by",
         )
 
 
-class AssessmentDocumentDownloadView(PermissionRequiredMixin, DetailView):
-    model = AssessmentDocument
-    permission_required = "assessments.view_assessmentdocument"
+class AssessmentDocumentDetailView(TitleMixin, AssessmentDocumentAccessMixin, DetailView):
+    template_name = "common/file_preview_detail.html"
+    context_object_name = "document"
+    title = "文件预览"
+    title_icon = "icon-[tabler--file-search]"
 
-    def get_queryset(self):
-        return visible_documents_for(self.request.user)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        document = self.object
+        if document.module_id:
+            source_url = reverse("assessments:module_detail", args=[document.module_id])
+            source_label = f"模块：{document.module.name}"
+        else:
+            assessment_url = reverse("assessments:assessment_detail", args=[document.assessment_id])
+            source_url = f"{assessment_url}?tab=modules"
+            source_label = f"考核：{document.assessment.name}"
+
+        metadata = [
+            FilePreviewMetadata("资料类型", document.get_document_type_display()),
+            FilePreviewMetadata("所属考核", document.assessment.name),
+            FilePreviewMetadata("所属模块", document.module.name if document.module_id else "公共资料"),
+        ]
+        if document.version:
+            metadata.insert(1, FilePreviewMetadata("版本", document.version))
+
+        context["file_preview"] = build_file_preview_descriptor(
+            file=document.file,
+            filename=document.filename,
+            download_url=reverse("assessments:document_download", args=[document.pk]),
+            preview_url=reverse("assessments:document_preview", args=[document.pk]),
+            uploader_name=get_user_display_name(document.uploaded_by),
+            uploaded_at=document.created_at,
+            source_label=source_label,
+            source_url=source_url,
+            title=document.title,
+            description=document.description,
+            metadata=tuple(metadata),
+        )
+        return context
+
+
+class AssessmentDocumentPreviewView(AssessmentDocumentAccessMixin, DetailView):
+    def get(self, request, *args, **kwargs):
+        document = self.get_object()
+        return build_inline_preview_response(document.file, document.filename)
+
+
+class AssessmentDocumentDownloadView(AssessmentDocumentAccessMixin, DetailView):
 
     def get(self, request, *args, **kwargs):
         document = self.get_object()
-        response = FileResponse(document.file.open("rb"), as_attachment=True, filename=document.filename)
-        response["X-Content-Type-Options"] = "nosniff"
-        response["Cache-Control"] = "private, no-store"
-        return response
+        return build_download_response(document.file, document.filename)

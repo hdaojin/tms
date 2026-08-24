@@ -1,6 +1,0 @@
-{% extends "layouts/app.html" %}
-{% block right_sidebar %}{% endblock %}
-
-{% block content %}
-  {% include 'components/doc_detail_with_pdf.html' with uploaded_at=document.uploaded_at|date:'Y-m-d H:i' uploader_name=document.uploaded_by.display_name|default:'-' file_size=document.file.size|filesizeformat file_name=document.filename file_url=document_download_url show_preview=True preview_url=pdf_preview_url %}
-{% endblock %}

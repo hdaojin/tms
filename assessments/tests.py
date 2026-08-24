@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
@@ -12,7 +13,7 @@ from django.utils import timezone
 from evidence.models import EvidenceSkillMap, KnowledgeEvidence
 from scoring.models import ScoringAspect, ScoringResult, ScoringScheme, ScoringSubCriterion
 from standards.models import Skill, SkillProject, TechnicalDomain, TechnicalDomainGroupScope
-from .forms import AssessmentDocumentForm, AssessmentForm, AssessmentParticipantForm
+from .forms import AssessmentDocumentForm, AssessmentForm, AssessmentParticipantForm, AssessmentUpdateForm
 from .models import (
     Assessment,
     AssessmentAward,
@@ -45,6 +46,7 @@ from .services import (
     transition_assessment,
     update_final_result_details,
 )
+from .views import AssessmentDocumentCreateView
 
 User = get_user_model()
 
@@ -279,6 +281,75 @@ class AssessmentModelTests(TestCase):
         )
         with self.assertRaisesMessage(ValidationError, "必须属于最终结果对应"):
             AssessmentResultAward.objects.create(final_result=final_result, award=other_award)
+
+
+class AssessmentFormViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(username="assessment-form-admin")
+        self.project = SkillProject.objects.create(code="FORM", name="表单测试项目")
+        self.assessment = Assessment.objects.create(
+            skill_project=self.project,
+            assessment_type=Assessment.Type.MOCK,
+            name="表单测试考核",
+            code="FORM-ASSESSMENT",
+            start_date=date(2026, 4, 1),
+            end_date=date(2026, 4, 2),
+            created_by=self.user,
+        )
+        self.client.force_login(self.user)
+
+    def test_create_and_edit_forms_use_shared_single_column_layout(self):
+        urls = [
+            reverse("assessments:assessment_create"),
+            reverse("assessments:assessment_edit", args=[self.assessment.pk]),
+        ]
+
+        for url in urls:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertTemplateUsed(response, "common/form.html")
+                self.assertContains(response, 'class="flex flex-col gap-4"')
+                self.assertNotContains(response, "md:grid-cols-2")
+
+    def test_edit_form_renders_existing_dates_in_html_date_format(self):
+        response = self.client.get(reverse("assessments:assessment_edit", args=[self.assessment.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        form = response.context["form"]
+        self.assertIn('value="2026-04-01"', str(form["start_date"]))
+        self.assertIn('value="2026-04-02"', str(form["end_date"]))
+
+    def test_edit_form_can_change_from_current_status_to_any_status(self):
+        self.assertNotIn("status", AssessmentForm().fields)
+        self.assertEqual(
+            [value for value, _label in AssessmentUpdateForm().fields["status"].choices],
+            list(Assessment.Status.values),
+        )
+
+        url = reverse("assessments:assessment_edit", args=[self.assessment.pk])
+        for status in Assessment.Status.values:
+            with self.subTest(status=status):
+                response = self.client.post(
+                    url,
+                    {
+                        "skill_project": self.project.pk,
+                        "series": "",
+                        "level": "",
+                        "training_cycle": "",
+                        "assessment_type": Assessment.Type.MOCK,
+                        "status": status,
+                        "name": self.assessment.name,
+                        "code": self.assessment.code,
+                        "start_date": "2026-04-01",
+                        "end_date": "2026-04-02",
+                        "location": "",
+                        "description": "",
+                    },
+                )
+                self.assertRedirects(response, reverse("assessments:assessment_detail", args=[self.assessment.pk]))
+                self.assessment.refresh_from_db()
+                self.assertEqual(self.assessment.status, status)
 
 
 class AssessmentScopeSelectorTests(TestCase):
@@ -577,6 +648,117 @@ class AssessmentWorkspaceTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "基本信息")
+
+    def test_modules_tab_renders_responsive_document_lists(self):
+        permission = Permission.objects.get(
+            content_type__app_label="assessments",
+            codename="add_assessmentdocument",
+        )
+        self.coach.groups.get(name="工作台 Linux 权限").permissions.add(permission)
+        self.coach = User.objects.get(pk=self.coach.pk)
+        self.client.force_login(self.coach)
+
+        AssessmentDocument.objects.create(
+            assessment=self.assessment,
+            document_type=AssessmentDocument.DocumentType.MARKING_STANDARD,
+            title="公共评分标准",
+            file="public/公共评分标准.pdf",
+            original_filename="公共评分标准.pdf",
+            file_sha256="a" * 64,
+            uploaded_by=self.owner,
+        )
+        older_document = AssessmentDocument.objects.create(
+            assessment=self.assessment,
+            module=self.linux_module,
+            document_type=AssessmentDocument.DocumentType.ATTACHMENT,
+            title="旧版模块说明",
+            file="modules/模块旧版.pdf",
+            original_filename="模块旧版.pdf",
+            file_sha256="b" * 64,
+            uploaded_by=self.owner,
+        )
+        newer_document = AssessmentDocument.objects.create(
+            assessment=self.assessment,
+            module=self.linux_module,
+            document_type=AssessmentDocument.DocumentType.TEST_PROJECT,
+            title="新版模块说明",
+            version="V2",
+            file="modules/模块新版.docx",
+            original_filename="模块新版.docx",
+            file_sha256="c" * 64,
+            uploaded_by=self.owner,
+        )
+        AssessmentDocument.objects.filter(pk=older_document.pk).update(
+            created_at=timezone.now() - timedelta(days=1)
+        )
+        AssessmentDocument.objects.filter(pk=newer_document.pk).update(created_at=timezone.now())
+        newer_document.refresh_from_db()
+
+        response = self.client.get(
+            reverse("assessments:assessment_detail", args=[self.assessment.pk]),
+            {"tab": "modules"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        for text in [
+            "公共资料",
+            "模块资料",
+            "公共评分标准.pdf",
+            "模块旧版.pdf",
+            "模块新版.docx",
+            "公共评分标准",
+            "新版模块说明",
+            "资料类型",
+            "版本",
+            "文件大小",
+            "上传者",
+            "上传时间",
+            "V2",
+            "未知",
+            self.owner.display_name,
+            timezone.localtime(newer_document.created_at).strftime("%Y-%m-%d %H:%M"),
+        ]:
+            self.assertContains(response, text)
+        self.assertContains(response, "icon-[tabler--file-type-pdf]")
+        self.assertContains(response, "icon-[tabler--file-type-doc]")
+        self.assertContains(response, "icon-[tabler--upload]")
+        self.assertContains(response, "上传模块资料")
+        self.assertContains(response, "xl:grid-cols-4")
+        self.assertNotContains(response, "xl:grid-cols-2")
+
+        content = response.content.decode()
+        self.assertLess(content.index("模块新版.docx"), content.index("模块旧版.pdf"))
+        self.assertIn(reverse("assessments:document_detail", args=[newer_document.pk]), content)
+        self.assertIn(reverse("assessments:document_download", args=[newer_document.pk]), content)
+        self.assertIn(f">{newer_document.filename}</a>", content)
+
+    def test_modules_tab_keeps_empty_general_documents_section(self):
+        response = self.client.get(
+            reverse("assessments:assessment_detail", args=[self.assessment.pk]),
+            {"tab": "modules"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "公共资料")
+        self.assertContains(response, "暂无公共资料")
+
+    def test_general_document_upload_returns_to_workspace_modules_tab(self):
+        view = AssessmentDocumentCreateView()
+        view.object = AssessmentDocument(assessment=self.assessment)
+
+        self.assertEqual(
+            view.get_success_url(),
+            f"{reverse('assessments:assessment_detail', args=[self.assessment.pk])}?tab=modules",
+        )
+
+    def test_module_document_upload_still_returns_to_module_detail(self):
+        view = AssessmentDocumentCreateView()
+        view.object = AssessmentDocument(assessment=self.assessment, module=self.linux_module)
+
+        self.assertEqual(
+            view.get_success_url(),
+            reverse("assessments:module_detail", args=[self.linux_module.pk]),
+        )
 
     def test_workspace_does_not_expose_aggregate_scores_without_view_all_permission(self):
         student = User.objects.create_user(username="workspace-student")
@@ -1114,6 +1296,21 @@ class AssessmentPermissionBoundaryTests(TestCase):
         user.groups.add(group)
         return User.objects.get(pk=user.pk)
 
+    def _create_preview_document(self, filename, content):
+        document = AssessmentDocument.objects.create(
+            assessment=self.linux_assessment,
+            module=self.linux_module,
+            document_type=AssessmentDocument.DocumentType.ATTACHMENT,
+            title="预览附件",
+            description="用于验证通用预览",
+            version="V1",
+            file=SimpleUploadedFile(filename, content),
+            original_filename=filename,
+            uploaded_by=self.owner,
+        )
+        self.addCleanup(document.file.delete, False)
+        return document
+
     def test_assessment_update_uses_owner_or_project_wide_permission(self):
         self.owner.user_permissions.add(*self._permissions(["assessments.change_assessment"]))
         self.owner = User.objects.get(pk=self.owner.pk)
@@ -1193,6 +1390,84 @@ class AssessmentPermissionBoundaryTests(TestCase):
         denied = self.client.get(reverse("assessments:participant_detail", args=[self.windows_participant.pk]))
         self.assertEqual(allowed.status_code, 200)
         self.assertEqual(denied.status_code, 404)
+
+    def test_document_detail_preview_and_download_follow_document_scope(self):
+        document = self._create_preview_document("linux-preview.pdf", b"%PDF-1.7\npreview")
+        self.client.force_login(self.linux_coach)
+
+        detail_url = reverse("assessments:document_detail", args=[document.pk])
+        preview_url = reverse("assessments:document_preview", args=[document.pk])
+        download_url = reverse("assessments:document_download", args=[document.pk])
+        detail_response = self.client.get(detail_url)
+        preview_response = self.client.get(preview_url)
+        download_response = self.client.get(download_url)
+
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, "linux-preview.pdf")
+        self.assertContains(detail_response, "预览附件")
+        self.assertContains(detail_response, "其他附件")
+        self.assertContains(detail_response, self.linux_assessment.name)
+        self.assertContains(detail_response, self.linux_module.name)
+        self.assertContains(detail_response, f'src="{preview_url}"')
+        self.assertContains(detail_response, f'href="{download_url}"')
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertEqual(preview_response["Content-Type"], "application/pdf")
+        self.assertIn("inline", preview_response["Content-Disposition"])
+        self.assertEqual(download_response.status_code, 200)
+        self.assertIn("attachment", download_response["Content-Disposition"])
+        preview_response.close()
+        download_response.close()
+
+        for url_name in ["document_detail", "document_preview", "document_download"]:
+            denied_response = self.client.get(
+                reverse(f"assessments:{url_name}", args=[self.windows_document.pk])
+            )
+            self.assertEqual(denied_response.status_code, 404)
+
+    def test_document_detail_escapes_text_and_handles_unsupported_or_missing_files(self):
+        text_document = self._create_preview_document(
+            "notes.txt",
+            b"<script>alert(1)</script>",
+        )
+        office_document = self._create_preview_document("report.docx", b"PK\x03\x04office")
+        self.client.force_login(self.linux_coach)
+
+        text_response = self.client.get(
+            reverse("assessments:document_detail", args=[text_document.pk])
+        )
+        office_response = self.client.get(
+            reverse("assessments:document_detail", args=[office_document.pk])
+        )
+        missing_detail = self.client.get(
+            reverse("assessments:document_detail", args=[self.linux_document.pk])
+        )
+        missing_preview = self.client.get(
+            reverse("assessments:document_preview", args=[self.linux_document.pk])
+        )
+        missing_download = self.client.get(
+            reverse("assessments:document_download", args=[self.linux_document.pk])
+        )
+
+        self.assertContains(text_response, "&lt;script&gt;alert(1)&lt;/script&gt;", html=False)
+        self.assertNotContains(text_response, "<script>alert(1)</script>", html=False)
+        self.assertContains(office_response, "该文件暂不支持在线预览")
+        self.assertNotContains(office_response, "<iframe", html=False)
+        self.assertContains(missing_detail, "文件不可用")
+        self.assertEqual(missing_preview.status_code, 404)
+        self.assertEqual(missing_download.status_code, 404)
+
+    def test_module_detail_document_link_opens_preview_detail(self):
+        self.client.force_login(self.linux_coach)
+
+        response = self.client.get(
+            reverse("assessments:module_detail", args=[self.linux_module.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("assessments:document_detail", args=[self.linux_document.pk])}"',
+        )
 
     def test_create_forms_only_offer_in_scope_assessments_and_modules(self):
         participant_form = AssessmentParticipantForm(user=self.linux_coach)

@@ -11,10 +11,6 @@ def can_view_meeting(user, meeting=None) -> bool:
     return getattr(user, "is_authenticated", False) and user.has_perm(VIEW_MEETING_PERMISSION)
 
 
-def can_view_meeting_request(request, meeting) -> bool:
-    return can_view_meeting(request.user, meeting)
-
-
 def can_upload_meeting(user) -> bool:
     return getattr(user, "is_authenticated", False) and (
         getattr(user, "is_superuser", False)

@@ -13,8 +13,10 @@ from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
+from django.http import Http404
 from django.db.migrations.writer import MigrationWriter
 from django.template import Context, Template
+from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase, override_settings
 from django.urls import resolve, reverse
 
@@ -51,6 +53,202 @@ User = get_user_model()
 PDF_BYTES = b"%PDF-1.7\n% test pdf\n"
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 ZIP_BYTES = b"PK\x03\x04" + b"\x00" * 16
+
+
+class FilePreviewTests(TestCase):
+    def build_descriptor(self, file, filename):
+        from core.file_preview import build_file_preview_descriptor
+
+        return build_file_preview_descriptor(
+            file=file,
+            filename=filename,
+            download_url="/download/",
+            preview_url="/preview/",
+            uploader_name="测试用户",
+            uploaded_at=None,
+            source_label="来源对象",
+            source_url="/source/",
+            title="测试附件",
+            description="附件说明",
+        )
+
+    def test_pdf_and_safe_raster_headers_are_previewable(self):
+        from core.file_preview import FilePreviewKind
+
+        pdf = self.build_descriptor(SimpleUploadedFile("report.pdf", PDF_BYTES), "report.pdf")
+        png = self.build_descriptor(SimpleUploadedFile("image.png", PNG_BYTES), "image.png")
+        jpeg = self.build_descriptor(
+            SimpleUploadedFile("image.jpg", b"\xff\xd8\xff" + b"\x00" * 16),
+            "image.jpg",
+        )
+        gif = self.build_descriptor(SimpleUploadedFile("image.gif", b"GIF89a"), "image.gif")
+        webp = self.build_descriptor(
+            SimpleUploadedFile("image.webp", b"RIFF" + b"\x00" * 4 + b"WEBP"),
+            "image.webp",
+        )
+
+        self.assertEqual(pdf.preview_kind, FilePreviewKind.PDF)
+        self.assertEqual(pdf.content_type, "application/pdf")
+        self.assertEqual(png.preview_kind, FilePreviewKind.IMAGE)
+        self.assertEqual(png.content_type, "image/png")
+        self.assertEqual(jpeg.content_type, "image/jpeg")
+        self.assertEqual(gif.content_type, "image/gif")
+        self.assertEqual(webp.content_type, "image/webp")
+
+    def test_mismatched_and_unsafe_files_are_not_previewed(self):
+        from core.file_preview import FilePreviewKind
+
+        fake_pdf = self.build_descriptor(SimpleUploadedFile("fake.pdf", b"not a pdf"), "fake.pdf")
+        svg = self.build_descriptor(
+            SimpleUploadedFile("active.svg", b'<svg><script>alert(1)</script></svg>'),
+            "active.svg",
+        )
+        office = self.build_descriptor(SimpleUploadedFile("report.docx", ZIP_BYTES), "report.docx")
+
+        self.assertEqual(fake_pdf.preview_kind, FilePreviewKind.UNAVAILABLE)
+        self.assertEqual(svg.preview_kind, FilePreviewKind.UNAVAILABLE)
+        self.assertEqual(office.preview_kind, FilePreviewKind.UNAVAILABLE)
+
+    def test_utf8_text_is_limited_and_marked_as_truncated(self):
+        from core.file_preview import FilePreviewKind, TEXT_PREVIEW_LIMIT_BYTES
+
+        content = b"<script>alert(1)</script>\n" + b"a" * TEXT_PREVIEW_LIMIT_BYTES
+        descriptor = self.build_descriptor(SimpleUploadedFile("notes.txt", content), "notes.txt")
+
+        self.assertEqual(descriptor.preview_kind, FilePreviewKind.TEXT)
+        self.assertEqual(len(descriptor.text_content.encode("utf-8")), TEXT_PREVIEW_LIMIT_BYTES)
+        self.assertTrue(descriptor.text_truncated)
+
+        html = render_to_string("common/file_preview_detail.html", {"file_preview": descriptor})
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", html)
+        self.assertNotIn("<script>alert(1)</script>", html)
+
+    def test_invalid_utf8_text_is_not_previewed(self):
+        from core.file_preview import FilePreviewKind
+
+        descriptor = self.build_descriptor(SimpleUploadedFile("notes.txt", b"\xff\xfe\xfa"), "notes.txt")
+
+        self.assertEqual(descriptor.preview_kind, FilePreviewKind.UNAVAILABLE)
+        self.assertIsNone(descriptor.text_content)
+
+    def test_invalid_utf8_at_truncation_boundary_is_not_previewed(self):
+        from core.file_preview import FilePreviewKind, TEXT_PREVIEW_LIMIT_BYTES
+
+        content = b"a" * (TEXT_PREVIEW_LIMIT_BYTES - 1) + b"\xff" + b"tail"
+        descriptor = self.build_descriptor(SimpleUploadedFile("notes.txt", content), "notes.txt")
+
+        self.assertEqual(descriptor.preview_kind, FilePreviewKind.UNAVAILABLE)
+        self.assertIsNone(descriptor.text_content)
+
+    def test_missing_physical_file_keeps_metadata_but_disables_file_actions(self):
+        from core.file_preview import FilePreviewKind
+
+        class MissingFile:
+            name = "missing.pdf"
+
+            @property
+            def size(self):
+                raise FileNotFoundError
+
+            def open(self, mode="rb"):
+                raise FileNotFoundError
+
+        descriptor = self.build_descriptor(MissingFile(), "missing.pdf")
+
+        self.assertEqual(descriptor.preview_kind, FilePreviewKind.UNAVAILABLE)
+        self.assertFalse(descriptor.file_available)
+        self.assertIsNone(descriptor.file_size)
+
+    def test_seek_failure_closes_new_handle_and_marks_file_unavailable(self):
+        class SeekFailingFile:
+            name = "broken.pdf"
+            size = 10
+            closed = True
+            close_called = False
+
+            def open(self, mode="rb"):
+                self.closed = False
+                return self
+
+            def seek(self, offset):
+                raise OSError("seek failed")
+
+            def close(self):
+                self.close_called = True
+                self.closed = True
+
+        file = SeekFailingFile()
+        descriptor = self.build_descriptor(file, "broken.pdf")
+
+        self.assertFalse(descriptor.file_available)
+        self.assertTrue(file.close_called)
+        with self.assertRaises(Http404):
+            from core.file_preview import build_download_response
+
+            build_download_response(file, "broken.pdf")
+
+    def test_read_failure_closes_new_handle_and_marks_file_unavailable(self):
+        class ReadFailingFile:
+            name = "broken.txt"
+            size = 10
+            closed = True
+            close_called = False
+
+            def open(self, mode="rb"):
+                self.closed = False
+                return self
+
+            def seek(self, offset):
+                return offset
+
+            def read(self, size=-1):
+                raise OSError("read failed")
+
+            def close(self):
+                self.close_called = True
+                self.closed = True
+
+        file = ReadFailingFile()
+        descriptor = self.build_descriptor(file, "broken.txt")
+
+        self.assertFalse(descriptor.file_available)
+        self.assertTrue(file.close_called)
+
+    def test_inline_pdf_response_sets_private_safe_headers(self):
+        from core.file_preview import build_inline_preview_response
+
+        response = build_inline_preview_response(
+            SimpleUploadedFile("report.pdf", PDF_BYTES),
+            "report.pdf",
+        )
+        try:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response["Content-Type"], "application/pdf")
+            self.assertIn("inline", response["Content-Disposition"])
+            self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+            self.assertEqual(response["Cache-Control"], "private, no-store")
+            self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
+        finally:
+            response.close()
+
+    def test_inline_response_rejects_unverified_or_unsupported_files(self):
+        from core.file_preview import build_inline_preview_response
+
+        with self.assertRaises(Http404):
+            build_inline_preview_response(SimpleUploadedFile("fake.pdf", b"not a pdf"), "fake.pdf")
+        with self.assertRaises(Http404):
+            build_inline_preview_response(SimpleUploadedFile("notes.txt", b"text"), "notes.txt")
+
+    def test_download_response_is_private_attachment(self):
+        from core.file_preview import build_download_response
+
+        response = build_download_response(SimpleUploadedFile("notes.txt", b"text"), "notes.txt")
+        try:
+            self.assertIn("attachment", response["Content-Disposition"])
+            self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+            self.assertEqual(response["Cache-Control"], "private, no-store")
+        finally:
+            response.close()
 
 
 class PermissionBundleRegistryTests(TestCase):
@@ -935,6 +1133,7 @@ class UploadSpecAdoptionTests(TestCase):
 
         self.assertIn("blob:", directives["img-src"])
         self.assertEqual(directives["worker-src"], ["'self'", "blob:"])
+        self.assertEqual(directives["frame-src"], ["'self'"])
         self.assertNotIn("blob:", directives["script-src"])
 
     def test_multipart_form_component_adds_htmx_encoding(self):
