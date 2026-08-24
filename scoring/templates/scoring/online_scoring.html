@@ -1,0 +1,87 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  {% partial workspace %}
+
+  {% partialdef workspace %}
+    <section id="online-scoring-workspace" class="space-y-4">
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 class="card-title">{{ module.code }} - {{ module.name }}</h2>
+              <p class="text-sm text-base-content/60">{{ module.assessment.name }} · {{ scheme.title }}</p>
+            </div>
+            <a class="btn btn-ghost btn-sm" href="{% url 'scoring:scheme_detail' scheme.pk %}">返回评分方案</a>
+          </div>
+          <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div class="stat rounded-box border border-base-300"><div class="stat-title">评分进度</div><div class="stat-value text-xl">{{ summary.completion_percent }}%</div><div class="stat-desc">{{ summary.scored_count }} / {{ summary.expected_count }} 项</div></div>
+            <div class="stat rounded-box border border-base-300"><div class="stat-title">已评分人数</div><div class="stat-value text-xl">{{ summary.scored_participant_count }}</div><div class="stat-desc">共 {{ summary.participant_count }} 名选手</div></div>
+            <div class="stat rounded-box border border-base-300"><div class="stat-title">未完成项</div><div class="stat-value text-xl">{{ summary.unfinished_count }}</div></div>
+            <div class="stat rounded-box border border-base-300"><div class="stat-title">已确认项</div><div class="stat-value text-xl">{{ summary.confirmed_count }}</div></div>
+            <div class="stat rounded-box border border-base-300"><div class="stat-title">累计得分率</div><div class="stat-value text-xl">{{ summary.score_rate }}%</div><div class="stat-desc">{{ summary.score_total }} / {{ summary.available_total }}</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div role="tablist" class="tabs tabs-box w-fit">
+        <a role="tab" class="tab {% if perspective == 'participant' %}tab-active{% endif %}" href="?perspective=participant{% if selected_participant %}&participant={{ selected_participant.pk }}{% endif %}" hx-get="?perspective=participant{% if selected_participant %}&participant={{ selected_participant.pk }}{% endif %}" hx-target="#online-scoring-workspace" hx-push-url="true">按选手</a>
+        <a role="tab" class="tab {% if perspective == 'aspect' %}tab-active{% endif %}" href="?perspective=aspect{% if selected_aspect %}&aspect={{ selected_aspect.pk }}{% endif %}" hx-get="?perspective=aspect{% if selected_aspect %}&aspect={{ selected_aspect.pk }}{% endif %}" hx-target="#online-scoring-workspace" hx-push-url="true">按评分点</a>
+      </div>
+
+      <div class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body gap-4">
+          <form method="get" class="flex flex-wrap items-end gap-3" hx-get="" hx-target="#online-scoring-workspace" hx-push-url="true">
+            <input type="hidden" name="perspective" value="{{ perspective }}">
+            {% if perspective == 'participant' %}
+              <label class="fieldset min-w-64 flex-1"><span class="fieldset-legend">选择选手</span><select class="select w-full" name="participant">{% for participant in participants %}<option value="{{ participant.pk }}" {% if participant.pk == selected_participant.pk %}selected{% endif %}>{{ participant.display_name }}</option>{% endfor %}</select></label>
+            {% else %}
+              <label class="fieldset min-w-64 flex-1"><span class="fieldset-legend">选择评分点</span><select class="select w-full" name="aspect">{% for aspect in aspects %}<option value="{{ aspect.pk }}" {% if aspect.pk == selected_aspect.pk %}selected{% endif %}>{{ aspect.code }} - {{ aspect.description|truncatechars:80 }}</option>{% endfor %}</select></label>
+            {% endif %}
+            <button class="btn btn-primary" type="submit">切换</button>
+          </form>
+
+          <div class="overflow-x-auto rounded-box border border-base-300">
+            <table class="table align-top">
+              <thead><tr><th>{% if perspective == 'participant' %}评分点{% else %}选手{% endif %}</th><th>分值</th><th>当前状态</th><th class="min-w-80">录分</th></tr></thead>
+              <tbody>
+                {% for row in scoring_rows %}
+                  <tr>
+                    <td>{% if perspective == 'participant' %}<div class="font-semibold">{{ row.aspect.code }}</div><div class="max-w-xl whitespace-normal text-sm text-base-content/70">{{ row.aspect.description }}</div>{% else %}<div class="font-semibold">{{ row.participant.display_name }}</div><div class="text-sm text-base-content/60">{{ row.participant.country_or_region|default:"-" }}</div>{% endif %}</td>
+                    <td>{% if perspective == 'participant' %}{{ row.aspect.max_mark }}{% else %}{{ selected_aspect.max_mark }}{% endif %}</td>
+                    <td>{% if row.result %}<div>{{ row.result.score_awarded }} 分</div><div class="text-xs text-base-content/60">{{ row.result.get_source_display }}</div>{% if row.result.confirmed_at %}<span class="badge badge-success badge-sm">已确认</span>{% else %}<span class="badge badge-warning badge-sm">未确认</span>{% endif %}{% else %}<span class="badge badge-ghost">未评分</span>{% endif %}</td>
+                    <td>
+                      {% if row.can_edit %}
+                        <form method="post" action="{% url 'scoring:online_scoring_entry' module.pk row.participant.pk row.aspect.pk %}" class="space-y-2" hx-post="{% url 'scoring:online_scoring_entry' module.pk row.participant.pk row.aspect.pk %}" hx-target="#online-scoring-workspace" hx-swap="outerHTML">
+                          {% csrf_token %}
+                          <input type="hidden" name="perspective" value="{{ perspective }}">
+                          {{ row.form.score_awarded }}
+                          {% for error in row.form.score_awarded.errors %}<p class="text-xs text-error">{{ error }}</p>{% endfor %}
+                          {% for error in row.form.non_field_errors %}<p class="text-xs text-error">{{ error }}</p>{% endfor %}
+                          <details class="collapse collapse-arrow border border-base-300">
+                            <summary class="collapse-title min-h-0 py-2 text-sm">证据、确认与修改原因</summary>
+                            <div class="collapse-content space-y-2 pb-3">
+                              {{ row.form.evidence }}
+                              <label class="label cursor-pointer justify-start gap-2">{{ row.form.confirm }}<span>确认本项得分</span></label>
+                              {{ row.form.reason }}
+                            </div>
+                          </details>
+                          <div class="flex items-center justify-end gap-2">{% if row.saved %}<span class="text-sm text-success">已保存</span>{% endif %}<button class="btn btn-primary btn-sm" type="submit">保存本项</button></div>
+                        </form>
+                      {% else %}
+                        <span class="text-sm text-base-content/60">仅查看</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="4">{% include "components/empty_state.html" with title="暂无可评分项目" message="请先维护选手并确认评分方案。" icon="icon-[tabler--database-off]" %}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="text-xs text-base-content/60">比赛期间本工作台不展示实时排名。</p>
+        </div>
+      </div>
+    </section>
+  {% endpartialdef %}
+{% endblock %}

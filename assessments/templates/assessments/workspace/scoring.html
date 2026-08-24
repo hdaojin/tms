@@ -1,0 +1,10 @@
+<section class="space-y-4">
+  <div class="grid gap-4 xl:grid-cols-2">
+    {% for module in workspace_modules %}
+      <article class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body gap-4"><div class="flex flex-wrap items-start justify-between gap-2"><div><h3 class="card-title break-words text-base">{{ module.code }} - {{ module.name }}</h3><p class="text-sm text-base-content/60">{% if module.workspace_scheme %}{{ module.workspace_scheme.title }}{% else %}尚未生成评分方案{% endif %}</p></div>{% if module.workspace_scheme %}<a class="btn btn-ghost btn-sm" href="{% url 'scoring:scheme_detail' module.workspace_scheme.pk %}">评分方案</a>{% endif %}</div>
+        {% if module.scoring_summary %}<div class="grid grid-cols-2 gap-3 sm:grid-cols-4"><div><div class="text-xs text-base-content/60">进度</div><div class="font-semibold">{{ module.scoring_summary.completion_percent }}%</div></div><div><div class="text-xs text-base-content/60">已评分人数</div><div class="font-semibold">{{ module.scoring_summary.scored_participant_count }}</div></div><div><div class="text-xs text-base-content/60">未完成项</div><div class="font-semibold">{{ module.scoring_summary.unfinished_count }}</div></div><div><div class="text-xs text-base-content/60">累计得分率</div><div class="font-semibold">{{ module.scoring_summary.score_rate }}%</div></div></div>{% else %}<p class="text-sm text-base-content/60">当前账号无权查看该模块实时评分汇总。</p>{% endif %}
+        <div class="card-actions justify-end">{% if module.can_open_online_scoring %}<a class="btn btn-primary btn-sm" href="{% url 'scoring:online_scoring' module.pk %}">进入在线评分</a>{% endif %}</div></div></article>
+    {% empty %}{% include "components/empty_state.html" with title="暂无可见评分模块" icon="icon-[tabler--database-off]" %}{% endfor %}
+  </div>
+  <p class="text-xs text-base-content/60">比赛期间不在工作台展示实时排名。</p>
+</section>

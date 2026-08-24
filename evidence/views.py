@@ -1,29 +1,30 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.db.models import Q
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, UpdateView
 from django_tables2 import SingleTableView
-from assessments.selectors import manageable_assessment_modules_for, visible_assessments_for
+from assessments.selectors import assessment_modules_in_scope_for
 from core.utils.mixins import TitleMixin
 from .forms import EvidenceSkillMapForm, KnowledgeEvidenceForm, KnowledgeEvidenceRejectForm
 from .models import EvidenceSkillMap, KnowledgeEvidence
+from .selectors import visible_evidences_for
 from .services import approve_evidence, approve_mapping, reject_evidence
 from .tables import KnowledgeEvidenceTable
 
 
-def visible_evidences_for(user):
+def manageable_evidences_for(user, permission="evidence.change_knowledgeevidence"):
     queryset = KnowledgeEvidence.objects.all()
-    if user.is_superuser:
+    if not user.is_authenticated or not user.has_perm(permission):
+        return queryset.none()
+    if user.is_superuser or user.has_perm("assessments.change_all_assessment"):
         return queryset
-    return queryset.filter(assessment_module__assessment__in=visible_assessments_for(user)).distinct()
-
-
-def manageable_evidences_for(user):
-    if user.is_superuser:
-        return KnowledgeEvidence.objects.all()
-    return KnowledgeEvidence.objects.filter(assessment_module__in=manageable_assessment_modules_for(user)).distinct()
+    modules = assessment_modules_in_scope_for(user, permission)
+    return queryset.filter(
+        Q(assessment_module__in=modules) | Q(assessment_module__isnull=True, created_by=user)
+    ).distinct()
 
 
 class KnowledgeEvidenceListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
@@ -55,12 +56,22 @@ class KnowledgeEvidenceCreateView(TitleMixin, PermissionRequiredMixin, CreateVie
     title = "新增考点证据"
     permission_required = "evidence.add_knowledgeevidence"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update(user=self.request.user, permission=self.permission_required)
+        return kwargs
+
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         form.instance.extraction_source = KnowledgeEvidence.ExtractionSource.MANUAL
         module = form.cleaned_data.get("assessment_module")
         direct = self.request.user.is_superuser or (
-            module and manageable_assessment_modules_for(self.request.user).filter(pk=module.pk).exists()
+            module
+            and assessment_modules_in_scope_for(
+                self.request.user,
+                self.permission_required,
+                module.__class__.objects.filter(pk=module.pk),
+            ).exists()
         )
         form.instance.review_status = (
             KnowledgeEvidence.ReviewStatus.APPROVED if direct else KnowledgeEvidence.ReviewStatus.PENDING
@@ -118,7 +129,7 @@ class EvidenceSkillMapCreateView(TitleMixin, PermissionRequiredMixin, CreateView
     permission_required = "evidence.add_evidenceskillmap"
 
     def get_evidence(self):
-        return manageable_evidences_for(self.request.user).get(pk=self.kwargs["evidence_pk"])
+        return manageable_evidences_for(self.request.user, self.permission_required).get(pk=self.kwargs["evidence_pk"])
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -142,7 +153,9 @@ class EvidenceSkillMapDeleteView(PermissionRequiredMixin, DeleteView):
     template_name = "evidence/mapping_confirm_delete.html"
 
     def get_queryset(self):
-        return EvidenceSkillMap.objects.filter(evidence__in=manageable_evidences_for(self.request.user))
+        return EvidenceSkillMap.objects.filter(
+            evidence__in=manageable_evidences_for(self.request.user, self.permission_required)
+        )
 
     def get_success_url(self):
         return reverse("evidence:evidence_detail", args=[self.object.evidence_id])

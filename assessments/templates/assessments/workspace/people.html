@@ -1,0 +1,8 @@
+<section class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body gap-4">
+    <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="card-title text-base">参与人员</h3>{% if perms.assessments.add_assessmentparticipant %}<a class="btn btn-primary btn-sm" href="{% url 'assessments:participant_create' %}?assessment={{ assessment.pk }}">新增人员</a>{% endif %}</div>
+    <div class="overflow-x-auto rounded-box border border-base-300"><table class="table"><thead><tr><th>姓名</th><th>角色</th><th>单位</th><th>国家或地区</th><th>来源</th></tr></thead><tbody>
+      {% for participant in workspace_participants %}<tr><td><a class="link" href="{% url 'assessments:participant_detail' participant.pk %}">{{ participant.display_name }}</a></td><td>{{ participant.role }}</td><td class="max-w-64 whitespace-normal">{{ participant.organization|default:"-" }}</td><td>{{ participant.country_or_region|default:"-" }}</td><td>{% if participant.user_id %}<span class="badge badge-info badge-sm">TMS 用户</span>{% elif participant.competition_person_id %}<span class="badge badge-success badge-sm">长期人员</span>{% else %}<span class="badge badge-ghost badge-sm">临时人员</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="5">暂无可见参与人员</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</section>

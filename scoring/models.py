@@ -287,84 +287,18 @@ class JudgementOption(models.Model):
         return f"{self.score_value} - {self.description}"
 
 
-class ScoringParticipant(models.Model):
-    scheme = models.ForeignKey(
-        ScoringScheme, verbose_name="评分方案", on_delete=models.CASCADE, related_name="participants"
-    )
-    assessment_participant = models.ForeignKey(
-        "assessments.AssessmentParticipant",
-        verbose_name="评测参与人员",
-        on_delete=models.PROTECT,
-        related_name="scoring_participations",
-        null=True,
-        blank=True,
-    )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        verbose_name="关联用户",
-        on_delete=models.PROTECT,
-        related_name="scoring_participations",
-        null=True,
-        blank=True,
-    )
-    external_identifier = models.CharField("外部编号", max_length=100, blank=True)
-    display_name = models.CharField("显示名称", max_length=200)
-    organization = models.CharField("所属单位", max_length=200, blank=True)
-    metadata = models.JSONField("元数据", default=dict, blank=True)
-    order = models.PositiveIntegerField("排序", default=0)
-    created_at = models.DateTimeField("创建时间", auto_now_add=True)
-
-    class Meta:
-        verbose_name = "参评对象"
-        verbose_name_plural = "参评对象"
-        ordering = ["scheme", "order", "display_name", "pk"]
-        permissions = [("view_all_scoringparticipant", "查看全部参评对象")]
-        constraints = [
-            models.UniqueConstraint(
-                fields=["scheme", "assessment_participant"],
-                condition=Q(assessment_participant__isnull=False),
-                name="uniq_scoringparticipant_assessment_participant",
-            ),
-            models.UniqueConstraint(
-                fields=["scheme", "user"],
-                condition=Q(user__isnull=False),
-                name="uniq_scoringparticipant_user",
-            ),
-            models.UniqueConstraint(
-                fields=["scheme", "external_identifier"],
-                condition=~Q(external_identifier=""),
-                name="uniq_scoringparticipant_external",
-            ),
-        ]
-
-    def clean(self):
-        super().clean()
-        identities = [bool(self.assessment_participant_id), bool(self.user_id), bool(self.external_identifier)]
-        if sum(identities) != 1:
-            raise ValidationError("参评对象必须且只能绑定评测参与人员、用户或外部编号中的一种。")
-        if self.assessment_participant_id and self.scheme_id:
-            if self.assessment_participant.assessment_id != self.scheme.assessment_module.assessment_id:
-                raise ValidationError({"assessment_participant": "评测参与人员必须属于评分方案对应评测。"})
-
-    def save(self, *args, **kwargs):
-        self.clean()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.display_name
-
-
 class ScoringResult(models.Model):
     class Source(models.TextChoices):
-        CMP = "cmp", "CMP 导入"
-        IMPORTED = "imported", "文件导入"
+        ONLINE = "online", "在线评分"
+        EXCEL_IMPORT = "excel_import", "Excel 导入"
+        CMP_IMPORT = "cmp_import", "CMP 导入"
         MANUAL = "manual", "人工录入"
 
     participant = models.ForeignKey(
-        ScoringParticipant,
-        verbose_name="参评对象",
+        "assessments.AssessmentParticipant",
+        verbose_name="评测参与人员",
         on_delete=models.CASCADE,
-        related_name="results",
+        related_name="scoring_results",
     )
     aspect = models.ForeignKey(ScoringAspect, verbose_name="评分点", on_delete=models.PROTECT, related_name="results")
     score_awarded = models.DecimalField(
@@ -374,10 +308,35 @@ class ScoringResult(models.Model):
         default=Decimal("0.00"),
         validators=[MinValueValidator(Decimal("0.00"))],
     )
-    source = models.CharField("来源", max_length=20, choices=Source.choices, default=Source.IMPORTED)
+    source = models.CharField("来源", max_length=20, choices=Source.choices, default=Source.MANUAL)
+    entered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="录入人",
+        on_delete=models.SET_NULL,
+        related_name="entered_scoring_results",
+        null=True,
+        blank=True,
+    )
+    entered_at = models.DateTimeField("录入时间", default=timezone.now)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="最后修改人",
+        on_delete=models.SET_NULL,
+        related_name="updated_scoring_results",
+        null=True,
+        blank=True,
+    )
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="确认人",
+        on_delete=models.SET_NULL,
+        related_name="confirmed_scoring_results",
+        null=True,
+        blank=True,
+    )
+    confirmed_at = models.DateTimeField("确认时间", null=True, blank=True)
     evidence = models.TextField("证据摘要", blank=True)
     raw_payload = models.JSONField("原始结果", default=dict, blank=True)
-    graded_at = models.DateTimeField("评分时间", null=True, blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
@@ -388,14 +347,28 @@ class ScoringResult(models.Model):
         permissions = [("view_all_scoringresult", "查看全部评分结果")]
         constraints = [
             models.UniqueConstraint(fields=["participant", "aspect"], name="uniq_scoring_result"),
+            models.CheckConstraint(condition=Q(score_awarded__gte=0), name="scoring_result_score_nonnegative"),
+            models.CheckConstraint(
+                condition=(Q(confirmed_by__isnull=True) & Q(confirmed_at__isnull=True))
+                | (Q(confirmed_by__isnull=False) & Q(confirmed_at__isnull=False)),
+                name="scoring_result_confirmation_pair",
+            ),
         ]
 
     def clean(self):
         super().clean()
-        if self.participant_id and self.aspect_id and self.participant.scheme_id != self.aspect.scheme_id:
-            raise ValidationError("评分点不属于当前参评对象的评分方案。")
+        if self.participant_id and self.aspect_id:
+            assessment_id = self.aspect.scheme.assessment_module.assessment_id
+            if self.participant.assessment_id != assessment_id:
+                raise ValidationError({"participant": "参与人员必须属于评分方案对应的竞赛或考核。"})
+            from assessments.models import CompetitionRole
+
+            if self.participant.role.category != CompetitionRole.Category.COMPETITOR:
+                raise ValidationError({"participant": "只有选手类参与人员可以产生评分结果。"})
         if self.aspect_id and self.score_awarded > self.aspect.max_mark:
             raise ValidationError({"score_awarded": f"得分不能超过评分点分值 {self.aspect.max_mark}。"})
+        if bool(self.confirmed_by_id) != bool(self.confirmed_at):
+            raise ValidationError("确认人和确认时间必须同时填写或同时留空。")
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -403,6 +376,35 @@ class ScoringResult(models.Model):
 
     def __str__(self):
         return f"{self.participant} / {self.aspect}: {self.score_awarded}"
+
+
+class ScoringResultRevision(models.Model):
+    scoring_result = models.ForeignKey(
+        ScoringResult,
+        verbose_name="评分结果",
+        on_delete=models.CASCADE,
+        related_name="revisions",
+    )
+    old_score = models.DecimalField("原得分", max_digits=8, decimal_places=2)
+    new_score = models.DecimalField("新得分", max_digits=8, decimal_places=2)
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="修改人",
+        on_delete=models.SET_NULL,
+        related_name="scoring_result_revisions",
+        null=True,
+        blank=True,
+    )
+    changed_at = models.DateTimeField("修改时间", auto_now_add=True)
+    reason = models.CharField("修改原因", max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "评分修改记录"
+        ordering = ["-changed_at", "-pk"]
+        default_permissions = ("view",)
+
+    def __str__(self):
+        return f"{self.scoring_result}：{self.old_score} → {self.new_score}"
 
 
 class ScoringResultImport(models.Model):

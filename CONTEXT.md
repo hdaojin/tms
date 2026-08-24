@@ -60,6 +60,14 @@ Skill 不设置面向用户的业务编号。正式名称和别名在技能项�
 
 某次 Assessment 的实际模块。模块可覆盖一个或多个 TechnicalDomain，但模块本身不是 TechnicalDomain。
 
+### CompetitionPerson / CompetitionRole（长期赛事人员/赛事角色）
+
+CompetitionPerson 是不可登录、可跨届复用的轻量赛事人员目录；CompetitionRole 是使用稳定代码和类别表达机器语义的可配置赛事角色。两者都不替代 Django User 或 Django Permission。
+
+### AssessmentParticipant（评测参与人员）
+
+某个人在单场 Assessment 中的历史人员快照，可来源于 User、CompetitionPerson 或临时录入。只有角色类别为 COMPETITOR 的参与人员可以产生 ScoringResult 和最终结果；后续修改 User 或长期人员目录不得改写既有比赛快照。
+
 ### AssessmentDocument（评测资料）
 
 Assessment 或 AssessmentModule 拥有的私有业务文件，包括试题、评分表、评分标准、评分脚本、结果文件和附件。同一上下文、资料类型和 SHA256 的重复文件拒绝保存；不同版本文件可以并存。
@@ -71,6 +79,10 @@ Assessment 或 AssessmentModule 拥有的私有业务文件，包括试题、评
 ### EvidenceSkillMap（考点技能映射）
 
 把 Evidence 映射到稳定 Skill。单条映射权重满足 `0 < weight <= 1`，同一 Evidence 的已批准映射权重合计不超过 1；修正映射后历史统计和表现按当前映射动态重算。
+
+### ScoringResult / AssessmentFinalResult（评分点结果/官方最终结果）
+
+ScoringResult 是某位选手在某个 ScoringAspect 上的统一评分事实，在线录入和外部导入使用同一结构。AssessmentFinalResult 是经确认的整场官方结果，可拥有多种 AssessmentFinalScore 表示和多个 AssessmentAward；实时汇总不能自动成为官方结果。
 
 ### TrainingCycle（训练周期）
 
@@ -109,6 +121,8 @@ Assessment 或 AssessmentModule 拥有的私有业务文件，包括试题、评
 13. SkillTreeVersion 只属于一个 TechnicalDomain；SkillTreeNode 不单独持久化技术领域，也不能跨版本移动。
 14. TrainingCycle 至少绑定一个领域版本；TrainingTask 的技术领域必须是其周期已绑定领域的子集。
 15. 训练周期状态只允许按“筹备中 → 进行中 → 已完成 → 已归档”前进，不能跳级或回退。
+16. ScoringResult 与 AssessmentFinalResult 只能关联同一 Assessment 内的 COMPETITOR 类参与人员。
+17. 最终名次、成绩表示和奖项相互独立；一名选手可以拥有多个成绩表示和多个奖项。
 
 ## 专业词库术语
 

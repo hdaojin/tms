@@ -10,6 +10,14 @@
       <span class="badge badge-outline">总分 {{ scheme.total_mark }}</span>
       <span class="badge badge-outline">{{ scheme.parser_version }}</span>
     </div>
+    {% if can_score_online %}
+      <div class="card-actions justify-end">
+        <a class="btn btn-primary" href="{% url 'scoring:online_scoring' scheme.assessment_module_id %}">
+          <span class="icon-[tabler--scoreboard] size-5"></span>
+          进入在线评分
+        </a>
+      </div>
+    {% endif %}
   </div>
 </div>
 <div class="card bg-base-100 shadow-sm">
@@ -21,9 +29,9 @@
 <div class="card bg-base-100 shadow-sm">
   <div class="card-body">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h3 class="font-semibold">参评对象</h3>
-      {% if perms.scoring.add_scoringparticipant %}
-        <a href="{% url 'scoring:participant_create' %}" class="btn btn-primary btn-sm">新增参评对象</a>
+      <h3 class="font-semibold">参评选手</h3>
+      {% if perms.assessments.add_assessmentparticipant %}
+        <a href="{% url 'assessments:participant_create' %}?assessment={{ scheme.assessment_module.assessment_id }}" class="btn btn-primary btn-sm">新增选手</a>
       {% endif %}
     </div>
     {% render_table participant_table %}

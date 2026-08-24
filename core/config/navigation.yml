@@ -225,84 +225,21 @@ sections:
         icon_class: icon-[tabler--trophy] size-5 text-warning
         children:
           - key: assessments
-            label: 竞赛与考核列表
+            label: 竞赛与考核
             url_name: assessments:assessment_list
             icon_class: icon-[tabler--trophy] size-5 text-warning
             permissions: [assessments.view_assessment]
-          - key: assessment_create
-            label: 新增竞赛与考核
-            url_name: assessments:assessment_create
-            icon_class: icon-[tabler--plus] size-5 text-warning
-            permissions:
-              - assessments.add_assessment
-          - key: assessment_modules
-            label: 评测模块
-            url_name: assessments:module_list
-            icon_class: icon-[tabler--stairs] size-5 text-warning
-            permissions: [assessments.view_assessmentmodule]
-          - key: assessment_module_create
-            label: 新增评测模块
-            url_name: assessments:module_create
-            icon_class: icon-[tabler--plus] size-5 text-warning
-            permissions:
-              - assessments.add_assessmentmodule
-      - key: assessment_operations
-        label: 评测资料与人员
-        icon_class: icon-[tabler--calendar-event] size-5 text-warning
-        children:
-          - key: assessment_documents
-            label: 上传评测资料
-            url_name: assessments:document_upload
-            icon_class: icon-[tabler--calendar-event] size-5 text-warning
-            permissions: [assessments.add_assessmentdocument]
-          - key: assessment_participant_create
-            label: 新增参与人员
-            url_name: assessments:participant_create
-            icon_class: icon-[tabler--plus] size-5 text-warning
-            permissions:
-              - assessments.add_assessmentparticipant
-      - key: evidence_group
-        label: 考点证据
-        icon_class: icon-[tabler--file-analytics] size-5 text-warning
-        children:
-          - key: evidence
-            label: 考点证据列表
-            url_name: evidence:evidence_list
-            icon_class: icon-[tabler--file-analytics] size-5 text-warning
-            permissions: [evidence.view_knowledgeevidence]
-          - key: evidence_create
-            label: 新增考点证据
-            url_name: evidence:evidence_create
-            icon_class: icon-[tabler--plus] size-5 text-warning
-            permissions:
-              - evidence.add_knowledgeevidence
-      - key: scoring_group
-        label: 评分管理
-        icon_class: icon-[tabler--clipboard-check] size-5 text-primary
-        children:
-          - key: scoring
-            label: 评分方案
-            url_name: scoring:scheme_list
-            icon_class: icon-[tabler--clipboard-check] size-5 text-primary
-            permissions: [scoring.view_scoringscheme]
-          - key: scoring_import
-            label: 导入评分表
-            url_name: scoring:scheme_import
-            icon_class: icon-[tabler--upload] size-5 text-primary
-            permissions:
-              - scoring.add_scoringscheme
-          - key: scoring_participant_create
-            label: 新增参评对象
-            url_name: scoring:participant_create
-            icon_class: icon-[tabler--user-plus] size-5 text-primary
-            permissions:
-              - scoring.add_scoringparticipant
-          - key: scoring_result_create
-            label: 录入评分结果
-            url_name: scoring:result_create
-            icon_class: icon-[tabler--edit] size-5 text-primary
-            permissions:
-              - scoring.add_scoringresult
+            active_app_names: [assessments, scoring, evidence]
+          - key: competition_people
+            label: 长期赛事人员
+            url_name: assessments:competition_person_list
+            icon_class: icon-[tabler--address-book] size-5 text-warning
+            permissions: [assessments.view_competitionperson]
+          - key: competition_roles
+            label: 赛事角色配置
+            url_name: assessments:competition_role_list
+            icon_class: icon-[tabler--user-cog] size-5 text-warning
+            permissions: [assessments.view_competitionrole]
 
   - key: standards
     label: 标准

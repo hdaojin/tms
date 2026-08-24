@@ -97,11 +97,11 @@ bundles:
   - code: assessments.view_assessments
     name: 竞赛与考核 | 查看
     description: 按业务范围查看竞赛、考核、模块、人员和资料。
-    permissions: [assessments.view_assessmentseries, assessments.view_assessmentlevel, assessments.view_assessment, assessments.view_assessmentmodule, assessments.view_assessmentmoduledomain, assessments.view_assessmentmodulecoach, assessments.view_assessmentparticipant, assessments.view_assessmentresultsummary, assessments.view_assessmentdocument]
+    permissions: [assessments.view_assessmentseries, assessments.view_assessmentlevel, assessments.view_competitionperson, assessments.view_competitionrole, assessments.view_assessment, assessments.view_assessmentmodule, assessments.view_assessmentmoduledomain, assessments.view_assessmentmodulecoach, assessments.view_assessmentparticipant, assessments.view_assessmentfinalresult, assessments.view_assessmentfinalscore, assessments.view_assessmentaward, assessments.view_assessmentresultaward, assessments.view_assessmentdocument]
   - code: assessments.maintain_assessments
     name: 竞赛与考核 | 维护
-    description: 按技术领域维护模块、人员和业务资料。
-    permissions: [assessments.view_assessment, assessments.add_assessment, assessments.change_assessment, assessments.view_assessmentmodule, assessments.add_assessmentmodule, assessments.change_assessmentmodule, assessments.view_assessmentparticipant, assessments.add_assessmentparticipant, assessments.change_assessmentparticipant, assessments.view_assessmentdocument, assessments.add_assessmentdocument, assessments.change_assessmentdocument]
+    description: 按业务范围维护竞赛、模块、人员、资料和最终结果。
+    permissions: [assessments.view_competitionperson, assessments.add_competitionperson, assessments.change_competitionperson, assessments.view_competitionrole, assessments.add_competitionrole, assessments.change_competitionrole, assessments.view_assessment, assessments.view_all_assessment, assessments.add_assessment, assessments.change_assessment, assessments.change_all_assessment, assessments.view_assessmentmodule, assessments.add_assessmentmodule, assessments.change_assessmentmodule, assessments.view_assessmentparticipant, assessments.add_assessmentparticipant, assessments.change_assessmentparticipant, assessments.view_assessmentdocument, assessments.add_assessmentdocument, assessments.change_assessmentdocument, assessments.view_assessmentfinalresult, assessments.add_assessmentfinalresult, assessments.change_assessmentfinalresult, assessments.view_assessmentfinalscore, assessments.add_assessmentfinalscore, assessments.change_assessmentfinalscore, assessments.view_assessmentaward, assessments.add_assessmentaward, assessments.change_assessmentaward, assessments.view_assessmentresultaward, assessments.add_assessmentresultaward, assessments.change_assessmentresultaward]
 
   - code: scoring.view_schemes
     name: 评分 | 查看评分方案
@@ -109,16 +109,16 @@ bundles:
     permissions: [scoring.view_scoringscheme, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption]
   - code: scoring.view_own_results
     name: 评分 | 查看本人评分结果
-    description: 查看与本人关联的参评对象和评分结果。
-    permissions: [scoring.view_scoringparticipant, scoring.view_scoringresult]
+    description: 查看本人的评分结果。
+    permissions: [scoring.view_scoringresult]
   - code: scoring.view_all_results
     name: 评分 | 查看全部评分结果
-    description: 将参评对象和评分结果范围扩大到全部人员。
-    permissions: [scoring.view_scoringparticipant, scoring.view_scoringresult, scoring.view_all_scoringparticipant, scoring.view_all_scoringresult]
+    description: 将评分结果范围扩大到全部人员。
+    permissions: [scoring.view_scoringresult, scoring.view_all_scoringresult]
   - code: scoring.maintain_scoring
     name: 评分 | 维护评分
-    description: 导入评分表并维护参评对象和评分结果。
-    permissions: [scoring.view_scoringscheme, scoring.add_scoringscheme, scoring.change_scoringscheme, scoring.view_scoringparserconfig, scoring.view_scoringschemeimport, scoring.add_scoringschemeimport, scoring.change_scoringschemeimport, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption, scoring.view_scoringparticipant, scoring.add_scoringparticipant, scoring.change_scoringparticipant, scoring.view_all_scoringparticipant, scoring.view_scoringresult, scoring.add_scoringresult, scoring.change_scoringresult, scoring.view_all_scoringresult, scoring.view_scoringresultimport, scoring.add_scoringresultimport, scoring.change_scoringresultimport]
+    description: 导入评分表并维护评分结果。
+    permissions: [scoring.view_scoringscheme, scoring.add_scoringscheme, scoring.change_scoringscheme, scoring.view_scoringparserconfig, scoring.view_scoringschemeimport, scoring.add_scoringschemeimport, scoring.change_scoringschemeimport, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption, scoring.view_scoringresult, scoring.add_scoringresult, scoring.change_scoringresult, scoring.view_all_scoringresult, scoring.view_scoringresultrevision, scoring.view_scoringresultimport, scoring.add_scoringresultimport, scoring.change_scoringresultimport]
 
   - code: evidence.view_evidence
     name: 考点证据 | 查看

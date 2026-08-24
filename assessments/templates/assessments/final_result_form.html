@@ -1,0 +1,13 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <div class="space-y-4">
+    <div class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body"><h2 class="card-title">{{ final_result.participant.display_name }}</h2><p class="text-sm text-base-content/60">{{ final_result.participant.assessment.name }} · 保存任何变化后需要重新确认。</p></div></div>
+    <form method="post" class="space-y-4">
+      {% csrf_token %}
+      <div class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body gap-4"><h3 class="card-title text-base">名次、奖项与备注</h3>{% include "components/form_errors.html" with form=form %}<div class="grid gap-4 md:grid-cols-2">{% include "components/field.html" with field=form.rank %}{% include "components/field.html" with field=form.awards %}{% include "components/field.html" with field=form.notes %}</div></div></div>
+      <div class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body gap-4"><div><h3 class="card-title text-base">多评分体系成绩</h3><p class="text-sm text-base-content/60">可同时保存原始成绩、百分制、WorldSkills 标准化成绩或自定义成绩；系统不会假定 WorldSkills 最大值。</p></div>{{ score_formset.management_form }}{% for hidden in score_formset.hidden_fields %}{{ hidden }}{% endfor %}{% if score_formset.non_form_errors %}<div class="alert alert-error">{{ score_formset.non_form_errors }}</div>{% endif %}<div class="space-y-3">{% for score_form in score_formset.forms %}<div class="grid gap-3 rounded-box border border-base-300 p-3 md:grid-cols-6">{% for hidden in score_form.hidden_fields %}{{ hidden }}{% endfor %}{% include "components/field.html" with field=score_form.score_type show_help=False %}{% include "components/field.html" with field=score_form.label show_help=False %}{% include "components/field.html" with field=score_form.value show_help=False %}{% include "components/field.html" with field=score_form.max_value show_help=False %}{% include "components/field.html" with field=score_form.order show_help=False %}{% include "components/field.html" with field=score_form.DELETE show_help=False %}</div>{% endfor %}</div></div></div>
+      <div class="flex flex-wrap justify-end gap-2"><a class="btn btn-ghost" href="{% url 'assessments:assessment_detail' final_result.participant.assessment_id %}?tab=results">取消</a><button class="btn btn-primary" type="submit">保存最终结果</button></div>
+    </form>
+  </div>
+{% endblock %}

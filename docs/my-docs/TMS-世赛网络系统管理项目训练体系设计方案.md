@@ -1446,8 +1446,8 @@ WSOS 标准
 - 评分表解析；
 - ScoringScheme；
 - ScoringAspect；
-- ScoringParticipant；
-- ScoringResult；
+- 直接关联 AssessmentParticipant 的 ScoringResult；
+- ScoringResult 修改审计；
 - 评分结果导入。
 
 ### evidence

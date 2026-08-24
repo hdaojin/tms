@@ -13,8 +13,11 @@ urlpatterns = [
         "parsers/<str:parser_key>/template/", views.ScoringParserTemplateDownloadView.as_view(), name="parser_template"
     ),
     path("schemes/<int:pk>/", views.ScoringSchemeDetailView.as_view(), name="scheme_detail"),
-    path("participants/create/", views.ScoringParticipantCreateView.as_view(), name="participant_create"),
-    path("participants/<int:pk>/", views.ScoringParticipantDetailView.as_view(), name="participant_detail"),
-    path("participants/<int:pk>/edit/", views.ScoringParticipantUpdateView.as_view(), name="participant_edit"),
+    path("modules/<int:module_pk>/online/", views.OnlineScoringWorkspaceView.as_view(), name="online_scoring"),
+    path(
+        "modules/<int:module_pk>/online/participants/<int:participant_pk>/aspects/<int:aspect_pk>/",
+        views.OnlineScoringEntryView.as_view(),
+        name="online_scoring_entry",
+    ),
     path("results/create/", views.ScoringResultCreateView.as_view(), name="result_create"),
 ]
