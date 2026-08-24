@@ -4,9 +4,9 @@ from .models import (
     JudgementOption,
     ScoringAspect,
     ScoringParserConfig,
-    ScoringParticipant,
     ScoringResult,
     ScoringResultImport,
+    ScoringResultRevision,
     ScoringScheme,
     ScoringSchemeImport,
     ScoringSubCriterion,
@@ -21,8 +21,8 @@ admin.site.register(
         ScoringSubCriterion,
         ScoringAspect,
         JudgementOption,
-        ScoringParticipant,
         ScoringResult,
+        ScoringResultRevision,
         ScoringResultImport,
     ]
 )

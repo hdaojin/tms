@@ -1,6 +1,6 @@
 from core.tables import ActionsColumn, BaseTable
 
-from .models import ScoringAspect, ScoringParticipant, ScoringScheme
+from .models import ScoringAspect, ScoringScheme
 
 
 class ScoringSchemeTable(BaseTable):
@@ -15,11 +15,3 @@ class ScoringAspectTable(BaseTable):
     class Meta(BaseTable.Meta):
         model = ScoringAspect
         fields = ("code", "aspect_type", "description", "calculation_row", "max_mark", "source_row_number")
-
-
-class ScoringParticipantTable(BaseTable):
-    actions = ActionsColumn(view_url="scoring:participant_detail", edit_url="scoring:participant_edit")
-
-    class Meta(BaseTable.Meta):
-        model = ScoringParticipant
-        fields = ("scheme", "display_name", "organization", "actions")

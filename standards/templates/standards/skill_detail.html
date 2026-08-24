@@ -74,16 +74,20 @@
       <div class="card border border-base-300">
         <div class="card-body">
           <h3 class="card-title">历史考查</h3>
-          <p>
-            证据 {{ assessment_history.evidence_count }} 条 · 考核
-            {{ assessment_history.assessment_count }} 次
-          </p>
-          <p>
-            折算分值
-            {{ assessment_history.weighted_mark }}{% if assessment_history.latest_date %}
-              · 最近 {{ assessment_history.latest_date }}
-            {% endif %}
-          </p>
+          {% if can_view_evidence_history %}
+            <p>
+              证据 {{ assessment_history.evidence_count }} 条 · 考核
+              {{ assessment_history.assessment_count }} 次
+            </p>
+            <p>
+              折算分值
+              {{ assessment_history.weighted_mark }}{% if assessment_history.latest_date %}
+                · 最近 {{ assessment_history.latest_date }}
+              {% endif %}
+            </p>
+          {% else %}
+            <p class="text-sm text-base-content/60">当前账号无权查看考点证据历史。</p>
+          {% endif %}
         </div>
       </div>
       <div class="card border border-base-300">
@@ -103,20 +107,26 @@
       <div class="card border border-base-300">
         <div class="card-body">
           <h3 class="card-title">考核表现</h3>
-          <p>
-            {{ assessment_performance.awarded_mark }} /
-            {{ assessment_performance.mapped_max_mark }}
-          </p>
-          <p class="text-sm text-base-content/70">
-            按已批准证据映射权重从真实评分结果动态折算。
-          </p>
+          {% if can_view_assessment_performance %}
+            <p>
+              得分 {{ assessment_performance.awarded_mark }} /
+              {{ assessment_performance.mapped_max_mark }} · 失分 {{ assessment_performance.lost_mark }}
+            </p>
+            <p>得分率 {% if assessment_performance.score_rate is not None %}{{ assessment_performance.score_rate }}%{% else %}-{% endif %}</p>
+            <p class="text-sm text-base-content/70">
+              {{ assessment_performance.assessment_count }} 场考核 · {{ assessment_performance.participant_count }} 名选手 · 按当前已批准映射动态折算。
+            </p>
+          {% else %}
+            <p class="text-sm text-base-content/60">当前账号无权查看全部评分结果或考点证据。</p>
+          {% endif %}
         </div>
       </div>
     </section>
+    {% if can_view_assessment_performance %}
     <section class="card border border-base-300">
       <div class="card-body">
         <div class="flex items-center justify-between gap-3">
-          <h3 class="card-title">最近得分趋势</h3>
+          <h3 class="card-title">最近得失分趋势</h3>
           {% if perms.training.add_trainingtask %}
             <a
               class="btn btn-sm btn-primary"
@@ -133,6 +143,8 @@
                 <th>评测</th>
                 <th>参评对象</th>
                 <th>得分</th>
+                <th>失分</th>
+                <th>得分率</th>
               </tr>
             </thead>
             <tbody>
@@ -141,15 +153,15 @@
                   <td>
                     {{ item.aspect__scheme__assessment_module__assessment__start_date }}
                   </td>
-                  <td>
-                    {{ item.aspect__scheme__assessment_module__assessment__name }}
-                  </td>
+                  <td>{% if can_open_assessment %}<a class="link" href="{% url 'assessments:assessment_detail' item.aspect__scheme__assessment_module__assessment_id %}?tab=analysis">{{ item.aspect__scheme__assessment_module__assessment__name }}</a>{% else %}{{ item.aspect__scheme__assessment_module__assessment__name }}{% endif %}</td>
                   <td>{{ item.participant__display_name }}</td>
                   <td>{{ item.awarded_mark }} / {{ item.mapped_max_mark }}</td>
+                  <td>{{ item.lost_mark }}</td>
+                  <td>{% if item.score_rate is not None %}{{ item.score_rate }}%{% else %}-{% endif %}</td>
                 </tr>
                 {% empty %}
                 <tr>
-                  <td colspan="4">暂无评分结果</td>
+                  <td colspan="6">暂无评分结果</td>
                 </tr>
               {% endfor %}
             </tbody>
@@ -157,5 +169,33 @@
         </div>
       </div>
     </section>
+    <section class="card border border-base-300">
+      <div class="card-body">
+        <div>
+          <h3 class="card-title">历史重复失分</h3>
+          <p class="text-sm text-base-content/60">同一评分点至少出现两次失分时列出；仅用于教练复核，不代表持久化掌握度。</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>Evidence</th><th>评分点</th><th>失分记录</th><th>涉及选手</th><th>涉及考核</th><th>折算失分</th></tr></thead>
+            <tbody>
+              {% for item in assessment_performance.repeated_losses %}
+                <tr>
+                  <td>{{ item.aspect__knowledge_evidence__title }}</td>
+                  <td class="max-w-xl whitespace-normal">{{ item.aspect__description }}</td>
+                  <td>{{ item.result_count }}</td>
+                  <td>{{ item.participant_count }}</td>
+                  <td>{{ item.assessment_count }}</td>
+                  <td>{{ item.lost_mark }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="6">暂无重复失分记录。</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+    {% endif %}
   </div>
 {% endblock %}

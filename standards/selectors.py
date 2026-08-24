@@ -237,7 +237,7 @@ def wsos_skill_candidates(*, section, query="", domain=None):
     return queryset.select_related("primary_domain").prefetch_related("terms").distinct().order_by("name", "pk")[:20]
 
 
-def skill_assessment_history(skill):
+def skill_assessment_history(skill, *, evidences=None):
     from evidence.models import EvidenceSkillMap, KnowledgeEvidence
 
     approved = EvidenceSkillMap.objects.filter(
@@ -245,6 +245,8 @@ def skill_assessment_history(skill):
         review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
         evidence__review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
     )
+    if evidences is not None:
+        approved = approved.filter(evidence__in=evidences)
     weighted_mark = ExpressionWrapper(
         Coalesce(F("evidence__estimated_mark"), Decimal("0")) * F("weight"),
         output_field=DecimalField(max_digits=12, decimal_places=4),
@@ -289,15 +291,30 @@ def skill_training_investment(skill):
     return summary
 
 
-def skill_assessment_performance(skill):
+def _decorate_performance_row(row):
+    awarded_mark = row.get("awarded_mark") or Decimal("0")
+    mapped_max_mark = row.get("mapped_max_mark") or Decimal("0")
+    row["lost_mark"] = mapped_max_mark - awarded_mark
+    row["score_rate"] = (
+        (awarded_mark * Decimal("100") / mapped_max_mark).quantize(Decimal("0.1"))
+        if mapped_max_mark
+        else None
+    )
+    return row
+
+
+def skill_assessment_performance(skill, *, results=None, evidences=None):
     from evidence.models import KnowledgeEvidence
     from scoring.models import ScoringResult
 
-    results = ScoringResult.objects.filter(
+    results = results if results is not None else ScoringResult.objects.all()
+    results = results.filter(
         aspect__knowledge_evidence__review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
         aspect__knowledge_evidence__skill_mappings__skill=skill,
         aspect__knowledge_evidence__skill_mappings__review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
     )
+    if evidences is not None:
+        results = results.filter(aspect__knowledge_evidence__in=evidences)
     weight = F("aspect__knowledge_evidence__skill_mappings__weight")
     score_contribution = ExpressionWrapper(
         F("score_awarded") * weight,
@@ -310,10 +327,16 @@ def skill_assessment_performance(skill):
     summary = results.aggregate(
         awarded_mark=Coalesce(Sum(score_contribution), Decimal("0")),
         mapped_max_mark=Coalesce(Sum(max_contribution), Decimal("0")),
+        result_count=Count("pk"),
+        participant_count=Count("participant_id", distinct=True),
+        assessment_count=Count("participant__assessment_id", distinct=True),
     )
-    summary["trend"] = list(
-        results.values(
+    _decorate_performance_row(summary)
+    summary["trend"] = [
+        _decorate_performance_row(row)
+        for row in results.values(
             "participant__display_name",
+            "aspect__scheme__assessment_module__assessment_id",
             "aspect__scheme__assessment_module__assessment__name",
             "aspect__scheme__assessment_module__assessment__start_date",
         )
@@ -322,5 +345,68 @@ def skill_assessment_performance(skill):
             mapped_max_mark=Sum(max_contribution),
         )
         .order_by("-aspect__scheme__assessment_module__assessment__start_date")[:10]
+    ]
+    loss_contribution = ExpressionWrapper(
+        (F("aspect__max_mark") - F("score_awarded")) * weight,
+        output_field=DecimalField(max_digits=12, decimal_places=4),
+    )
+    summary["repeated_losses"] = list(
+        results.filter(score_awarded__lt=F("aspect__max_mark"))
+        .values(
+            "aspect_id",
+            "aspect__description",
+            "aspect__knowledge_evidence__pk",
+            "aspect__knowledge_evidence__title",
+        )
+        .annotate(
+            result_count=Count("pk"),
+            participant_count=Count("participant_id", distinct=True),
+            assessment_count=Count("participant__assessment_id", distinct=True),
+            lost_mark=Sum(loss_contribution),
+        )
+        .filter(result_count__gte=2)
+        .order_by("-result_count", "-lost_mark", "aspect__knowledge_evidence__title")[:10]
     )
     return summary
+
+
+def assessment_skill_performance(assessment, *, modules, results, evidences):
+    from evidence.models import KnowledgeEvidence
+
+    weight = F("aspect__knowledge_evidence__skill_mappings__weight")
+    score_contribution = ExpressionWrapper(
+        F("score_awarded") * weight,
+        output_field=DecimalField(max_digits=12, decimal_places=4),
+    )
+    max_contribution = ExpressionWrapper(
+        F("aspect__max_mark") * weight,
+        output_field=DecimalField(max_digits=12, decimal_places=4),
+    )
+    rows = list(
+        results.filter(
+            participant__assessment=assessment,
+            aspect__scheme__assessment_module__in=modules,
+            aspect__knowledge_evidence__in=evidences,
+            aspect__knowledge_evidence__review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
+            aspect__knowledge_evidence__skill_mappings__review_status=KnowledgeEvidence.ReviewStatus.APPROVED,
+        )
+        .values(
+            skill_id=F("aspect__knowledge_evidence__skill_mappings__skill_id"),
+            skill_name=F("aspect__knowledge_evidence__skill_mappings__skill__name"),
+            primary_domain_name=F(
+                "aspect__knowledge_evidence__skill_mappings__skill__primary_domain__name"
+            ),
+        )
+        .annotate(
+            awarded_mark=Sum(score_contribution),
+            mapped_max_mark=Sum(max_contribution),
+            result_count=Count("pk"),
+            participant_count=Count("participant_id", distinct=True),
+            evidence_count=Count("aspect__knowledge_evidence", distinct=True),
+        )
+        .order_by("skill_name")
+    )
+    for row in rows:
+        _decorate_performance_row(row)
+    rows.sort(key=lambda row: (-row["lost_mark"], row["skill_name"]))
+    return rows

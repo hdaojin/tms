@@ -1,0 +1,12 @@
+{% extends "common/table_page.html" %}
+
+{% block content %}
+  {% if perms.assessments.add_competitionrole %}
+    <div class="mb-3 flex justify-end">
+      <a class="btn btn-primary btn-sm" href="{% url 'assessments:competition_role_create' %}">
+        <span class="icon-[tabler--user-plus] size-4"></span>新增赛事角色
+      </a>
+    </div>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

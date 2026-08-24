@@ -1,0 +1,51 @@
+<section class="space-y-4">
+  <div class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div><h3 class="card-title text-base">最终结果管理</h3><p class="text-sm text-base-content/60">实时计算结果仅供预览；只有逐条确认并显式发布后，才成为选手可见的正式结果。</p></div>
+        <span class="badge {% if assessment.results_published_at %}badge-success{% else %}badge-warning{% endif %}">{% if assessment.results_published_at %}已发布{% else %}未发布{% endif %}</span>
+      </div>
+      {% if can_manage_results %}
+        <div class="flex flex-wrap justify-end gap-2">
+          {% if can_create_award %}<a class="btn btn-outline btn-sm" href="{% url 'assessments:award_create' assessment.pk %}">新增奖项</a>{% endif %}
+          {% if can_generate_final_results %}<form method="post" action="{% url 'assessments:final_results_generate' assessment.pk %}">{% csrf_token %}<button class="btn btn-outline btn-sm" type="submit">生成或更新草稿结果</button></form>{% endif %}
+          {% if can_publish_final_results %}<form method="post" action="{% url 'assessments:final_results_publish' assessment.pk %}">{% csrf_token %}<button class="btn btn-primary btn-sm" type="submit">发布最终成绩</button></form>{% endif %}
+        </div>
+        {% if assessment_awards %}<div class="flex flex-wrap items-center gap-2"><span class="text-sm text-base-content/60">本场奖项：</span>{% for award in assessment_awards %}<span class="badge badge-outline h-auto whitespace-normal">{{ award.name }}</span>{% endfor %}</div>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  {% if can_manage_results %}
+    <div class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body gap-4">
+        <div><h3 class="card-title text-base">实时计算预览</h3><p class="text-sm text-base-content/60">按计入排名模块的 ScoringResult 动态汇总，不会自动写成官方结果。</p></div>
+        <div class="overflow-x-auto rounded-box border border-base-300">
+          <table class="table"><thead><tr><th>选手</th><th>原始总分</th><th>百分制</th><th>实时名次</th><th>完整性</th></tr></thead><tbody>
+            {% for preview in calculated_final_results %}<tr><td>{{ preview.participant.display_name }}</td><td>{{ preview.raw_score }} / {{ preview.max_score }}</td><td>{{ preview.percentage|default:"-" }}</td><td>{{ preview.rank }}</td><td>{% if preview.is_complete %}<span class="badge badge-success">完整</span>{% else %}<span class="badge badge-warning h-auto whitespace-normal">{{ preview.scored_count }} / {{ preview.expected_count }} 项</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="5">暂无选手或可汇总评分点</td></tr>{% endfor %}
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <h3 class="card-title text-base">已保存最终结果</h3>
+      <div class="overflow-x-auto rounded-box border border-base-300">
+        <table class="table"><thead><tr><th>选手</th><th>成绩</th><th>名次</th><th>奖项</th><th>确认</th>{% if can_manage_results and not assessment.results_published_at %}<th>操作</th>{% endif %}</tr></thead><tbody>
+          {% for result in workspace_final_results %}
+            <tr>
+              <td>{{ result.participant.display_name }}</td>
+              <td>{% for score in result.scores.all %}<div>{{ score.label }}：{{ score.value }}{% if score.max_value is not None %} / {{ score.max_value }}{% endif %}</div>{% empty %}-{% endfor %}</td>
+              <td>{{ result.rank|default:"-" }}</td>
+              <td>{% for link in result.award_links.all %}<span class="badge badge-outline h-auto whitespace-normal">{{ link.award.name }}</span>{% empty %}-{% endfor %}</td>
+              <td>{% if result.is_official %}<span class="badge badge-success">已确认</span>{% else %}<span class="badge badge-warning">待确认</span>{% endif %}</td>
+              {% if can_manage_results and not assessment.results_published_at %}<td><div class="flex flex-wrap gap-2"><a class="btn btn-ghost btn-xs" href="{% url 'assessments:final_result_edit' result.pk %}">编辑</a>{% if not result.is_official %}<form method="post" action="{% url 'assessments:final_result_confirm' result.pk %}">{% csrf_token %}<button class="btn btn-primary btn-xs" type="submit">确认</button></form>{% endif %}</div></td>{% endif %}
+            </tr>
+          {% empty %}<tr><td colspan="{% if can_manage_results and not assessment.results_published_at %}6{% else %}5{% endif %}">暂无可查看的最终结果</td></tr>{% endfor %}
+        </tbody></table>
+      </div>
+    </div>
+  </div>
+</section>

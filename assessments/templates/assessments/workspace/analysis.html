@@ -1,0 +1,63 @@
+<section class="space-y-4">
+  <div class="alert alert-info">
+    <span class="icon-[tabler--info-circle] size-5"></span>
+    <span>当前分析只展示可解释的真实评分汇总，不存储自动推断的 Skill 真值，也不会自动调整训练计划。</span>
+  </div>
+
+  <div class="grid gap-4 xl:grid-cols-2">
+    {% for module in workspace_modules %}
+      <article class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body">
+          <h3 class="card-title break-words text-base">{{ module.code }} - {{ module.name }}</h3>
+          {% if module.scoring_summary %}
+            <dl class="grid grid-cols-2 gap-3 text-sm">
+              <div><dt class="text-base-content/60">完成率</dt><dd class="font-semibold">{{ module.scoring_summary.completion_percent }}%</dd></div>
+              <div><dt class="text-base-content/60">累计得分率</dt><dd class="font-semibold">{{ module.scoring_summary.score_rate }}%</dd></div>
+              <div><dt class="text-base-content/60">已评分项</dt><dd>{{ module.scoring_summary.scored_count }} / {{ module.scoring_summary.expected_count }}</dd></div>
+              <div><dt class="text-base-content/60">已确认项</dt><dd>{{ module.scoring_summary.confirmed_count }}</dd></div>
+            </dl>
+          {% else %}
+            <p class="text-sm text-base-content/60">暂无可查看的评分汇总。</p>
+          {% endif %}
+        </div>
+      </article>
+    {% empty %}
+      {% include "components/empty_state.html" with title="暂无分析数据" icon="icon-[tabler--database-off]" %}
+    {% endfor %}
+  </div>
+
+  <article class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body gap-4">
+      <div>
+        <h3 class="card-title text-base">Skill 得失分证据</h3>
+        <p class="text-sm text-base-content/60">只统计已批准 Evidence 与已批准映射，并按当前映射权重从真实评分结果动态折算。</p>
+      </div>
+      {% if can_view_skill_analysis %}
+        <div class="overflow-x-auto rounded-box border border-base-300">
+          <table class="table table-sm">
+            <thead><tr><th>Skill</th><th>主要领域</th><th>证据</th><th>选手</th><th>得分</th><th>失分</th><th>得分率</th></tr></thead>
+            <tbody>
+              {% for item in assessment_skill_performance %}
+                <tr>
+                  <td class="max-w-72 whitespace-normal">
+                    {% if can_open_skill_detail %}<a class="link" href="{% url 'standards:skill_detail' item.skill_id %}">{{ item.skill_name }}</a>{% else %}{{ item.skill_name }}{% endif %}
+                  </td>
+                  <td>{{ item.primary_domain_name|default:"-" }}</td>
+                  <td>{{ item.evidence_count }}</td>
+                  <td>{{ item.participant_count }}</td>
+                  <td>{{ item.awarded_mark }} / {{ item.mapped_max_mark }}</td>
+                  <td>{{ item.lost_mark }}</td>
+                  <td>{% if item.score_rate is not None %}{{ item.score_rate }}%{% else %}-{% endif %}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="7">当前可见范围内暂无已批准 Skill 映射评分。</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="alert"><span>需要“查看全部评分结果”和“查看考点证据”权限后才能查看 Skill 得失分分析。</span></div>
+      {% endif %}
+    </div>
+  </article>
+</section>

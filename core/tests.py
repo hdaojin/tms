@@ -333,8 +333,9 @@ class MobileNavigationTemplateTests(TestCase):
             "新增评测模块",
             "新增参与人员",
             "导入评分表",
-            "新增参评对象",
             "录入评分结果",
+            "长期赛事人员",
+            "赛事角色配置",
             "标准技能树",
             "技能树版本",
             "技能项目",
@@ -350,13 +351,9 @@ class MobileNavigationTemplateTests(TestCase):
             user,
             "training.add_trainingcycle",
             "training.add_traininglog",
-            "assessments.add_assessment",
-            "assessments.add_assessmentmodule",
-            "assessments.add_assessmentparticipant",
-            "assessments.add_assessmentdocument",
-            "scoring.add_scoringscheme",
-            "scoring.add_scoringparticipant",
-            "scoring.add_scoringresult",
+            "assessments.view_assessment",
+            "assessments.view_competitionperson",
+            "assessments.view_competitionrole",
             "standards.add_skillproject",
             "standards.add_technicaldomain",
             "standards.add_skill",
@@ -364,7 +361,6 @@ class MobileNavigationTemplateTests(TestCase):
             "standards.add_wsosversion",
             "standards.view_skillproject",
             "standards.view_skilltreeversion",
-            "evidence.add_knowledgeevidence",
             "meetings.add_meeting",
             "behaviors.add_conduct_record",
         )
@@ -378,21 +374,48 @@ class MobileNavigationTemplateTests(TestCase):
         for label in [
             "新增训练周期",
             "新增训练日志",
-            "新增竞赛与考核",
-            "新增评测模块",
-            "新增参与人员",
-            "上传评测资料",
-            "导入评分表",
-            "新增参评对象",
-            "录入评分结果",
+            "长期赛事人员",
+            "赛事角色配置",
             "标准技能树",
             "技能树版本",
             "技能项目",
-            "新增考点证据",
             "上传会议记录",
             "录入奖惩记录",
         ]:
             self.assertIn(label, html)
+
+    def test_assessment_navigation_exposes_only_business_entries_and_keeps_workspace_routes_active(self):
+        user = User.objects.create_user(username="assessment-nav-user", password="testpass123")
+        user = self._grant_permissions(
+            user,
+            "assessments.view_assessment",
+            "assessments.view_competitionperson",
+            "assessments.view_competitionrole",
+            "assessments.add_assessment",
+            "assessments.add_assessmentmodule",
+            "assessments.add_assessmentparticipant",
+            "assessments.add_assessmentdocument",
+            "scoring.view_scoringscheme",
+            "scoring.add_scoringscheme",
+            "scoring.add_scoringresult",
+            "evidence.view_knowledgeevidence",
+            "evidence.add_knowledgeevidence",
+        )
+
+        for path in [reverse("scoring:scheme_list"), reverse("evidence:evidence_list")]:
+            with self.subTest(path=path):
+                request = self.factory.get(path)
+                request.user = user
+                request.resolver_match = resolve(request.path)
+                items = navigation.get_section_items("assessments", user, request=request)
+                children = items[0].children
+
+                self.assertEqual(
+                    [item.label for item in children],
+                    ["竞赛与考核", "长期赛事人员", "赛事角色配置"],
+                )
+                self.assertTrue(children[0].active)
+                self.assertEqual(navigation.resolve_current_section(request), "assessments")
 
     def test_render_sections_cards_keeps_dashboard_members_unchanged(self):
         user = User.objects.create_user(username="dashboard-nav-user", password="testpass123")

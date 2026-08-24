@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -9,6 +10,7 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
 
+from accounts.services.users import get_user_display_name
 from core.uploads import (
     ASSESSMENT_DOCUMENT_UPLOAD_SPEC,
     PrivateMediaStorage,
@@ -56,6 +58,51 @@ class AssessmentLevel(models.Model):
     class Meta:
         verbose_name = verbose_name_plural = "竞赛与考核级别"
         ordering = ["order", "code"]
+
+    def __str__(self):
+        return self.name
+
+
+class CompetitionPerson(models.Model):
+    name = models.CharField("姓名", max_length=150)
+    organization = models.CharField("单位", max_length=200, blank=True)
+    country_or_region = models.CharField("国家或地区", max_length=120, blank=True)
+    title = models.CharField("职务", max_length=120, blank=True)
+    email = models.EmailField("电子邮箱", blank=True)
+    phone = models.CharField("联系电话", max_length=80, blank=True)
+    notes = models.TextField("备注", blank=True)
+    metadata = models.JSONField("元数据", default=dict, blank=True)
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "长期赛事人员"
+        ordering = ["name", "organization", "pk"]
+
+    def __str__(self):
+        return self.name
+
+
+class CompetitionRole(models.Model):
+    class Category(models.TextChoices):
+        COMPETITOR = "competitor", "选手"
+        OFFICIAL = "official", "赛事官员"
+        EXPERT = "expert", "专家或裁判"
+        COACH = "coach", "教练"
+        STAFF = "staff", "工作人员"
+        OTHER = "other", "其他"
+
+    code = models.CharField("角色代码", max_length=50, unique=True)
+    name = models.CharField("角色名称", max_length=120)
+    category = models.CharField("角色类别", max_length=20, choices=Category.choices)
+    description = models.TextField("说明", blank=True)
+    order = models.PositiveIntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "赛事角色"
+        ordering = ["order", "code", "pk"]
 
     def __str__(self):
         return self.name
@@ -114,6 +161,9 @@ class Assessment(models.Model):
     location = models.CharField("地点", max_length=200, blank=True)
     description = models.TextField("描述", blank=True)
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.DRAFT)
+    started_at = models.DateTimeField("实际启动时间", null=True, blank=True)
+    completed_at = models.DateTimeField("实际完成时间", null=True, blank=True)
+    results_published_at = models.DateTimeField("成绩发布时间", null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         verbose_name="创建人",
@@ -127,6 +177,10 @@ class Assessment(models.Model):
     class Meta:
         verbose_name = verbose_name_plural = "竞赛与考核"
         ordering = ["-start_date", "code"]
+        permissions = [
+            ("view_all_assessment", "查看全部竞赛与考核"),
+            ("change_all_assessment", "维护全部竞赛与考核"),
+        ]
 
     def clean(self):
         super().clean()
@@ -158,6 +212,7 @@ class AssessmentModule(models.Model):
     total_mark = models.DecimalField(
         "总分", max_digits=8, decimal_places=2, default=Decimal("0.00"), validators=[MinValueValidator(0)]
     )
+    scheduled_start_at = models.DateTimeField("计划开始时间", null=True, blank=True)
     duration_minutes = models.PositiveIntegerField("时长（分钟）", null=True, blank=True)
     counts_towards_ranking = models.BooleanField("计入排名", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
@@ -172,6 +227,12 @@ class AssessmentModule(models.Model):
 
     def __str__(self):
         return f"{self.assessment.code} / {self.code} - {self.name}"
+
+    @property
+    def scheduled_end_at(self):
+        if self.scheduled_start_at is None or self.duration_minutes is None:
+            return None
+        return self.scheduled_start_at + timedelta(minutes=self.duration_minutes)
 
 
 class AssessmentModuleDomain(models.Model):
@@ -248,14 +309,6 @@ class AssessmentModuleCoach(models.Model):
 
 
 class AssessmentParticipant(models.Model):
-    class Role(models.TextChoices):
-        COMPETITOR = "competitor", "选手"
-        EXPERT = "expert", "专家"
-        COACH = "coach", "教练"
-        STAFF = "staff", "工作人员"
-        OBSERVER = "observer", "观察员"
-        OTHER = "other", "其他"
-
     assessment = models.ForeignKey(
         Assessment, verbose_name="竞赛与考核", on_delete=models.CASCADE, related_name="participants"
     )
@@ -267,10 +320,24 @@ class AssessmentParticipant(models.Model):
         null=True,
         blank=True,
     )
+    competition_person = models.ForeignKey(
+        CompetitionPerson,
+        verbose_name="长期赛事人员",
+        on_delete=models.SET_NULL,
+        related_name="assessment_participations",
+        null=True,
+        blank=True,
+    )
     external_code = models.CharField("外部代码", max_length=100, blank=True)
     display_name = models.CharField("显示名称", max_length=150)
-    role = models.CharField("角色", max_length=20, choices=Role.choices, default=Role.COMPETITOR)
+    role = models.ForeignKey(
+        CompetitionRole,
+        verbose_name="赛事角色",
+        on_delete=models.PROTECT,
+        related_name="participants",
+    )
     organization = models.CharField("单位", max_length=200, blank=True)
+    country_or_region = models.CharField("国家或地区", max_length=120, blank=True)
     metadata = models.JSONField("元数据", default=dict, blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
@@ -287,14 +354,46 @@ class AssessmentParticipant(models.Model):
                 condition=~Q(external_code=""),
                 name="uniq_assessmentparticipant_external",
             ),
+            models.UniqueConstraint(
+                fields=["assessment", "competition_person"],
+                condition=Q(competition_person__isnull=False),
+                name="uniq_assessmentparticipant_competition_person",
+            ),
+            models.CheckConstraint(
+                condition=Q(user__isnull=True) | Q(competition_person__isnull=True),
+                name="assessmentparticipant_single_linked_source",
+            ),
+            models.CheckConstraint(
+                condition=~Q(display_name=""),
+                name="assessmentparticipant_display_name_required",
+            ),
         ]
+
+    def populate_snapshot_fields(self):
+        if self.user_id and self.competition_person_id:
+            return
+        if self.competition_person_id:
+            if not self.display_name:
+                self.display_name = self.competition_person.name
+            if not self.organization:
+                self.organization = self.competition_person.organization
+            if not self.country_or_region:
+                self.country_or_region = self.competition_person.country_or_region
+        elif self.user_id and not self.display_name:
+            self.display_name = get_user_display_name(self.user)
+        elif self.external_code and not self.display_name:
+            self.display_name = self.external_code
 
     def clean(self):
         super().clean()
-        if not self.user_id and not self.external_code:
-            raise ValidationError("参与人员必须关联系统用户或填写外部代码。")
+        self.populate_snapshot_fields()
+        if self.user_id and self.competition_person_id:
+            raise ValidationError("参与人员不能同时关联系统用户和长期赛事人员。")
+        if not self.display_name:
+            raise ValidationError({"display_name": "参与人员必须有显示名称。"})
 
     def save(self, *args, **kwargs):
+        self.populate_snapshot_fields()
         self.clean()
         super().save(*args, **kwargs)
 
@@ -302,31 +401,158 @@ class AssessmentParticipant(models.Model):
         return self.display_name
 
 
-class AssessmentResultSummary(models.Model):
-    assessment = models.ForeignKey(
-        Assessment, verbose_name="竞赛与考核", on_delete=models.CASCADE, related_name="result_summaries"
-    )
+class AssessmentFinalResult(models.Model):
     participant = models.OneToOneField(
-        AssessmentParticipant, verbose_name="参与人员", on_delete=models.CASCADE, related_name="result_summary"
+        AssessmentParticipant,
+        verbose_name="选手",
+        on_delete=models.CASCADE,
+        related_name="final_result",
     )
-    total_score = models.DecimalField("总分", max_digits=10, decimal_places=2, null=True, blank=True)
     rank = models.PositiveIntegerField("名次", null=True, blank=True)
-    award = models.CharField("奖项", max_length=100, blank=True)
+    is_official = models.BooleanField("官方结果", default=False)
+    confirmed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="确认人",
+        on_delete=models.SET_NULL,
+        related_name="confirmed_assessment_final_results",
+        null=True,
+        blank=True,
+    )
+    confirmed_at = models.DateTimeField("确认时间", null=True, blank=True)
+    notes = models.TextField("备注", blank=True)
     metadata = models.JSONField("元数据", default=dict, blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
+    awards = models.ManyToManyField(
+        "AssessmentAward",
+        through="AssessmentResultAward",
+        related_name="final_results",
+        blank=True,
+    )
 
     class Meta:
-        verbose_name = verbose_name_plural = "评测结果摘要"
+        verbose_name = verbose_name_plural = "评测最终结果"
+        ordering = ["participant__assessment", "rank", "participant__display_name", "pk"]
 
     def clean(self):
         super().clean()
-        if self.participant_id and self.assessment_id and self.participant.assessment_id != self.assessment_id:
-            raise ValidationError({"participant": "参与人员必须属于当前评测。"})
+        if self.participant_id and self.participant.role.category != CompetitionRole.Category.COMPETITOR:
+            raise ValidationError({"participant": "只有选手类参与人员可以拥有最终结果。"})
 
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
+    @property
+    def assessment(self):
+        return self.participant.assessment
+
+    def __str__(self):
+        return f"{self.participant} / {self.rank or '-'}"
+
+
+class AssessmentFinalScore(models.Model):
+    class ScoreType(models.TextChoices):
+        RAW = "raw", "原始成绩"
+        PERCENTAGE = "percentage", "百分制成绩"
+        WORLDSKILLS = "worldskills", "WorldSkills 标准化成绩"
+        CUSTOM = "custom", "自定义成绩"
+
+    final_result = models.ForeignKey(
+        AssessmentFinalResult,
+        verbose_name="最终结果",
+        on_delete=models.CASCADE,
+        related_name="scores",
+    )
+    score_type = models.CharField("成绩类型", max_length=20, choices=ScoreType.choices)
+    label = models.CharField("成绩名称", max_length=120)
+    value = models.DecimalField("成绩值", max_digits=12, decimal_places=4)
+    max_value = models.DecimalField("参考最大值", max_digits=12, decimal_places=4, null=True, blank=True)
+    order = models.PositiveIntegerField("排序", default=0)
+    metadata = models.JSONField("元数据", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "评测最终成绩"
+        ordering = ["final_result", "order", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["final_result", "score_type", "label"],
+                name="uniq_assessment_final_score_type_label",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.label}: {self.value}"
+
+
+class AssessmentAward(models.Model):
+    class Category(models.TextChoices):
+        GOLD = "gold", "金牌"
+        SILVER = "silver", "银牌"
+        BRONZE = "bronze", "铜牌"
+        EXCELLENCE = "excellence", "优胜奖"
+        OTHER = "other", "其他"
+
+    assessment = models.ForeignKey(
+        Assessment,
+        verbose_name="竞赛与考核",
+        on_delete=models.CASCADE,
+        related_name="awards",
+    )
+    code = models.CharField("奖项代码", max_length=50)
+    name = models.CharField("奖项名称", max_length=120)
+    category = models.CharField("奖项类别", max_length=20, choices=Category.choices, default=Category.OTHER)
+    description = models.TextField("说明", blank=True)
+    order = models.PositiveIntegerField("排序", default=0)
+    metadata = models.JSONField("元数据", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "评测奖项"
+        ordering = ["assessment", "order", "name", "pk"]
+        constraints = [
+            models.UniqueConstraint(fields=["assessment", "code"], name="uniq_assessment_award_code"),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class AssessmentResultAward(models.Model):
+    final_result = models.ForeignKey(
+        AssessmentFinalResult,
+        verbose_name="最终结果",
+        on_delete=models.CASCADE,
+        related_name="award_links",
+    )
+    award = models.ForeignKey(
+        AssessmentAward,
+        verbose_name="奖项",
+        on_delete=models.PROTECT,
+        related_name="result_links",
+    )
+    notes = models.TextField("备注", blank=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "最终结果奖项"
+        constraints = [
+            models.UniqueConstraint(fields=["final_result", "award"], name="uniq_assessment_result_award"),
+        ]
+
+    def clean(self):
+        super().clean()
+        if (
+            self.final_result_id
+            and self.award_id
+            and self.final_result.participant.assessment_id != self.award.assessment_id
+        ):
+            raise ValidationError({"award": "奖项必须属于最终结果对应的竞赛或考核。"})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.final_result} / {self.award}"
 
 
 class AssessmentDocument(models.Model):

@@ -14,6 +14,8 @@ from django_tables2 import SingleTableView
 
 from core.utils.mixins import SuperuserRequiredMixin, TitleMixin
 from core.utils.listing import FilterableListMixin, ListFilterSpec
+from evidence.selectors import visible_evidences_for
+from scoring.selectors import scoring_results_visible_to
 
 from .forms import (
     SkillForm,
@@ -274,10 +276,29 @@ class SkillDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        visible_evidences = visible_evidences_for(self.request.user).filter(skill_project=self.object.skill_project)
+        can_view_assessment_performance = bool(
+            self.request.user.has_perm("evidence.view_knowledgeevidence")
+            and self.request.user.has_perm("scoring.view_scoringresult")
+            and self.request.user.has_perm("scoring.view_all_scoringresult")
+        )
+        visible_results = scoring_results_visible_to(self.request.user)
+        if not can_view_assessment_performance:
+            visible_results = visible_results.none()
         context["can_edit_skill"] = can_manage_skill(self.request.user, self.object)
-        context["assessment_history"] = skill_assessment_history(self.object)
+        context["can_open_assessment"] = self.request.user.has_perm("assessments.view_assessment")
+        context["can_view_evidence_history"] = self.request.user.has_perm("evidence.view_knowledgeevidence")
+        context["can_view_assessment_performance"] = can_view_assessment_performance
+        context["assessment_history"] = skill_assessment_history(
+            self.object,
+            evidences=visible_evidences,
+        )
         context["training_investment"] = skill_training_investment(self.object)
-        context["assessment_performance"] = skill_assessment_performance(self.object)
+        context["assessment_performance"] = skill_assessment_performance(
+            self.object,
+            results=visible_results,
+            evidences=visible_evidences,
+        )
         return context
 
 

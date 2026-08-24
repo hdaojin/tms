@@ -12,14 +12,18 @@
           </div>
           <span class="badge {% if scheme_import.status == 'confirmed' %}badge-success{% else %}badge-info{% endif %}">{{ scheme_import.get_status_display }}</span>
         </div>
-        <div class="grid gap-3 md:grid-cols-4">
+        <div class="grid gap-3 md:grid-cols-5">
           <div class="stat rounded-box border border-base-300 bg-base-100">
             <div class="stat-title">模块</div>
             <div class="stat-value text-xl">{{ scheme_import.module_code }}</div>
             <div class="stat-desc">{{ scheme_import.module_name }}</div>
           </div>
           <div class="stat rounded-box border border-base-300 bg-base-100">
-            <div class="stat-title">Mark</div>
+            <div class="stat-title">模块配置总分</div>
+            <div class="stat-value text-xl">{{ consistency_report.checks.assessment_module_total }}</div>
+          </div>
+          <div class="stat rounded-box border border-base-300 bg-base-100">
+            <div class="stat-title">解析器模块总分</div>
             <div class="stat-value text-xl">{{ scheme_import.module_mark }}</div>
           </div>
           <div class="stat rounded-box border border-base-300 bg-base-100">
@@ -123,10 +127,27 @@
       <div class="card-body">
         <h2 class="card-title text-base">校验结果</h2>
         <div class="space-y-2 text-sm">
-          <div class="flex justify-between gap-3"><span>明细合计</span><span>{{ scheme_import.validation_report.checks.aspect_total }}</span></div>
-          <div class="flex justify-between gap-3"><span>Total Marks</span><span>{{ scheme_import.validation_report.checks.total_mark }}</span></div>
-          <div class="flex justify-between gap-3"><span>模块 Mark</span><span>{{ scheme_import.validation_report.checks.module_mark }}</span></div>
+          <div class="flex justify-between gap-3"><span>评测模块配置总分</span><span>{{ consistency_report.checks.assessment_module_total }}</span></div>
+          <div class="flex justify-between gap-3"><span>解析器模块总分</span><span>{{ consistency_report.checks.parser_module_total }}</span></div>
+          <div class="flex justify-between gap-3"><span>评分方案总分</span><span>{{ consistency_report.checks.scheme_total }}</span></div>
+          <div class="flex justify-between gap-3"><span>评分点分值合计</span><span>{{ consistency_report.checks.aspect_total }}</span></div>
         </div>
+        {% if consistency_report.warnings %}
+          <div class="alert alert-warning mt-3 items-start text-sm">
+            <span class="icon-[tabler--alert-triangle] mt-0.5 size-5 shrink-0"></span>
+            <ul class="list-disc space-y-1 pl-5">
+              {% for warning in consistency_report.warnings %}<li>{{ warning }}</li>{% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+        {% if consistency_report.errors %}
+          <div class="alert alert-error mt-3 items-start text-sm">
+            <span class="icon-[tabler--circle-x] mt-0.5 size-5 shrink-0"></span>
+            <ul class="list-disc space-y-1 pl-5">
+              {% for error in consistency_report.errors %}<li>{{ error }}</li>{% endfor %}
+            </ul>
+          </div>
+        {% endif %}
       </div>
     </div>
 
@@ -137,8 +158,9 @@
         {% else %}
           <form method="post">
             {% csrf_token %}
-            <button class="btn btn-primary w-full" type="submit">确认生成评分方案</button>
+            <button class="btn btn-primary w-full" type="submit" {% if not consistency_report.can_confirm %}disabled{% endif %}>确认生成评分方案</button>
           </form>
+          {% if not consistency_report.can_confirm %}<p class="text-sm text-error">请先修正总分不一致后再确认。</p>{% endif %}
         {% endif %}
         <a class="btn btn-ghost" href="{% url 'scoring:scheme_import' %}">重新上传</a>
       </div>

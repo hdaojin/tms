@@ -26,6 +26,7 @@ class NavigationItem:
     url: str | None = None
     section: str | None = None
     permissions: list[str] = field(default_factory=list)
+    active_app_names: list[str] = field(default_factory=list)
     children: list["NavigationItem"] = field(default_factory=list)
     external: bool = False
     debug_only: bool = False
@@ -71,6 +72,9 @@ def _validate_config(data: dict) -> None:
         permissions = raw.get("permissions") or []
         if not isinstance(permissions, list) or any(not isinstance(value, str) for value in permissions):
             raise ConfigurationError(f"{location}.permissions 必须是字符串列表。")
+        active_app_names = raw.get("active_app_names") or []
+        if not isinstance(active_app_names, list) or any(not isinstance(value, str) for value in active_app_names):
+            raise ConfigurationError(f"{location}.active_app_names 必须是字符串列表。")
         children = raw.get("children") or []
         is_leaf = not children and bool(raw.get("url") or raw.get("url_name"))
         explicit_login_required = raw.get("login_required") is True and "login_required" in raw
@@ -140,6 +144,7 @@ def _build_item(raw: dict, section_slug: str | None = None) -> NavigationItem:
         url=raw.get("url"),
         section=raw.get("section") or section_slug,
         permissions=list(raw.get("permissions") or []),
+        active_app_names=list(raw.get("active_app_names") or []),
         children=children,
         external=bool(raw.get("external", False)),
         debug_only=bool(raw.get("debug_only", False)),
@@ -210,6 +215,8 @@ def _mark_active(items: list[NavigationItem], request) -> None:
         score = path_match_score(item.resolved_url) if item.has_own_url else 0
         if item.url_name and view_name == item.url_name:
             score = max(score, 1_000_000 + len(item.resolved_url or ""))
+        if app_name in item.active_app_names:
+            score = max(score, 10)
         if item.key == app_name:
             score = max(score, 10)
         return score
@@ -292,7 +299,7 @@ def resolve_current_section(request) -> str | None:
             if section.get("key") == app_name:
                 return section.get("key")
             for item in _iter_raw_items(section.get("items", []) or []):
-                if item.get("key") == app_name:
+                if item.get("key") == app_name or app_name in (item.get("active_app_names") or []):
                     return section.get("key")
     path = getattr(request, "path", "") or ""
     best_section: str | None = None

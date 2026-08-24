@@ -1,9 +1,12 @@
 from __future__ import annotations
 
-from django.core.exceptions import ValidationError
-from django.db import transaction
+from decimal import Decimal, InvalidOperation
 
-from assessments.models import AssessmentDocument
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
+from django.utils import timezone
+
+from assessments.models import AssessmentDocument, AssessmentParticipant
 from evidence.services import create_evidence_from_scoring_aspect
 
 from .models import (
@@ -11,11 +14,28 @@ from .models import (
     ScoringAspect,
     ScoringParserConfig,
     ScoringResult,
+    ScoringResultRevision,
     ScoringScheme,
     ScoringSchemeImport,
     ScoringSubCriterion,
 )
 from .registry import PARSER_DEFINITIONS, default_parser_key, get_parser_definition
+from .selectors import scoring_modules_in_scope_for
+
+
+CENT = Decimal("0.01")
+_UNSET = object()
+
+
+def _ensure_module_permission(user, module, permission):
+    if user is None:
+        return
+    if not scoring_modules_in_scope_for(
+        user,
+        permission,
+        module.__class__.objects.filter(pk=module.pk),
+    ).exists():
+        raise PermissionDenied("您无权管理该评测模块的评分数据。")
 
 
 def sync_parser_configs():
@@ -57,14 +77,132 @@ def default_parser_config():
     )
 
 
+def _payload_aspect_total(parsed_payload):
+    total = Decimal("0.00")
+    invalid_aspects = []
+    for subcriterion in parsed_payload.get("subcriteria", []):
+        for aspect in subcriterion.get("aspects", []):
+            try:
+                total += Decimal(str(aspect["max_mark"]))
+            except (InvalidOperation, KeyError, TypeError, ValueError):
+                invalid_aspects.append(aspect.get("code") or "未编号评分点")
+    return total.quantize(CENT), invalid_aspects
+
+
+def scheme_import_consistency_report(scheme_import: ScoringSchemeImport):
+    """Build the confirmation-time total-mark consistency report."""
+    module_total = scheme_import.assessment_module.total_mark.quantize(CENT)
+    parser_module_total = scheme_import.module_mark.quantize(CENT)
+    scheme_total = scheme_import.total_mark.quantize(CENT)
+    aspect_total, invalid_aspects = _payload_aspect_total(scheme_import.parsed_payload)
+    errors = list(scheme_import.validation_report.get("errors", []))
+    warnings = list(scheme_import.validation_report.get("warnings", []))
+
+    if invalid_aspects:
+        errors.append(f"以下评分点缺少有效分值：{'、'.join(invalid_aspects)}。")
+    if parser_module_total != scheme_total:
+        errors.append(
+            f"解析器识别的模块总分 {parser_module_total} 与评分方案总分 {scheme_total} 不一致。"
+        )
+    if scheme_total != aspect_total:
+        errors.append(f"评分方案总分 {scheme_total} 与评分点分值合计 {aspect_total} 不一致。")
+    if module_total == Decimal("0.00"):
+        warnings.append("评测模块尚未配置总分；本次导入不会自动修改模块总分。")
+    elif module_total != parser_module_total:
+        errors.append(
+            f"评测模块配置总分 {module_total} 与解析器识别的模块总分 {parser_module_total} 不一致。"
+        )
+
+    return {
+        "checks": {
+            "assessment_module_total": str(module_total),
+            "parser_module_total": str(parser_module_total),
+            "scheme_total": str(scheme_total),
+            "aspect_total": str(aspect_total),
+        },
+        "warnings": list(dict.fromkeys(warnings)),
+        "errors": list(dict.fromkeys(errors)),
+        "can_confirm": not errors,
+    }
+
+
+@transaction.atomic
+def record_scoring_result(
+    *,
+    participant,
+    aspect,
+    score_awarded,
+    user=None,
+    source=ScoringResult.Source.ONLINE,
+    evidence="",
+    raw_payload=_UNSET,
+    confirm=False,
+    reason="",
+):
+    """Create or update the single scoring fact for one competitor and aspect."""
+    participant = AssessmentParticipant.objects.select_for_update().select_related("role").get(pk=participant.pk)
+    aspect = ScoringAspect.objects.select_related("scheme__assessment_module").get(pk=aspect.pk)
+    module = aspect.scheme.assessment_module
+    existing = ScoringResult.objects.select_for_update().filter(participant=participant, aspect=aspect).first()
+    permission = "scoring.change_scoringresult" if existing else "scoring.add_scoringresult"
+    _ensure_module_permission(user, module, permission)
+
+    try:
+        normalized_score = Decimal(str(score_awarded)).quantize(CENT)
+    except (InvalidOperation, TypeError, ValueError) as exc:
+        raise ValidationError({"score_awarded": "请输入有效得分。"}) from exc
+
+    now = timezone.now()
+    if existing is None:
+        result = ScoringResult(
+            participant=participant,
+            aspect=aspect,
+            entered_by=user,
+            entered_at=now,
+        )
+        old_score = None
+    else:
+        result = existing
+        old_score = result.score_awarded
+
+    score_changed = old_score is not None and old_score != normalized_score
+    result.score_awarded = normalized_score
+    result.source = source
+    result.evidence = evidence
+    result.updated_by = user
+    if raw_payload is not _UNSET:
+        result.raw_payload = raw_payload
+    if confirm:
+        if user is None:
+            raise ValidationError("确认评分结果时必须记录确认人。")
+        result.confirmed_by = user
+        result.confirmed_at = now
+    elif existing is not None and (score_changed or result.confirmed_at):
+        result.confirmed_by = None
+        result.confirmed_at = None
+    result.full_clean()
+    result.save()
+
+    if score_changed:
+        ScoringResultRevision.objects.create(
+            scoring_result=result,
+            old_score=old_score,
+            new_score=normalized_score,
+            changed_by=user,
+            reason=reason,
+        )
+    return result
+
+
 @transaction.atomic
 def parse_scheme_document(document, parser_config, user=None):
     if document.document_type != AssessmentDocument.DocumentType.MARKING_SCHEME or not document.module_id:
         raise ValidationError("只能解析绑定评测模块的评分表资料。")
+    _ensure_module_permission(user, document.module, "scoring.add_scoringscheme")
     definition = get_parser_definition(parser_config.parser_key)
     with document.file.open("rb") as source:
         parsed = definition.parse(source, expected_module_code=document.module.code)
-    return ScoringSchemeImport.objects.create(
+    scheme_import = ScoringSchemeImport.objects.create(
         assessment_module=document.module,
         source_document=document,
         parser_key=parser_config.parser_key,
@@ -82,13 +220,22 @@ def parse_scheme_document(document, parser_config, user=None):
         parsed_payload=parsed.as_payload(),
         imported_by=user,
     )
+    validation_report = dict(scheme_import.validation_report)
+    validation_report["consistency"] = scheme_import_consistency_report(scheme_import)
+    scheme_import.validation_report = validation_report
+    scheme_import.save(update_fields=["validation_report"])
+    return scheme_import
 
 
 @transaction.atomic
 def confirm_scheme_import(scheme_import: ScoringSchemeImport, user=None):
     scheme_import = ScoringSchemeImport.objects.select_for_update().get(pk=scheme_import.pk)
+    _ensure_module_permission(user, scheme_import.assessment_module, "scoring.add_scoringscheme")
     if scheme_import.status == ScoringSchemeImport.Status.CONFIRMED and scheme_import.scheme_id:
         return scheme_import.scheme
+    consistency_report = scheme_import_consistency_report(scheme_import)
+    if not consistency_report["can_confirm"]:
+        raise ValidationError(consistency_report["errors"])
     existing_scheme = ScoringScheme.objects.filter(
         assessment_module=scheme_import.assessment_module,
         module_code=scheme_import.module_code,

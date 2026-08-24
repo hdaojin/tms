@@ -1,4 +1,8 @@
 from django import forms
+from django.db.models import Q
+
+from assessments.models import AssessmentDocument
+from assessments.selectors import assessment_modules_in_scope_for
 from core.utils.forms import StyledFormMixin
 from standards.forms import DefaultSkillProjectFormMixin
 from standards.models import Skill
@@ -28,6 +32,18 @@ class KnowledgeEvidenceForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms
             "normalized_text": forms.Textarea(attrs={"rows": 4}),
             "review_note": forms.Textarea(attrs={"rows": 3}),
         }
+
+    def __init__(self, *args, user=None, permission="evidence.add_knowledgeevidence", **kwargs):
+        super().__init__(*args, **kwargs)
+        if user is None:
+            return
+        modules = assessment_modules_in_scope_for(user, permission)
+        project_ids = modules.values("assessment__skill_project_id")
+        self.fields["assessment_module"].queryset = modules.select_related("assessment")
+        self.fields["skill_project"].queryset = self.fields["skill_project"].queryset.filter(pk__in=project_ids)
+        self.fields["source_document"].queryset = AssessmentDocument.objects.filter(
+            Q(module__in=modules) | Q(module__isnull=True, assessment__skill_project_id__in=project_ids)
+        ).distinct()
 
 
 class KnowledgeEvidenceRejectForm(StyledFormMixin, forms.Form):

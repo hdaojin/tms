@@ -1,0 +1,16 @@
+{% extends "common/table_page.html" %}
+
+{% block content %}
+  <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <form class="join" method="get">
+      <input class="input input-sm join-item" type="search" name="q" value="{{ request.GET.q }}" placeholder="按姓名搜索">
+      <button class="btn btn-sm join-item" type="submit">搜索</button>
+    </form>
+    {% if perms.assessments.add_competitionperson %}
+      <a class="btn btn-primary btn-sm" href="{% url 'assessments:competition_person_create' %}">
+        <span class="icon-[tabler--user-plus] size-4"></span>新增长期赛事人员
+      </a>
+    {% endif %}
+  </div>
+  {{ block.super }}
+{% endblock %}
