@@ -193,11 +193,13 @@ Copy-Item .env.example .env
 uv run manage.py migrate
 ```
 
-### 5. 导入基础数据
+### 5. 初始化默认业务目录
 
 ```bash
-uv run manage.py loaddata core/default behaviors/default
+uv run manage.py bootstrap_tms
 ```
+
+该命令显式创建新环境缺失的出厂业务目录，可安全重复执行，并且不会覆盖管理员已经修改的名称、排序、启用状态或其他配置。正常部署不在应用启动时自动执行该命令。
 
 ### 6. 创建超级管理员
 
@@ -357,7 +359,7 @@ mkdir -p /srv/tms/media-private
 
 ```bash
 uv run manage.py migrate
-uv run manage.py loaddata core/default behaviors/default
+uv run manage.py bootstrap_tms
 uv run manage.py createsuperuser
 ```
 
@@ -366,6 +368,8 @@ uv run manage.py createsuperuser
 ```bash
 uv run manage.py migrate
 ```
+
+`bootstrap_tms` 主要用于新环境初始化。后续版本只有在发布说明明确要求补充出厂目录时才需要再次显式执行；命令不会覆盖已有目录项的管理员配置。
 
 数据库结构变更应通过 Django migration 管理；部署前应按实际环境做好数据库和上传文件备份。
 

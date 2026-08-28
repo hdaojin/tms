@@ -94,9 +94,11 @@ class AssessmentListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     permission_required = "assessments.view_assessment"
 
     def get_queryset(self):
-        queryset = visible_assessments_for(self.request.user).select_related("skill_project", "series", "level")
+        queryset = visible_assessments_for(self.request.user).select_related(
+            "skill_project", "series", "level", "assessment_type"
+        )
         if value := self.request.GET.get("type"):
-            queryset = queryset.filter(assessment_type=value)
+            queryset = queryset.filter(assessment_type__code=value)
         if value := self.request.GET.get("status"):
             queryset = queryset.filter(status=value)
         if value := self.request.GET.get("q"):

@@ -8,10 +8,7 @@
         <div class="min-w-0">
           <div class="mb-2 flex flex-wrap items-center gap-2 text-sm text-base-content/60">
             <span class="font-mono font-semibold text-primary">#{{ feedback.pk }}</span>
-            {% if feedback.category == "bug" %}<span class="badge badge-error badge-outline">{{ feedback.get_category_display }}</span>{% endif %}
-            {% if feedback.category == "feature" %}<span class="badge badge-info badge-outline">{{ feedback.get_category_display }}</span>{% endif %}
-            {% if feedback.category == "suggestion" %}<span class="badge badge-success badge-outline">{{ feedback.get_category_display }}</span>{% endif %}
-            {% if feedback.category == "complaint" %}<span class="badge badge-warning badge-outline">{{ feedback.get_category_display }}</span>{% endif %}
+            <span class="badge badge-ghost">{{ feedback.category.name }}</span>
             {% if feedback.status == "open" %}<span class="badge badge-ghost">{{ feedback.get_status_display }}</span>{% endif %}
             {% if feedback.status == "in_progress" %}<span class="badge badge-info">{{ feedback.get_status_display }}</span>{% endif %}
             {% if feedback.status == "resolved" %}<span class="badge badge-success">{{ feedback.get_status_display }}</span>{% endif %}

@@ -28,6 +28,7 @@ class ScoringParticipantMigrationTests(TransactionTestCase):
         User = old_apps.get_model("auth", "User")
         SkillProject = old_apps.get_model("standards", "SkillProject")
         Assessment = old_apps.get_model("assessments", "Assessment")
+        AssessmentType = old_apps.get_model("assessments", "AssessmentType")
         AssessmentModule = old_apps.get_model("assessments", "AssessmentModule")
         AssessmentParticipant = old_apps.get_model("assessments", "AssessmentParticipant")
         CompetitionRole = old_apps.get_model("assessments", "CompetitionRole")
@@ -39,9 +40,13 @@ class ScoringParticipantMigrationTests(TransactionTestCase):
 
         user = User.objects.create(username="legacy-competitor", first_name="一", last_name="选手")
         project = SkillProject.objects.create(code="LEGACY-SCORE", name="历史评分项目")
+        assessment_type, _created = AssessmentType.objects.get_or_create(
+            code='competition',
+            defaults={'name': '正式竞赛', 'order': 10},
+        )
         assessment = Assessment.objects.create(
             skill_project=project,
-            assessment_type="competition",
+            assessment_type=assessment_type,
             name="历史评分竞赛",
             code="LEGACY-SCORE-ASSESSMENT",
             start_date=date(2025, 1, 1),

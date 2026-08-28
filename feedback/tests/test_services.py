@@ -1,6 +1,6 @@
 from django.core.exceptions import PermissionDenied, ValidationError
 
-from feedback.models import FeedbackReply, FeedbackStatus
+from feedback.models import FeedbackCategory, FeedbackReply, FeedbackStatus
 from feedback.services import add_feedback_reply, create_feedback, update_feedback_status
 
 from .base import FeedbackTestCase
@@ -10,7 +10,7 @@ class FeedbackServiceTests(FeedbackTestCase):
     def test_create_feedback_with_attachments(self):
         feedback = create_feedback(
             data={
-                "category": "bug",
+                "category": FeedbackCategory.objects.get(code='bug'),
                 "title": "导入异常",
                 "content": "提交截图",
                 "is_anonymous": True,

@@ -1,10 +1,23 @@
 from django import forms
 from django.contrib import admin
+from django.db.models import Q
 from django.http import JsonResponse
 from django.urls import path, reverse
 
-from core.constants import CONDUCT_SEVERITY_MODERATE
 from core.utils.mixins import CreatedUpdatedAdminMixin
+from .forms import configure_severity_field
+from .models import (
+    ConductCategory,
+    ConductItem,
+    ConductNature,
+    ConductRecord,
+    ConductSeverity,
+    ConductSeverityRule,
+    ConductSummary,
+    format_conduct_score,
+    get_conduct_severity_choices_with_multiplier,
+    get_default_conduct_severity,
+)
 from .permissions import (
     can_access_conduct_record_admin_module,
     can_change_conduct_record_admin,
@@ -16,25 +29,18 @@ from .permissions import (
 from .selectors import get_conduct_record_admin_queryset
 from .services import prepare_conduct_record_for_save
 
-from .models import (
-    ConductCategory,
-    ConductItem,
-    ConductRecord,
-    ConductSeverityRule,
-    ConductSummary,
-    format_conduct_score,
-    get_conduct_severity_choices,
-)
-
 
 SEVERITY_PLACEHOLDER_LABEL = '请先选择奖惩事项'
 
 
-def get_record_severity_choices(nature=None):
+def get_record_severity_choices(nature=None, *, current_severity_id=None):
     if not nature:
         return [('', SEVERITY_PLACEHOLDER_LABEL)]
 
-    return get_conduct_severity_choices(nature)
+    return get_conduct_severity_choices_with_multiplier(
+        nature,
+        current_severity_id=current_severity_id,
+    )
 
 
 def get_widget_attr_target(widget):
@@ -58,8 +64,30 @@ class ConductSeverityRuleAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        nature = self.data.get('nature') or getattr(self.instance, 'nature', None)
-        self.fields['severity'].choices = get_conduct_severity_choices(nature)
+        current_severity_id = self.instance.severity_id if self.instance.pk else None
+        self.fields['severity'].to_field_name = 'code'
+        self.fields['severity'].queryset = ConductSeverity.objects.filter(
+            Q(is_active=True) | Q(pk=current_severity_id)
+        ).order_by('code')
+
+
+class ConductItemAdminForm(forms.ModelForm):
+    class Meta:
+        model = ConductItem
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        queryset = ConductCategory.objects.filter(
+            is_active=True,
+            nature__in=ConductNature.values,
+        )
+        if self.instance.pk and self.instance.category_id:
+            queryset = ConductCategory.objects.filter(
+                Q(is_active=True, nature__in=ConductNature.values)
+                | Q(pk=self.instance.category_id)
+            )
+        self.fields['category'].queryset = queryset.order_by('nature', 'order', 'name')
 
 
 class ConductRecordAdminForm(forms.ModelForm):
@@ -71,23 +99,46 @@ class ConductRecordAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         item_id = self.data.get('item') or getattr(self.instance, 'item_id', None)
         nature = None
+        current_item_id = self.instance.item_id if self.instance.pk else None
+        item_queryset = ConductItem.objects.filter(
+            is_active=True,
+            category__is_active=True,
+            category__nature__in=ConductNature.values,
+        )
+        if current_item_id:
+            item_queryset = ConductItem.objects.filter(
+                Q(
+                    is_active=True,
+                    category__is_active=True,
+                    category__nature__in=ConductNature.values,
+                )
+                | Q(pk=current_item_id)
+            )
+        self.fields['item'].queryset = item_queryset.select_related('category')
 
         if item_id:
-            item = ConductItem.objects.filter(pk=item_id).select_related('category').first()
+            item = item_queryset.filter(pk=item_id).select_related('category').first()
             if item is not None:
                 nature = item.category.nature
 
-        self.fields['severity'].choices = get_record_severity_choices(nature)
+        current_severity_id = self.instance.severity_id if self.instance.pk else None
+        default_code = configure_severity_field(
+            self.fields['severity'],
+            nature,
+            current_severity_id=current_severity_id,
+        )
         if nature is None:
-            self.fields['severity'].initial = ''
-            self.initial['severity'] = ''
+            self.fields['severity'].empty_label = SEVERITY_PLACEHOLDER_LABEL
+        elif not self.is_bound and not self.instance.pk and default_code:
+            self.fields['severity'].initial = default_code
 
 
 @admin.register(ConductCategory)
 class ConductCategoryAdmin(ConductAuditAdminMixin, admin.ModelAdmin):
     list_display = [
+        'code',
         'name',
-        'nature',
+        'nature_display',
         'order',
         'is_active',
         'created_by_display',
@@ -96,13 +147,13 @@ class ConductCategoryAdmin(ConductAuditAdminMixin, admin.ModelAdmin):
         'updated_at',
     ]
     list_filter = ['nature', 'is_active', 'created_by', 'updated_by', 'created_at', 'updated_at']
-    search_fields = ['name', 'description']
+    search_fields = ['code', 'name', 'description']
     readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
     ordering = ['nature', 'order', 'name']
     
     fieldsets = (
         ('基本信息', {
-            'fields': ('nature', 'name', 'description', 'order')
+            'fields': ('code', 'nature', 'name', 'description', 'order')
         }),
         ('状态', {
             'fields': ('is_active',)
@@ -113,10 +164,38 @@ class ConductCategoryAdmin(ConductAuditAdminMixin, admin.ModelAdmin):
         }),
     )
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(self.readonly_fields)
+        if obj is not None:
+            readonly_fields.append('code')
+            if obj.nature not in ConductNature.values:
+                readonly_fields.append('nature')
+        return readonly_fields
+
+    @admin.display(description='性质', ordering='nature')
+    def nature_display(self, obj):
+        return obj.nature_label
+
+
+@admin.register(ConductSeverity)
+class ConductSeverityAdmin(admin.ModelAdmin):
+    list_display = ['code', 'name', 'is_active', 'created_at', 'updated_at']
+    list_filter = ['is_active']
+    search_fields = ['code', 'name', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(self.readonly_fields)
+        if obj is not None:
+            readonly_fields.append('code')
+        return readonly_fields
+
 
 @admin.register(ConductItem)
 class ConductItemAdmin(ConductAuditAdminMixin, admin.ModelAdmin):
+    form = ConductItemAdminForm
     list_display = [
+        'code',
         'name',
         'category',
         'default_score',
@@ -127,13 +206,13 @@ class ConductItemAdmin(ConductAuditAdminMixin, admin.ModelAdmin):
         'updated_at',
     ]
     list_filter = ['category__nature', 'category', 'is_active', 'created_by', 'updated_by', 'created_at', 'updated_at']
-    search_fields = ['name', 'description']
+    search_fields = ['code', 'name', 'description']
     readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
     ordering = ['category__nature', 'category__order', 'name']
     
     fieldsets = (
         ('基本信息', {
-            'fields': ('category', 'name', 'default_score', 'description'),
+            'fields': ('category', 'code', 'name', 'default_score', 'description'),
             'description': '当前分值 = 事项默认分值 × 严重程度系数。一般情形按默认分值计分。'
         }),
         ('状态', {
@@ -145,28 +224,36 @@ class ConductItemAdmin(ConductAuditAdminMixin, admin.ModelAdmin):
         }),
     )
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(self.readonly_fields)
+        if obj is not None:
+            readonly_fields.append('code')
+        return readonly_fields
+
 
 @admin.register(ConductSeverityRule)
 class ConductSeverityRuleAdmin(ConductAuditAdminMixin, admin.ModelAdmin):
     form = ConductSeverityRuleAdminForm
     list_display = [
-        'nature',
+        'nature_display',
         'severity_display',
+        'label',
         'multiplier_display',
         'order',
+        'is_default',
         'created_by_display',
         'created_at',
         'updated_by_display',
         'updated_at',
     ]
     list_filter = ['nature', 'severity', 'created_by', 'updated_by', 'created_at', 'updated_at']
-    search_fields = ['nature', 'severity']
+    search_fields = ['nature', 'severity__code', 'severity__name', 'label']
     readonly_fields = ['created_by', 'created_at', 'updated_by', 'updated_at']
     ordering = ['nature', 'order', 'severity']
 
     fieldsets = (
         ('基本信息', {
-            'fields': ('nature', 'severity', 'multiplier', 'order'),
+            'fields': ('nature', 'severity', 'label', 'multiplier', 'order', 'is_default'),
             'description': '当前分值 = 事项默认分值 × 严重程度系数。修改系数后，相关历史记录与汇总会同步重算。',
         }),
         ('元数据', {
@@ -181,7 +268,17 @@ class ConductSeverityRuleAdmin(ConductAuditAdminMixin, admin.ModelAdmin):
 
     @admin.display(description='严重程度')
     def severity_display(self, obj):
-        return obj.severity_label
+        return obj.severity.name
+
+    @admin.display(description='性质', ordering='nature')
+    def nature_display(self, obj):
+        return obj.nature_label
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = list(self.readonly_fields)
+        if obj is not None and obj.nature not in ConductNature.values:
+            readonly_fields.append('nature')
+        return readonly_fields
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -220,6 +317,8 @@ class ConductRecordAdmin(admin.ModelAdmin):
         'student__first_name',
         'student__last_name',
         'item__name',
+        'severity__code',
+        'severity__name',
         'reason'
     ]
     readonly_fields = ['recorded_by', 'recorded_at', 'updated_by', 'updated_at', 'reviewed_by', 'reviewed_at']
@@ -253,6 +352,7 @@ class ConductRecordAdmin(admin.ModelAdmin):
         queryset = super().get_queryset(request).select_related(
             'student',
             'item__category',
+            'severity',
             'recorded_by',
             'updated_by',
             'reviewed_by',
@@ -279,7 +379,6 @@ class ConductRecordAdmin(admin.ModelAdmin):
 
         if 'severity' in form.base_fields:
             severity_widget = get_widget_attr_target(form.base_fields['severity'].widget)
-            severity_widget.attrs['data-default-severity'] = CONDUCT_SEVERITY_MODERATE
             severity_widget.attrs['data-placeholder-label'] = SEVERITY_PLACEHOLDER_LABEL
 
         return form
@@ -297,9 +396,15 @@ class ConductRecordAdmin(admin.ModelAdmin):
             {'value': value, 'label': label}
             for value, label in get_record_severity_choices(nature)
         ]
+        default_rule = get_default_conduct_severity(nature) if nature else None
+        default_code = default_rule.severity.code if default_rule is not None else ''
+        if nature and choices and not default_code:
+            choices.insert(0, {'value': '', 'label': '请选择程度（未配置默认项）'})
+        elif nature and not choices:
+            choices = [{'value': '', 'label': '当前性质未配置严重程度规则'}]
         return JsonResponse({
             'choices': choices,
-            'default': CONDUCT_SEVERITY_MODERATE,
+            'default': default_code,
         })
 
     def get_fieldsets(self, request, obj=None):
@@ -310,7 +415,7 @@ class ConductRecordAdmin(admin.ModelAdmin):
         fieldsets = [
             ('基本信息', {
                 'fields': basic_fields,
-                'description': '当前分值 = 事项默认分值 × 严重程度系数。默认“一般”档会按事项默认分值计分。',
+                'description': '当前分值 = 事项默认分值 × 严重程度系数。默认程度由对应性质的规则配置决定。',
             }),
         ]
 

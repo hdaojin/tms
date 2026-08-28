@@ -16,10 +16,12 @@ from assessments.models import (
     AssessmentModuleCoach,
     AssessmentModuleDomain,
     AssessmentParticipant,
+    AssessmentType,
     CompetitionRole,
 )
 from evidence.models import KnowledgeEvidence
 from standards.models import SkillProject, TechnicalDomain, TechnicalDomainGroupScope
+from .bootstrap import bootstrap_defaults as bootstrap_scoring_defaults
 from .forms import ScoringImportForm, ScoringResultForm
 from .models import (
     ScoringAspect,
@@ -37,6 +39,13 @@ from .services import confirm_scheme_import, record_scoring_result, scheme_impor
 User = get_user_model()
 
 
+def get_mock_assessment_type():
+    return AssessmentType.objects.get_or_create(
+        code='mock',
+        defaults={'name': '模拟赛', 'order': 40},
+    )[0]
+
+
 class ScoringEvidenceWorkflowTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="coach")
@@ -47,7 +56,7 @@ class ScoringEvidenceWorkflowTests(TestCase):
         project = SkillProject.objects.create(code="NS", name="网络系统管理")
         assessment = Assessment.objects.create(
             skill_project=project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="模拟赛",
             code="MOCK",
             start_date=date(2026, 1, 1),
@@ -221,7 +230,7 @@ class ScoringResultModelTests(TestCase):
         self.project = SkillProject.objects.create(code="SCORE", name="评分测试")
         self.assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="评分测试",
             code="SCORE-ASSESSMENT",
             start_date=date(2026, 2, 1),
@@ -284,7 +293,7 @@ class ScoringResultModelTests(TestCase):
 
         other_assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="另一场",
             code="SCORE-OTHER",
             start_date=date(2026, 2, 2),
@@ -367,7 +376,7 @@ class OnlineScoringWorkflowTests(TestCase):
         )
         self.assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="在线评分测试",
             code="ONLINE-ASSESSMENT",
             start_date=date(2026, 5, 1),
@@ -625,6 +634,7 @@ class OnlineScoringWorkflowTests(TestCase):
 
 class ScoringPermissionBoundaryTests(TestCase):
     def setUp(self):
+        bootstrap_scoring_defaults()
         self.owner = User.objects.create_user(username="scoring-permission-owner")
         self.other_owner = User.objects.create_user(username="scoring-permission-other-owner")
         self.linux_coach = User.objects.create_user(username="scoring-linux-coach")
@@ -708,7 +718,7 @@ class ScoringPermissionBoundaryTests(TestCase):
     def _assessment(self, code, owner):
         return Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name=code,
             code=code,
             start_date=date(2026, 4, 1),

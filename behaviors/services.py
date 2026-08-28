@@ -4,8 +4,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from core.constants import CONDUCT_NATURE_PENALTY, CONDUCT_NATURE_REWARD
-
+from .models import ConductNature
 
 def _get_conduct_record_model():
     from .models import ConductRecord
@@ -31,14 +30,14 @@ def prepare_conduct_record_for_save(record, *, actor, change, now=None):
 
     if not change:
         record.recorded_by = actor
-        record.status = record_model.STATUS_PENDING
+        record.status = record_model.Status.PENDING
         return record
 
     record.updated_by = actor
     original_status = record_model.objects.filter(pk=record.pk).values_list("status", flat=True).first()
     if (
-        original_status == record_model.STATUS_PENDING
-        and record.status in [record_model.STATUS_APPROVED, record_model.STATUS_REJECTED]
+        original_status == record_model.Status.PENDING
+        and record.status in [record_model.Status.APPROVED, record_model.Status.REJECTED]
     ):
         record.reviewed_by = actor
         record.reviewed_at = current_time
@@ -51,10 +50,10 @@ def recalculate_conduct_summary(summary):
     conduct_severity_rule_model = _get_conduct_severity_rule_model()
 
     approved_records = summary.student.conduct_records.filter(
-        status=conduct_record_model.STATUS_APPROVED,
-    ).select_related('item__category')
+        status=conduct_record_model.Status.APPROVED,
+    ).select_related('item__category', 'severity')
     rule_map = {
-        (rule.nature, rule.severity): rule.multiplier
+        (rule.nature, rule.severity_id): rule.multiplier
         for rule in conduct_severity_rule_model.objects.all()
     }
 
@@ -64,9 +63,9 @@ def recalculate_conduct_summary(summary):
 
     for record in approved_records:
         total_score += record.get_score(rule_map=rule_map)
-        if record.item.category.nature == CONDUCT_NATURE_REWARD:
+        if record.item.category.nature == ConductNature.REWARD:
             reward_count += 1
-        elif record.item.category.nature == CONDUCT_NATURE_PENALTY:
+        elif record.item.category.nature == ConductNature.PENALTY:
             penalty_count += 1
 
     summary.total_score = total_score
@@ -98,7 +97,7 @@ def refresh_conduct_summaries(student_ids):
 
 def sync_conduct_summary_after_record_save(record):
     record_model = type(record)
-    if record.status in [record_model.STATUS_APPROVED, record_model.STATUS_REJECTED]:
+    if record.status in [record_model.Status.APPROVED, record_model.Status.REJECTED]:
         refresh_conduct_summary(record.student_id)
 
 
@@ -116,7 +115,7 @@ def sync_conduct_summaries_for_item(item):
     conduct_record_model = _get_conduct_record_model()
     student_ids = conduct_record_model.objects.filter(
         item=item,
-        status=conduct_record_model.STATUS_APPROVED,
+        status=conduct_record_model.Status.APPROVED,
     ).values_list('student_id', flat=True).distinct()
     return refresh_conduct_summaries(student_ids)
 
@@ -125,7 +124,7 @@ def sync_conduct_summaries_for_category(category):
     conduct_record_model = _get_conduct_record_model()
     student_ids = conduct_record_model.objects.filter(
         item__category=category,
-        status=conduct_record_model.STATUS_APPROVED,
+        status=conduct_record_model.Status.APPROVED,
     ).values_list('student_id', flat=True).distinct()
     return refresh_conduct_summaries(student_ids)
 
@@ -134,7 +133,7 @@ def sync_conduct_summaries_for_rule(rule):
     conduct_record_model = _get_conduct_record_model()
     student_ids = conduct_record_model.objects.filter(
         item__category__nature=rule.nature,
-        severity=rule.severity,
-        status=conduct_record_model.STATUS_APPROVED,
+        severity_id=rule.severity_id,
+        status=conduct_record_model.Status.APPROVED,
     ).values_list('student_id', flat=True).distinct()
     return refresh_conduct_summaries(student_ids)

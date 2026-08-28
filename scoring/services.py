@@ -19,7 +19,7 @@ from .models import (
     ScoringSchemeImport,
     ScoringSubCriterion,
 )
-from .registry import PARSER_DEFINITIONS, default_parser_key, get_parser_definition
+from .registry import get_parser_definition
 from .selectors import scoring_modules_in_scope_for
 
 
@@ -38,39 +38,11 @@ def _ensure_module_permission(user, module, permission):
         raise PermissionDenied("您无权管理该评测模块的评分数据。")
 
 
-def sync_parser_configs():
-    created_configs = []
-    existing_default = ScoringParserConfig.objects.filter(is_default=True).first()
-    for index, definition in enumerate(PARSER_DEFINITIONS.values()):
-        config, created = ScoringParserConfig.objects.get_or_create(
-            parser_key=definition.key,
-            defaults={
-                "display_name": definition.display_name,
-                "alias": definition.alias,
-                "description": definition.description,
-                "is_enabled": True,
-                "is_default": definition.key == default_parser_key() and existing_default is None,
-                "order": index,
-            },
-        )
-        if created:
-            created_configs.append(config)
-    if not ScoringParserConfig.objects.filter(is_default=True, is_enabled=True).exists():
-        fallback = ScoringParserConfig.objects.filter(parser_key=default_parser_key()).first()
-        if fallback:
-            fallback.is_enabled = True
-            fallback.is_default = True
-            fallback.save(update_fields=["is_enabled", "is_default", "updated_at"])
-    return created_configs
-
-
 def enabled_parser_configs():
-    sync_parser_configs()
     return ScoringParserConfig.objects.filter(is_enabled=True).order_by("order", "display_name", "parser_key")
 
 
 def default_parser_config():
-    sync_parser_configs()
     return (
         ScoringParserConfig.objects.filter(is_enabled=True, is_default=True).first()
         or ScoringParserConfig.objects.filter(is_enabled=True).order_by("order", "display_name").first()
@@ -294,5 +266,8 @@ def confirm_scheme_import(scheme_import: ScoringSchemeImport, user=None):
 
 @transaction.atomic
 def create_scheme_from_document(document, user=None, parser_config=None):
-    scheme_import = parse_scheme_document(document, parser_config or default_parser_config(), user=user)
+    selected_parser = parser_config or default_parser_config()
+    if selected_parser is None:
+        raise ValidationError('当前没有可用的评分表解析器，请先执行 bootstrap_tms 或在后台配置解析器。')
+    scheme_import = parse_scheme_document(document, selected_parser, user=user)
     return confirm_scheme_import(scheme_import, user=user)

@@ -1,10 +1,38 @@
+from django import forms
 from django.contrib import admin
+from django.db import models
 
-from .models import CountdownEvent
+from .models import CountdownEvent, CountdownEventType
+
+
+class CountdownEventAdminForm(forms.ModelForm):
+    class Meta:
+        model = CountdownEvent
+        fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        queryset = CountdownEventType.objects.filter(is_active=True)
+        if self.instance.pk and self.instance.event_type_id:
+            queryset = CountdownEventType.objects.filter(
+                models.Q(is_active=True) | models.Q(pk=self.instance.event_type_id)
+            )
+        self.fields['event_type'].queryset = queryset.order_by('order', 'code')
+
+
+@admin.register(CountdownEventType)
+class CountdownEventTypeAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'order', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('code', 'name')
+
+    def get_readonly_fields(self, request, obj=None):
+        return ('code',) if obj else ()
 
 
 @admin.register(CountdownEvent)
 class CountdownEventAdmin(admin.ModelAdmin):
+    form = CountdownEventAdminForm
     list_display = (
         'name',
         'event_type',
@@ -78,3 +106,10 @@ class CountdownEventAdmin(admin.ModelAdmin):
             },
         ),
     )
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        other_type = CountdownEventType.objects.filter(code='other', is_active=True).first()
+        if other_type is not None:
+            initial.setdefault('event_type', other_type.pk)
+        return initial

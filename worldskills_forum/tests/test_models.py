@@ -4,7 +4,14 @@ from django.db.models.deletion import ProtectedError
 from django.utils import timezone
 
 from worldskills_forum.forms import ForumPostTranslationForm, ForumTopicForm
-from worldskills_forum.models import ForumPost, ForumPostAttachment, ForumSourceRole, ForumTag, ForumTopicReadState
+from worldskills_forum.models import (
+    ForumPost,
+    ForumPostAttachment,
+    ForumPostType,
+    ForumSourceRole,
+    ForumTag,
+    ForumTopicReadState,
+)
 
 from .base import ForumTestCase
 
@@ -88,6 +95,29 @@ class ForumModelTests(ForumTestCase):
         self.assertIn(
             custom_role,
             ForumPostTranslationForm(post=post).fields["source_role"].queryset,
+        )
+
+    def test_post_form_excludes_inactive_type_but_keeps_current_historical_value(self):
+        custom_type = ForumPostType.objects.create(
+            code="technical-update",
+            name="技术更新",
+        )
+        self.assertIn(
+            custom_type,
+            ForumPostTranslationForm(topic=self.make_topic()).fields["post_type"].queryset,
+        )
+
+        post = self.make_post(post_type=custom_type)
+        custom_type.is_active = False
+        custom_type.save(update_fields=["is_active"])
+
+        self.assertNotIn(
+            custom_type,
+            ForumPostTranslationForm(topic=post.topic).fields["post_type"].queryset,
+        )
+        self.assertIn(
+            custom_type,
+            ForumPostTranslationForm(post=post).fields["post_type"].queryset,
         )
 
     def test_source_role_controls_whether_detail_is_kept(self):

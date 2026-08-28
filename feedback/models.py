@@ -30,11 +30,23 @@ def sanitize_original_filename(filename: str | None) -> str:
     return value if value not in {"", ".", ".."} else "附件"
 
 
-class FeedbackCategory(models.TextChoices):
-    BUG = "bug", "Bug反馈"
-    FEATURE = "feature", "功能需求"
-    SUGGESTION = "suggestion", "意见建议"
-    COMPLAINT = "complaint", "我要投诉"
+class FeedbackCategory(models.Model):
+    code = models.CharField("分类代码", max_length=20, unique=True)
+    name = models.CharField("分类名称", max_length=120)
+    description = models.TextField("说明", blank=True)
+    order = models.PositiveIntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+    default_private = models.BooleanField("默认设为私密", default=False)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        ordering = ["order", "code"]
+        verbose_name = "反馈分类"
+        verbose_name_plural = "反馈分类"
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class FeedbackStatus(models.TextChoices):
@@ -45,7 +57,12 @@ class FeedbackStatus(models.TextChoices):
 
 
 class Feedback(models.Model):
-    category = models.CharField("反馈类型", max_length=20, choices=FeedbackCategory, db_index=True)
+    category = models.ForeignKey(
+        FeedbackCategory,
+        models.PROTECT,
+        related_name="feedbacks",
+        verbose_name="反馈类型",
+    )
     title = models.CharField("标题", max_length=200)
     content = models.TextField("详细描述")
     author = models.ForeignKey(
@@ -87,7 +104,7 @@ class Feedback(models.Model):
             ("view_anonymous_identity", "查看匿名反馈人身份"),
         ]
         indexes = [
-            models.Index(fields=["category", "status"]),
+            models.Index(fields=["category", "status"], name="feedback_fe_categor_ca3927_idx"),
             models.Index(fields=["is_private", "status"]),
         ]
 

@@ -22,7 +22,7 @@ class ConductRecordTable(BaseTable):
     status = tables.Column(verbose_name="状态")
 
     def render_nature(self, record):
-        return record.item.category.get_nature_display()
+        return record.item.category.nature_label
 
     def render_score(self, record):
         score = record.score

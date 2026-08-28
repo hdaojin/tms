@@ -13,16 +13,36 @@ from .models import (
     AssessmentParticipant,
     AssessmentResultAward,
     AssessmentSeries,
+    AssessmentType,
     CompetitionPerson,
     CompetitionRole,
 )
+
+class StableCodeAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "order", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("code", "name")
+
+    def get_readonly_fields(self, request, obj=None):
+        return ("code",) if obj else ()
+
+
+@admin.register(AssessmentType)
+class AssessmentTypeAdmin(StableCodeAdmin):
+    pass
+
+
+@admin.register(CompetitionRole)
+class CompetitionRoleAdmin(StableCodeAdmin):
+    list_display = ("code", "name", "category", "order", "is_active")
+    list_filter = ("category", "is_active")
+
 
 admin.site.register(
     [
         AssessmentSeries,
         AssessmentLevel,
         CompetitionPerson,
-        CompetitionRole,
         Assessment,
         AssessmentModule,
         AssessmentModuleDomain,

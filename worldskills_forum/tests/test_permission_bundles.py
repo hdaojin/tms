@@ -8,7 +8,7 @@ from core.permissions import get_permission_bundle_choices
 class ForumPermissionBundleTests(TestCase):
     def test_translate_forum_bundle_is_available_and_grants_publish_permissions(self):
         bundle_code = "worldskills_forum.translate_forum"
-        self.assertIn((bundle_code, "翻译世赛论坛"), get_permission_bundle_choices())
+        self.assertIn((bundle_code, "世赛论坛 | 翻译世赛论坛"), get_permission_bundle_choices())
         group = Group.objects.create(name="论坛翻译人员")
 
         sync_group_permission_assignments(group, [bundle_code])

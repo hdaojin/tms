@@ -5,11 +5,22 @@ from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.utils import timezone
 
-from worldskills_forum.models import ForumCategory, ForumModule, ForumPost, ForumSourceRole, ForumTag, ForumTopic, ForumTranslation
+from worldskills_forum.bootstrap import bootstrap_defaults
+from worldskills_forum.models import (
+    ForumCategory,
+    ForumModule,
+    ForumPost,
+    ForumPostType,
+    ForumSourceRole,
+    ForumTag,
+    ForumTopic,
+    ForumTranslation,
+)
 
 
 class ForumTestCase(TestCase):
     def setUp(self):
+        bootstrap_defaults()
         user_model = get_user_model()
         self.reader = user_model.objects.create_user(username="reader", password="test")
         self.translator_a = user_model.objects.create_user(username="translator_a", password="test")
@@ -79,6 +90,8 @@ class ForumTestCase(TestCase):
             "updated_by": user,
         }
         data.update(kwargs)
+        if isinstance(data['post_type'], str):
+            data['post_type'] = ForumPostType.objects.get(code=data['post_type'])
         post = ForumPost.objects.create(**data)
         ForumTranslation.objects.create(
             post=post,

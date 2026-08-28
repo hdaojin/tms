@@ -3,26 +3,33 @@ from django.db import models
 from .themes import DEFAULT_THEME_KEY, THEME_CHOICES
 
 
-class CountdownEvent(models.Model):
-    class EventType(models.TextChoices):
-        WORLDSKILLS = 'worldskills', '世界技能大赛'
-        NATIONAL = 'national', '全国技能大赛'
-        PROVINCIAL = 'provincial', '省级技能大赛'
-        MUNICIPAL = 'municipal', '市级技能大赛'
-        SCHOOL = 'school', '校内比赛'
-        TRAINING = 'training', '集训活动'
-        EXAM = 'exam', '考核测评'
-        MEETING = 'meeting', '会议活动'
-        OTHER = 'other', '其他活动'
+class CountdownEventType(models.Model):
+    code = models.CharField('类型代码', max_length=20, unique=True)
+    name = models.CharField('类型名称', max_length=120)
+    description = models.TextField('说明', blank=True)
+    order = models.PositiveIntegerField('排序', default=0)
+    is_active = models.BooleanField('启用', default=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
 
+    class Meta:
+        verbose_name = '倒计时事件类型'
+        verbose_name_plural = '倒计时事件类型'
+        ordering = ['order', 'code']
+
+    def __str__(self):
+        return self.name
+
+
+class CountdownEvent(models.Model):
     name = models.CharField('事件名称', max_length=120)
     slug = models.SlugField('访问标识', max_length=120, unique=True, blank=True, null=True)
     subtitle = models.CharField('副标题', max_length=200, blank=True)
-    event_type = models.CharField(
-        '事件类型',
-        max_length=20,
-        choices=EventType.choices,
-        default=EventType.OTHER,
+    event_type = models.ForeignKey(
+        CountdownEventType,
+        verbose_name='事件类型',
+        on_delete=models.PROTECT,
+        related_name='events',
     )
     project_name = models.CharField('项目名称', max_length=120, blank=True)
     project_english_name = models.CharField('项目英文名称', max_length=160, blank=True)

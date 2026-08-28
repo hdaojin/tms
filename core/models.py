@@ -116,20 +116,24 @@ class SiteConfig(models.Model):
     
     @classmethod
     def get_solo(cls):
-        """获取唯一的站点配置实例，若不存在则创建一个默认实例。"""
+        """获取唯一的站点配置实例；缺失时返回不落库的安全默认对象。"""
         cache_key = "site_config_solo"
         obj = cache.get(cache_key)
         if obj is not None:
             return obj
 
-        obj, _created = cls.objects.get_or_create(id=1, defaults={
-            "site_name": "Training management system",
-            "site_short_name": "TMS",
-            "site_description": "A training management system for skill competitions.",
-            "site_keywords": "training, management, skills, competitions",
-            "site_author": "hdaojin",
-            "site_copyright": "TMS 版权所有",
-        })
+        obj = cls.objects.filter(pk=1).first()
+        if obj is None:
+            return cls(
+                pk=1,
+                site_name="Training management system",
+                site_short_name="TMS",
+                site_description="A training management system for skill competitions.",
+                site_keywords="training, management, skills, competitions",
+                site_author="hdaojin",
+                site_copyright="TMS 版权所有",
+            )
+
         cache.set(cache_key, obj, timeout=settings.CACHE_TIMEOUT)
         return obj
 

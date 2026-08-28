@@ -5,11 +5,18 @@ from django.contrib.auth.models import Permission
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
+from feedback.bootstrap import bootstrap_defaults
 from feedback.models import Feedback, FeedbackCategory
+
+
+BUG_CODE = 'bug'
+FEATURE_CODE = 'feature'
+COMPLAINT_CODE = 'complaint'
 
 
 class FeedbackTestCase(TestCase):
     def setUp(self):
+        bootstrap_defaults()
         self.private_media = tempfile.TemporaryDirectory()
         self.private_media_override = override_settings(PRIVATE_MEDIA_ROOT=self.private_media.name)
         self.private_media_override.enable()
@@ -41,12 +48,14 @@ class FeedbackTestCase(TestCase):
 
     def make_feedback(self, author=None, **kwargs):
         data = {
-            "category": FeedbackCategory.BUG,
+            "category": FeedbackCategory.objects.get(code=BUG_CODE),
             "title": "测试反馈",
             "content": "反馈正文内容",
             "author": author or self.author,
         }
         data.update(kwargs)
+        if isinstance(data['category'], str):
+            data['category'] = FeedbackCategory.objects.get(code=data['category'])
         return Feedback.objects.create(**data)
 
     @staticmethod

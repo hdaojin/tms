@@ -22,7 +22,7 @@
       return defaultValue;
     }
 
-    return availableValues[0] || '';
+    return '';
   }
 
   document.addEventListener('DOMContentLoaded', function () {
