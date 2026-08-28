@@ -1,26 +1,23 @@
-from django.db import models
-from django.conf import settings
-from django.utils import timezone
-from django.core.exceptions import ValidationError
-from django.db.models.signals import post_save, post_delete
-from django.dispatch import receiver
-from pathlib import Path
 from decimal import Decimal
+from pathlib import Path
 
-from core.constants import (
-    CONDUCT_NATURE_REWARD,
-    CONDUCT_NATURE_PENALTY,
-    CONDUCT_NATURE_CHOICES,
-    CONDUCT_SEVERITY_CHOICES,
-    CONDUCT_SEVERITY_MODERATE,
-    CONDUCT_SEVERITY_NAMES,
-    CONDUCT_REWARD_SEVERITY_NAMES,
-    CONDUCT_PENALTY_SEVERITY_NAMES,
-)
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import Q
+from django.db.models.signals import post_delete, post_save
+from django.dispatch import receiver
+from django.utils import timezone
+
 from core.models import AuditedModel
 from core.uploads import CONDUCT_ATTACHMENT_UPLOAD_SPEC, PrivateMediaStorage
-from core.utils.validators import validate_date_not_future
 from core.utils.signals import register_file_cleanup_signals
+from core.utils.validators import validate_date_not_future
+
+
+class ConductNature(models.TextChoices):
+    REWARD = 'REWARD', '奖励'
+    PENALTY = 'PENALTY', '惩罚'
 
 
 def format_conduct_score(value):
@@ -31,51 +28,39 @@ def format_conduct_score(value):
     return f'{value:+.2f}'
 
 
-def get_conduct_severity_name(nature, severity):
-    """按事项性质返回对应的严重程度文案。"""
-    if nature == CONDUCT_NATURE_REWARD:
-        return CONDUCT_REWARD_SEVERITY_NAMES.get(severity, CONDUCT_SEVERITY_NAMES.get(severity, severity))
+class ConductSeverity(models.Model):
+    code = models.CharField('程度代码', max_length=20, unique=True)
+    name = models.CharField('程度名称', max_length=50)
+    description = models.TextField('说明', blank=True)
+    is_active = models.BooleanField('启用状态', default=True)
+    created_at = models.DateTimeField('创建时间', auto_now_add=True)
+    updated_at = models.DateTimeField('更新时间', auto_now=True)
 
-    if nature == CONDUCT_NATURE_PENALTY:
-        return CONDUCT_PENALTY_SEVERITY_NAMES.get(severity, CONDUCT_SEVERITY_NAMES.get(severity, severity))
+    class Meta:
+        verbose_name = '奖惩严重程度'
+        verbose_name_plural = '奖惩严重程度'
+        ordering = ['code']
 
-    return CONDUCT_SEVERITY_NAMES.get(severity, severity)
+    def __str__(self):
+        return self.name
 
-
-def get_conduct_severity_choices(nature=None):
-    """按事项性质返回对应的程度选项。"""
-    return [
-        (code, get_conduct_severity_name(nature, code))
-        for code, _label in CONDUCT_SEVERITY_CHOICES
-    ]
-
-
-def get_conduct_severity_choices_with_multiplier(nature):
-    """按事项性质返回程度选项，同时显示系数。"""
-    rules = dict(
-        ConductSeverityRule.objects.filter(nature=nature)
-        .values_list('severity', 'multiplier')
-    )
-    choices = []
-    for code, _label in CONDUCT_SEVERITY_CHOICES:
-        name = get_conduct_severity_name(nature, code)
-        multiplier = rules.get(code)
-        if multiplier is not None:
-            label = f"{name}（×{multiplier:.2f}）"
-        else:
-            label = name
-        choices.append((code, label))
-    return choices
+    def clean(self):
+        super().clean()
+        if self.pk and not self.is_active and self.rules.filter(is_default=True).exists():
+            raise ValidationError({
+                'is_active': '该严重程度仍被奖惩性质用作默认项，请先调整对应系数规则。',
+            })
 
 
 class ConductCategory(AuditedModel):
     """奖惩分类模型（第二层：可添加修改）"""
-    
+
+    code = models.CharField('分类代码', max_length=64, unique=True)
     nature = models.CharField(
         '性质',
         max_length=20,
-        choices=CONDUCT_NATURE_CHOICES,
-        help_text='行为性质：奖励、惩罚'
+        choices=ConductNature.choices,
+        help_text='行为性质：奖励、惩罚',
     )
     name = models.CharField('分类名称', max_length=50)
     description = models.TextField('说明', blank=True)
@@ -94,7 +79,13 @@ class ConductCategory(AuditedModel):
         ]
 
     def __str__(self):
-        return f"{self.get_nature_display()} - {self.name}"
+        return f'{self.nature_label} - {self.name}'
+
+    @property
+    def nature_label(self):
+        if self.nature in ConductNature.values:
+            return self.get_nature_display()
+        return f'{self.nature or "空值"}（历史）'
 
 
 class ConductSeverityRule(AuditedModel):
@@ -103,13 +94,15 @@ class ConductSeverityRule(AuditedModel):
     nature = models.CharField(
         '性质',
         max_length=20,
-        choices=CONDUCT_NATURE_CHOICES,
+        choices=ConductNature.choices,
     )
-    severity = models.CharField(
-        '程度',
-        max_length=20,
-        choices=CONDUCT_SEVERITY_CHOICES,
+    severity = models.ForeignKey(
+        ConductSeverity,
+        verbose_name='程度',
+        on_delete=models.PROTECT,
+        related_name='rules',
     )
+    label = models.CharField('显示名称', max_length=50)
     multiplier = models.DecimalField(
         '系数',
         max_digits=4,
@@ -117,6 +110,7 @@ class ConductSeverityRule(AuditedModel):
         help_text='当前分值 = 事项默认分值 × 严重程度系数。',
     )
     order = models.IntegerField('排序', default=0, help_text='数字越小越靠前')
+    is_default = models.BooleanField('默认程度', default=False)
 
     class Meta:
         verbose_name = '严重程度系数规则'
@@ -127,41 +121,89 @@ class ConductSeverityRule(AuditedModel):
                 fields=['nature', 'severity'],
                 name='uniq_conduct_severity_rule_nature_severity',
             ),
+            models.UniqueConstraint(
+                fields=['nature'],
+                condition=Q(is_default=True),
+                name='uniq_default_conduct_severity_rule_per_nature',
+            ),
+            models.CheckConstraint(
+                condition=Q(multiplier__gte=0),
+                name='conduct_severity_rule_multiplier_nonnegative',
+            ),
         ]
 
     def __str__(self):
-        return f"{self.get_nature_display()} - {self.severity_label} ({self.multiplier:.2f}倍)"
+        return f'{self.nature_label} - {self.label} ({self.multiplier:.2f}倍)'
+
+    @property
+    def nature_label(self):
+        if self.nature in ConductNature.values:
+            return self.get_nature_display()
+        return f'{self.nature or "空值"}（历史）'
 
     @property
     def severity_label(self):
-        """返回按性质映射后的严重程度文案。"""
-        return get_conduct_severity_name(self.nature, self.severity)
+        return self.label
 
     def clean(self):
-        """严重程度系数不能为负数。"""
-        if self.multiplier < 0:
+        if self.multiplier is not None and self.multiplier < 0:
             raise ValidationError({'multiplier': '严重程度系数不能为负数。'})
+        if self.is_default and self.severity_id and not self.severity.is_active:
+            raise ValidationError({'severity': '默认规则必须关联已启用的严重程度。'})
 
     @classmethod
     def get_multiplier(cls, nature, severity):
-        if not nature or not severity:
+        severity_id = getattr(severity, 'pk', severity)
+        if not nature or not severity_id:
             return None
 
         return cls.objects.filter(
             nature=nature,
-            severity=severity,
+            severity_id=severity_id,
         ).values_list('multiplier', flat=True).first()
+
+
+def get_conduct_severity_rules(nature, *, current_severity_id=None):
+    queryset = ConductSeverityRule.objects.filter(nature=nature).select_related('severity')
+    if current_severity_id is None:
+        queryset = queryset.filter(severity__is_active=True)
+    else:
+        queryset = queryset.filter(Q(severity__is_active=True) | Q(severity_id=current_severity_id))
+    return queryset.order_by('order', 'severity__code')
+
+
+def get_conduct_severity_choices(nature, *, current_severity_id=None):
+    return [
+        (rule.severity.code, rule.label)
+        for rule in get_conduct_severity_rules(nature, current_severity_id=current_severity_id)
+    ]
+
+
+def get_conduct_severity_choices_with_multiplier(nature, *, current_severity_id=None):
+    return [
+        (rule.severity.code, f'{rule.label}（×{rule.multiplier:.2f}）')
+        for rule in get_conduct_severity_rules(nature, current_severity_id=current_severity_id)
+    ]
+
+
+def get_default_conduct_severity(nature):
+    return (
+        ConductSeverityRule.objects.select_related('severity')
+        .filter(nature=nature, is_default=True, severity__is_active=True)
+        .first()
+    )
 
 
 class ConductItem(AuditedModel):
     """奖惩具体事项模型（第三层：可添加修改）"""
-    
+
     category = models.ForeignKey(
         ConductCategory,
         on_delete=models.PROTECT,
         related_name='items',
         verbose_name='所属分类'
     )
+    code = models.CharField('事项代码', max_length=64)
     name = models.CharField('事项名称', max_length=100)
     default_score = models.DecimalField(
         '默认分值',
@@ -181,6 +223,10 @@ class ConductItem(AuditedModel):
                 fields=['category', 'name'],
                 name='uniq_conduct_item_category_name',
             ),
+            models.UniqueConstraint(
+                fields=['category', 'code'],
+                name='uniq_conduct_item_category_code',
+            ),
         ]
 
     def __str__(self):
@@ -191,10 +237,10 @@ class ConductItem(AuditedModel):
         if not self.category_id:
             return
 
-        if self.category.nature == CONDUCT_NATURE_REWARD and self.default_score <= 0:
+        if self.category.nature == ConductNature.REWARD and self.default_score <= 0:
             raise ValidationError({'default_score': '奖励类事项的默认分值应为正数。'})
 
-        if self.category.nature == CONDUCT_NATURE_PENALTY and self.default_score >= 0:
+        if self.category.nature == ConductNature.PENALTY and self.default_score >= 0:
             raise ValidationError({'default_score': '惩罚类事项的默认分值应为负数。'})
 
 
@@ -223,16 +269,11 @@ def conduct_attachment_upload_to(instance, filename):
 class ConductRecord(models.Model):
     """奖惩记录模型"""
 
-    STATUS_PENDING = 'PENDING'
-    STATUS_APPROVED = 'APPROVED'
-    STATUS_REJECTED = 'REJECTED'
-    
-    STATUS_CHOICES = [
-        (STATUS_PENDING, '待审核'),
-        (STATUS_APPROVED, '已通过'),
-        (STATUS_REJECTED, '已驳回'),
-    ]
-    
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', '待审核'
+        APPROVED = 'APPROVED', '已通过'
+        REJECTED = 'REJECTED', '已驳回'
+
     student = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -246,11 +287,11 @@ class ConductRecord(models.Model):
         verbose_name='奖惩事项',
         limit_choices_to={'is_active': True}
     )
-    severity = models.CharField(
-        '严重程度',
-        max_length=20,
-        choices=CONDUCT_SEVERITY_CHOICES,
-        default=CONDUCT_SEVERITY_MODERATE,
+    severity = models.ForeignKey(
+        ConductSeverity,
+        verbose_name='严重程度',
+        on_delete=models.PROTECT,
+        related_name='records',
         help_text='当前分值 = 事项默认分值 × 严重程度系数',
     )
     occurred_date = models.DateField(
@@ -272,8 +313,8 @@ class ConductRecord(models.Model):
     status = models.CharField(
         '状态',
         max_length=10,
-        choices=STATUS_CHOICES,
-        default=STATUS_PENDING
+        choices=Status.choices,
+        default=Status.PENDING,
     )
     
     # 记录信息
@@ -324,12 +365,19 @@ class ConductRecord(models.Model):
 
     @property
     def severity_label(self):
-        """返回按事项性质映射后的严重程度文案。"""
-        if not self.severity:
+        if not self.severity_id:
             return ''
 
         nature = self.item.category.nature if self.item_id else None
-        return get_conduct_severity_name(nature, self.severity)
+        prefetched_rules = getattr(self.severity, '_conduct_rules', None)
+        if prefetched_rules is not None:
+            rule = next((candidate for candidate in prefetched_rules if candidate.nature == nature), None)
+        else:
+            rule = ConductSeverityRule.objects.filter(
+                nature=nature,
+                severity_id=self.severity_id,
+            ).first()
+        return rule.label if rule is not None else self.severity.name
 
     def clean(self):
         """验证学生范围与审核状态流。"""
@@ -346,21 +394,21 @@ class ConductRecord(models.Model):
             if not is_subject:
                 errors['student'] = '该用户未获“可作为奖惩对象”权限。'
 
-        if self.item and self.severity:
+        if self.item_id and self.severity_id:
             has_rule = ConductSeverityRule.objects.filter(
                 nature=self.item.category.nature,
-                severity=self.severity,
+                severity_id=self.severity_id,
             ).exists()
             if not has_rule:
                 errors['severity'] = '当前事项性质下未配置该严重程度的系数规则。'
 
-        if self.status == self.STATUS_PENDING:
+        if self.status == self.Status.PENDING:
             if self.review_note.strip():
                 errors['review_note'] = '待审核记录不能填写审核意见。'
             if self.reviewed_by or self.reviewed_at:
                 errors['status'] = '待审核记录不能包含审核信息。'
 
-        if self.status == self.STATUS_REJECTED and not self.review_note.strip():
+        if self.status == self.Status.REJECTED and not self.review_note.strip():
             errors['review_note'] = '驳回时必须填写审核意见。'
 
         if self.pk:
@@ -368,7 +416,7 @@ class ConductRecord(models.Model):
             if (
                 original_status
                 and original_status != self.status
-                and original_status != self.STATUS_PENDING
+                and original_status != self.Status.PENDING
             ):
                 errors['status'] = '已审核记录不允许再次变更状态。'
 
@@ -385,14 +433,19 @@ class ConductRecord(models.Model):
         if not self.item_id:
             return Decimal('0')
 
-        if not self.severity:
+        if not self.severity_id:
             return Decimal('1')
 
         nature = self.item.category.nature
         if rule_map is not None:
-            return rule_map.get((nature, self.severity), Decimal('0'))
+            return rule_map.get((nature, self.severity_id), Decimal('0'))
 
-        multiplier = ConductSeverityRule.get_multiplier(nature, self.severity)
+        prefetched_rules = getattr(self.severity, '_conduct_rules', None)
+        if prefetched_rules is not None:
+            rule = next((candidate for candidate in prefetched_rules if candidate.nature == nature), None)
+            return rule.multiplier if rule is not None else Decimal('0')
+
+        multiplier = ConductSeverityRule.get_multiplier(nature, self.severity_id)
         return multiplier if multiplier is not None else Decimal('0')
 
     def get_score(self, rule_map=None):
@@ -401,7 +454,7 @@ class ConductRecord(models.Model):
             return Decimal('0')
 
         base_score = self.item.default_score
-        if not self.severity:
+        if not self.severity_id:
             return base_score
 
         score = base_score * self.get_multiplier(rule_map=rule_map)
@@ -414,7 +467,7 @@ class ConductRecord(models.Model):
             return ''
 
         base_score = self.item.default_score
-        if not self.severity:
+        if not self.severity_id:
             return format_conduct_score(base_score)
 
         multiplier = self.get_multiplier()

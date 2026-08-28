@@ -352,7 +352,7 @@ class SiteConfigSingletonTests(TestCase):
         super().tearDown()
 
     def test_second_site_config_cannot_overwrite_singleton(self):
-        original = SiteConfig.get_solo()
+        original = SiteConfig.objects.create(pk=1, site_name='原站点')
         duplicate = SiteConfig(site_name="不应覆盖")
 
         with self.assertRaisesRegex(ValidationError, "只能存在一条"):
@@ -362,11 +362,20 @@ class SiteConfigSingletonTests(TestCase):
         self.assertNotEqual(original.site_name, "不应覆盖")
 
     def test_save_invalidates_cached_singleton(self):
-        config = SiteConfig.get_solo()
+        config = SiteConfig.objects.create(pk=1, site_name='原站点')
         config.site_name = "更新后的站点"
         config.save()
 
         self.assertEqual(SiteConfig.get_solo().site_name, "更新后的站点")
+
+    def test_get_solo_returns_unsaved_fallback_without_writing(self):
+        self.assertFalse(SiteConfig.objects.exists())
+
+        config = SiteConfig.get_solo()
+
+        self.assertEqual(config.pk, 1)
+        self.assertTrue(config._state.adding)
+        self.assertFalse(SiteConfig.objects.exists())
 
 
 JSON_BYTES = b'{"ok": true}'
@@ -1101,7 +1110,7 @@ class UploadSpecAdoptionTests(TestCase):
         self.assertIn('tabindex="0"', html)
         self.assertIn(" noattribution", html)
         self.assertNotIn("data-tms-upload-browse", html)
-        self.assertIn("先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴截图或文件", html)
+        self.assertIn("支持直接复制/粘贴截图或文件，先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴", html)
         self.assertIn("data-tms-upload-drag-status", html)
 
     def test_file_upload_component_links_help_and_errors_for_accessibility(self):

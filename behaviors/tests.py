@@ -1,6 +1,7 @@
 import json
-from io import StringIO
 from decimal import Decimal
+from io import StringIO
+from itertools import count
 from pathlib import Path
 
 from django.contrib.admin.sites import AdminSite
@@ -10,26 +11,47 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.management import call_command
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management.base import CommandError
 from django.db import connection
 from django.db.migrations.recorder import MigrationRecorder
 from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from core.constants import (
-    CONDUCT_NATURE_PENALTY,
-    CONDUCT_NATURE_REWARD,
-    CONDUCT_PENALTY_SEVERITY_NAMES,
-    CONDUCT_SEVERITY_MINOR,
-    CONDUCT_SEVERITY_MODERATE,
-    CONDUCT_SEVERITY_SEVERE,
-)
 from behaviors.admin import ConductCategoryAdmin, ConductItemAdmin, ConductRecordAdmin, ConductSeverityRuleAdmin, ConductSummaryAdmin
-from behaviors.models import ConductCategory, ConductItem, ConductRecord, ConductSeverityRule, ConductSummary
+from behaviors.bootstrap import bootstrap_defaults
+from behaviors.models import (
+    ConductCategory,
+    ConductItem,
+    ConductNature,
+    ConductRecord,
+    ConductSeverity,
+    ConductSeverityRule,
+    ConductSummary,
+)
 from behaviors.services import prepare_conduct_record_for_save
 
 
 User = get_user_model()
+CONDUCT_NATURE_REWARD = ConductNature.REWARD
+CONDUCT_NATURE_PENALTY = ConductNature.PENALTY
+CONDUCT_SEVERITY_MINOR = 'MINOR'
+CONDUCT_SEVERITY_MODERATE = 'MODERATE'
+CONDUCT_SEVERITY_SEVERE = 'SEVERE'
+CONDUCT_PENALTY_SEVERITY_NAMES = {
+    'MINOR': '轻微',
+    'MODERATE': '一般',
+    'SEVERE': '严重',
+}
+_TEST_CODE_SEQUENCE = count(1)
+
+
+def severity(code):
+    return ConductSeverity.objects.get(code=code)
+
+
+def next_test_code(prefix):
+    return f'test-{prefix}-{next(_TEST_CODE_SEQUENCE)}'
 
 
 def create_conduct_subject_group(name="奖惩对象组"):
@@ -48,16 +70,19 @@ class ConductItemValidationTestCase(TestCase):
 
     def setUp(self):
         self.reward_category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_REWARD,
             name='奖励分类',
         )
         self.penalty_category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_PENALTY,
             name='惩罚分类',
         )
 
     def test_reward_item_default_score_must_be_positive(self):
         item = ConductItem(
+            code=next_test_code('item'),
             category=self.reward_category,
             name='奖励事项',
             default_score=Decimal('0.00'),
@@ -70,6 +95,7 @@ class ConductItemValidationTestCase(TestCase):
 
     def test_penalty_item_default_score_must_be_negative(self):
         item = ConductItem(
+            code=next_test_code('item'),
             category=self.penalty_category,
             name='惩罚事项',
             default_score=Decimal('0.00'),
@@ -81,12 +107,13 @@ class ConductItemValidationTestCase(TestCase):
         self.assertIn('default_score', context.exception.message_dict)
 
 
-class ConductDefaultFixtureTestCase(TestCase):
-    """默认 fixture 应提供代表性的奖惩分类与事项。"""
+class ConductBootstrapTestCase(TestCase):
+    """Bootstrap 应提供代表性的奖惩分类与事项。"""
 
-    fixtures = ['behaviors/default']
+    def setUp(self):
+        bootstrap_defaults()
 
-    def test_default_fixture_seeds_representative_categories_and_items(self):
+    def test_bootstrap_seeds_representative_categories_and_items(self):
         self.assertEqual(ConductCategory.objects.count(), 2)
         self.assertEqual(ConductItem.objects.count(), 7)
 
@@ -117,6 +144,24 @@ class ConductDefaultFixtureTestCase(TestCase):
             },
         )
 
+    def test_bootstrap_does_not_make_an_inactive_severity_the_default(self):
+        moderate = severity(CONDUCT_SEVERITY_MODERATE)
+        ConductSeverityRule.objects.filter(
+            severity=moderate,
+        ).delete()
+        moderate.is_active = False
+        moderate.save(update_fields=['is_active'])
+
+        bootstrap_defaults()
+
+        recreated = ConductSeverityRule.objects.get(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=moderate,
+        )
+        self.assertFalse(recreated.is_default)
+        moderate.refresh_from_db()
+        self.assertFalse(moderate.is_active)
+
 
 class ConductSeverityRuleValidationTestCase(TestCase):
     """严重程度规则应使用非负系数。"""
@@ -124,7 +169,8 @@ class ConductSeverityRuleValidationTestCase(TestCase):
     def test_multiplier_cannot_be_negative(self):
         rule = ConductSeverityRule(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
+            label='表扬',
             multiplier=Decimal('-1.00'),
         )
 
@@ -133,10 +179,19 @@ class ConductSeverityRuleValidationTestCase(TestCase):
 
         self.assertIn('multiplier', context.exception.message_dict)
 
+    def test_default_severity_cannot_be_deactivated_before_rules_are_adjusted(self):
+        moderate = severity(CONDUCT_SEVERITY_MODERATE)
+        moderate.is_active = False
+
+        with self.assertRaises(ValidationError) as context:
+            moderate.full_clean()
+
+        self.assertIn('is_active', context.exception.message_dict)
+
     def test_zero_multiplier_is_allowed(self):
         rule = ConductSeverityRule.objects.get(
             nature=CONDUCT_NATURE_PENALTY,
-            severity=CONDUCT_SEVERITY_MINOR,
+            severity=severity(CONDUCT_SEVERITY_MINOR),
         )
 
         rule.full_clean()
@@ -144,12 +199,13 @@ class ConductSeverityRuleValidationTestCase(TestCase):
     def test_severity_labels_are_mapped_by_nature(self):
         reward_rule = ConductSeverityRule(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
+            label='表扬',
             multiplier=Decimal('1.00'),
         )
         penalty_rule = ConductSeverityRule.objects.get(
             nature=CONDUCT_NATURE_PENALTY,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
         )
 
         self.assertEqual(reward_rule.severity_label, '表扬')
@@ -168,15 +224,17 @@ class ConductRecordValidationTestCase(TestCase):
         self.reviewer = User.objects.create_user(username='reviewer', password='testpass123')
 
         self.category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_REWARD,
             name='学习表现',
         )
         ConductSeverityRule.objects.update_or_create(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             defaults={'multiplier': Decimal('1.00'), 'order': 20},
         )
         self.item = ConductItem.objects.create(
+            code=next_test_code('item'),
             category=self.category,
             name='课堂表现优秀',
             default_score=Decimal('5.00'),
@@ -186,7 +244,7 @@ class ConductRecordValidationTestCase(TestCase):
         record = ConductRecord(
             student=self.outsider,
             item=self.item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='非选手用户不应被录入',
             recorded_by=self.recorder,
         )
@@ -200,7 +258,7 @@ class ConductRecordValidationTestCase(TestCase):
         record = ConductRecord(
             student=self.student,
             item=self.item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='一般情形按默认分值计算',
             recorded_by=self.recorder,
         )
@@ -214,7 +272,7 @@ class ConductRecordValidationTestCase(TestCase):
         record = ConductRecord.objects.create(
             student=self.student,
             item=self.item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='上传奖惩附件',
             recorded_by=self.recorder,
             attachment=SimpleUploadedFile('evidence.pdf', b'%PDF-1.4\nbehavior test', content_type='application/pdf'),
@@ -227,13 +285,13 @@ class ConductRecordValidationTestCase(TestCase):
     def test_record_requires_configured_severity_rule(self):
         ConductSeverityRule.objects.filter(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_SEVERE,
+            severity=severity(CONDUCT_SEVERITY_SEVERE),
         ).delete()
 
         record = ConductRecord(
             student=self.student,
             item=self.item,
-            severity=CONDUCT_SEVERITY_SEVERE,
+            severity=severity(CONDUCT_SEVERITY_SEVERE),
             reason='未配置严重程度规则',
             recorded_by=self.recorder,
         )
@@ -247,10 +305,10 @@ class ConductRecordValidationTestCase(TestCase):
         record = ConductRecord(
             student=self.student,
             item=self.item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='需要驳回',
             recorded_by=self.recorder,
-            status=ConductRecord.STATUS_REJECTED,
+            status=ConductRecord.Status.REJECTED,
         )
 
         with self.assertRaises(ValidationError) as context:
@@ -262,7 +320,7 @@ class ConductRecordValidationTestCase(TestCase):
         record = ConductRecord(
             student=self.student,
             item=self.item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='待审核记录不能预先写审核信息',
             recorded_by=self.recorder,
             review_note='先写意见',
@@ -280,15 +338,15 @@ class ConductRecordValidationTestCase(TestCase):
         record = ConductRecord.objects.create(
             student=self.student,
             item=self.item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='先通过再尝试改状态',
             recorded_by=self.recorder,
-            status=ConductRecord.STATUS_APPROVED,
+            status=ConductRecord.Status.APPROVED,
             reviewed_by=self.reviewer,
             reviewed_at=timezone.now(),
         )
 
-        record.status = ConductRecord.STATUS_REJECTED
+        record.status = ConductRecord.Status.REJECTED
         record.review_note = '再次驳回'
 
         with self.assertRaises(ValidationError) as context:
@@ -308,15 +366,17 @@ class ConductSummarySynchronizationTestCase(TestCase):
         self.reviewer = User.objects.create_user(username='summary-reviewer', password='testpass123')
 
         self.category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_REWARD,
             name='竞赛荣誉',
         )
         self.rule, _ = ConductSeverityRule.objects.update_or_create(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             defaults={'multiplier': Decimal('1.00'), 'order': 20},
         )
         self.item = ConductItem.objects.create(
+            code=next_test_code('item'),
             category=self.category,
             name='获奖',
             default_score=Decimal('5.00'),
@@ -324,10 +384,10 @@ class ConductSummarySynchronizationTestCase(TestCase):
         ConductRecord.objects.create(
             student=self.student,
             item=self.item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='获奖一次',
             recorded_by=self.recorder,
-            status=ConductRecord.STATUS_APPROVED,
+            status=ConductRecord.Status.APPROVED,
             reviewed_by=self.reviewer,
             reviewed_at=timezone.now(),
         )
@@ -368,15 +428,17 @@ class ConductSummaryZeroScoreCountTestCase(TestCase):
         reviewer = User.objects.create_user(username='warning-reviewer', password='testpass123')
 
         category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_PENALTY,
             name='纪律问题',
         )
         ConductSeverityRule.objects.update_or_create(
             nature=CONDUCT_NATURE_PENALTY,
-            severity=CONDUCT_SEVERITY_MINOR,
+            severity=severity(CONDUCT_SEVERITY_MINOR),
             defaults={'multiplier': Decimal('0.00'), 'order': 10},
         )
         item = ConductItem.objects.create(
+            code=next_test_code('item'),
             category=category,
             name='迟到',
             default_score=Decimal('-2.00'),
@@ -385,10 +447,10 @@ class ConductSummaryZeroScoreCountTestCase(TestCase):
         ConductRecord.objects.create(
             student=student,
             item=item,
-            severity=CONDUCT_SEVERITY_MINOR,
+            severity=severity(CONDUCT_SEVERITY_MINOR),
             reason='只做警告，不扣分',
             recorded_by=recorder,
-            status=ConductRecord.STATUS_APPROVED,
+            status=ConductRecord.Status.APPROVED,
             reviewed_by=reviewer,
             reviewed_at=timezone.now(),
         )
@@ -425,15 +487,17 @@ class ConductRecordAdminTestCase(TestCase):
         self.reviewer.user_permissions.add(Permission.objects.get(codename='review_conduct_record'))
 
         category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_REWARD,
             name='后台测试分类',
         )
         ConductSeverityRule.objects.update_or_create(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             defaults={'multiplier': Decimal('1.00'), 'order': 20},
         )
         item = ConductItem.objects.create(
+            code=next_test_code('item'),
             category=category,
             name='后台测试事项',
             default_score=Decimal('6.00'),
@@ -441,14 +505,14 @@ class ConductRecordAdminTestCase(TestCase):
         self.record = ConductRecord.objects.create(
             student=self.student,
             item=item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='待审核记录',
             recorded_by=self.recorder,
         )
         self.other_record = ConductRecord.objects.create(
             student=self.student,
             item=item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='其他人录入的记录',
             recorded_by=self.other_recorder,
         )
@@ -459,10 +523,12 @@ class ConductRecordAdminTestCase(TestCase):
         self.item_admin = ConductItemAdmin(ConductItem, AdminSite())
         self.rule_admin = ConductSeverityRuleAdmin(ConductSeverityRule, AdminSite())
         self.penalty_category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_PENALTY,
             name='后台惩罚分类',
         )
         self.penalty_item = ConductItem.objects.create(
+            code=next_test_code('item'),
             category=self.penalty_category,
             name='后台惩罚事项',
             default_score=Decimal('-2.00'),
@@ -517,7 +583,19 @@ class ConductRecordAdminTestCase(TestCase):
         form = form_class(instance=self.record)
         choices = dict(form.fields['severity'].choices)
 
-        self.assertEqual(choices[CONDUCT_SEVERITY_MODERATE], '表扬')
+        self.assertEqual(choices[CONDUCT_SEVERITY_MODERATE], '表扬（×1.00）')
+
+    def test_inactive_severity_is_hidden_for_new_selection_but_kept_on_history(self):
+        current_severity = severity(CONDUCT_SEVERITY_MODERATE)
+        current_severity.is_active = False
+        current_severity.save(update_fields=['is_active'])
+
+        form_class = self.admin.get_form(self.build_request(self.recorder), self.record)
+        history_form = form_class(instance=self.record)
+        new_form = form_class(data={'item': self.record.item_id})
+
+        self.assertIn(current_severity, history_form.fields['severity'].queryset)
+        self.assertNotIn(current_severity, new_form.fields['severity'].queryset)
 
     def test_add_record_form_shows_placeholder_before_item_selection(self):
         form_class = self.admin.get_form(self.build_request(self.recorder))
@@ -530,7 +608,7 @@ class ConductRecordAdminTestCase(TestCase):
         form = form_class()
 
         self.assertIn('data-severity-choices-url', str(form['item']))
-        self.assertIn('data-default-severity', str(form['severity']))
+        self.assertNotIn('data-default-severity', str(form['severity']))
         self.assertIn('data-placeholder-label', str(form['severity']))
 
     def test_severity_choices_endpoint_returns_reward_labels(self):
@@ -544,7 +622,23 @@ class ConductRecordAdminTestCase(TestCase):
         payload = json.loads(response.content)
         choices = {choice['value']: choice['label'] for choice in payload['choices']}
 
-        self.assertEqual(choices[CONDUCT_SEVERITY_MODERATE], '表扬')
+        self.assertEqual(choices[CONDUCT_SEVERITY_MODERATE], '表扬（×1.00）')
+
+    def test_severity_choices_endpoint_does_not_guess_when_no_default_rule_exists(self):
+        ConductSeverityRule.objects.filter(nature=CONDUCT_NATURE_REWARD).update(is_default=False)
+        request = self.factory.get(
+            '/admin/behaviors/conductrecord/severity-choices/',
+            {'item_id': self.record.item_id},
+        )
+        request.user = self.recorder
+
+        payload = json.loads(self.admin.severity_choices_view(request).content)
+
+        self.assertEqual(payload['default'], '')
+        self.assertEqual(payload['choices'][0], {
+            'value': '',
+            'label': '请选择程度（未配置默认项）',
+        })
 
     def test_severity_choices_endpoint_returns_penalty_labels(self):
         request = self.factory.get(
@@ -557,19 +651,41 @@ class ConductRecordAdminTestCase(TestCase):
         payload = json.loads(response.content)
         choices = {choice['value']: choice['label'] for choice in payload['choices']}
 
-        self.assertEqual(choices[CONDUCT_SEVERITY_MINOR], CONDUCT_PENALTY_SEVERITY_NAMES[CONDUCT_SEVERITY_MINOR])
-        self.assertEqual(choices[CONDUCT_SEVERITY_MODERATE], CONDUCT_PENALTY_SEVERITY_NAMES[CONDUCT_SEVERITY_MODERATE])
+        self.assertEqual(
+            choices[CONDUCT_SEVERITY_MINOR],
+            f'{CONDUCT_PENALTY_SEVERITY_NAMES[CONDUCT_SEVERITY_MINOR]}（×0.00）',
+        )
+        self.assertEqual(
+            choices[CONDUCT_SEVERITY_MODERATE],
+            f'{CONDUCT_PENALTY_SEVERITY_NAMES[CONDUCT_SEVERITY_MODERATE]}（×1.00）',
+        )
 
     def test_rule_admin_form_uses_penalty_specific_severity_labels(self):
         penalty_rule = ConductSeverityRule.objects.get(
             nature=CONDUCT_NATURE_PENALTY,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
         )
         form_class = self.rule_admin.get_form(self.build_request(self.reviewer), penalty_rule)
         form = form_class(instance=penalty_rule)
         choices = dict(form.fields['severity'].choices)
 
         self.assertEqual(choices[CONDUCT_SEVERITY_MODERATE], '一般')
+
+    def test_historical_warning_nature_is_displayed_raw_and_locked_in_admin(self):
+        historical = ConductCategory.objects.create(
+            code=next_test_code('category'),
+            nature='WARNING',
+            name='历史警告分类',
+        )
+
+        readonly = self.category_admin.get_readonly_fields(
+            self.build_request(self.reviewer),
+            historical,
+        )
+
+        self.assertEqual(historical.nature_label, 'WARNING（历史）')
+        self.assertIn('code', readonly)
+        self.assertIn('nature', readonly)
 
     def test_recorder_cannot_edit_review_fields(self):
         readonly_fields = self.admin.get_readonly_fields(
@@ -589,7 +705,7 @@ class ConductRecordAdminTestCase(TestCase):
         self.assertNotIn('status', readonly_fields)
 
         record = ConductRecord.objects.get(pk=self.record.pk)
-        record.status = ConductRecord.STATUS_APPROVED
+        record.status = ConductRecord.Status.APPROVED
         self.admin.save_model(request, record, form=None, change=True)
 
         record.refresh_from_db()
@@ -603,7 +719,7 @@ class ConductRecordAdminTestCase(TestCase):
         self.assertEqual(record.score_formula, '+6.00 x 1.00 = +6.00')
 
     def test_reviewed_record_is_read_only_in_admin(self):
-        self.record.status = ConductRecord.STATUS_APPROVED
+        self.record.status = ConductRecord.Status.APPROVED
         self.record.reviewed_by = self.reviewer
         self.record.reviewed_at = timezone.now()
         self.record.save(update_fields=['status', 'reviewed_by', 'reviewed_at'])
@@ -624,15 +740,17 @@ class ConductWorkflowServiceTests(TestCase):
         self.recorder = User.objects.create_user(username='workflow-recorder', password='testpass123')
         self.reviewer = User.objects.create_user(username='workflow-reviewer', password='testpass123')
         category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_REWARD,
             name='服务测试分类',
         )
         ConductSeverityRule.objects.update_or_create(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             defaults={'multiplier': Decimal('1.00'), 'order': 20},
         )
         self.item = ConductItem.objects.create(
+            code=next_test_code('item'),
             category=category,
             name='服务测试事项',
             default_score=Decimal('3.00'),
@@ -642,26 +760,26 @@ class ConductWorkflowServiceTests(TestCase):
         record = ConductRecord(
             student=self.student,
             item=self.item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='创建时由 service 补齐记录信息',
-            status=ConductRecord.STATUS_APPROVED,
+            status=ConductRecord.Status.APPROVED,
         )
 
         prepare_conduct_record_for_save(record, actor=self.recorder, change=False)
 
         self.assertEqual(record.recorded_by, self.recorder)
-        self.assertEqual(record.status, ConductRecord.STATUS_PENDING)
+        self.assertEqual(record.status, ConductRecord.Status.PENDING)
 
     def test_prepare_conduct_record_for_update_sets_review_metadata_on_first_review(self):
         record = ConductRecord.objects.create(
             student=self.student,
             item=self.item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='等待审核',
             recorded_by=self.recorder,
         )
         review_time = timezone.now()
-        record.status = ConductRecord.STATUS_APPROVED
+        record.status = ConductRecord.Status.APPROVED
 
         prepare_conduct_record_for_save(record, actor=self.reviewer, change=True, now=review_time)
 
@@ -698,20 +816,22 @@ class ConductRecordListViewTests(TestCase):
         )
 
         category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_REWARD,
             name='列表测试分类',
         )
         ConductSeverityRule.objects.update_or_create(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             defaults={'multiplier': Decimal('1.00'), 'order': 20},
         )
         ConductSeverityRule.objects.update_or_create(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MINOR,
+            severity=severity(CONDUCT_SEVERITY_MINOR),
             defaults={'multiplier': Decimal('0.00'), 'order': 10},
         )
         item = ConductItem.objects.create(
+            code=next_test_code('item'),
             category=category,
             name='列表测试事项',
             default_score=Decimal('5.00'),
@@ -720,21 +840,21 @@ class ConductRecordListViewTests(TestCase):
         ConductRecord.objects.create(
             student=self.student,
             item=item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='课堂表现积极，主动帮助同学',
             recorded_by=self.recorder,
         )
         ConductRecord.objects.create(
             student=self.student,
             item=item,
-            severity=CONDUCT_SEVERITY_MINOR,
+            severity=severity(CONDUCT_SEVERITY_MINOR),
             reason='只做提醒，不计分',
             recorded_by=self.recorder,
         )
         ConductRecord.objects.create(
             student=self.other_student,
             item=item,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             reason='不应显示的其他学生原因',
             recorded_by=self.recorder,
         )
@@ -786,15 +906,17 @@ class ConductRecordCreateViewTests(TestCase):
         )
 
         self.category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_REWARD,
             name='录入测试分类',
         )
         ConductSeverityRule.objects.update_or_create(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
             defaults={'multiplier': Decimal('1.00'), 'order': 20},
         )
         self.item = ConductItem.objects.create(
+            code=next_test_code('item'),
             category=self.category,
             name='录入测试事项',
             default_score=Decimal('4.00'),
@@ -819,7 +941,7 @@ class ConductRecordCreateViewTests(TestCase):
 
         record = ConductRecord.objects.get(reason='前台录入测试')
         self.assertEqual(record.recorded_by, self.recorder)
-        self.assertEqual(record.status, ConductRecord.STATUS_PENDING)
+        self.assertEqual(record.status, ConductRecord.Status.PENDING)
 
 
 class ConductAuditAdminTestCase(TestCase):
@@ -834,6 +956,7 @@ class ConductAuditAdminTestCase(TestCase):
         self.factory = RequestFactory()
 
         self.reward_category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_REWARD,
             name='审计奖励分类',
         )
@@ -845,6 +968,7 @@ class ConductAuditAdminTestCase(TestCase):
 
     def test_category_admin_tracks_creator_and_updater(self):
         category = ConductCategory(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_PENALTY,
             name='审计惩罚分类',
         )
@@ -874,6 +998,7 @@ class ConductAuditAdminTestCase(TestCase):
 
     def test_item_admin_tracks_creator_and_updater(self):
         item = ConductItem(
+            code=next_test_code('item'),
             category=self.reward_category,
             name='审计事项',
             default_score=Decimal('3.00'),
@@ -892,12 +1017,13 @@ class ConductAuditAdminTestCase(TestCase):
     def test_rule_admin_tracks_creator_and_updater(self):
         ConductSeverityRule.objects.filter(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
         ).delete()
 
         rule = ConductSeverityRule(
             nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
+            severity=severity(CONDUCT_SEVERITY_MODERATE),
+            label='表扬',
             multiplier=Decimal('1.00'),
         )
 
@@ -924,6 +1050,7 @@ class ConductCutoverCommandTests(TestCase):
 class ConductCutoverRecoveryTests(TransactionTestCase):
     def test_cutover_command_recovers_dual_table_state_when_new_table_is_empty(self):
         category = ConductCategory.objects.create(
+            code=next_test_code('category'),
             nature=CONDUCT_NATURE_REWARD,
             name='恢复奖励分类',
         )
@@ -970,46 +1097,22 @@ class ConductCutoverRecoveryTests(TransactionTestCase):
             ).exists()
         )
 
-    def test_cutover_command_recovers_when_new_severity_rule_table_only_has_seed_rows(self):
-        old_rule = ConductSeverityRule.objects.create(
-            nature=CONDUCT_NATURE_REWARD,
-            severity=CONDUCT_SEVERITY_MODERATE,
-            multiplier=Decimal('9.00'),
-            order=20,
-        )
-
+    def test_cutover_command_rejects_legacy_severity_rule_schema(self):
         self.addCleanup(
             lambda: connection.cursor().execute('DROP TABLE IF EXISTS conduct_conductseverityrule')
         )
-        self.addCleanup(
-            lambda: connection.cursor().execute('DROP TABLE IF EXISTS behaviors_conductseverityrule_empty_backup')
-        )
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = %s",
-                ['behaviors_conductseverityrule'],
-            )
-            create_sql = cursor.fetchone()[0].replace(
-                '"behaviors_conductseverityrule"',
-                '"conduct_conductseverityrule"',
-                1,
-            )
-            cursor.execute(create_sql)
-            cursor.execute(
-                'INSERT INTO conduct_conductseverityrule SELECT * FROM behaviors_conductseverityrule'
-            )
-            cursor.execute('DELETE FROM behaviors_conductseverityrule')
-            cursor.execute(
-                """
-                INSERT INTO behaviors_conductseverityrule (id, nature, severity, multiplier, "order", created_at, updated_at, created_by_id, updated_by_id)
-                VALUES (999, 'REWARD', 'MODERATE', 1.00, 20, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, NULL, NULL)
-                """
+                '''
+                CREATE TABLE conduct_conductseverityrule (
+                    id INTEGER PRIMARY KEY,
+                    nature VARCHAR(20) NOT NULL,
+                    severity VARCHAR(20) NOT NULL,
+                    multiplier DECIMAL NOT NULL,
+                    "order" INTEGER NOT NULL
+                )
+                '''
             )
 
-        stdout = StringIO()
-        call_command('cutover_conduct_to_behaviors', '--execute', stdout=stdout)
-
-        self.assertIn('conduct 已切换为 behaviors', stdout.getvalue())
-        self.assertEqual(ConductSeverityRule.objects.count(), 1)
-        self.assertEqual(ConductSeverityRule.objects.get().pk, old_rule.pk)
-        self.assertEqual(ConductSeverityRule.objects.get().multiplier, Decimal('9.00'))
+        with self.assertRaisesMessage(CommandError, '结构早于当前 behaviors 模型'):
+            call_command('cutover_conduct_to_behaviors', '--execute')

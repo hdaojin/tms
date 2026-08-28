@@ -107,3 +107,19 @@ class SearchAndUnreadTests(ForumTestCase):
 
         self.assertContains(response, post.topic.translated_title)
         self.assertContains(response, "赛事官方代表")
+
+    def test_official_feed_uses_post_type_configuration(self):
+        from worldskills_forum.models import ForumPostType
+
+        configured_official = ForumPostType.objects.create(
+            code="official-technical-update",
+            name="官方技术更新",
+            is_official=True,
+        )
+        post = self.make_post(post_type=configured_official)
+        self.client.force_login(self.reader)
+
+        response = self.client.get(reverse("worldskills_forum:feed"), {"view": "official"})
+
+        self.assertContains(response, post.topic.translated_title)
+        self.assertContains(response, "官方技术更新")

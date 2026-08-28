@@ -5,13 +5,20 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
+from django.utils.html import escape
 from django.views.generic import CreateView
 from django_tables2 import SingleTableView
 
-from core.constants import CONDUCT_SEVERITY_MODERATE
 from core.utils.mixins import TitleMixin
 from .forms import ConductRecordForm
-from .models import ConductItem, ConductRecord, ConductSummary, get_conduct_severity_choices_with_multiplier
+from .models import (
+    ConductItem,
+    ConductNature,
+    ConductRecord,
+    ConductSummary,
+    get_conduct_severity_choices_with_multiplier,
+    get_default_conduct_severity,
+)
 from .permissions import ADD_CONDUCT_RECORD_PERMISSION
 from .selectors import get_conduct_record_list_queryset, get_conduct_summary_list_queryset
 from .services import prepare_conduct_record_for_save
@@ -44,7 +51,7 @@ class ConductRecordListView(TitleMixin, PermissionRequiredMixin, SingleTableView
 
     def get_queryset(self):
         qs = super().get_queryset().select_related(
-            'student', 'item__category', 'recorded_by',
+            'student', 'item__category', 'severity', 'recorded_by',
         )
         return get_conduct_record_list_queryset(qs, self.request.user)
 
@@ -86,19 +93,20 @@ def item_choices_view(request):
     """HTMX endpoint: 根据选中的奖惩性质返回对应事项选项。"""
     nature = request.GET.get('nature')
 
-    if not nature:
+    if nature not in ConductNature.values:
         return HttpResponse(
             '<option value="" selected>---------</option>',
         )
 
     items = ConductItem.objects.filter(
         is_active=True,
+        category__is_active=True,
         category__nature=nature,
     ).select_related('category')
 
     options = ['<option value="" selected>---------</option>']
     for item in items:
-        options.append(f'<option value="{item.pk}">{item}</option>')
+        options.append(f'<option value="{item.pk}">{escape(item)}</option>')
     return HttpResponse(''.join(options))
 
 
@@ -111,6 +119,9 @@ def severity_choices_view(request):
     if item_id:
         item = ConductItem.objects.filter(
             pk=item_id,
+            is_active=True,
+            category__is_active=True,
+            category__nature__in=ConductNature.values,
         ).select_related('category').first()
         if item:
             nature = item.category.nature
@@ -121,8 +132,16 @@ def severity_choices_view(request):
         )
 
     choices = get_conduct_severity_choices_with_multiplier(nature)
+    default_rule = get_default_conduct_severity(nature)
+    default_code = default_rule.severity.code if default_rule is not None else None
     options = []
+    if not choices:
+        return HttpResponse(
+            '<option value="" disabled selected>当前性质未配置严重程度规则</option>',
+        )
+    if default_code is None:
+        options.append('<option value="" selected>请选择程度（未配置默认项）</option>')
     for value, label in choices:
-        selected = ' selected' if value == CONDUCT_SEVERITY_MODERATE else ''
-        options.append(f'<option value="{value}"{selected}>{label}</option>')
+        selected = ' selected' if value == default_code else ''
+        options.append(f'<option value="{escape(value)}"{selected}>{escape(label)}</option>')
     return HttpResponse(''.join(options))

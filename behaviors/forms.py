@@ -1,24 +1,58 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.urls import reverse
 from django.utils import timezone
 
-from core.constants import (
-    CONDUCT_NATURE_CHOICES,
-    CONDUCT_NATURE_PENALTY,
-)
 from core.permissions import get_users_with_explicit_permission
 from core.uploads import CONDUCT_ATTACHMENT_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
-from .models import ConductItem, ConductRecord, get_conduct_severity_choices_with_multiplier
+from .models import (
+    ConductItem,
+    ConductNature,
+    ConductRecord,
+    ConductSeverity,
+    get_conduct_severity_rules,
+)
 
 User = get_user_model()
+
+
+def configure_severity_field(field, nature, *, current_severity_id=None):
+    field.to_field_name = 'code'
+    if not nature:
+        field.queryset = ConductSeverity.objects.none()
+        return None
+
+    rules = list(
+        get_conduct_severity_rules(
+            nature,
+            current_severity_id=current_severity_id,
+        )
+    )
+    rule_by_severity_id = {rule.severity_id: rule for rule in rules}
+    field.queryset = (
+        ConductSeverity.objects.filter(pk__in=rule_by_severity_id)
+        .filter(rules__nature=nature)
+        .filter(Q(is_active=True) | Q(pk=current_severity_id))
+        .order_by('rules__order', 'code')
+        .distinct()
+    )
+    field.label_from_instance = lambda severity: (
+        f'{rule_by_severity_id[severity.pk].label}'
+        f'（×{rule_by_severity_id[severity.pk].multiplier:.2f}）'
+    )
+    default_rule = next(
+        (rule for rule in rules if rule.is_default and rule.severity.is_active),
+        None,
+    )
+    return default_rule.severity.code if default_rule is not None else None
 
 
 class ConductRecordForm(StyledFormMixin, forms.ModelForm):
     nature = forms.ChoiceField(
         label='奖惩性质',
-        choices=CONDUCT_NATURE_CHOICES,
+        choices=ConductNature.choices,
         required=True,
         widget=forms.Select(attrs={
             'aria-label': 'nature-select',
@@ -26,6 +60,13 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
             'hx-target': '#id_item',
             'hx-swap': 'innerHTML',
         }),
+    )
+    severity = forms.ModelChoiceField(
+        label='程度',
+        queryset=ConductSeverity.objects.none(),
+        to_field_name='code',
+        empty_label='请选择程度',
+        widget=forms.Select(attrs={'aria-label': 'severity-select'}),
     )
 
     class Meta:
@@ -39,7 +80,6 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
                 'hx-target': '#id_severity',
                 'hx-swap': 'innerHTML',
             }),
-            'severity': forms.Select(attrs={'aria-label': 'severity-select'}),
             'occurred_date': forms.DateInput(attrs={'type': 'date', 'aria-label': 'date-input'}),
             'reason': forms.Textarea(attrs={
                 'rows': 3,
@@ -69,24 +109,26 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
         # HTMX: 选择事项后动态更新程度选项
         self.fields['item'].widget.attrs['hx-get'] = reverse('behaviors:severity_choices')
 
-        # 修改严重程度字段标签
-        self.fields['severity'].label = '程度'
-
         # 根据提交数据或实例恢复 nature / item / severity 的选项列表
         nature = None
+        selected_item = None
         if self.data and self.data.get('item'):
             try:
-                item = ConductItem.objects.select_related('category').get(
+                selected_item = ConductItem.objects.select_related('category').get(
                     pk=self.data['item'],
+                    is_active=True,
+                    category__is_active=True,
+                    category__nature__in=ConductNature.values,
                 )
-                nature = item.category.nature
+                nature = selected_item.category.nature
             except (ConductItem.DoesNotExist, ValueError):
                 pass
         elif self.instance.pk and self.instance.item_id:
+            selected_item = self.instance.item
             nature = self.instance.item.category.nature
         elif not self.data:
             # 新建表单：默认选择惩罚
-            nature = CONDUCT_NATURE_PENALTY
+            nature = ConductNature.PENALTY
 
         if nature:
             # 恢复 nature 字段选中值
@@ -94,14 +136,24 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
             # 恢复 item 下拉：仅显示对应性质的事项
             self.fields['item'].queryset = ConductItem.objects.filter(
                 is_active=True,
+                category__is_active=True,
                 category__nature=nature,
             ).select_related('category')
-            # 恢复 severity 下拉（显示系数）
-            self.fields['severity'].choices = get_conduct_severity_choices_with_multiplier(nature)
         else:
-            # 初始状态：事项和程度均为占位提示
             self.fields['item'].queryset = ConductItem.objects.none()
-            self.fields['severity'].choices = [('', '请先选择奖惩事项')]
+
+        if selected_item is not None:
+            current_severity_id = self.instance.severity_id if self.instance.pk else None
+            default_code = configure_severity_field(
+                self.fields['severity'],
+                selected_item.category.nature,
+                current_severity_id=current_severity_id,
+            )
+            if not self.is_bound and not self.instance.pk and default_code:
+                self.fields['severity'].initial = default_code
+        else:
+            self.fields['severity'].queryset = ConductSeverity.objects.none()
+            self.fields['severity'].empty_label = '请先选择奖惩事项'
 
         # 设置默认日期为今天
         if not self.instance.pk:

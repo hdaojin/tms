@@ -25,6 +25,7 @@ from .models import (
     AssessmentModuleDomain,
     AssessmentParticipant,
     AssessmentResultAward,
+    AssessmentType,
     CompetitionPerson,
     CompetitionRole,
 )
@@ -51,6 +52,41 @@ from .views import AssessmentDocumentCreateView
 User = get_user_model()
 
 
+def get_mock_assessment_type():
+    return AssessmentType.objects.get_or_create(
+        code='mock',
+        defaults={'name': '模拟赛', 'order': 40},
+    )[0]
+
+
+class AssessmentCatalogFormTests(TestCase):
+    def setUp(self):
+        self.active_type = AssessmentType.objects.create(
+            code='active-type',
+            name='启用类型',
+        )
+        self.inactive_type = AssessmentType.objects.create(
+            code='inactive-type',
+            name='停用类型',
+            is_active=False,
+        )
+
+    def test_create_excludes_inactive_type_but_edit_keeps_historical_value(self):
+        create_form = AssessmentForm()
+        self.assertIn(self.active_type, create_form.fields['assessment_type'].queryset)
+        self.assertNotIn(self.inactive_type, create_form.fields['assessment_type'].queryset)
+
+        assessment = Assessment.objects.create(
+            skill_project=SkillProject.objects.create(code='CATALOG', name='目录测试'),
+            assessment_type=self.inactive_type,
+            name='历史考核',
+            code='CATALOG-HISTORY',
+            start_date=date(2026, 8, 24),
+        )
+        edit_form = AssessmentForm(instance=assessment)
+        self.assertIn(self.inactive_type, edit_form.fields['assessment_type'].queryset)
+
+
 class AssessmentModelTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="owner")
@@ -67,7 +103,7 @@ class AssessmentModelTests(TestCase):
         )
         self.assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="模拟赛",
             code="MOCK",
             start_date=date(2026, 1, 1),
@@ -89,7 +125,7 @@ class AssessmentModelTests(TestCase):
     def test_document_module_must_belong_to_same_assessment(self):
         other_assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="另一场",
             code="OTHER",
             start_date=date(2026, 2, 1),
@@ -267,7 +303,7 @@ class AssessmentModelTests(TestCase):
         final_result = AssessmentFinalResult.objects.create(participant=participant)
         other_assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="另一场",
             code="FINAL-OTHER",
             start_date=date(2026, 2, 1),
@@ -289,7 +325,7 @@ class AssessmentFormViewTests(TestCase):
         self.project = SkillProject.objects.create(code="FORM", name="表单测试项目")
         self.assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="表单测试考核",
             code="FORM-ASSESSMENT",
             start_date=date(2026, 4, 1),
@@ -337,7 +373,7 @@ class AssessmentFormViewTests(TestCase):
                         "series": "",
                         "level": "",
                         "training_cycle": "",
-                        "assessment_type": Assessment.Type.MOCK,
+                        "assessment_type": get_mock_assessment_type().pk,
                         "status": status,
                         "name": self.assessment.name,
                         "code": self.assessment.code,
@@ -350,6 +386,28 @@ class AssessmentFormViewTests(TestCase):
                 self.assertRedirects(response, reverse("assessments:assessment_detail", args=[self.assessment.pk]))
                 self.assessment.refresh_from_db()
                 self.assertEqual(self.assessment.status, status)
+
+    def test_list_type_filter_keeps_stable_code_query_parameter(self):
+        other_type = AssessmentType.objects.create(
+            code="other-filter-type",
+            name="其他筛选类型",
+        )
+        other_assessment = Assessment.objects.create(
+            skill_project=self.project,
+            assessment_type=other_type,
+            name="不应出现的其他类型考核",
+            code="OTHER-FILTER-ASSESSMENT",
+            start_date=date(2026, 5, 1),
+            created_by=self.user,
+        )
+
+        response = self.client.get(
+            reverse("assessments:assessment_list"),
+            {"type": get_mock_assessment_type().code},
+        )
+
+        self.assertContains(response, self.assessment.name)
+        self.assertNotContains(response, other_assessment.name)
 
 
 class AssessmentScopeSelectorTests(TestCase):
@@ -391,7 +449,7 @@ class AssessmentScopeSelectorTests(TestCase):
     def _assessment(self, code, name):
         return Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name=name,
             code=code,
             start_date=date(2026, 1, 1),
@@ -450,7 +508,7 @@ class AssessmentWorkspaceTests(TestCase):
         )
         self.assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="评测工作台",
             code="WORKSPACE-ASSESSMENT",
             start_date=date(2026, 6, 1),
@@ -903,7 +961,7 @@ class AssessmentLifecycleAndFinalResultTests(TestCase):
         self.project = SkillProject.objects.create(code="FINAL", name="最终结果项目")
         self.assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="最终结果评测",
             code="FINAL-ASSESSMENT",
             start_date=date(2026, 7, 1),
@@ -1263,7 +1321,7 @@ class AssessmentPermissionBoundaryTests(TestCase):
     def _assessment(self, code, owner):
         return Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name=code,
             code=code,
             start_date=date(2026, 3, 1),

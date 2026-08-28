@@ -10,7 +10,7 @@
               <h2 class="card-title break-words">{{ assessment.name }}</h2>
               <span class="badge badge-outline">{{ assessment.get_status_display }}</span>
             </div>
-            <p class="mt-1 text-sm text-base-content/60">{{ assessment.code }} · {{ assessment.skill_project }} · {{ assessment.get_assessment_type_display }}</p>
+            <p class="mt-1 text-sm text-base-content/60">{{ assessment.code }} · {{ assessment.skill_project }} · {{ assessment.assessment_type.name }}</p>
           </div>
           {% if can_manage_assessment %}<a class="btn btn-outline btn-sm" href="{% url 'assessments:assessment_edit' assessment.pk %}"><span class="icon-[tabler--edit] size-4"></span>编辑</a>{% endif %}
         </div>

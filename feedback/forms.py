@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from django import forms
 from django.core.exceptions import ValidationError
 
@@ -13,7 +15,11 @@ from .services import validate_feedback_attachments
 
 
 class FeedbackForm(StyledFormMixin, forms.Form):
-    category = forms.ChoiceField(label="反馈类型", choices=FeedbackCategory.choices)
+    category = forms.ModelChoiceField(
+        label="反馈类型",
+        queryset=FeedbackCategory.objects.none(),
+        to_field_name="code",
+    )
     title = forms.CharField(label="标题", max_length=200)
     content = forms.CharField(label="详细描述", widget=forms.Textarea(attrs={"rows": 8}))
     attachments = MultipleFileField(
@@ -27,7 +33,16 @@ class FeedbackForm(StyledFormMixin, forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["category"].widget.attrs.update({"x-ref": "category", "x-on:change": "categoryChanged"})
+        categories = FeedbackCategory.objects.filter(is_active=True)
+        self.fields["category"].queryset = categories
+        private_codes = categories.filter(default_private=True).values_list("code", flat=True)
+        self.fields["category"].widget.attrs.update(
+            {
+                "x-ref": "category",
+                "x-on:change": "categoryChanged",
+                "data-default-private-values": json.dumps(list(private_codes)),
+            }
+        )
         self.fields["is_private"].widget.attrs.update({"x-ref": "private", "x-on:change": "privateChanged"})
         self.fields["attachments"].widget.attrs.update(
             {
@@ -35,8 +50,11 @@ class FeedbackForm(StyledFormMixin, forms.Form):
                 "data-upload-max-total-size-mb": str(FEEDBACK_ATTACHMENT_MAX_TOTAL_SIZE_MB),
             }
         )
-        if not self.is_bound and self.initial.get("category") == FeedbackCategory.COMPLAINT:
-            self.fields["is_private"].initial = True
+        initial_category = self.initial.get("category")
+        if not self.is_bound and initial_category:
+            initial_code = getattr(initial_category, "code", initial_category)
+            if categories.filter(code=initial_code, default_private=True).exists():
+                self.fields["is_private"].initial = True
 
     def clean_title(self):
         title = self.cleaned_data["title"].strip()

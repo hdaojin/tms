@@ -5,7 +5,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
 from django.utils import timezone
 
-from worldskills_forum.models import ForumPost
+from worldskills_forum.models import ForumPost, ForumPostType
 from worldskills_forum.services import create_published_post, update_published_post
 
 from .base import ForumTestCase
@@ -27,7 +27,9 @@ class ForumServiceTests(ForumTestCase):
         return {
             "author_name": "WorldSkills Secretariat", "source_role": self.official_role,
             "source_role_detail": "", "posted_at": timezone.now(), "source_url": "https://forum.example.com/p/1",
-            "source_post_id": "p-1", "post_type": "official_reply", "importance": "important",
+            "source_post_id": "p-1",
+            "post_type": ForumPostType.objects.get(code="official_reply"),
+            "importance": "important",
             "original_content": "Official reply",
         }
 

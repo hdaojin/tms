@@ -63,6 +63,23 @@ class AssessmentLevel(models.Model):
         return self.name
 
 
+class AssessmentType(models.Model):
+    code = models.CharField("类型代码", max_length=30, unique=True)
+    name = models.CharField("类型名称", max_length=120)
+    description = models.TextField("说明", blank=True)
+    order = models.PositiveIntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "竞赛与考核类型"
+        ordering = ["order", "code"]
+
+    def __str__(self):
+        return self.name
+
+
 class CompetitionPerson(models.Model):
     name = models.CharField("姓名", max_length=150)
     organization = models.CharField("单位", max_length=200, blank=True)
@@ -109,15 +126,6 @@ class CompetitionRole(models.Model):
 
 
 class Assessment(models.Model):
-    class Type(models.TextChoices):
-        COMPETITION = "competition", "正式竞赛"
-        SELECTION = "selection", "选拔赛"
-        EXCHANGE = "exchange", "交流赛"
-        MOCK = "mock", "模拟赛"
-        TRAINING_ASSESSMENT = "training_assessment", "训练考核"
-        TRAINING_TEST = "training_test", "训练测试"
-        OTHER = "other", "其他"
-
     class Status(models.TextChoices):
         DRAFT = "draft", "草稿"
         PUBLISHED = "published", "已发布"
@@ -153,7 +161,12 @@ class Assessment(models.Model):
         null=True,
         blank=True,
     )
-    assessment_type = models.CharField("类型", max_length=30, choices=Type.choices)
+    assessment_type = models.ForeignKey(
+        AssessmentType,
+        verbose_name="类型",
+        on_delete=models.PROTECT,
+        related_name="assessments",
+    )
     name = models.CharField("名称", max_length=180)
     code = models.CharField("代码", max_length=80, unique=True)
     start_date = models.DateField("开始日期")

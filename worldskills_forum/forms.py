@@ -25,6 +25,7 @@ from .models import (
     ForumModule,
     ForumPost,
     ForumPostAttachment,
+    ForumPostType,
     ForumSourceRole,
     ForumTag,
     ForumTopic,
@@ -187,7 +188,11 @@ class ForumPostTranslationForm(StyledFormMixin, forms.Form):
     posted_at = forms.DateTimeField(label="论坛原始发布时间", widget=forms.DateTimeInput(attrs={"type": "datetime-local"}, format="%Y-%m-%dT%H:%M"), input_formats=["%Y-%m-%dT%H:%M"])
     source_url = forms.URLField(label="原帖链接", max_length=1000, required=False, validators=[http_url_validator], help_text="没有单条帖子链接时可留空，详情页将使用论坛主题链接。")
     source_post_id = forms.CharField(label="论坛帖子 ID", max_length=120, required=False)
-    post_type = forms.ChoiceField(label="信息类型", choices=ForumPost._meta.get_field("post_type").choices)
+    post_type = forms.ModelChoiceField(
+        label="信息类型",
+        queryset=ForumPostType.objects.none(),
+        to_field_name="code",
+    )
     importance = forms.ChoiceField(label="重要程度", choices=ForumPost._meta.get_field("importance").choices)
     original_content = forms.CharField(label="英文原文", widget=forms.Textarea(attrs={"rows": 12}), help_text="完整粘贴英文原文。")
     translated_content = forms.CharField(label="中文翻译", widget=forms.Textarea(attrs={"rows": 12}), help_text="保存后直接发布，不经过审核。")
@@ -199,9 +204,12 @@ class ForumPostTranslationForm(StyledFormMixin, forms.Form):
         self.topic = topic or getattr(post, "topic", None)
         super().__init__(*args, **kwargs)
         role_filter = Q(is_active=True)
+        post_type_filter = Q(is_active=True)
         if post:
             role_filter |= Q(pk=post.source_role_id)
+            post_type_filter |= Q(pk=post.post_type_id)
         self.fields["source_role"].queryset = ForumSourceRole.objects.filter(role_filter)
+        self.fields["post_type"].queryset = ForumPostType.objects.filter(post_type_filter)
         if post and not self.is_bound:
             for name in ["author_name", "source_role", "source_role_detail", "posted_at", "source_url", "source_post_id", "post_type", "importance", "original_content"]:
                 self.fields[name].initial = getattr(post, name)

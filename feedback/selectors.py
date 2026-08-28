@@ -13,7 +13,7 @@ def visible_feedbacks_for(user):
         return Feedback.objects.none()
 
     queryset = (
-        Feedback.objects.select_related("author", "resolved_by")
+        Feedback.objects.select_related("author", "resolved_by", "category")
         .annotate(
             reply_count=Count("replies", distinct=True),
             attachment_count=Count("attachments", distinct=True),

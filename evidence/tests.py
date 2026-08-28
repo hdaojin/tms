@@ -13,6 +13,7 @@ from assessments.models import (
     AssessmentModuleCoach,
     AssessmentModuleDomain,
     AssessmentParticipant,
+    AssessmentType,
     CompetitionRole,
 )
 from scoring.models import ScoringAspect, ScoringResult, ScoringScheme, ScoringSubCriterion
@@ -25,6 +26,13 @@ from .views import manageable_evidences_for, visible_evidences_for
 User = get_user_model()
 
 
+def get_mock_assessment_type():
+    return AssessmentType.objects.get_or_create(
+        code='mock',
+        defaults={'name': '模拟赛', 'order': 40},
+    )[0]
+
+
 class EvidenceMappingAndPerformanceTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="coach")
@@ -33,7 +41,7 @@ class EvidenceMappingAndPerformanceTests(TestCase):
         self.skill = Skill.objects.create(skill_project=self.project, primary_domain=self.domain, name="Linux")
         self.assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="模拟赛",
             code="MOCK",
             start_date=date(2026, 1, 1),
@@ -211,7 +219,7 @@ class EvidencePermissionBoundaryTests(TestCase):
         )
         assessment = Assessment.objects.create(
             skill_project=self.project,
-            assessment_type=Assessment.Type.MOCK,
+            assessment_type=get_mock_assessment_type(),
             name="证据权限评测",
             code="EVIDENCE-PERM-ASSESSMENT",
             start_date=date(2026, 5, 1),

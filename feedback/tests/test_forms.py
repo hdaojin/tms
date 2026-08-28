@@ -1,12 +1,15 @@
-from feedback.forms import FeedbackForm, FeedbackManageForm, FeedbackReplyForm
-from feedback.models import FeedbackCategory, FeedbackStatus
+import json
 
-from .base import FeedbackTestCase
+from feedback.admin import FeedbackAdminForm
+from feedback.forms import FeedbackForm, FeedbackManageForm, FeedbackReplyForm
+from feedback.models import Feedback, FeedbackCategory, FeedbackStatus
+
+from .base import BUG_CODE, COMPLAINT_CODE, FeedbackTestCase
 
 
 class FeedbackFormTests(FeedbackTestCase):
     def test_title_and_content_are_required(self):
-        form = FeedbackForm(data={"category": FeedbackCategory.BUG, "title": " ", "content": " "})
+        form = FeedbackForm(data={"category": BUG_CODE, "title": " ", "content": " "})
         self.assertFalse(form.is_valid())
         self.assertIn("title", form.errors)
         self.assertIn("content", form.errors)
@@ -14,7 +17,7 @@ class FeedbackFormTests(FeedbackTestCase):
     def test_more_than_ten_attachments_is_rejected(self):
         files = [self.make_text(f"file-{index}.log") for index in range(11)]
         form = FeedbackForm(
-            data={"category": FeedbackCategory.BUG, "title": "标题", "content": "正文"},
+            data={"category": BUG_CODE, "title": "标题", "content": "正文"},
             files={"attachments": files},
         )
         self.assertFalse(form.is_valid())
@@ -24,7 +27,7 @@ class FeedbackFormTests(FeedbackTestCase):
         large_file = self.make_text("large.log")
         large_file.size = 20 * 1024 * 1024 + 1
         form = FeedbackForm(
-            data={"category": FeedbackCategory.BUG, "title": "标题", "content": "正文"},
+            data={"category": BUG_CODE, "title": "标题", "content": "正文"},
             files={"attachments": [large_file]},
         )
         self.assertFalse(form.is_valid())
@@ -37,7 +40,7 @@ class FeedbackFormTests(FeedbackTestCase):
             upload.size = 17 * 1024 * 1024
             files.append(upload)
         form = FeedbackForm(
-            data={"category": FeedbackCategory.BUG, "title": "标题", "content": "正文"},
+            data={"category": BUG_CODE, "title": "标题", "content": "正文"},
             files={"attachments": files},
         )
         self.assertFalse(form.is_valid())
@@ -45,7 +48,7 @@ class FeedbackFormTests(FeedbackTestCase):
 
     def test_disallowed_attachment_extension_is_rejected(self):
         form = FeedbackForm(
-            data={"category": FeedbackCategory.BUG, "title": "标题", "content": "正文"},
+            data={"category": BUG_CODE, "title": "标题", "content": "正文"},
             files={"attachments": [self.make_text("script.svg")]},
         )
         self.assertFalse(form.is_valid())
@@ -54,7 +57,7 @@ class FeedbackFormTests(FeedbackTestCase):
     def test_complaint_is_not_forced_private_on_server(self):
         form = FeedbackForm(
             data={
-                "category": FeedbackCategory.COMPLAINT,
+                "category": COMPLAINT_CODE,
                 "title": "投诉",
                 "content": "公开投诉",
                 "is_private": "",
@@ -64,8 +67,39 @@ class FeedbackFormTests(FeedbackTestCase):
         self.assertFalse(form.cleaned_data["is_private"])
 
     def test_unbound_complaint_form_defaults_private(self):
-        form = FeedbackForm(initial={"category": FeedbackCategory.COMPLAINT})
+        form = FeedbackForm(initial={"category": COMPLAINT_CODE})
         self.assertTrue(form.fields["is_private"].initial)
+
+    def test_private_default_and_frontend_metadata_follow_database_configuration(self):
+        FeedbackCategory.objects.update(default_private=False)
+        bug = FeedbackCategory.objects.get(code=BUG_CODE)
+        bug.default_private = True
+        bug.save(update_fields=["default_private"])
+
+        form = FeedbackForm(initial={"category": BUG_CODE})
+
+        self.assertTrue(form.fields["is_private"].initial)
+        self.assertEqual(
+            json.loads(form.fields["category"].widget.attrs["data-default-private-values"]),
+            [BUG_CODE],
+        )
+
+    def test_admin_form_excludes_inactive_category_but_keeps_historical_value(self):
+        inactive = FeedbackCategory.objects.get(code=BUG_CODE)
+        inactive.is_active = False
+        inactive.save(update_fields=["is_active"])
+        self.assertNotIn(inactive, FeedbackAdminForm().fields["category"].queryset)
+
+        feedback = Feedback.objects.create(
+            category=inactive,
+            title="历史反馈",
+            content="保留停用分类",
+            author=self.author,
+        )
+        self.assertIn(
+            inactive,
+            FeedbackAdminForm(instance=feedback).fields["category"].queryset,
+        )
 
     def test_create_form_does_not_expose_management_fields(self):
         self.assertNotIn("status", FeedbackForm().fields)

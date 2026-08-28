@@ -125,6 +125,8 @@ class Command(BaseCommand):
         for plan in table_plan:
             old_exists = plan.old_name in existing_tables
             new_exists = plan.new_name in existing_tables
+            if old_exists:
+                self._assert_table_schema_compatible(connection, plan)
             if old_exists and new_exists:
                 if self._table_has_rows(connection, plan.new_name) and not self._can_replace_non_empty_new_table(
                     connection,
@@ -138,6 +140,22 @@ class Command(BaseCommand):
             if old_exists:
                 actions.append(TableAction(plan=plan, mode="rename-old-table"))
         return actions
+
+    def _assert_table_schema_compatible(self, connection, plan):
+        with connection.cursor() as cursor:
+            description = connection.introspection.get_table_description(cursor, plan.old_name)
+        actual_columns = {column.name for column in description}
+        required_columns = {
+            field.column
+            for field in plan.model._meta.local_concrete_fields
+        }
+        missing_columns = sorted(required_columns - actual_columns)
+        if missing_columns:
+            missing_display = '、'.join(missing_columns)
+            raise CommandError(
+                f'旧表 {plan.old_name} 的结构早于当前 behaviors 模型，缺少字段：{missing_display}。'
+                '为避免错误重命名导致数据损坏，请使用治理前版本先完成 conduct 切换并迁移，再升级当前版本。'
+            )
 
     def _table_has_rows(self, connection, table_name):
         quoted_name = connection.ops.quote_name(table_name)

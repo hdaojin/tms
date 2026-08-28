@@ -61,7 +61,7 @@ def can_change_conduct_record_admin(user, obj=None) -> bool:
     if not can_view_conduct_record_admin(user, obj):
         return False
 
-    if obj.status != ConductRecord.STATUS_PENDING:
+    if obj.status != ConductRecord.Status.PENDING:
         return False
 
     if can_review_conduct(user):

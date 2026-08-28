@@ -20,6 +20,7 @@ from .models import (
     AssessmentModuleCoach,
     AssessmentModuleDomain,
     AssessmentParticipant,
+    AssessmentType,
     CompetitionPerson,
     CompetitionRole,
 )
@@ -49,6 +50,26 @@ class AssessmentForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelF
             "end_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "description": forms.Textarea(attrs={"rows": 4}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        querysets = {
+            "assessment_type": AssessmentType.objects.filter(is_active=True),
+            "series": self.fields["series"].queryset.filter(is_active=True),
+            "level": self.fields["level"].queryset.filter(is_active=True),
+        }
+        if self.instance.pk:
+            querysets["assessment_type"] = AssessmentType.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.assessment_type_id)
+            )
+            querysets["series"] = self.fields["series"].queryset.model.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.series_id)
+            )
+            querysets["level"] = self.fields["level"].queryset.model.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.level_id)
+            )
+        for field_name, queryset in querysets.items():
+            self.fields[field_name].queryset = queryset.distinct()
 
 
 class AssessmentUpdateForm(AssessmentForm):
@@ -94,6 +115,11 @@ class CompetitionRoleForm(StyledFormMixin, forms.ModelForm):
         model = CompetitionRole
         fields = ["code", "name", "category", "description", "order", "is_active"]
         widgets = {"description": forms.Textarea(attrs={"rows": 3})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.fields["code"].disabled = True
 
 
 class AssessmentModuleForm(StyledFormMixin, forms.ModelForm):

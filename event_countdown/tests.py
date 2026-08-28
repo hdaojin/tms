@@ -1,23 +1,63 @@
 from datetime import timedelta
 
+from django.contrib.admin.sites import AdminSite
 from django.core.cache import cache
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
 from core.models import SiteConfig
 
-from .models import CountdownEvent
+from .admin import CountdownEventAdmin, CountdownEventAdminForm
+from .bootstrap import bootstrap_defaults
+from .models import CountdownEvent, CountdownEventType
 from .themes import COUNTDOWN_THEMES, DEFAULT_THEME_KEY
 
 
+class CountdownEventCatalogAdminTests(TestCase):
+    def setUp(self):
+        bootstrap_defaults()
+
+    def test_model_has_no_implicit_type_default_and_admin_prefills_active_other(self):
+        self.assertFalse(CountdownEvent._meta.get_field('event_type').has_default())
+        other_type = CountdownEventType.objects.get(code='other')
+        model_admin = CountdownEventAdmin(CountdownEvent, AdminSite())
+
+        initial = model_admin.get_changeform_initial_data(
+            RequestFactory().get('/admin/event_countdown/countdownevent/add/')
+        )
+
+        self.assertEqual(initial['event_type'], other_type.pk)
+
+    def test_admin_form_excludes_inactive_type_but_keeps_current_historical_value(self):
+        inactive_type = CountdownEventType.objects.create(
+            code='historical-event',
+            name='历史事件',
+            is_active=False,
+        )
+        self.assertNotIn(inactive_type, CountdownEventAdminForm().fields['event_type'].queryset)
+
+        event = CountdownEvent.objects.create(
+            name='历史倒计时',
+            event_type=inactive_type,
+            target_at=timezone.now() + timedelta(days=1),
+        )
+        self.assertIn(
+            inactive_type,
+            CountdownEventAdminForm(instance=event).fields['event_type'].queryset,
+        )
+
+
 class CountdownEventViewTests(TestCase):
+    def setUp(self):
+        bootstrap_defaults()
+
     def make_event(self, **kwargs):
         defaults = {
             'name': '测试倒计时事件',
             'slug': 'test-countdown',
             'subtitle': '测试倒计时',
-            'event_type': CountdownEvent.EventType.TRAINING,
+            'event_type': CountdownEventType.objects.get(code='training'),
             'target_at': timezone.now() + timedelta(days=7),
             'is_active': True,
             'display_order': 10,
@@ -82,7 +122,7 @@ class CountdownEventViewTests(TestCase):
         event = self.make_event(
             name='云计算项目备战倒计时',
             subtitle='全国技能大赛冲刺',
-            event_type=CountdownEvent.EventType.NATIONAL,
+            event_type=CountdownEventType.objects.get(code='national'),
             project_name='云平台运维项目',
             project_english_name='Cloud Platform Operations',
             location='广东深圳',

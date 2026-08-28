@@ -55,14 +55,6 @@ class FeedbackListView(TitleMixin, LoginRequiredMixin, FilterableListMixin, List
     search_fields = ("title", "content")
     list_filter_specs = (
         ListFilterSpec(
-            name="category",
-            label="反馈类型",
-            control="select",
-            lookup="category",
-            choices=FeedbackCategory.choices,
-            empty_label="全部类型",
-        ),
-        ListFilterSpec(
             name="status",
             label="状态",
             control="select",
@@ -85,6 +77,20 @@ class FeedbackListView(TitleMixin, LoginRequiredMixin, FilterableListMixin, List
         ),
     )
     list_filter_target_id = "feedback-list"
+
+    def get_list_filter_specs(self):
+        category_choices = tuple(FeedbackCategory.objects.values_list("code", "name"))
+        return (
+            ListFilterSpec(
+                name="category",
+                label="反馈类型",
+                control="select",
+                lookup="category__code",
+                choices=category_choices,
+                empty_label="全部类型",
+            ),
+            *self.list_filter_specs,
+        )
 
     def get_base_queryset(self):
         return visible_feedbacks_for(self.request.user)

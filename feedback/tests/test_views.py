@@ -1,15 +1,15 @@
 from django.urls import reverse
 
-from feedback.models import FeedbackCategory, FeedbackStatus
+from feedback.models import FeedbackStatus
 
-from .base import FeedbackTestCase
+from .base import BUG_CODE, FEATURE_CODE, FeedbackTestCase
 
 
 class FeedbackViewTests(FeedbackTestCase):
     def test_create_form_explains_focused_screenshot_and_file_paste(self):
         self.client.force_login(self.author)
         response = self.client.get(reverse("feedback:create"))
-        self.assertContains(response, "先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴截图或文件")
+        self.assertContains(response, "支持直接复制/粘贴截图或文件，先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴")
         self.assertNotContains(response, "data-tms-upload-browse")
         self.assertContains(response, "noattribution")
         self.assertNotContains(response, "无需点击")
@@ -70,9 +70,9 @@ class FeedbackViewTests(FeedbackTestCase):
         self.assertNotContains(response, ">筛选</button>", html=False)
 
     def test_list_filters_and_search_keep_existing_behavior(self):
-        mine = self.make_feedback(title="登录异常", category=FeedbackCategory.BUG)
-        others = self.make_feedback(author=self.other, title="登录异常（他人）", category=FeedbackCategory.BUG)
-        feature = self.make_feedback(title="功能建议", category=FeedbackCategory.FEATURE)
+        mine = self.make_feedback(title="登录异常", category=BUG_CODE)
+        others = self.make_feedback(author=self.other, title="登录异常（他人）", category=BUG_CODE)
+        feature = self.make_feedback(title="功能建议", category=FEATURE_CODE)
         self.client.force_login(self.author)
 
         response = self.client.get(
@@ -163,7 +163,7 @@ class FeedbackViewTests(FeedbackTestCase):
         feedback = self.make_feedback()
         self.client.force_login(self.author)
         response = self.client.get(reverse("feedback:detail", args=[feedback.pk]))
-        self.assertContains(response, "先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴截图或文件")
+        self.assertContains(response, "支持直接复制/粘贴截图或文件，先点击上传区域，再按 Ctrl+V / Cmd+V 粘贴")
         self.assertNotContains(response, "data-tms-upload-browse")
         self.assertContains(response, "noattribution")
         self.assertNotContains(response, "无需点击")

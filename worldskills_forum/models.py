@@ -42,14 +42,6 @@ class TopicStatus(models.TextChoices):
     ARCHIVED = "archived", "已归档"
 
 
-class PostType(models.TextChoices):
-    DISCUSSION = "discussion", "专家讨论"
-    OFFICIAL_REPLY = "official_reply", "官方回复"
-    OFFICIAL_NOTICE = "official_notice", "官方通知"
-    RULE_CHANGE = "rule_change", "规则变更"
-    IMPORTANT_REMINDER = "important_reminder", "重要提醒"
-
-
 class AttachmentKind(models.TextChoices):
     IMAGE = "image", "图片"
     FILE = "file", "附件"
@@ -118,6 +110,25 @@ class ForumSourceRole(SluggedNameModel):
         verbose_name_plural = "论坛来源身份"
 
 
+class ForumPostType(models.Model):
+    code = models.CharField("类型代码", max_length=30, unique=True)
+    name = models.CharField("类型名称", max_length=120)
+    description = models.TextField("说明", blank=True)
+    order = models.PositiveIntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+    is_official = models.BooleanField("官方信息", default=False)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        ordering = ["order", "code"]
+        verbose_name = "论坛信息类型"
+        verbose_name_plural = "论坛信息类型"
+
+    def __str__(self):
+        return self.name
+
+
 class ForumTag(SluggedNameModel):
     class Meta:
         ordering = ["name", "pk"]
@@ -173,7 +184,12 @@ class ForumPost(models.Model):
     posted_at = models.DateTimeField("论坛原始发布时间", default=timezone.now)
     source_url = models.URLField("原帖链接", max_length=1000, blank=True, validators=[http_url_validator])
     source_post_id = models.CharField("论坛帖子 ID", max_length=120, blank=True, db_index=True)
-    post_type = models.CharField("信息类型", max_length=30, choices=PostType, db_index=True)
+    post_type = models.ForeignKey(
+        ForumPostType,
+        models.PROTECT,
+        related_name="posts",
+        verbose_name="信息类型",
+    )
     importance = models.CharField("重要程度", max_length=20, choices=Importance, default=Importance.NORMAL, db_index=True)
     original_content = models.TextField("英文原文")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, models.SET_NULL, null=True, related_name="forum_posts_created", verbose_name="创建人")

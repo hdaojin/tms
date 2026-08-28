@@ -17,7 +17,7 @@ def _event_context(event):
         target_at = timezone.localtime(event.target_at)
         target_at_iso = target_at.isoformat()
         event_year = str(target_at.year)
-        event_type_display = event.get_event_type_display()
+        event_type_display = event.event_type.name
         theme_key = event.theme
 
     theme = get_countdown_theme(theme_key)
@@ -69,13 +69,18 @@ def _event_context(event):
 
 
 def countdown_screen(request):
-    event = CountdownEvent.objects.filter(is_active=True).order_by('display_order', 'target_at').first()
+    event = (
+        CountdownEvent.objects.select_related('event_type')
+        .filter(is_active=True)
+        .order_by('display_order', 'target_at')
+        .first()
+    )
     return render(request, 'event_countdown/countdown_screen.html', _event_context(event))
 
 
 def countdown_screen_by_slug(request, slug):
     try:
-        event = CountdownEvent.objects.get(slug=slug, is_active=True)
+        event = CountdownEvent.objects.select_related('event_type').get(slug=slug, is_active=True)
     except CountdownEvent.DoesNotExist as exc:
         raise Http404('倒计时事件不存在或未启用') from exc
 

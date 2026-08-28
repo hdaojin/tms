@@ -1,7 +1,7 @@
 <article class="card border border-base-300 bg-base-100 shadow-sm" id="post-{{ post.pk }}">
   <div class="card-body gap-4">
     <div class="flex flex-wrap items-center gap-2">
-      {% if post.post_type == 'official_reply' or post.post_type == 'official_notice' or post.post_type == 'rule_change' %}<span class="badge badge-info">{{ post.get_post_type_display }}</span>{% else %}<span class="badge badge-ghost">{{ post.get_post_type_display }}</span>{% endif %}
+      {% if post.post_type.is_official %}<span class="badge badge-info">{{ post.post_type.name }}</span>{% else %}<span class="badge badge-ghost">{{ post.post_type.name }}</span>{% endif %}
       {% if post.importance == 'urgent' %}<span class="badge badge-error">紧急</span>{% elif post.importance == 'important' %}<span class="badge badge-warning">重要</span>{% endif %}
       {% if post.source_role.is_official %}<span class="badge badge-primary">{{ post.source_role }}</span>{% else %}<span class="badge badge-outline">{{ post.source_role }}{% if post.source_role_detail %} · {{ post.source_role_detail }}{% endif %}</span>{% endif %}
     </div>

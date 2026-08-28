@@ -2,11 +2,27 @@ from django.contrib import admin
 
 from core.utils.mixins import CreatedUpdatedAdminMixin
 
-from .models import ForumCategory, ForumModule, ForumPost, ForumPostAttachment, ForumSourceRole, ForumTag, ForumTopic, ForumTopicReadState, ForumTranslation
+from .models import (
+    ForumCategory,
+    ForumModule,
+    ForumPost,
+    ForumPostAttachment,
+    ForumPostType,
+    ForumSourceRole,
+    ForumTag,
+    ForumTopic,
+    ForumTopicReadState,
+    ForumTranslation,
+)
+
+
+class StableSlugAdmin(admin.ModelAdmin):
+    def get_readonly_fields(self, request, obj=None):
+        return ("slug",) if obj else ()
 
 
 @admin.register(ForumCategory)
-class ForumCategoryAdmin(admin.ModelAdmin):
+class ForumCategoryAdmin(StableSlugAdmin):
     list_display = ("name", "slug", "sort_order", "is_active")
     list_editable = ("sort_order", "is_active")
     search_fields = ("name", "slug")
@@ -19,17 +35,27 @@ class ForumTagAdmin(admin.ModelAdmin):
 
 
 @admin.register(ForumModule)
-class ForumModuleAdmin(admin.ModelAdmin):
+class ForumModuleAdmin(StableSlugAdmin):
     list_display = ("name", "slug", "sort_order", "is_active")
     list_editable = ("sort_order", "is_active")
     search_fields = ("name", "slug")
 
 
 @admin.register(ForumSourceRole)
-class ForumSourceRoleAdmin(admin.ModelAdmin):
+class ForumSourceRoleAdmin(StableSlugAdmin):
     list_display = ("name", "slug", "sort_order", "is_active", "is_official", "allows_detail")
     list_editable = ("sort_order", "is_active", "is_official", "allows_detail")
     search_fields = ("name", "slug")
+
+
+@admin.register(ForumPostType)
+class ForumPostTypeAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "order", "is_active", "is_official")
+    list_filter = ("is_active", "is_official")
+    search_fields = ("code", "name")
+
+    def get_readonly_fields(self, request, obj=None):
+        return ("code",) if obj else ()
 
 
 @admin.register(ForumTopic)

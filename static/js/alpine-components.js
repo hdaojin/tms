@@ -14,10 +14,18 @@ document.addEventListener("alpine:init", function () {
   window.Alpine.data("feedbackForm", function () {
     return {
       privateTouched: false,
+      init() {
+        this.applyCategoryDefault();
+      },
       categoryChanged() {
-        if (!this.privateTouched && this.$refs.category.value === "complaint") {
-          this.$refs.private.checked = true;
-        }
+        this.applyCategoryDefault();
+      },
+      applyCategoryDefault() {
+        if (this.privateTouched) return;
+        const defaultPrivateValues = JSON.parse(
+          this.$refs.category.dataset.defaultPrivateValues || "[]",
+        );
+        this.$refs.private.checked = defaultPrivateValues.includes(this.$refs.category.value);
       },
       privateChanged() {
         this.privateTouched = true;
