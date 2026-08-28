@@ -21,7 +21,7 @@ from assessments.models import (
 )
 from evidence.models import KnowledgeEvidence
 from standards.models import SkillProject, TechnicalDomain, TechnicalDomainGroupScope
-from .bootstrap import bootstrap_defaults as bootstrap_scoring_defaults
+from core.bootstrap_engine import bootstrap_defaults as bootstrap_scoring_defaults
 from .forms import ScoringImportForm, ScoringResultForm
 from .models import (
     ScoringAspect,

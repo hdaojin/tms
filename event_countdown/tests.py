@@ -9,7 +9,7 @@ from django.utils import timezone
 from core.models import SiteConfig
 
 from .admin import CountdownEventAdmin, CountdownEventAdminForm
-from .bootstrap import bootstrap_defaults
+from core.bootstrap_engine import bootstrap_defaults
 from .models import CountdownEvent, CountdownEventType
 from .themes import COUNTDOWN_THEMES, DEFAULT_THEME_KEY
 

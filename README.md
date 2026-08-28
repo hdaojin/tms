@@ -197,9 +197,19 @@ uv run manage.py migrate
 
 ```bash
 uv run manage.py bootstrap_tms
+uv run manage.py bootstrap_tms --dry-run
 ```
 
-该命令显式创建新环境缺失的出厂业务目录，可安全重复执行，并且不会覆盖管理员已经修改的名称、排序、启用状态或其他配置。正常部署不在应用启动时自动执行该命令。
+该命令先执行只读预检并输出完整预览，确认后才创建新环境缺失的出厂业务目录；默认模式可安全重复执行，并保留管理员已经修改的名称、排序、启用状态或其他受管配置。`--dry-run` 只预览、不询问且不写数据库。正常部署不在应用启动时自动执行该命令。
+
+需要明确恢复 Bootstrap 声明的出厂受管值时，可以先预览再执行强制覆盖：
+
+```bash
+uv run manage.py bootstrap_tms --force --dry-run
+uv run manage.py bootstrap_tms --force
+```
+
+`--force` 仍会先输出预览并要求确认，只按稳定业务键更新声明字段，不删除数据库中的额外业务目录，也不改变记录主键或稳定代码。生产环境执行前应先备份数据库。自动化场景可附加 `--yes` 跳过确认，但不会跳过预览或预检。
 
 ### 6. 创建超级管理员
 
@@ -369,7 +379,16 @@ uv run manage.py createsuperuser
 uv run manage.py migrate
 ```
 
-`bootstrap_tms` 主要用于新环境初始化。后续版本只有在发布说明明确要求补充出厂目录时才需要再次显式执行；命令不会覆盖已有目录项的管理员配置。
+`bootstrap_tms` 主要用于新环境初始化。命令会先预览并确认；默认模式不覆盖已有目录项的管理员配置，也不删除额外数据。后续版本只有在发布说明明确要求补充出厂目录时才需要再次显式执行。
+
+如需恢复 Bootstrap 声明的受管出厂值，先备份数据库并执行：
+
+```bash
+uv run manage.py bootstrap_tms --force --dry-run
+uv run manage.py bootstrap_tms --force
+```
+
+自动化部署可使用 `--yes`，但该选项只跳过人工确认，不跳过完整预览和预检。
 
 数据库结构变更应通过 Django migration 管理；部署前应按实际环境做好数据库和上传文件备份。
 

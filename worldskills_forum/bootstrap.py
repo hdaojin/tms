@@ -1,81 +1,42 @@
-from django.core.exceptions import ValidationError
+FORUM_CATEGORIES = [
+    {"slug": "official", "name": "官方发布", "sort_order": 10, "is_active": True},
+    {"slug": "technical", "name": "技术讨论", "sort_order": 20, "is_active": True},
+    {"slug": "rules", "name": "竞赛规则", "sort_order": 30, "is_active": True},
+    {"slug": "marking", "name": "评分", "sort_order": 40, "is_active": True},
+    {"slug": "environment", "name": "竞赛环境", "sort_order": 50, "is_active": True},
+    {"slug": "infrastructure", "name": "基础设施", "sort_order": 60, "is_active": True},
+    {"slug": "other", "name": "其他", "sort_order": 70, "is_active": True},
+]
 
-from .models import ForumCategory, ForumModule, ForumPostType, ForumSourceRole
+FORUM_MODULES = [
+    {"slug": "general", "name": "综合", "sort_order": 10, "is_active": True},
+    {"slug": "module-a", "name": "模块 A", "sort_order": 20, "is_active": True},
+    {"slug": "module-b", "name": "模块 B", "sort_order": 30, "is_active": True},
+    {"slug": "module-c", "name": "模块 C", "sort_order": 40, "is_active": True},
+    {"slug": "module-d", "name": "模块 D", "sort_order": 50, "is_active": True},
+    {"slug": "other", "name": "其他", "sort_order": 60, "is_active": True},
+]
 
+FORUM_SOURCE_ROLES = [
+    {"slug": "worldskills_official", "name": "世界技能组织官方", "sort_order": 10, "is_active": True, "is_official": True, "allows_detail": False},
+    {"slug": "chief_expert", "name": "首席专家", "sort_order": 20, "is_active": True, "is_official": False, "allows_detail": False},
+    {"slug": "deputy_chief_expert", "name": "副首席专家", "sort_order": 30, "is_active": True, "is_official": False, "allows_detail": False},
+    {"slug": "expert", "name": "专家", "sort_order": 40, "is_active": True, "is_official": False, "allows_detail": False},
+    {"slug": "organizer", "name": "竞赛组织方", "sort_order": 50, "is_active": True, "is_official": False, "allows_detail": False},
+    {"slug": "other", "name": "其他", "sort_order": 60, "is_active": True, "is_official": False, "allows_detail": True},
+]
 
-FORUM_CATEGORY_DEFAULTS = (
-    ("official", "官方发布"),
-    ("technical", "技术讨论"),
-    ("rules", "竞赛规则"),
-    ("marking", "评分"),
-    ("environment", "竞赛环境"),
-    ("infrastructure", "基础设施"),
-    ("other", "其他"),
-)
+FORUM_POST_TYPES = [
+    {"code": "discussion", "name": "专家讨论", "description": "", "order": 10, "is_active": True, "is_official": False},
+    {"code": "official_reply", "name": "官方回复", "description": "", "order": 20, "is_active": True, "is_official": True},
+    {"code": "official_notice", "name": "官方通知", "description": "", "order": 30, "is_active": True, "is_official": True},
+    {"code": "rule_change", "name": "规则变更", "description": "", "order": 40, "is_active": True, "is_official": True},
+    {"code": "important_reminder", "name": "重要提醒", "description": "", "order": 50, "is_active": True, "is_official": False},
+]
 
-FORUM_MODULE_DEFAULTS = (
-    ("general", "综合"),
-    ("module-a", "模块 A"),
-    ("module-b", "模块 B"),
-    ("module-c", "模块 C"),
-    ("module-d", "模块 D"),
-    ("other", "其他"),
-)
-
-FORUM_SOURCE_ROLE_DEFAULTS = (
-    ("worldskills_official", "世界技能组织官方", True, False),
-    ("chief_expert", "首席专家", False, False),
-    ("deputy_chief_expert", "副首席专家", False, False),
-    ("expert", "专家", False, False),
-    ("organizer", "竞赛组织方", False, False),
-    ("other", "其他", False, True),
-)
-
-FORUM_POST_TYPE_DEFAULTS = (
-    ("discussion", "专家讨论", False),
-    ("official_reply", "官方回复", True),
-    ("official_notice", "官方通知", True),
-    ("rule_change", "规则变更", True),
-    ("important_reminder", "重要提醒", False),
-)
-
-
-def _bootstrap_slugged(model, definitions):
-    created_count = 0
-    existing_count = 0
-    for sort_order, definition in enumerate(definitions):
-        slug, name, *flags = definition
-        if model.objects.filter(name=name).exclude(slug=slug).exists():
-            raise ValidationError(f"{model._meta.verbose_name}“{name}”已被其他标识占用，请先人工修正。")
-        defaults = {"name": name, "sort_order": sort_order}
-        if model is ForumSourceRole:
-            defaults.update({"is_official": flags[0], "allows_detail": flags[1]})
-        _obj, created = model.objects.get_or_create(slug=slug, defaults=defaults)
-        created_count += int(created)
-        existing_count += int(not created)
-    return created_count, existing_count
-
-
-def bootstrap_defaults():
-    created_count = 0
-    existing_count = 0
-    for model, definitions in (
-        (ForumCategory, FORUM_CATEGORY_DEFAULTS),
-        (ForumModule, FORUM_MODULE_DEFAULTS),
-        (ForumSourceRole, FORUM_SOURCE_ROLE_DEFAULTS),
-    ):
-        created, existing = _bootstrap_slugged(model, definitions)
-        created_count += created
-        existing_count += existing
-
-    for order, (code, name, is_official) in enumerate(FORUM_POST_TYPE_DEFAULTS, start=1):
-        if ForumPostType.objects.filter(name=name).exclude(code=code).exists():
-            raise ValidationError(f"论坛信息类型“{name}”已被其他代码占用，请先人工修正。")
-        _obj, created = ForumPostType.objects.get_or_create(
-            code=code,
-            defaults={"name": name, "is_official": is_official, "order": order * 10},
-        )
-        created_count += int(created)
-        existing_count += int(not created)
-
-    return {"created": created_count, "existing": existing_count}
+BOOTSTRAP_DATA = [
+    {"label": "论坛分类", "model": "worldskills_forum.ForumCategory", "key_fields": ("slug",), "collision_fields": (("name",),), "records": FORUM_CATEGORIES},
+    {"label": "论坛模块", "model": "worldskills_forum.ForumModule", "key_fields": ("slug",), "collision_fields": (("name",),), "records": FORUM_MODULES},
+    {"label": "论坛来源身份", "model": "worldskills_forum.ForumSourceRole", "key_fields": ("slug",), "collision_fields": (("name",),), "records": FORUM_SOURCE_ROLES},
+    {"label": "论坛信息类型", "model": "worldskills_forum.ForumPostType", "key_fields": ("code",), "collision_fields": (("name",),), "records": FORUM_POST_TYPES},
+]

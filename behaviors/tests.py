@@ -19,7 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from behaviors.admin import ConductCategoryAdmin, ConductItemAdmin, ConductRecordAdmin, ConductSeverityRuleAdmin, ConductSummaryAdmin
-from behaviors.bootstrap import bootstrap_defaults
+from core.bootstrap_engine import bootstrap_defaults
 from behaviors.models import (
     ConductCategory,
     ConductItem,
