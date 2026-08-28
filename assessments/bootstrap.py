@@ -1,57 +1,42 @@
-from django.core.exceptions import ValidationError
+ASSESSMENT_LEVELS = [
+    {"code": "world", "name": "世界级", "weight": "1.00", "order": 10, "is_active": True},
+    {"code": "national", "name": "国家级", "weight": "1.00", "order": 20, "is_active": True},
+    {"code": "provincial", "name": "省级", "weight": "1.00", "order": 30, "is_active": True},
+]
 
-from .models import AssessmentType, CompetitionRole
+ASSESSMENT_SERIES = [
+    {"code": "worldskills", "name": "世界技能大赛", "description": "", "order": 10, "is_active": True},
+]
 
+ASSESSMENT_TYPES = [
+    {"code": "competition", "name": "正式竞赛", "description": "", "order": 10, "is_active": True},
+    {"code": "selection", "name": "选拔赛", "description": "", "order": 20, "is_active": True},
+    {"code": "exchange", "name": "交流赛", "description": "", "order": 30, "is_active": True},
+    {"code": "mock", "name": "模拟赛", "description": "", "order": 40, "is_active": True},
+    {"code": "training_assessment", "name": "训练考核", "description": "", "order": 50, "is_active": True},
+    {"code": "training_test", "name": "训练测试", "description": "", "order": 60, "is_active": True},
+    {"code": "other", "name": "其他", "description": "", "order": 70, "is_active": True},
+]
 
-ASSESSMENT_TYPE_DEFAULTS = (
-    ("competition", "正式竞赛", 10),
-    ("selection", "选拔赛", 20),
-    ("exchange", "交流赛", 30),
-    ("mock", "模拟赛", 40),
-    ("training_assessment", "训练考核", 50),
-    ("training_test", "训练测试", 60),
-    ("other", "其他", 70),
-)
+COMPETITION_ROLES = [
+    {"code": "project_manager", "name": "项目经理", "category": "official", "description": "", "order": 10, "is_active": True},
+    {"code": "skill_competition_manager", "name": "技能竞赛经理", "category": "official", "description": "", "order": 20, "is_active": True},
+    {"code": "venue_manager", "name": "场地经理", "category": "official", "description": "", "order": 30, "is_active": True},
+    {"code": "team_leader", "name": "领队", "category": "official", "description": "", "order": 40, "is_active": True},
+    {"code": "chief_expert", "name": "专家组长", "category": "expert", "description": "", "order": 50, "is_active": True},
+    {"code": "deputy_chief_expert", "name": "副专家组长", "category": "expert", "description": "", "order": 60, "is_active": True},
+    {"code": "expert", "name": "专家", "category": "expert", "description": "", "order": 70, "is_active": True},
+    {"code": "judge", "name": "裁判", "category": "expert", "description": "", "order": 80, "is_active": True},
+    {"code": "coach", "name": "教练", "category": "coach", "description": "", "order": 90, "is_active": True},
+    {"code": "competitor", "name": "选手", "category": "competitor", "description": "", "order": 100, "is_active": True},
+    {"code": "staff", "name": "工作人员", "category": "staff", "description": "", "order": 110, "is_active": True},
+    {"code": "observer", "name": "观察员", "category": "other", "description": "", "order": 120, "is_active": True},
+    {"code": "other", "name": "其他", "category": "other", "description": "", "order": 999, "is_active": True},
+]
 
-COMPETITION_ROLE_DEFAULTS = (
-    ("project_manager", "项目经理", CompetitionRole.Category.OFFICIAL, 10),
-    ("skill_competition_manager", "技能竞赛经理", CompetitionRole.Category.OFFICIAL, 20),
-    ("venue_manager", "场地经理", CompetitionRole.Category.OFFICIAL, 30),
-    ("team_leader", "领队", CompetitionRole.Category.OFFICIAL, 40),
-    ("chief_expert", "专家组长", CompetitionRole.Category.EXPERT, 50),
-    ("deputy_chief_expert", "副专家组长", CompetitionRole.Category.EXPERT, 60),
-    ("expert", "专家", CompetitionRole.Category.EXPERT, 70),
-    ("judge", "裁判", CompetitionRole.Category.EXPERT, 80),
-    ("coach", "教练", CompetitionRole.Category.COACH, 90),
-    ("competitor", "选手", CompetitionRole.Category.COMPETITOR, 100),
-    ("staff", "工作人员", CompetitionRole.Category.STAFF, 110),
-    ("observer", "观察员", CompetitionRole.Category.OTHER, 120),
-    ("other", "其他", CompetitionRole.Category.OTHER, 999),
-)
-
-
-def _create_defaults(model, definitions):
-    created_count = 0
-    existing_count = 0
-    for code, name, *values in definitions:
-        if model.objects.filter(name=name).exclude(code=code).exists():
-            raise ValidationError(
-                f'{model._meta.verbose_name}“{name}”已被其他代码占用，请先人工修正稳定代码。'
-            )
-        if model is AssessmentType:
-            defaults = {"name": name, "order": values[0]}
-        else:
-            defaults = {"name": name, "category": values[0], "order": values[1]}
-        _obj, created = model.objects.get_or_create(code=code, defaults=defaults)
-        created_count += int(created)
-        existing_count += int(not created)
-    return created_count, existing_count
-
-
-def bootstrap_defaults():
-    type_created, type_existing = _create_defaults(AssessmentType, ASSESSMENT_TYPE_DEFAULTS)
-    role_created, role_existing = _create_defaults(CompetitionRole, COMPETITION_ROLE_DEFAULTS)
-    return {
-        "created": type_created + role_created,
-        "existing": type_existing + role_existing,
-    }
+BOOTSTRAP_DATA = [
+    {"label": "竞赛与考核级别", "model": "assessments.AssessmentLevel", "key_fields": ("code",), "collision_fields": (("name",),), "records": ASSESSMENT_LEVELS},
+    {"label": "竞赛与考核系列", "model": "assessments.AssessmentSeries", "key_fields": ("code",), "collision_fields": (("name",),), "records": ASSESSMENT_SERIES},
+    {"label": "竞赛与考核类型", "model": "assessments.AssessmentType", "key_fields": ("code",), "collision_fields": (("name",),), "records": ASSESSMENT_TYPES},
+    {"label": "赛事角色", "model": "assessments.CompetitionRole", "key_fields": ("code",), "collision_fields": (("name",),), "records": COMPETITION_ROLES},
+]

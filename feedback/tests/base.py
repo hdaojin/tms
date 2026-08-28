@@ -5,7 +5,7 @@ from django.contrib.auth.models import Permission
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 
-from feedback.bootstrap import bootstrap_defaults
+from core.bootstrap_engine import bootstrap_defaults
 from feedback.models import Feedback, FeedbackCategory
 
 

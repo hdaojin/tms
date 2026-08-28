@@ -5,7 +5,7 @@ from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.utils import timezone
 
-from worldskills_forum.bootstrap import bootstrap_defaults
+from core.bootstrap_engine import bootstrap_defaults
 from worldskills_forum.models import (
     ForumCategory,
     ForumModule,
