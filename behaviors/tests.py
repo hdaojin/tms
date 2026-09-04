@@ -470,6 +470,98 @@ class ConductSummaryAdminTestCase(TestCase):
         self.assertFalse(model_admin.has_delete_permission(request))
 
 
+class ConductSeverityRuleAdminDeleteTestCase(TestCase):
+    def setUp(self):
+        self.request = RequestFactory().get('/admin/behaviors/conductseverityrule/')
+        self.request.user = User.objects.create_superuser('severity-rule-admin', password='testpass123')
+        self.model_admin = ConductSeverityRuleAdmin(ConductSeverityRule, AdminSite())
+
+    def test_unused_rule_can_be_deleted(self):
+        rule = ConductSeverityRule.objects.get(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=severity(CONDUCT_SEVERITY_MINOR),
+        )
+
+        self.assertTrue(self.model_admin.has_delete_permission(self.request, rule))
+        self.client.force_login(self.request.user)
+        response = self.client.post(
+            reverse('admin:behaviors_conductseverityrule_delete', args=[rule.pk]),
+            {'post': 'yes'},
+        )
+
+        self.assertRedirects(response, reverse('admin:behaviors_conductseverityrule_changelist'))
+        self.assertFalse(ConductSeverityRule.objects.filter(pk=rule.pk).exists())
+
+    def test_rule_used_by_conduct_record_cannot_be_deleted(self):
+        competitor_group = create_conduct_subject_group()
+        student = User.objects.create_user(username='rule-delete-student', password='testpass123')
+        student.groups.add(competitor_group)
+        recorder = User.objects.create_user(username='rule-delete-recorder', password='testpass123')
+        category = ConductCategory.objects.create(
+            code=next_test_code('category'),
+            nature=CONDUCT_NATURE_REWARD,
+            name='系数删除测试分类',
+        )
+        item = ConductItem.objects.create(
+            code=next_test_code('item'),
+            category=category,
+            name='系数删除测试事项',
+            default_score=Decimal('1.00'),
+        )
+        rule = ConductSeverityRule.objects.get(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=severity(CONDUCT_SEVERITY_MINOR),
+        )
+        ConductRecord.objects.create(
+            student=student,
+            item=item,
+            severity=rule.severity,
+            reason='保留历史计分规则',
+            recorded_by=recorder,
+        )
+
+        self.assertFalse(self.model_admin.has_delete_permission(self.request, rule))
+
+    def test_bulk_delete_reports_used_rule_as_missing_permission(self):
+        competitor_group = create_conduct_subject_group()
+        student = User.objects.create_user(username='rule-bulk-delete-student', password='testpass123')
+        student.groups.add(competitor_group)
+        recorder = User.objects.create_user(username='rule-bulk-delete-recorder', password='testpass123')
+        category = ConductCategory.objects.create(
+            code=next_test_code('category'),
+            nature=CONDUCT_NATURE_REWARD,
+            name='系数批量删除测试分类',
+        )
+        item = ConductItem.objects.create(
+            code=next_test_code('item'),
+            category=category,
+            name='系数批量删除测试事项',
+            default_score=Decimal('1.00'),
+        )
+        used_rule = ConductSeverityRule.objects.get(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=severity(CONDUCT_SEVERITY_MINOR),
+        )
+        unused_rule = ConductSeverityRule.objects.get(
+            nature=CONDUCT_NATURE_REWARD,
+            severity=severity(CONDUCT_SEVERITY_SEVERE),
+        )
+        ConductRecord.objects.create(
+            student=student,
+            item=item,
+            severity=used_rule.severity,
+            reason='批量删除也必须保留历史计分规则',
+            recorded_by=recorder,
+        )
+
+        _, _, perms_needed, _ = self.model_admin.get_deleted_objects(
+            ConductSeverityRule.objects.filter(pk__in=[used_rule.pk, unused_rule.pk]),
+            self.request,
+        )
+
+        self.assertIn('已被奖惩记录使用的严重程度系数规则', perms_needed)
+
+
 class ConductRecordAdminTestCase(TestCase):
     """仅保留后台时，admin 仍需区分录入与审核权限。"""
 
