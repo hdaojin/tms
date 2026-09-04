@@ -280,8 +280,23 @@ class ConductSeverityRuleAdmin(ConductAuditAdminMixin, admin.ModelAdmin):
             readonly_fields.append('nature')
         return readonly_fields
 
+    @staticmethod
+    def is_used_by_conduct_records(obj):
+        return ConductRecord.objects.filter(
+            item__category__nature=obj.nature,
+            severity_id=obj.severity_id,
+        ).exists()
+
     def has_delete_permission(self, request, obj=None):
-        return False
+        if not super().has_delete_permission(request, obj):
+            return False
+        return obj is None or not self.is_used_by_conduct_records(obj)
+
+    def get_deleted_objects(self, objs, request):
+        deleted_objects, model_count, perms_needed, protected = super().get_deleted_objects(objs, request)
+        if any(self.is_used_by_conduct_records(obj) for obj in objs):
+            perms_needed.add('已被奖惩记录使用的严重程度系数规则')
+        return deleted_objects, model_count, perms_needed, protected
 
 
 @admin.register(ConductRecord)
