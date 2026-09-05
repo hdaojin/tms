@@ -914,7 +914,7 @@ class UploadSpecTests(TestCase):
         spec = UploadSpec(["pdf", ".docx"], 12)
 
         self.assertEqual(spec.accept, ".pdf,.docx")
-        self.assertEqual(spec.help_text("上传资料"), "上传资料，支持 pdf, docx，大小不超过 12MB")
+        self.assertEqual(spec.help_text("上传资料"), "上传资料，支持 pdf, docx，大小不超过 12MB。")
         self.assertEqual(
             spec.widget_attrs(type="file"),
             {"type": "file", "accept": ".pdf,.docx", "data-upload-max-size-mb": "12"},
