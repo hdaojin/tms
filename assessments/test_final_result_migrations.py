@@ -13,7 +13,8 @@ class FinalResultMigrationTests(TransactionTestCase):
     @staticmethod
     def migration_targets(executor, assessment_target):
         return [
-            *[node for node in executor.loader.graph.leaf_nodes() if node[0] != "assessments"],
+            *[node for node in executor.loader.graph.leaf_nodes() if node[0] not in {"assessments", "scoring"}],
+            ("scoring", "0002_unify_scoring_results_with_assessment_participants"),
             assessment_target,
         ]
 

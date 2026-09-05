@@ -5,7 +5,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -145,7 +144,7 @@ class AssessmentModelTests(TestCase):
         with self.assertRaises(ValidationError):
             document.save()
 
-    def test_exact_document_duplicate_is_rejected_but_different_hash_version_is_allowed(self):
+    def test_legacy_document_hashes_are_no_longer_unique(self):
         module = AssessmentModule.objects.create(assessment=self.assessment, code="A", name="模块 A")
         values = {
             "assessment": self.assessment,
@@ -156,8 +155,7 @@ class AssessmentModelTests(TestCase):
             "uploaded_by": self.user,
         }
         AssessmentDocument.objects.create(file="first.pdf", file_sha256="a" * 64, version="V1", **values)
-        with self.assertRaises(IntegrityError), transaction.atomic():
-            AssessmentDocument.objects.create(file="duplicate.pdf", file_sha256="a" * 64, version="V2", **values)
+        AssessmentDocument.objects.create(file="duplicate.pdf", file_sha256="a" * 64, version="V2", **values)
         self.assertIsNotNone(
             AssessmentDocument.objects.create(file="second.pdf", file_sha256="b" * 64, version="V2", **values).pk
         )
@@ -327,7 +325,7 @@ class AssessmentFormViewTests(TestCase):
             skill_project=self.project,
             assessment_type=get_mock_assessment_type(),
             name="表单测试考核",
-            code="FORM-ASSESSMENT",
+            code="FORMASSESSMENT",
             start_date=date(2026, 4, 1),
             end_date=date(2026, 4, 2),
             created_by=self.user,
@@ -809,13 +807,13 @@ class AssessmentWorkspaceTests(TestCase):
             f"{reverse('assessments:assessment_detail', args=[self.assessment.pk])}?tab=modules",
         )
 
-    def test_module_document_upload_still_returns_to_module_detail(self):
+    def test_module_document_upload_returns_to_workspace_modules_tab(self):
         view = AssessmentDocumentCreateView()
         view.object = AssessmentDocument(assessment=self.assessment, module=self.linux_module)
 
         self.assertEqual(
             view.get_success_url(),
-            reverse("assessments:module_detail", args=[self.linux_module.pk]),
+            f"{reverse('assessments:assessment_detail', args=[self.assessment.pk])}?tab=modules",
         )
 
     def test_workspace_does_not_expose_aggregate_scores_without_view_all_permission(self):

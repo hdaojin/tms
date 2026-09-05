@@ -34,7 +34,12 @@ from .models import (
 )
 from .parser import WorkbookParseError
 from .selectors import module_scoring_summary, scoring_results_visible_to, scoring_schemes_in_scope_for
-from .services import confirm_scheme_import, record_scoring_result, scheme_import_consistency_report
+from .services import (
+    confirm_scheme_import,
+    parse_scheme_document,
+    record_scoring_result,
+    scheme_import_consistency_report,
+)
 
 User = get_user_model()
 
@@ -66,8 +71,8 @@ class ScoringEvidenceWorkflowTests(TestCase):
         self.document = AssessmentDocument.objects.create(
             assessment=assessment,
             module=self.module,
-            document_type=AssessmentDocument.DocumentType.MARKING_SCHEME,
-            title="评分表",
+            document_type=AssessmentDocument.DocumentType.MARKING_STANDARD,
+            title="评分标准",
             file="placeholder.xlsx",
             original_filename="scheme.xlsx",
             file_sha256="a" * 64,
@@ -195,6 +200,29 @@ class ScoringEvidenceWorkflowTests(TestCase):
 
         self.assertContains(response, "评测模块配置总分 3.00")
         self.assertContains(response, "disabled")
+
+    def test_marking_sheet_cannot_be_used_as_scoring_scheme_source(self):
+        marking_sheet = AssessmentDocument.objects.create(
+            assessment=self.module.assessment,
+            module=self.module,
+            document_type=AssessmentDocument.DocumentType.ATTACHMENT,
+            title="评分表",
+            file="marking-sheet.xlsx",
+            original_filename="marking-sheet.xlsx",
+            file_sha256="b" * 64,
+            uploaded_by=self.user,
+        )
+
+        with self.assertRaisesMessage(ValidationError, "只能解析绑定评测模块的评分标准资料"):
+            parse_scheme_document(marking_sheet, parser_config=None, user=self.user)
+        with self.assertRaisesMessage(ValidationError, "评分方案来源资料必须是评分标准"):
+            ScoringScheme.objects.create(
+                assessment_module=self.module,
+                source_document=marking_sheet,
+                title="错误来源方案",
+                module_code="A",
+                module_name="模块 A",
+            )
 
     def test_result_import_accepts_only_result_file_from_same_module(self):
         scheme = ScoringScheme.objects.create(
@@ -760,8 +788,8 @@ class ScoringPermissionBoundaryTests(TestCase):
         return AssessmentDocument.objects.create(
             assessment=module.assessment,
             module=module,
-            document_type=AssessmentDocument.DocumentType.MARKING_SCHEME,
-            title=f"{module.code} 评分表",
+            document_type=AssessmentDocument.DocumentType.MARKING_STANDARD,
+            title=f"{module.code} 评分标准",
             file=f"{module.code}.xlsx",
             original_filename=f"{module.code}.xlsx",
             file_sha256=hash_character * 64,
@@ -836,8 +864,19 @@ class ScoringPermissionBoundaryTests(TestCase):
         )
 
     def test_import_and_result_forms_only_offer_in_scope_objects(self):
+        marking_sheet = AssessmentDocument.objects.create(
+            assessment=self.linux_module.assessment,
+            module=self.linux_module,
+            document_type=AssessmentDocument.DocumentType.ATTACHMENT,
+            title="Linux 评分表",
+            file="linux-marking-sheet.xlsx",
+            original_filename="linux-marking-sheet.xlsx",
+            file_sha256="d" * 64,
+            uploaded_by=self.owner,
+        )
         import_form = ScoringImportForm(user=self.linux_coach)
         self.assertIn(self.linux_document, import_form.fields["source_document"].queryset)
+        self.assertNotIn(marking_sheet, import_form.fields["source_document"].queryset)
         self.assertNotIn(self.windows_document, import_form.fields["source_document"].queryset)
         self.assertNotIn(self.cross_document, import_form.fields["source_document"].queryset)
         contextual_import_form = ScoringImportForm(
@@ -860,7 +899,7 @@ class ScoringPermissionBoundaryTests(TestCase):
 
         with patch(
             "scoring.views.parse_scheme_document",
-            side_effect=WorkbookParseError("评分表格式错误。"),
+            side_effect=WorkbookParseError("评分标准格式错误。"),
         ):
             response = self.client.post(
                 reverse("scoring:scheme_import"),
@@ -871,7 +910,7 @@ class ScoringPermissionBoundaryTests(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertFormError(response.context["form"], "source_document", "评分表格式错误。")
+        self.assertFormError(response.context["form"], "source_document", "评分标准格式错误。")
 
     def test_service_rejects_import_confirmation_outside_scope(self):
         self.split_scope_user.user_permissions.add(*self._permissions(["scoring.add_scoringscheme"]))

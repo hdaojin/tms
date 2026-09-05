@@ -41,6 +41,7 @@
             <div class="min-w-0">
               <dt class="text-xs text-base-content/60 lg:hidden">版本</dt>
               <dd class="break-words">{{ document.version|default:"—" }}</dd>
+              {% if document.document_date %}<dd>资料日期：{{ document.document_date|date:"Y.m.d" }}</dd>{% endif %}
             </div>
             <div class="min-w-0">
               <dt class="text-xs text-base-content/60 lg:hidden">文件大小</dt>

@@ -108,7 +108,7 @@ class ScoringParserBootstrapTests(TestCase):
         self.assertEqual(force.action, UPDATE)
         apply_bootstrap_plan(build_bootstrap_plan(force=True))
         config.refresh_from_db()
-        self.assertEqual(config.display_name, "CMP 单模块评分表")
+        self.assertEqual(config.display_name, "CMP 单模块评分标准")
         self.assertTrue(config.is_enabled)
         self.assertTrue(config.is_default)
         self.assertEqual(self.parser_record(build_bootstrap_plan(force=True)).action, UNCHANGED)

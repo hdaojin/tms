@@ -285,7 +285,7 @@ class UploadSpec:
         return attrs
 
     def help_text(self, action_text: str = "上传文件") -> str:
-        return f"{action_text}，支持 {self.extensions_display}，大小不超过 {self.max_size_mb}MB"
+        return f"{action_text}，支持 {self.extensions_display}，大小不超过 {self.max_size_mb}MB。"
 
     def validators(self) -> list[Any]:
         validators: list[Any] = []

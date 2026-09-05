@@ -612,9 +612,9 @@ def parse_marking_workbook(file_or_path, *, expected_module_code: str = "") -> P
             row_index += 1
 
     if not subcriteria:
-        errors.append("评分表至少需要一个子评分项。")
+        errors.append("评分标准至少需要一个子评分项。")
     if not any(subcriterion.aspects for subcriterion in subcriteria):
-        errors.append("评分表至少需要一个评分点。")
+        errors.append("评分标准至少需要一个评分点。")
     if not total_row_seen:
         errors.append("未找到 Total Marks: 总分行。")
         total_mark = Decimal("0.00")

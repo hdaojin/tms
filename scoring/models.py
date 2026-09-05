@@ -21,7 +21,7 @@ class ScoringScheme(models.Model):
     )
     source_document = models.ForeignKey(
         "assessments.AssessmentDocument",
-        verbose_name="来源评分表",
+        verbose_name="来源评分标准",
         on_delete=models.PROTECT,
         related_name="scoring_schemes",
         null=True,
@@ -67,14 +67,14 @@ class ScoringScheme(models.Model):
     def clean(self):
         super().clean()
         if self.assessment_module_id and self.module_code and self.assessment_module.code != self.module_code:
-            raise ValidationError({"module_code": f"评分表模块代码必须与评测模块一致：{self.assessment_module.code}。"})
+            raise ValidationError({"module_code": f"评分标准模块代码必须与评测模块一致：{self.assessment_module.code}。"})
         if self.source_document_id:
             from assessments.models import AssessmentDocument
 
-            if self.source_document.document_type != AssessmentDocument.DocumentType.MARKING_SCHEME:
-                raise ValidationError({"source_document": "评分方案来源资料必须是评分表。"})
+            if self.source_document.document_type != AssessmentDocument.DocumentType.MARKING_STANDARD:
+                raise ValidationError({"source_document": "评分方案来源资料必须是评分标准。"})
             if self.source_document.module_id != self.assessment_module_id:
-                raise ValidationError({"source_document": "来源评分表必须属于当前评测模块。"})
+                raise ValidationError({"source_document": "来源评分标准必须属于当前评测模块。"})
 
     def save(self, *args, **kwargs):
         self.clean()
@@ -96,8 +96,8 @@ class ScoringParserConfig(models.Model):
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
-        verbose_name = "评分表解析器"
-        verbose_name_plural = "评分表解析器"
+        verbose_name = "评分标准解析器"
+        verbose_name_plural = "评分标准解析器"
         ordering = ["order", "display_name", "parser_key"]
         constraints = [
             models.UniqueConstraint(
@@ -138,7 +138,7 @@ class ScoringSchemeImport(models.Model):
     )
     source_document = models.ForeignKey(
         "assessments.AssessmentDocument",
-        verbose_name="来源评分表",
+        verbose_name="来源评分标准",
         on_delete=models.PROTECT,
         related_name="scoring_scheme_imports",
     )
@@ -176,8 +176,8 @@ class ScoringSchemeImport(models.Model):
     confirmed_at = models.DateTimeField("确认时间", null=True, blank=True)
 
     class Meta:
-        verbose_name = "评分表导入记录"
-        verbose_name_plural = "评分表导入记录"
+        verbose_name = "评分标准导入记录"
+        verbose_name_plural = "评分标准导入记录"
         ordering = ["-imported_at", "-pk"]
 
     def confirm(self, scheme):

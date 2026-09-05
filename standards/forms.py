@@ -5,7 +5,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.urls import reverse
 
-from core.utils.forms import StyledFormMixin
+from core.utils.forms import ImmutableCodeFormMixin, StyledFormMixin
 
 from .models import (
     Skill,
@@ -34,7 +34,7 @@ class DefaultSkillProjectFormMixin:
             self.initial["skill_project"] = default_project
 
 
-class SkillProjectForm(StyledFormMixin, forms.ModelForm):
+class SkillProjectForm(ImmutableCodeFormMixin, StyledFormMixin, forms.ModelForm):
     def _get_validation_exclusions(self):
         exclusions = super()._get_validation_exclusions()
         exclusions.add("is_default")
@@ -43,7 +43,10 @@ class SkillProjectForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = SkillProject
         fields = ["code", "name", "short_name", "description", "order", "is_active", "is_default"]
-        widgets = {"description": forms.Textarea(attrs={"rows": 4})}
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+            "code": forms.TextInput(attrs={"maxlength": 12, "pattern": "[A-Za-z0-9]{1,12}"}),
+        }
 
 
 class TechnicalDomainForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):

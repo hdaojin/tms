@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core.code_validators import project_code_validator, validate_immutable_code
+
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
@@ -11,7 +13,10 @@ from django.db.models import Q
 class SkillProject(models.Model):
     """长期稳定的技能项目本体。"""
 
-    code = models.CharField("技能项目代码", max_length=50, unique=True)
+    code = models.CharField(
+        "技能项目代码", max_length=50, unique=True,
+        validators=[project_code_validator], help_text="1–12 位英文字母或数字。",
+    )
     name = models.CharField("技能项目名称", max_length=150)
     short_name = models.CharField("简称", max_length=80, blank=True)
     description = models.TextField("描述", blank=True)
@@ -43,6 +48,7 @@ class SkillProject(models.Model):
 
     def clean(self):
         super().clean()
+        validate_immutable_code(self)
         if self.is_default and not self.is_active:
             raise ValidationError({"is_default": "默认技能项目必须处于启用状态。"})
 

@@ -26,7 +26,7 @@
 - [notes/overview.md](notes/overview.md): 笔记仓库与附件访问规则。
 - [notices/overview.md](notices/overview.md): 通知公告与发布权限说明。
 - [samba/overview.md](samba/overview.md): Samba 账户开通与改密说明。
-- [scoring/overview.md](scoring/overview.md): 评分表导入、评分点和结果导入说明。
+- [scoring/overview.md](scoring/overview.md): 评分标准导入、评分点和结果导入说明。
 - [standards/overview.md](standards/overview.md): 技能项目、技术领域、稳定技能、技能树和 WSOS 说明。
 - [training/overview.md](training/overview.md): 训练周期、计划、任务、执行、反馈和训练日志说明。
 - [worldskills_forum/overview.md](worldskills_forum/overview.md): 世赛论坛主题、翻译、未读信息和私有附件归档说明。

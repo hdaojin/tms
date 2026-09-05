@@ -539,7 +539,7 @@ class MobileNavigationTemplateTests(TestCase):
             "新增竞赛与考核",
             "新增评测模块",
             "新增参与人员",
-            "导入评分表",
+            "导入评分标准",
             "录入评分结果",
             "长期赛事人员",
             "赛事角色配置",

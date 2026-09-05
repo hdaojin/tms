@@ -6,6 +6,8 @@ ASSESSMENT_LEVELS = [
 
 ASSESSMENT_SERIES = [
     {"code": "worldskills", "name": "世界技能大赛", "description": "", "order": 10, "is_active": True},
+    {"code": "chinaskills", "name": "全国职业技能大赛", "description": "", "order": 20, "is_active": True},
+    {"code": "provincialskills", "name": "省级职业技能大赛", "description": "", "order": 30, "is_active": True},
 ]
 
 ASSESSMENT_TYPES = [

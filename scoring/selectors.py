@@ -29,7 +29,7 @@ def scoring_scheme_documents_in_scope_for(user, permission="scoring.add_scorings
     queryset = queryset if queryset is not None else AssessmentDocument.objects.all()
     module_ids = scoring_modules_in_scope_for(user, permission).values("pk")
     return queryset.filter(
-        document_type=AssessmentDocument.DocumentType.MARKING_SCHEME,
+        document_type=AssessmentDocument.DocumentType.MARKING_STANDARD,
         module_id__in=module_ids,
     )
 

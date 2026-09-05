@@ -31,9 +31,9 @@ CMP_SINGLE_MODULE_V1 = "cmp_single_module_v1"
 PARSER_DEFINITIONS = {
     CMP_SINGLE_MODULE_V1: ParserDefinition(
         key=CMP_SINGLE_MODULE_V1,
-        display_name="CMP 单模块评分表",
+        display_name="CMP 单模块评分标准",
         alias="CMP v1",
-        description="严格解析 CMP 官方单模块评分表模板，支持 M 测量评分点和 J 评价四档分档。",
+        description="严格解析 CMP 官方单模块评分标准模板，支持 M 测量评分点和 J 评价四档分档。",
         template_filename="cpm_48th_wsc_marking_scheme_template_v5.0.xlsx",
         parse_function_path="scoring.parser.parse_marking_workbook",
     ),

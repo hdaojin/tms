@@ -689,7 +689,7 @@ class AssessmentParticipantCreateView(TitleMixin, PermissionRequiredMixin, Creat
 class AssessmentDocumentCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = AssessmentDocument
     form_class = AssessmentDocumentForm
-    template_name = "common/form.html"
+    template_name = "assessments/document_upload.html"
     title = "上传评测资料"
     permission_required = "assessments.add_assessmentdocument"
 
@@ -707,15 +707,49 @@ class AssessmentDocumentCreateView(TitleMixin, PermissionRequiredMixin, CreateVi
         return initial
 
     def form_valid(self, form):
-        form.instance.uploaded_by = self.request.user
-        form.instance.original_filename = Path(form.cleaned_data["file"].name).name
-        return super().form_valid(form)
+        from .services import upload_assessment_document
+
+        try:
+            self.object = upload_assessment_document(form.save(commit=False), self.request.user)
+        except ValidationError as exc:
+            if hasattr(exc, "message_dict"):
+                for field, errors in exc.message_dict.items():
+                    form.add_error(field if field in form.fields else None, errors)
+            else:
+                form.add_error(None, exc)
+            return self.form_invalid(form)
+        return redirect(self.get_success_url())
 
     def get_success_url(self):
-        if self.object.module_id:
-            return reverse("assessments:module_detail", args=[self.object.module_id])
         assessment_url = reverse("assessments:assessment_detail", args=[self.object.assessment_id])
         return f"{assessment_url}?tab=modules"
+
+
+class AssessmentDocumentVersionHintView(PermissionRequiredMixin, View):
+    permission_required = "assessments.add_assessmentdocument"
+
+    def get(self, request):
+        from decimal import Decimal
+        from .document_uploads import latest_document_version
+
+        form = AssessmentDocumentForm(user=request.user)
+        try:
+            assessment = form.fields["assessment"].clean(request.GET.get("assessment"))
+            module = form.fields["module"].clean(request.GET.get("module"))
+            document_type = form.fields["document_type"].clean(request.GET.get("document_type"))
+        except ValidationError:
+            return render(request, "assessments/document_version_hint.html", {"ready": False})
+        if (module and module.assessment_id != assessment.pk) or (
+            not module and not (request.user.is_superuser
+                                or request.user.has_perm("assessments.change_all_assessment")
+                                or assessment.created_by_id == request.user.pk)
+        ):
+            return render(request, "assessments/document_version_hint.html", {"ready": False})
+        latest = latest_document_version(assessment.pk, module.pk if module else None, document_type)
+        return render(request, "assessments/document_version_hint.html", {
+            "ready": True, "latest": f"{latest:.1f}" if latest is not None else None,
+            "suggested": f"{latest + Decimal('0.1'):.1f}" if latest is not None else "1.0",
+        })
 
 
 class AssessmentDocumentAccessMixin:
@@ -751,6 +785,8 @@ class AssessmentDocumentDetailView(TitleMixin, AssessmentDocumentAccessMixin, De
             FilePreviewMetadata("所属考核", document.assessment.name),
             FilePreviewMetadata("所属模块", document.module.name if document.module_id else "公共资料"),
         ]
+        if document.document_date:
+            metadata.append(FilePreviewMetadata("资料日期", document.document_date.strftime("%Y.%m.%d")))
         if document.version:
             metadata.insert(1, FilePreviewMetadata("版本", document.version))
 

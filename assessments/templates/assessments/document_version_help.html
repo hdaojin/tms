@@ -1,0 +1,8 @@
+{{ help_text }}
+<span id="document-version-hint"
+      class="text-info"
+      hx-get="{% url 'assessments:document_version_hint' %}"
+      hx-trigger="load"
+      hx-include="[name=assessment], [name=module], [name=document_type]">
+  请选择评测、模块及资料类型以查看最高版本；首次版本至少为 1.0。
+</span>
