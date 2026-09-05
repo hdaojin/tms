@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
+import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -11,18 +12,27 @@ from django.db import models
 from django.db.models import Q
 
 from accounts.services.users import get_user_display_name
+from core.code_validators import assessment_code_validator, module_code_validator, validate_immutable_code
 from core.uploads import (
     ASSESSMENT_DOCUMENT_UPLOAD_SPEC,
-    PrivateMediaStorage,
     UploadSignatureValidator,
     compute_file_sha256,
 )
+from .storage import AssessmentDocumentStorage
 
 
-assessment_storage = PrivateMediaStorage("assessments")
+assessment_storage = AssessmentDocumentStorage()
 
 
 def assessment_document_upload_path(instance, filename):
+    if getattr(instance, "normalized_filename", ""):
+        from .document_uploads import DOCUMENT_FILENAME_TYPES
+
+        module_code = instance.module.code if instance.module_id else "GEN"
+        return (
+            f"{instance.assessment.code}/{instance.assessment.skill_project.code}/{module_code}/"
+            f"{DOCUMENT_FILENAME_TYPES[instance.document_type]}/{instance.normalized_filename}"
+        )
     module_code = instance.module.code if instance.module_id else "general"
     return str(Path(instance.assessment.code, module_code, instance.document_type, Path(filename).name))
 
@@ -168,7 +178,10 @@ class Assessment(models.Model):
         related_name="assessments",
     )
     name = models.CharField("名称", max_length=180)
-    code = models.CharField("代码", max_length=80, unique=True)
+    code = models.CharField(
+        "代码", max_length=80, unique=True,
+        validators=[assessment_code_validator], help_text="1–20 位英文字母或数字。",
+    )
     start_date = models.DateField("开始日期")
     end_date = models.DateField("结束日期", null=True, blank=True)
     location = models.CharField("地点", max_length=200, blank=True)
@@ -197,6 +210,7 @@ class Assessment(models.Model):
 
     def clean(self):
         super().clean()
+        validate_immutable_code(self)
         if self.end_date and self.start_date and self.end_date < self.start_date:
             raise ValidationError({"end_date": "结束日期不能早于开始日期。"})
         if (
@@ -218,7 +232,10 @@ class AssessmentModule(models.Model):
     assessment = models.ForeignKey(
         Assessment, verbose_name="竞赛与考核", on_delete=models.CASCADE, related_name="modules"
     )
-    code = models.CharField("模块代码", max_length=50)
+    code = models.CharField(
+        "模块代码", max_length=50, validators=[module_code_validator],
+        help_text="1–8 位英文字母或数字；GEN 为公共资料保留值。",
+    )
     name = models.CharField("模块名称", max_length=150)
     description = models.TextField("描述", blank=True)
     order = models.PositiveIntegerField("排序", default=0)
@@ -237,6 +254,14 @@ class AssessmentModule(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["assessment", "code"], name="uniq_assessmentmodule_assessment_code")
         ]
+
+    def clean(self):
+        super().clean()
+        validate_immutable_code(self)
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.assessment.code} / {self.code} - {self.name}"
@@ -571,7 +596,7 @@ class AssessmentResultAward(models.Model):
 class AssessmentDocument(models.Model):
     class DocumentType(models.TextChoices):
         TEST_PROJECT = "test_project", "试题"
-        MARKING_SCHEME = "marking_scheme", "评分表"
+        TECHNICAL_DESCRIPTION = "technical_description", "技术文件"
         MARKING_STANDARD = "marking_standard", "评分标准"
         SCORING_SCRIPT = "scoring_script", "评分脚本"
         RESULT_FILE = "result_file", "成绩或结果文件"
@@ -595,12 +620,19 @@ class AssessmentDocument(models.Model):
         "文件",
         storage=assessment_storage,
         upload_to=assessment_document_upload_path,
+        max_length=300,
         validators=[*ASSESSMENT_DOCUMENT_UPLOAD_SPEC.validators(), UploadSignatureValidator()],
         help_text=ASSESSMENT_DOCUMENT_UPLOAD_SPEC.help_text(),
     )
     original_filename = models.CharField("原始文件名", max_length=255)
     file_sha256 = models.CharField("SHA256", max_length=64, editable=False)
     version = models.CharField("版本", max_length=50, blank=True)
+    numeric_version = models.DecimalField(
+        "数值版本", max_digits=9, decimal_places=1, null=True, blank=True, editable=False,
+    )
+    document_date = models.DateField("资料日期", null=True, blank=True)
+    normalized_filename = models.CharField("规范文件名", max_length=255, blank=True, editable=False)
+    storage_key = models.UUIDField(default=uuid.uuid4, editable=False)
     metadata = models.JSONField("元数据", default=dict, blank=True)
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -616,14 +648,14 @@ class AssessmentDocument(models.Model):
         ordering = ["assessment", "module_id", "document_type", "-created_at"]
         constraints = [
             models.UniqueConstraint(
-                fields=["assessment", "module", "document_type", "file_sha256"],
+                fields=["assessment", "module", "document_type", "numeric_version"],
                 condition=Q(module__isnull=False),
-                name="uniq_assessment_document_module_hash",
+                name="uniq_assessment_document_module_version",
             ),
             models.UniqueConstraint(
-                fields=["assessment", "document_type", "file_sha256"],
+                fields=["assessment", "document_type", "numeric_version"],
                 condition=Q(module__isnull=True),
-                name="uniq_assessment_document_general_hash",
+                name="uniq_assessment_document_general_version",
             ),
         ]
 
@@ -642,7 +674,7 @@ class AssessmentDocument(models.Model):
 
     @property
     def filename(self):
-        return self.original_filename or Path(self.file.name).name
+        return self.normalized_filename or self.original_filename or Path(self.file.name).name
 
     def __str__(self):
         return self.title

@@ -12,7 +12,8 @@ from .services import default_parser_config, enabled_parser_configs
 
 class AssessmentDocumentChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, obj):
-        return f"{obj.assessment.name} / {obj.module.code} - {obj.title}"
+        label = f"{obj.assessment.name} / {obj.module.code} - {obj.title}"
+        return f"{label}（{obj.version}）" if obj.version else label
 
 
 class ParserConfigChoiceField(forms.ModelChoiceField):
@@ -21,15 +22,15 @@ class ParserConfigChoiceField(forms.ModelChoiceField):
 
 
 class ScoringImportForm(StyledFormMixin, forms.Form):
-    source_document = AssessmentDocumentChoiceField(label="评分表资料", queryset=AssessmentDocument.objects.none())
+    source_document = AssessmentDocumentChoiceField(label="评分标准资料", queryset=AssessmentDocument.objects.none())
     parser_config = ParserConfigChoiceField(
-        label="解析器", queryset=ScoringParserConfig.objects.none(), help_text="只显示已启用的评分表解析器。"
+        label="解析器", queryset=ScoringParserConfig.objects.none(), help_text="只显示已启用的评分标准解析器。"
     )
 
     def __init__(self, *args, user=None, permission="scoring.add_scoringscheme", module_id=None, **kwargs):
         super().__init__(*args, **kwargs)
         documents = AssessmentDocument.objects.filter(
-            document_type=AssessmentDocument.DocumentType.MARKING_SCHEME,
+            document_type=AssessmentDocument.DocumentType.MARKING_STANDARD,
             module__isnull=False,
         )
         if user is not None:

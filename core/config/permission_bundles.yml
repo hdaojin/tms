@@ -117,7 +117,7 @@ bundles:
     permissions: [scoring.view_scoringresult, scoring.view_all_scoringresult]
   - code: scoring.maintain_scoring
     name: 评分 | 维护评分
-    description: 导入评分表并维护评分结果。
+    description: 导入评分标准并维护评分结果。
     permissions: [scoring.view_scoringscheme, scoring.add_scoringscheme, scoring.change_scoringscheme, scoring.view_scoringparserconfig, scoring.view_scoringschemeimport, scoring.add_scoringschemeimport, scoring.change_scoringschemeimport, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption, scoring.view_scoringresult, scoring.add_scoringresult, scoring.change_scoringresult, scoring.view_all_scoringresult, scoring.view_scoringresultrevision, scoring.view_scoringresultimport, scoring.add_scoringresultimport, scoring.change_scoringresultimport]
 
   - code: evidence.view_evidence

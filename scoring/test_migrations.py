@@ -14,7 +14,8 @@ class ScoringParticipantMigrationTests(TransactionTestCase):
     @staticmethod
     def migration_targets(executor, scoring_target):
         return [
-            *[node for node in executor.loader.graph.leaf_nodes() if node[0] != "scoring"],
+            *[node for node in executor.loader.graph.leaf_nodes() if node[0] not in {"scoring", "assessments"}],
+            ("assessments", "0007_finalize_assessment_type"),
             scoring_target,
         ]
 
@@ -195,3 +196,138 @@ class ScoringParticipantMigrationTests(TransactionTestCase):
                 metadata__legacy_scoring_participants__isnull=False,
             ).exists()
         )
+
+
+class ScoringStandardSourceMigrationTests(TransactionTestCase):
+    migrate_from = ("scoring", "0002_unify_scoring_results_with_assessment_participants")
+    migrate_to = ("scoring", "0003_alter_scoringparserconfig_options_and_more")
+
+    @staticmethod
+    def migration_targets(executor, scoring_target):
+        return [
+            *[node for node in executor.loader.graph.leaf_nodes() if node[0] not in {"scoring", "assessments"}],
+            ("assessments", "0007_finalize_assessment_type"),
+            scoring_target,
+        ]
+
+    def setUp(self):
+        super().setUp()
+        executor = MigrationExecutor(connection)
+        from_targets = self.migration_targets(executor, self.migrate_from)
+        executor.migrate(from_targets)
+        old_apps = executor.loader.project_state(from_targets).apps
+
+        User = old_apps.get_model("auth", "User")
+        SkillProject = old_apps.get_model("standards", "SkillProject")
+        Assessment = old_apps.get_model("assessments", "Assessment")
+        AssessmentType = old_apps.get_model("assessments", "AssessmentType")
+        AssessmentModule = old_apps.get_model("assessments", "AssessmentModule")
+        AssessmentDocument = old_apps.get_model("assessments", "AssessmentDocument")
+        ScoringParserConfig = old_apps.get_model("scoring", "ScoringParserConfig")
+        ScoringScheme = old_apps.get_model("scoring", "ScoringScheme")
+        ScoringSchemeImport = old_apps.get_model("scoring", "ScoringSchemeImport")
+
+        user = User.objects.create(username="legacy-standard-source")
+        project = SkillProject.objects.create(code="STANDARD-SOURCE", name="评分标准迁移项目")
+        assessment_type, _created = AssessmentType.objects.get_or_create(
+            code="mock",
+            defaults={"name": "模拟赛", "order": 40},
+        )
+        assessment = Assessment.objects.create(
+            skill_project=project,
+            assessment_type=assessment_type,
+            name="评分标准迁移测试",
+            code="STANDARD-SOURCE-ASSESSMENT",
+            start_date=date(2026, 1, 1),
+            created_by=user,
+        )
+        module = AssessmentModule.objects.create(assessment=assessment, code="A", name="模块 A")
+        scheme_source = AssessmentDocument.objects.create(
+            assessment=assessment,
+            module=module,
+            document_type="marking_scheme",
+            title="历史来源评分表",
+            file="legacy-source.xlsx",
+            original_filename="legacy-source.xlsx",
+            file_sha256="a" * 64,
+            uploaded_by=user,
+        )
+        duplicate_source = AssessmentDocument.objects.create(
+            assessment=assessment,
+            module=module,
+            document_type="marking_scheme",
+            title="待合并来源评分表",
+            file="duplicate-source.xlsx",
+            original_filename="duplicate-source.xlsx",
+            file_sha256="b" * 64,
+            uploaded_by=user,
+        )
+        existing_standard = AssessmentDocument.objects.create(
+            assessment=assessment,
+            module=module,
+            document_type="marking_standard",
+            title="已存在评分标准",
+            file="existing-standard.xlsx",
+            original_filename="existing-standard.xlsx",
+            file_sha256="b" * 64,
+            uploaded_by=user,
+        )
+        scheme = ScoringScheme.objects.create(
+            assessment_module=module,
+            source_document=scheme_source,
+            title="历史评分方案",
+            module_code="A",
+            module_name="模块 A",
+        )
+        scheme_import = ScoringSchemeImport.objects.create(
+            assessment_module=module,
+            source_document=duplicate_source,
+            parser_key="cmp_single_module_v1",
+            parser_display_name="CMP 单模块评分表",
+            title="历史导入",
+            module_code="A",
+            module_name="模块 A",
+            module_mark=Decimal("0"),
+            total_mark=Decimal("0"),
+        )
+        ScoringParserConfig.objects.create(
+            parser_key="cmp_single_module_v1",
+            display_name="CMP 单模块评分表",
+            description="严格解析 CMP 官方单模块评分表模板，支持 M 测量评分点和 J 评价四档分档。",
+        )
+        self.scheme_pk = scheme.pk
+        self.scheme_source_pk = scheme_source.pk
+        self.scheme_import_pk = scheme_import.pk
+        self.existing_standard_pk = existing_standard.pk
+
+        executor = MigrationExecutor(connection)
+        to_targets = self.migration_targets(executor, self.migrate_to)
+        executor.migrate(to_targets)
+        self.apps = executor.loader.project_state(to_targets).apps
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
+    def test_sources_and_default_parser_copy_use_scoring_standard_terms(self):
+        AssessmentDocument = self.apps.get_model("assessments", "AssessmentDocument")
+        ScoringParserConfig = self.apps.get_model("scoring", "ScoringParserConfig")
+        ScoringScheme = self.apps.get_model("scoring", "ScoringScheme")
+        ScoringSchemeImport = self.apps.get_model("scoring", "ScoringSchemeImport")
+
+        self.assertEqual(
+            AssessmentDocument.objects.get(pk=self.scheme_source_pk).document_type,
+            "marking_standard",
+        )
+        self.assertEqual(
+            ScoringScheme.objects.get(pk=self.scheme_pk).source_document_id,
+            self.scheme_source_pk,
+        )
+        self.assertEqual(
+            ScoringSchemeImport.objects.get(pk=self.scheme_import_pk).source_document_id,
+            self.existing_standard_pk,
+        )
+        parser_config = ScoringParserConfig.objects.get(parser_key="cmp_single_module_v1")
+        self.assertEqual(parser_config.display_name, "CMP 单模块评分标准")
+        self.assertIn("评分标准模板", parser_config.description)

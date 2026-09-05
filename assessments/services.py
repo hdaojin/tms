@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.db import IntegrityError, OperationalError, transaction
+from django.db.models import F
 from django.utils import timezone
 
 from .models import (
@@ -14,6 +16,74 @@ from .models import (
     AssessmentResultAward,
 )
 from .selectors import calculated_final_result_preview, manageable_assessments_for
+
+
+def upload_assessment_document(document, user):
+    """锁定评测后重新校验版本；文件存储失败或数据库回滚时清理本次文件。"""
+    from .document_uploads import DOCUMENT_FILENAME_TYPES, validate_document_upload
+    from .selectors import assessment_modules_in_scope_for
+
+    permission = "assessments.add_assessmentdocument"
+    if not user.has_perm(permission):
+        raise PermissionDenied("您无权上传评测资料。")
+    if document.pk or not document.file or document.file._committed:
+        raise ValidationError("请选择一个新文件上传。")
+    stored_name = None
+    try:
+        with transaction.atomic():
+            # 首条数据库语句取得写锁：SQLite 的 select_for_update 本身不锁行。
+            Assessment.objects.filter(pk=document.assessment_id).update(updated_at=F("updated_at"))
+            document.assessment = Assessment.objects.select_related("skill_project").get(pk=document.assessment_id)
+            if document.module_id:
+                module = assessment_modules_in_scope_for(user, permission).filter(pk=document.module_id).first()
+                if module is None:
+                    raise PermissionDenied("您无权管理该评测模块的资料。")
+                document.module = module
+            elif not (user.is_superuser or user.has_perm("assessments.change_all_assessment")
+                      or document.assessment.created_by_id == user.pk):
+                raise PermissionDenied("只有评测负责人可以上传整场通用资料。")
+            document.numeric_version = validate_document_upload(
+                document.assessment, document.module, document.document_type, document.version,
+            )
+            if document.document_date is None:
+                raise ValidationError({"document_date": "请填写资料日期。"})
+            document.version = f"{document.numeric_version:.1f}"
+            document.original_filename = Path(document.file.name).name
+            project = document.assessment.skill_project
+            module_code = document.module.code if document.module_id else "GEN"
+            document.normalized_filename = (
+                f"{document.assessment.code}-{project.code}-{module_code}-"
+                f"{DOCUMENT_FILENAME_TYPES[document.document_type]}-v{document.version}-"
+                f"{document.document_date:%Y.%m.%d}{Path(document.original_filename).suffix.lower()}"
+            )
+            document.title = (
+                f"{document.assessment.name} · {project.name} · "
+                f"{document.module.name if document.module_id else '公共资料'} · "
+                f"{document.get_document_type_display()} · v{document.version}"
+            )[:255]
+            document.uploaded_by = user
+            document.full_clean(exclude=["file_sha256"])
+            # 提前保存并记录真实路径，后续 INSERT 失败也能准确清理。
+            document.file.save(document.normalized_filename, document.file.file, save=False)
+            stored_name = document.file.name
+            document.save()
+            document.file.close()
+        return document
+    except Exception as exc:
+        if stored_name:
+            document.file.close()
+            document.file.storage.delete(stored_name)
+        if isinstance(exc, FileExistsError):
+            raise ValidationError({"file": "目标文件已存在，未覆盖原文件。请核对目录和版本后重试。"}) from exc
+        if isinstance(exc, OSError):
+            raise ValidationError({"file": "文件写入失败，请检查存储空间、权限及文件系统是否支持硬链接。"}) from exc
+        if isinstance(exc, IntegrityError):
+            raise ValidationError({"version": "该版本已被使用，请刷新后指定更大的版本号。"}) from exc
+        if isinstance(exc, OperationalError) and any(
+            word in str(exc).lower() for word in ("locked", "deadlock", "serialize")
+        ):
+            raise ValidationError({"version": "有其他上传正在保存，请刷新最高版本后重试。"}) from exc
+        raise
 
 
 LIFECYCLE_TRANSITIONS = {

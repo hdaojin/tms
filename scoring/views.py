@@ -204,7 +204,7 @@ class ScoringImportView(TitleMixin, PermissionRequiredMixin, FormView):
     form_class = ScoringImportForm
     template_name = "scoring/scheme_import_form.html"
     permission_required = "scoring.add_scoringscheme"
-    title = "导入评分表"
+    title = "导入评分标准"
     title_icon = "icon-[tabler--upload]"
 
     def get_form_kwargs(self):
@@ -243,7 +243,7 @@ class ScoringSchemeImportPreviewView(TitleMixin, PermissionRequiredMixin, Detail
     template_name = "scoring/scheme_import_preview.html"
     context_object_name = "scheme_import"
     permission_required = "scoring.add_scoringscheme"
-    title = "确认评分表导入"
+    title = "确认评分标准导入"
     title_icon = "icon-[tabler--clipboard-check]"
 
     def get_queryset(self):

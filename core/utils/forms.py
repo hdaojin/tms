@@ -7,7 +7,26 @@ from __future__ import annotations
 from typing import Any, Dict, Tuple, Type
 
 from django import forms
+from django.utils.html import format_html
 from django.utils import timezone
+
+
+class ImmutableCodeFormMixin:
+    """创建时说明稳定代码约束，编辑时忽略客户端篡改的代码。"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields.get("code")
+        if field is not None:
+            field.disabled = self.instance.pk is not None
+            if field.disabled:
+                field.help_text = "代码创建后不可修改。"
+            else:
+                field.help_text = format_html(
+                    '{} <span class="text-info">{}</span>',
+                    field.help_text,
+                    "代码创建后不可修改，请确认后保存。",
+                )
 
 
 class DefaultTodayDateFormMixin:

@@ -279,7 +279,7 @@ class BootstrapForceTests(BootstrapTestMixin, TestCase):
             Decimal("-1.00"),
         )
         parser = ScoringParserConfig.objects.get(parser_key="cmp_single_module_v1")
-        self.assertEqual(parser.display_name, "CMP 单模块评分表")
+        self.assertEqual(parser.display_name, "CMP 单模块评分标准")
         self.assertTrue(parser.is_enabled)
         self.assertTrue(parser.is_default)
         self.assertTrue(AssessmentType.objects.filter(pk=extra_type.pk).exists())

@@ -1,4 +1,8 @@
 from django import forms
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+from django.urls import reverse
+from django.template.loader import render_to_string
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
@@ -6,7 +10,7 @@ from django.forms import inlineformset_factory
 
 from accounts.services.users import get_user_display_name
 from core.uploads import ASSESSMENT_DOCUMENT_UPLOAD_SPEC
-from core.utils.forms import StyledFormMixin
+from core.utils.forms import ImmutableCodeFormMixin, StyledFormMixin
 from standards.forms import DefaultSkillProjectFormMixin
 from standards.models import TechnicalDomain
 from standards.selectors import scoped_domains_for
@@ -29,7 +33,7 @@ from .selectors import assessment_modules_in_scope_for, assessments_in_scope_for
 User = get_user_model()
 
 
-class AssessmentForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
+class AssessmentForm(ImmutableCodeFormMixin, DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
     class Meta:
         model = Assessment
         fields = [
@@ -46,6 +50,7 @@ class AssessmentForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelF
             "description",
         ]
         widgets = {
+            "code": forms.TextInput(attrs={"maxlength": 20, "pattern": "[A-Za-z0-9]{1,20}"}),
             "start_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "end_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "description": forms.Textarea(attrs={"rows": 4}),
@@ -122,7 +127,7 @@ class CompetitionRoleForm(StyledFormMixin, forms.ModelForm):
             self.fields["code"].disabled = True
 
 
-class AssessmentModuleForm(StyledFormMixin, forms.ModelForm):
+class AssessmentModuleForm(ImmutableCodeFormMixin, StyledFormMixin, forms.ModelForm):
     domains = forms.ModelMultipleChoiceField(
         label="技术领域", queryset=TechnicalDomain.objects.none(), widget=forms.CheckboxSelectMultiple
     )
@@ -149,6 +154,7 @@ class AssessmentModuleForm(StyledFormMixin, forms.ModelForm):
         ]
         widgets = {
             "description": forms.Textarea(attrs={"rows": 4}),
+            "code": forms.TextInput(attrs={"maxlength": 8, "pattern": "[A-Za-z0-9]{1,8}"}),
             "scheduled_start_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
         }
 
@@ -284,9 +290,19 @@ class AssessmentParticipantForm(StyledFormMixin, forms.ModelForm):
 
 
 class AssessmentDocumentForm(StyledFormMixin, forms.ModelForm):
+    version = forms.CharField(
+        label="版本", max_length=10, strip=False,
+        help_text="必填，例如 1.0；仅接受一位小数，必须大于当前最高版本。整数部分最多 8 位。",
+        widget=forms.TextInput(attrs={"pattern": r"[0-9]{1,8}\.[0-9]", "placeholder": "1.0"}),
+    )
+    document_date = forms.DateField(
+        label="资料日期", initial=timezone.localdate,
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+    )
+
     class Meta:
         model = AssessmentDocument
-        fields = ["assessment", "module", "document_type", "title", "description", "file", "version"]
+        fields = ["assessment", "module", "document_type", "description", "file", "version", "document_date"]
         widgets = {"description": forms.Textarea(attrs={"rows": 3})}
 
     def __init__(self, *args, user=None, permission="assessments.add_assessmentdocument", **kwargs):
@@ -305,6 +321,19 @@ class AssessmentDocumentForm(StyledFormMixin, forms.ModelForm):
             self.fields["assessment"].queryset = assessments
             self.fields["module"].queryset = modules.filter(assessment__in=assessments)
         self.fields["file"].widget.attrs.update(ASSESSMENT_DOCUMENT_UPLOAD_SPEC.widget_attrs())
+        self.fields["file"].help_text += (
+            " 文件名由评测、项目、模块代码、资料类型、版本及资料日期自动生成。公共资料使用 GEN。"
+        )
+        self.fields["version"].help_text = render_to_string(
+            "assessments/document_version_help.html", {"help_text": self.fields["version"].help_text},
+        )
+        for name in ("assessment", "module", "document_type"):
+            self.fields[name].widget.attrs.update({
+                "hx-get": reverse("assessments:document_version_hint"),
+                "hx-trigger": "change",
+                "hx-include": "[name=assessment], [name=module], [name=document_type]",
+                "hx-target": "#document-version-hint",
+            })
 
     def clean(self):
         cleaned = super().clean()
@@ -329,6 +358,16 @@ class AssessmentDocumentForm(StyledFormMixin, forms.ModelForm):
                 or cleaned["assessment"].created_by_id == self.user.pk
             ):
                 self.add_error("assessment", "只有评测负责人可以上传整场通用资料。")
+        if cleaned.get("assessment") and cleaned.get("document_type") and cleaned.get("version"):
+            from .document_uploads import validate_document_upload
+
+            try:
+                validate_document_upload(
+                    cleaned["assessment"], cleaned.get("module"), cleaned["document_type"], cleaned["version"],
+                )
+            except ValidationError as exc:
+                for field, errors in exc.message_dict.items():
+                    self.add_error(field, errors)
         return cleaned
 
 

@@ -168,8 +168,8 @@ def record_scoring_result(
 
 @transaction.atomic
 def parse_scheme_document(document, parser_config, user=None):
-    if document.document_type != AssessmentDocument.DocumentType.MARKING_SCHEME or not document.module_id:
-        raise ValidationError("只能解析绑定评测模块的评分表资料。")
+    if document.document_type != AssessmentDocument.DocumentType.MARKING_STANDARD or not document.module_id:
+        raise ValidationError("只能解析绑定评测模块的评分标准资料。")
     _ensure_module_permission(user, document.module, "scoring.add_scoringscheme")
     definition = get_parser_definition(parser_config.parser_key)
     with document.file.open("rb") as source:
@@ -268,6 +268,6 @@ def confirm_scheme_import(scheme_import: ScoringSchemeImport, user=None):
 def create_scheme_from_document(document, user=None, parser_config=None):
     selected_parser = parser_config or default_parser_config()
     if selected_parser is None:
-        raise ValidationError('当前没有可用的评分表解析器，请先执行 bootstrap_tms 或在后台配置解析器。')
+        raise ValidationError('当前没有可用的评分标准解析器，请先执行 bootstrap_tms 或在后台配置解析器。')
     scheme_import = parse_scheme_document(document, selected_parser, user=user)
     return confirm_scheme_import(scheme_import, user=user)

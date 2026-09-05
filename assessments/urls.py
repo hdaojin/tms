@@ -58,6 +58,7 @@ urlpatterns = [
     path("participants/create/", views.AssessmentParticipantCreateView.as_view(), name="participant_create"),
     path("participants/<int:pk>/", views.AssessmentParticipantDetailView.as_view(), name="participant_detail"),
     path("documents/upload/", views.AssessmentDocumentCreateView.as_view(), name="document_upload"),
+    path("documents/version-hint/", views.AssessmentDocumentVersionHintView.as_view(), name="document_version_hint"),
     path("documents/<int:pk>/", views.AssessmentDocumentDetailView.as_view(), name="document_detail"),
     path("documents/<int:pk>/preview/", views.AssessmentDocumentPreviewView.as_view(), name="document_preview"),
     path("documents/<int:pk>/download/", views.AssessmentDocumentDownloadView.as_view(), name="document_download"),
