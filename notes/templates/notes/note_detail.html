@@ -71,33 +71,6 @@
 
     <div class="tms-note-content min-w-0 space-y-4">
       <div class="space-y-1">
-        <div class="breadcrumbs text-sm text-base-content/80">
-          <ul>
-            <li>
-              <a href="{% url 'notes:repo_list' %}"
-                >{{ notes_root_name|default:"Notes"|title }}</a
-              >
-            </li>
-            <li>
-              <a href="{% url 'notes:note_repo_index' repo=repo %}"
-                >{{ repo_title|default:repo }}</a
-              >
-            </li>
-            {% if slug %}
-              <li>
-                <a href="{% url 'notes:note_detail' repo=repo slug=slug %}"
-                  >{{ current_note_title|default:slug|truncatechars:20 }}</a
-                >
-              </li>
-            {% else %}
-              <li>
-                <a href="{% url 'notes:note_repo_index' repo=repo %}"
-                  >{{ current_note_title|default:"README"|truncatechars:20 }}</a
-                >
-              </li>
-            {% endif %}
-          </ul>
-        </div>
 
         <div class="flex items-center justify-between gap-4">
           <div class="space-x-4 text-sm text-base-content/70">

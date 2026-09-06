@@ -9,6 +9,7 @@ from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, DetailView, FormView, UpdateView
 from django_tables2 import SingleTableView
 
+from core.utils.breadcrumbs import breadcrumb_link
 from core.utils.mixins import TitleMixin
 
 from .forms import (
@@ -58,6 +59,11 @@ class TrainingCycleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{name}"
     permission_required = "training.view_trainingcycle"
 
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("training.view_trainingcycle"):
+            return []
+        return [breadcrumb_link("训练周期", "training:cycle_list")]
+
     def get_queryset(self):
         return TrainingCycle.objects.select_related("skill_project", "parent").prefetch_related(
             "skill_tree_version_links__technical_domain",
@@ -72,6 +78,11 @@ class TrainingCycleCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     extra_context = {"grid_class": "grid gap-4 md:grid-cols-2"}
     title = "新增训练周期"
     permission_required = "training.add_trainingcycle"
+
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("training.view_trainingcycle"):
+            return []
+        return [breadcrumb_link("训练周期", "training:cycle_list")]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -139,6 +150,11 @@ class TrainingPlanDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{title}"
     permission_required = "training.view_trainingplan"
 
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("training.view_trainingplan"):
+            return []
+        return [breadcrumb_link("训练计划", "training:plan_list")]
+
 
 class TrainingPlanCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingPlan
@@ -147,6 +163,11 @@ class TrainingPlanCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     extra_context = {"grid_class": "grid gap-4 md:grid-cols-2"}
     title = "新增训练计划"
     permission_required = "training.add_trainingplan"
+
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("training.view_trainingplan"):
+            return []
+        return [breadcrumb_link("训练计划", "training:plan_list")]
 
     def form_valid(self, form):
         form.instance.created_by = self.request.user
@@ -192,6 +213,11 @@ class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{title}"
     permission_required = "training.view_trainingtask"
 
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("training.view_trainingtask"):
+            return []
+        return [breadcrumb_link("训练任务", "training:task_list")]
+
     def get_queryset(self):
         return visible_training_tasks_for(self.request.user).prefetch_related(
             "domain_links__technical_domain",
@@ -208,6 +234,11 @@ class TrainingTaskCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     template_name = "common/form.html"
     title = "新增训练任务"
     permission_required = "training.add_trainingtask"
+
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("training.view_trainingtask"):
+            return []
+        return [breadcrumb_link("训练任务", "training:task_list")]
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -320,6 +351,11 @@ class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{topic}"
     permission_required = "training.view_traininglog"
 
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("training.view_traininglog"):
+            return []
+        return [breadcrumb_link("训练日志", "training:log_list")]
+
     def get_queryset(self):
         return training_logs_visible_to(self.request.user)
 
@@ -330,6 +366,11 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     template_name = "common/form.html"
     title = "新增训练日志"
     permission_required = "training.add_traininglog"
+
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("training.view_traininglog"):
+            return []
+        return [breadcrumb_link("训练日志", "training:log_list")]
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

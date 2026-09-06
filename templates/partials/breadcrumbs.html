@@ -1,15 +1,22 @@
 {% if breadcrumbs %}
-  <div class="breadcrumbs max-w-full overflow-x-auto text-sm">
+  <nav aria-label="面包屑" class="breadcrumbs max-w-full overflow-x-auto text-sm text-base-content/70">
     <ul>
       {% for crumb in breadcrumbs %}
         <li>
-          {% if crumb.url %}
-            <a href="{{ crumb.url }}">{{ crumb.label }}</a>
+          {% if forloop.last %}
+            <span aria-current="page">{{ crumb.label }}</span>
+          {% elif crumb.url %}
+            <a href="{{ crumb.url }}">
+              {% if crumb.icon_class %}
+                <span class="icon-[tabler--home] size-4" aria-hidden="true"></span>
+                <span class="sr-only">{{ crumb.label }}</span>
+              {% else %}{{ crumb.label }}{% endif %}
+            </a>
           {% else %}
             <span>{{ crumb.label }}</span>
           {% endif %}
         </li>
       {% endfor %}
     </ul>
-  </div>
+  </nav>
 {% endif %}

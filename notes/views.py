@@ -18,6 +18,8 @@ from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpRe
 from django.shortcuts import render
 from django.urls import reverse
 
+from core.utils.breadcrumbs import breadcrumb_link, build_breadcrumbs
+
 from .models import NoteRepo
 from .paths import (
     InvalidNotePathError,
@@ -155,6 +157,7 @@ def notes_repo_list_view(request: HttpRequest) -> HttpResponse:
                 "repo_stats_rows": repo_stats_rows,
             }
         )
+    context["breadcrumbs"] = build_breadcrumbs(request, context["title"])
     return render(request, "notes/repo_list.html", context)
 
 
@@ -231,6 +234,14 @@ def note_detail_view(
         "show_right_sidebar": True,
         "wide_sidebars": True,
     }
+    context["breadcrumbs"] = build_breadcrumbs(
+        request,
+        context["title"],
+        [
+            breadcrumb_link("笔记仓库", "notes:repo_list"),
+            breadcrumb_link(repo_obj.title or safe_repo, "notes:note_repo_index", kwargs={"repo": safe_repo}),
+        ],
+    )
     return render(request, "notes/note_detail.html", context)
 
 

@@ -10,6 +10,9 @@ from typing import Any
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import Http404
+from django.utils.functional import SimpleLazyObject
+
+from core.utils.breadcrumbs import build_breadcrumbs
 
 class SuperuserRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     """
@@ -50,7 +53,28 @@ class OwnerRequiredMixin:
         return obj
 
 
-class TitleMixin:
+class BreadcrumbMixin:
+    """在完整 context 构造后使用最终标题，不干扰协作式 MRO。"""
+
+    show_breadcrumbs = True
+    breadcrumb_parents = ()
+
+    def get_breadcrumb_parents(self):
+        return self.breadcrumb_parents
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['breadcrumbs'] = SimpleLazyObject(
+            lambda: (
+                build_breadcrumbs(getattr(self, 'request', None), context.get('title'), self.get_breadcrumb_parents())
+                if self.show_breadcrumbs
+                else []
+            )
+        )
+        return context
+
+
+class TitleMixin(BreadcrumbMixin):
     """
     为类视图添加标题的混入
     

@@ -154,6 +154,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - 导航的唯一配置入口是 `core/config/navigation.yml`；不要恢复旧 `core/config/menus/*.yml` / `menus.yml` 体系。
 - 页面按用途扩展：`templates/layouts/app.html`、`minimal.html`、`auth.html`、`print.html`、`htmx.html`；`templates/base.html` 仅作为兼容/薄入口，不应成为新页面首选布局。
 - 优先复用 `templates/components/`，尤其是表单、字段和表格包装组件。
+- 完整业务页通过 `TitleMixin` 统一提供标题和面包屑，展示入口为 `layouts/app.html` 的 breadcrumbs block。一级栏目复用 `core.navigation`，复杂父级由 View 的 `get_breadcrumb_parents()` 在既有权限边界内显式声明；函数视图复用 `build_breadcrumbs()`。不按 URL path 猜业务层级，不在业务模板重复手写面包屑；可用 `show_breadcrumbs = False` 关闭。
 
 ## HTMX
 

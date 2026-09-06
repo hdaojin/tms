@@ -16,6 +16,7 @@ from core.file_preview import (
     build_file_preview_descriptor,
     build_inline_preview_response,
 )
+from core.utils.breadcrumbs import breadcrumb_link
 from core.utils.mixins import TitleMixin
 from evidence.selectors import visible_evidences_for
 from scoring.selectors import (
@@ -608,8 +609,14 @@ class AssessmentModuleDetailView(TitleMixin, PermissionRequiredMixin, DetailView
     title = "{name}"
     permission_required = "assessments.view_assessmentmodule"
 
+    def get_breadcrumb_parents(self):
+        assessment = self.object.assessment
+        if not visible_assessments_for(self.request.user).filter(pk=assessment.pk).exists():
+            return []
+        return [breadcrumb_link(assessment.name, "assessments:assessment_detail", args=[assessment.pk])]
+
     def get_queryset(self):
-        return visible_assessment_modules_for(self.request.user).prefetch_related(
+        return visible_assessment_modules_for(self.request.user).select_related("assessment").prefetch_related(
             "domain_mappings__technical_domain",
             "coach_assignments__user",
             "documents",
@@ -643,6 +650,12 @@ class AssessmentModuleUpdateView(AssessmentModuleCreateView, UpdateView):
     title = "编辑评测模块"
     permission_required = "assessments.change_assessmentmodule"
 
+    def get_breadcrumb_parents(self):
+        assessment = self.object.assessment
+        if not visible_assessments_for(self.request.user).filter(pk=assessment.pk).exists():
+            return []
+        return [breadcrumb_link(assessment.name, "assessments:assessment_detail", args=[assessment.pk])]
+
     def get_queryset(self):
         return manageable_assessment_modules_for(self.request.user)
 
@@ -653,6 +666,12 @@ class AssessmentParticipantDetailView(TitleMixin, PermissionRequiredMixin, Detai
     context_object_name = "participant"
     title = "{display_name}"
     permission_required = "assessments.view_assessmentparticipant"
+
+    def get_breadcrumb_parents(self):
+        assessment = self.object.assessment
+        if not visible_assessments_for(self.request.user).filter(pk=assessment.pk).exists():
+            return []
+        return [breadcrumb_link(assessment.name, "assessments:assessment_detail", args=[assessment.pk])]
 
     def get_queryset(self):
         return visible_assessment_participants_for(self.request.user).select_related(
@@ -768,6 +787,12 @@ class AssessmentDocumentDetailView(TitleMixin, AssessmentDocumentAccessMixin, De
     context_object_name = "document"
     title = "文件预览"
     title_icon = "icon-[tabler--file-search]"
+
+    def get_breadcrumb_parents(self):
+        assessment = self.object.assessment
+        if not visible_assessments_for(self.request.user).filter(pk=assessment.pk).exists():
+            return []
+        return [breadcrumb_link(assessment.name, "assessments:assessment_detail", args=[assessment.pk])]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

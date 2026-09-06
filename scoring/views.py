@@ -8,7 +8,9 @@ from django.views.generic import CreateView, DetailView, FormView, TemplateView,
 from django_tables2 import SingleTableView
 
 from assessments.models import AssessmentModule, AssessmentParticipant, CompetitionRole
+from assessments.selectors import visible_assessment_modules_for, visible_assessments_for
 from assessments.tables import AssessmentParticipantTable
+from core.utils.breadcrumbs import breadcrumb_link
 from core.utils.mixins import TitleMixin
 
 from .forms import OnlineScoringForm, ScoringImportForm, ScoringResultForm
@@ -36,6 +38,17 @@ ONLINE_SCORING_PERMISSIONS = (
     "scoring.view_scoringresult",
     "scoring.view_all_scoringresult",
 )
+
+
+def _module_breadcrumb_parents(user, module):
+    parents = []
+    if visible_assessments_for(user).filter(pk=module.assessment_id).exists():
+        parents.append(
+            breadcrumb_link(module.assessment.name, "assessments:assessment_detail", args=[module.assessment_id])
+        )
+    if visible_assessment_modules_for(user).filter(pk=module.pk).exists():
+        parents.append(breadcrumb_link(module.name, "assessments:module_detail", args=[module.pk]))
+    return parents
 
 
 def _online_scoring_module(user, module_pk):
@@ -160,6 +173,9 @@ class ScoringSchemeDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title_icon = "icon-[tabler--clipboard-check]"
     permission_required = "scoring.view_scoringscheme"
 
+    def get_breadcrumb_parents(self):
+        return _module_breadcrumb_parents(self.request.user, self.object.assessment_module)
+
     def get_queryset(self):
         return scoring_schemes_in_scope_for(self.request.user).select_related(
             "assessment_module",
@@ -246,6 +262,9 @@ class ScoringSchemeImportPreviewView(TitleMixin, PermissionRequiredMixin, Detail
     title = "确认评分标准导入"
     title_icon = "icon-[tabler--clipboard-check]"
 
+    def get_breadcrumb_parents(self):
+        return _module_breadcrumb_parents(self.request.user, self.object.assessment_module)
+
     def get_queryset(self):
         return scoring_scheme_imports_in_scope_for(self.request.user).select_related(
             "assessment_module",
@@ -297,9 +316,13 @@ class OnlineScoringWorkspaceView(TitleMixin, PermissionRequiredMixin, TemplateVi
     title = "在线评分"
     title_icon = "icon-[tabler--scoreboard]"
 
+    def get_breadcrumb_parents(self):
+        return _module_breadcrumb_parents(self.request.user, self.module)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         module = _online_scoring_module(self.request.user, self.kwargs["module_pk"])
+        self.module = module
         context.update(
             _online_scoring_context(
                 self.request.user,

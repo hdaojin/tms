@@ -12,6 +12,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 from django.views.generic import CreateView, DetailView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
 
+from core.utils.breadcrumbs import Breadcrumb, breadcrumb_link
 from core.utils.mixins import SuperuserRequiredMixin, TitleMixin
 from core.utils.listing import FilterableListMixin, ListFilterSpec
 from evidence.selectors import visible_evidences_for
@@ -82,6 +83,28 @@ from .tables import (
 )
 
 
+def _project_breadcrumb_parents(user, project=None):
+    if not user.has_perm("standards.view_skillproject"):
+        return []
+    parents = [breadcrumb_link("技能项目", "standards:project_list")]
+    if project is not None:
+        parents.append(breadcrumb_link(project.name, "standards:project_detail", args=[project.pk]))
+    return parents
+
+
+def _domain_breadcrumb_parents(user, project, domain, *, current=False):
+    parents = _project_breadcrumb_parents(user, project)
+    if user.has_perm("standards.view_skilltreeversion"):
+        # 当前领域页即当前树入口，无独立领域详情页；避免生成指向自身的父链接。
+        if current or not project.is_active:
+            parents.append(Breadcrumb(domain.name))
+        else:
+            parents.append(breadcrumb_link(domain.name, "standards:current_domain_tree", args=[project.pk, domain.pk]))
+    elif user.has_perm("standards.view_technicaldomain"):
+        parents.append(Breadcrumb(domain.name))
+    return parents
+
+
 def _decorate_candidate_permissions(user, candidates):
     visible_ids = set(
         visible_skills_for(user).filter(pk__in=[item.pk for item in candidates]).values_list("pk", flat=True)
@@ -134,6 +157,9 @@ class SkillProjectDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{name}"
     permission_required = "standards.view_skillproject"
 
+    def get_breadcrumb_parents(self):
+        return _project_breadcrumb_parents(self.request.user)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         domains = project_domains_for_view(
@@ -181,6 +207,9 @@ class SkillProjectCreateView(StandardCreateMixin, TitleMixin, SuperuserRequiredM
     permission_required = "standards.add_skillproject"
     success_url_name = "standards:project_detail"
 
+    def get_breadcrumb_parents(self):
+        return _project_breadcrumb_parents(self.request.user)
+
 
 class SkillProjectUpdateView(SkillProjectCreateView, UpdateView):
     title = "编辑技能项目"
@@ -192,6 +221,9 @@ class TechnicalDomainCreateView(StandardCreateMixin, TitleMixin, SuperuserRequir
     form_class = TechnicalDomainForm
     title = "新增技术领域"
     permission_required = "standards.add_technicaldomain"
+
+    def get_breadcrumb_parents(self):
+        return _project_breadcrumb_parents(self.request.user, self.project)
 
     def dispatch(self, request, *args, **kwargs):
         self.project = get_object_or_404(SkillProject, pk=kwargs["project_pk"], is_active=True)
@@ -242,6 +274,9 @@ class CurrentSkillTreeEntryView(TitleMixin, PermissionRequiredMixin, TemplateVie
     title_icon = "icon-[tabler--hierarchy-3]"
     permission_required = "standards.view_skillproject"
 
+    def get_breadcrumb_parents(self):
+        return _project_breadcrumb_parents(self.request.user)
+
     def get(self, request, *args, **kwargs):
         projects = SkillProject.objects.filter(is_active=True)
         project = projects.filter(is_default=True).first()
@@ -266,6 +301,9 @@ class SkillDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     template_name = "standards/skill_detail.html"
     title = "{name}"
     permission_required = "standards.view_skill"
+
+    def get_breadcrumb_parents(self):
+        return _domain_breadcrumb_parents(self.request.user, self.object.skill_project, self.object.primary_domain)
 
     def get_queryset(self):
         return (
@@ -308,6 +346,9 @@ class SkillUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
     template_name = "common/form.html"
     title = "编辑技能"
     permission_required = "standards.change_skill"
+
+    def get_breadcrumb_parents(self):
+        return _domain_breadcrumb_parents(self.request.user, self.object.skill_project, self.object.primary_domain)
 
     def get_queryset(self):
         return manageable_skills_for(self.request.user)
@@ -458,6 +499,9 @@ class SkillTreeVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView
     title = "{name}"
     permission_required = "standards.view_skilltreeversion"
 
+    def get_breadcrumb_parents(self):
+        return _domain_breadcrumb_parents(self.request.user, self.object.skill_project, self.object.technical_domain)
+
     def get_queryset(self):
         return SkillTreeVersion.objects.select_related(
             "technical_domain",
@@ -494,6 +538,9 @@ class DomainSkillTreeMixin(TitleMixin, PermissionRequiredMixin, TemplateView):
     template_name = "standards/domain_tree.html"
     title_icon = "icon-[tabler--hierarchy-3]"
     permission_required = "standards.view_skilltreeversion"
+
+    def get_breadcrumb_parents(self):
+        return _domain_breadcrumb_parents(self.request.user, self.project, self.domain, current=True)
 
     def _set_tree_and_domain(self, *, tree):
         self.tree = tree
@@ -544,7 +591,7 @@ class CurrentDomainSkillTreeView(DomainSkillTreeMixin):
 
     def get_context_data(self, **kwargs):
         if self.tree is None:
-            context = TemplateView.get_context_data(self, **kwargs)
+            context = TitleMixin.get_context_data(self, **kwargs)
             can_create_tree = self.request.user.is_superuser
             context.update(
                 project=self.project,
@@ -572,6 +619,9 @@ class SkillTreeVersionCreateView(StandardCreateMixin, TitleMixin, SuperuserRequi
     title = "新增技能树版本"
     permission_required = "standards.add_skilltreeversion"
 
+    def get_breadcrumb_parents(self):
+        return _domain_breadcrumb_parents(self.request.user, self.project, self.domain)
+
     def dispatch(self, request, *args, **kwargs):
         self.project = get_object_or_404(SkillProject, pk=kwargs["project_pk"])
         self.domain = get_object_or_404(
@@ -595,6 +645,9 @@ class SkillTreeVersionUpdateView(StandardCreateMixin, TitleMixin, SuperuserRequi
     form_class = SkillTreeVersionForm
     title = "编辑技能树版本"
     permission_required = "standards.change_skilltreeversion"
+
+    def get_breadcrumb_parents(self):
+        return _domain_breadcrumb_parents(self.request.user, self.object.skill_project, self.object.technical_domain)
 
     def get_queryset(self):
         return SkillTreeVersion.objects.select_related("technical_domain")
@@ -635,6 +688,11 @@ class SkillTreeNodeListView(
         ListFilterSpec("assessable", "可考核", "select", choices=(("1", "是"), ("0", "否"))),
         ListFilterSpec("active", "启用状态", "select", choices=(("1", "启用"), ("0", "停用"))),
     )
+
+    def get_breadcrumb_parents(self):
+        parents = _domain_breadcrumb_parents(self.request.user, self.project, self.domain)
+        parents.append(breadcrumb_link(self.tree.name, "standards:tree_detail", args=[self.tree.pk]))
+        return parents
 
     def dispatch(self, request, *args, **kwargs):
         if "tree_pk" in kwargs:
@@ -1449,6 +1507,11 @@ class WSOSVersionDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{name}"
     permission_required = "standards.view_wsosversion"
 
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("standards.view_wsosversion"):
+            return []
+        return [breadcrumb_link("WSOS", "standards:wsos_list")]
+
     def get_queryset(self):
         return WSOSVersion.objects.select_related("skill_project")
 
@@ -1473,6 +1536,11 @@ class WSOSVersionCreateView(StandardCreateMixin, TitleMixin, SuperuserRequiredMi
     title = "新增 WSOS 版本"
     permission_required = "standards.add_wsosversion"
     success_url_name = "standards:wsos_detail"
+
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("standards.view_wsosversion"):
+            return []
+        return [breadcrumb_link("WSOS", "standards:wsos_list")]
 
 
 class WSOSVersionUpdateView(WSOSVersionCreateView, UpdateView):
