@@ -1,21 +1,21 @@
-import { BOUNDARY_EFFECT as g, EFFECT_TRANSPARENT as E, EFFECT_PRESERVED as k } from "../../constants.js";
-import { set_component_context as v, component_context as F } from "../../context.js";
-import { handle_error as x, invoke_error_boundary as _ } from "../../error-handling.js";
-import { block as R, branch as h, pause_effect as l, move_effect as S, destroy_effect as p } from "../../reactivity/effects.js";
-import { active_effect as c, set_active_effect as y, set_active_reaction as b, active_reaction as T, get as w } from "../../runtime.js";
-import { svelte_boundary_reset_noop as D } from "../../warnings.js";
-import { create_text as A } from "../operations.js";
-import { queue_micro_task as u } from "../task.js";
-import { svelte_boundary_reset_onerror as B } from "../../errors.js";
-import { current_batch as f, Batch as C } from "../../reactivity/batch.js";
-import { internal_set as N, source as q } from "../../reactivity/sources.js";
-import { createSubscriber as P } from "../../../../reactivity/create-subscriber.js";
-import { defer_effect as j } from "../../reactivity/utils.js";
-var O = E | k;
-function Z(d, t, e, i) {
-  new U(d, t, e, i);
+import { BOUNDARY_EFFECT as d, EFFECT_TRANSPARENT as y, EFFECT_PRESERVED as b } from "../../constants.js";
+import { set_component_context as m, component_context as k } from "../../context.js";
+import { handle_error as E, invoke_error_boundary as a } from "../../error-handling.js";
+import { block as F, branch as n, pause_effect as l, move_effect as x, destroy_effect as u } from "../../reactivity/effects.js";
+import { active_effect as _, set_active_effect as g, set_active_reaction as v, active_reaction as R, get as S } from "../../runtime.js";
+import { svelte_boundary_reset_noop as T } from "../../warnings.js";
+import { create_text as w } from "../operations.js";
+import { queue_micro_task as c } from "../task.js";
+import { svelte_boundary_reset_onerror as D } from "../../errors.js";
+import { current_batch as h, Batch as A } from "../../reactivity/batch.js";
+import { internal_set as B, source as C } from "../../reactivity/sources.js";
+import { createSubscriber as N } from "../../../../reactivity/create-subscriber.js";
+import { defer_effect as q } from "../../reactivity/utils.js";
+var P = y | b;
+function W(p, t, e, r) {
+  new j(p, t, e, r);
 }
-class U {
+class j {
   /** @type {Boundary | null} */
   parent;
   is_pending = !1;
@@ -28,7 +28,7 @@ class U {
   /** @type {TemplateNode} */
   #r;
   /** @type {TemplateNode | null} */
-  #b = null;
+  #k = null;
   /** @type {BoundaryProps} */
   #s;
   /** @type {((anchor: Node) => void)} */
@@ -44,10 +44,10 @@ class U {
   /** @type {DocumentFragment | null} */
   #h = null;
   #_ = 0;
-  #o = 0;
+  #f = 0;
   #c = !1;
   /** @type {Set<Effect>} */
-  #u = /* @__PURE__ */ new Set();
+  #p = /* @__PURE__ */ new Set();
   /** @type {Set<Effect>} */
   #d = /* @__PURE__ */ new Set();
   /**
@@ -57,9 +57,9 @@ class U {
    * calls followed by no-op flushes
    * @type {Source<number> | null}
    */
-  #f = null;
-  #y = P(() => (this.#f = q(this.#_), () => {
-    this.#f = null;
+  #o = null;
+  #b = N(() => (this.#o = C(this.#_), () => {
+    this.#o = null;
   }));
   /**
    * @param {TemplateNode} node
@@ -67,21 +67,21 @@ class U {
    * @param {((anchor: Node) => void)} children
    * @param {((error: unknown) => unknown) | undefined} [transform_error]
    */
-  constructor(t, e, i, o) {
+  constructor(t, e, r, i) {
     this.#r = t, this.#s = e, this.#a = (s) => {
-      var a = (
+      var o = (
         /** @type {Effect} */
-        c
+        _
       );
-      a.b = this, a.f |= g, i(s);
+      o.b = this, o.f |= d, r(s);
     }, this.parent = /** @type {Effect} */
-    c.b, this.transform_error = o ?? this.parent?.transform_error ?? ((s) => s), this.#e = R(() => {
-      this.#m();
-    }, O);
+    _.b, this.transform_error = i ?? this.parent?.transform_error ?? ((s) => s), this.#e = F(() => {
+      this.#g();
+    }, P);
   }
   #E() {
     try {
-      this.#n = h(() => this.#a(this.#r));
+      this.#n = n(() => this.#a(this.#r));
     } catch (t) {
       this.error(t);
     }
@@ -89,22 +89,48 @@ class U {
   /**
    * @param {unknown} error The deserialized error from the server's hydration comment
    */
-  #k(t) {
-    const e = this.#s.failed;
-    e && (this.#i = h(() => {
+  #F(t) {
+    const e = this.#s.failed, { reset: r, invoke_onerror: i } = this.#m(t);
+    c(i), e && (this.#i = n(() => {
       e(
         this.#r,
         () => t,
-        () => () => {
-        }
+        () => r
       );
     }));
   }
-  #F() {
+  /**
+   * Creates the `reset` function for a failed boundary, along with a function
+   * that invokes `onerror` with it (if provided)
+   * @param {unknown} error
+   * @returns {{ reset: () => void, invoke_onerror: () => void }}
+   */
+  #m(t) {
+    var e = !1, r = !1;
+    const i = () => {
+      if (e) {
+        T();
+        return;
+      }
+      e = !0, r && D(), this.#i !== null && l(this.#i, () => {
+        this.#i = null;
+      }), this.#u(() => {
+        this.#g();
+      });
+    };
+    return { reset: i, invoke_onerror: () => {
+      try {
+        r = !0, this.#s.onerror?.(t, i), r = !1;
+      } catch (o) {
+        a(o, this.#e && this.#e.parent);
+      }
+    } };
+  }
+  #x() {
     const t = this.#s.pending;
-    t && (this.is_pending = !0, this.#t = h(() => t(this.#r)), u(() => {
-      var e = this.#h = document.createDocumentFragment(), i = A();
-      e.append(i), this.#n = this.#p(() => h(() => this.#a(i))), this.#o === 0 && (this.#r.before(e), this.#h = null, l(
+    t && (this.is_pending = !0, this.#t = n(() => t(this.#r)), c(() => {
+      var e = this.#h = document.createDocumentFragment(), r = w();
+      e.append(r), this.#n = this.#u(() => n(() => this.#a(r))), this.#f === 0 && (this.#r.before(e), this.#h = null, l(
         /** @type {Effect} */
         this.#t,
         () => {
@@ -112,26 +138,26 @@ class U {
         }
       ), this.#l(
         /** @type {Batch} */
-        f
+        h
       ));
     }));
   }
-  #m() {
+  #g() {
     try {
-      if (this.is_pending = this.has_pending_snippet(), this.#o = 0, this.#_ = 0, this.#n = h(() => {
+      if (this.is_pending = this.has_pending_snippet(), this.#f = 0, this.#_ = 0, this.#n = n(() => {
         this.#a(this.#r);
-      }), this.#o > 0) {
+      }), this.#f > 0) {
         var t = this.#h = document.createDocumentFragment();
-        S(this.#n, t);
+        x(this.#n, t);
         const e = (
           /** @type {(anchor: Node) => void} */
           this.#s.pending
         );
-        this.#t = h(() => e(this.#r));
+        this.#t = n(() => e(this.#r));
       } else
         this.#l(
           /** @type {Batch} */
-          f
+          h
         );
     } catch (e) {
       this.error(e);
@@ -141,14 +167,14 @@ class U {
    * @param {Batch} batch
    */
   #l(t) {
-    this.is_pending = !1, t.transfer_effects(this.#u, this.#d);
+    this.is_pending = !1, t.transfer_effects(this.#p, this.#d);
   }
   /**
    * Defer an effect inside a pending boundary until the boundary resolves
    * @param {Effect} effect
    */
   defer_effect(t) {
-    j(t, this.#u, this.#d);
+    q(t, this.#p, this.#d);
   }
   /**
    * Returns `false` if the effect exists inside a boundary whose pending snippet is shown
@@ -164,15 +190,15 @@ class U {
    * @template T
    * @param {() => T} fn
    */
-  #p(t) {
-    var e = c, i = T, o = F;
-    y(this.#e), b(this.#e), v(this.#e.ctx);
+  #u(t) {
+    var e = _, r = R, i = k;
+    g(this.#e), v(this.#e), m(this.#e.ctx);
     try {
-      return C.ensure(), t();
+      return A.ensure(), t();
     } catch (s) {
-      return x(s), null;
+      return E(s), null;
     } finally {
-      y(e), b(i), v(o);
+      g(e), v(r), m(i);
     }
   }
   /**
@@ -181,12 +207,12 @@ class U {
    * @param {1 | -1} d
    * @param {Batch} batch
    */
-  #g(t, e) {
+  #v(t, e) {
     if (!this.has_pending_snippet()) {
-      this.parent && this.parent.#g(t, e);
+      this.parent && this.parent.#v(t, e);
       return;
     }
-    this.#o += t, this.#o === 0 && (this.#l(e), this.#t && l(this.#t, () => {
+    this.#f += t, this.#f === 0 && (this.#l(e), this.#t && l(this.#t, () => {
       this.#t = null;
     }), this.#h && (this.#r.before(this.#h), this.#h = null));
   }
@@ -198,88 +224,72 @@ class U {
    * @param {Batch} batch
    */
   update_pending_count(t, e) {
-    this.#g(t, e), this.#_ += t, !(!this.#f || this.#c) && (this.#c = !0, u(() => {
-      this.#c = !1, this.#f && N(this.#f, this.#_);
+    this.#v(t, e), this.#_ += t, !(!this.#o || this.#c) && (this.#c = !0, c(() => {
+      this.#c = !1, this.#o && B(this.#o, this.#_);
     }));
   }
   get_effect_pending() {
-    return this.#y(), w(
+    return this.#b(), S(
       /** @type {Source<number>} */
-      this.#f
+      this.#o
     );
   }
   /** @param {unknown} error */
   error(t) {
     if (!this.#s.onerror && !this.#s.failed)
       throw t;
-    f?.is_fork ? (this.#n && f.skip_effect(this.#n), this.#t && f.skip_effect(this.#t), this.#i && f.skip_effect(this.#i), f.on_fork_commit(() => {
-      this.#v(t);
-    })) : this.#v(t);
+    h?.is_fork ? (this.#n && h.skip_effect(this.#n), this.#t && h.skip_effect(this.#t), this.#i && h.skip_effect(this.#i), h.oncommit(() => {
+      this.#y(t);
+    })) : this.#y(t);
   }
   /**
    * @param {unknown} error
    */
-  #v(t) {
-    this.#n && (p(this.#n), this.#n = null), this.#t && (p(this.#t), this.#t = null), this.#i && (p(this.#i), this.#i = null);
-    var e = this.#s.onerror;
-    let i = this.#s.failed;
-    var o = !1, s = !1;
-    const a = () => {
-      if (o) {
-        D();
-        return;
-      }
-      o = !0, s && B(), this.#i !== null && l(this.#i, () => {
-        this.#i = null;
-      }), this.#p(() => {
-        this.#m();
-      });
-    }, m = (n) => {
-      try {
-        s = !0, e?.(n, a), s = !1;
-      } catch (r) {
-        _(r, this.#e && this.#e.parent);
-      }
-      i && (this.#i = this.#p(() => {
+  #y(t) {
+    this.#n && (u(this.#n), this.#n = null), this.#t && (u(this.#t), this.#t = null), this.#i && (u(this.#i), this.#i = null);
+    let e = this.#s.failed;
+    const r = (i) => {
+      const { reset: s, invoke_onerror: o } = this.#m(i);
+      o(), e && (this.#i = this.#u(() => {
         try {
-          return h(() => {
-            var r = (
+          return n(() => {
+            var f = (
               /** @type {Effect} */
-              c
+              _
             );
-            r.b = this, r.f |= g, i(
+            f.b = this, f.f |= d, e(
               this.#r,
-              () => n,
-              () => a
+              () => i,
+              () => s
             );
           });
-        } catch (r) {
-          return _(
-            r,
+        } catch (f) {
+          return a(
+            f,
             /** @type {Effect} */
             this.#e.parent
           ), null;
         }
       }));
     };
-    u(() => {
-      var n;
+    c(() => {
+      var i;
       try {
-        n = this.transform_error(t);
-      } catch (r) {
-        _(r, this.#e && this.#e.parent);
+        i = this.transform_error(t);
+      } catch (s) {
+        a(s, this.#e && this.#e.parent);
         return;
       }
-      n !== null && typeof n == "object" && typeof /** @type {any} */
-      n.then == "function" ? n.then(
-        m,
+      i !== null && typeof i == "object" && typeof /** @type {any} */
+      i.then == "function" ? i.then(
+        r,
         /** @param {unknown} e */
-        (r) => _(r, this.#e && this.#e.parent)
-      ) : m(n);
+        (s) => a(s, this.#e && this.#e.parent)
+      ) : r(i);
     });
   }
 }
 export {
-  U as Boundary,
-  Z as boundary
+  j as Boundary,
+  W as boundary
 };

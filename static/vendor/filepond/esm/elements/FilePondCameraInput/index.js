@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -25,11 +25,11 @@ class g extends i {
   get name() {
     return this.getAttribute("name") ?? void 0;
   }
-  /** Gets camera value */
+  /** Gets value */
   get value() {
     return this.#e;
   }
-  /** Sets camera value */
+  /** Sets value */
   set value(t) {
     this.#e = t;
   }

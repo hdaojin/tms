@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -10,8 +10,8 @@ import { pop as Ee, push as Pe } from "../../../vendor/svelte/src/internal/clien
 import { get as t, untrack as Ft } from "../../../vendor/svelte/src/internal/client/runtime.js";
 import { first_child as z } from "../../../vendor/svelte/src/internal/client/dom/operations.js";
 import { set as d, state as p } from "../../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { comment as A, append as D } from "../../../vendor/svelte/src/internal/client/dom/template.js";
 import { user_derived as i } from "../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { comment as A, append as D } from "../../../vendor/svelte/src/internal/client/dom/template.js";
 import { if_block as _t } from "../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
 import { snippet as we } from "../../../vendor/svelte/src/internal/client/dom/blocks/snippet.js";
 import { element as Tt } from "../../../vendor/svelte/src/internal/client/dom/blocks/svelte-element.js";

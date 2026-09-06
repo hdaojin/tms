@@ -1,30 +1,32 @@
-import { ERROR_VALUE as r, REACTION_RAN as t, EFFECT as a, BOUNDARY_EFFECT as _ } from "./constants.js";
-import { active_reaction as f, active_effect as u } from "./runtime.js";
-function R(n) {
-  var i = u;
-  if (i === null)
-    return f.f |= r, n;
-  if ((i.f & t) === 0 && (i.f & a) === 0)
-    throw n;
-  E(n, i);
+import { ERROR_VALUE as o, REACTION_RAN as r, EFFECT as u, DESTROYED as E, BOUNDARY_EFFECT as a } from "./constants.js";
+import { active_reaction as l, active_effect as _ } from "./runtime.js";
+function m(i) {
+  var n = _;
+  if (n === null)
+    return l.f |= o, i;
+  if ((n.f & r) === 0 && (n.f & u) === 0)
+    throw i;
+  R(i, n);
 }
-function E(n, i) {
-  for (; i !== null; ) {
-    if ((i.f & _) !== 0) {
-      if ((i.f & t) === 0)
-        throw n;
-      try {
-        i.b.error(n);
-        return;
-      } catch (o) {
-        n = o;
+function R(i, n) {
+  if (!(n !== null && (n.f & E) !== 0)) {
+    for (; n !== null; ) {
+      if ((n.f & a) !== 0) {
+        if ((n.f & r) === 0)
+          throw i;
+        try {
+          n.b.error(i);
+          return;
+        } catch (t) {
+          i = t;
+        }
       }
+      n = n.parent;
     }
-    i = i.parent;
+    throw i;
   }
-  throw n;
 }
 export {
-  R as handle_error,
-  E as invoke_error_boundary
+  m as handle_error,
+  R as invoke_error_boundary
 };

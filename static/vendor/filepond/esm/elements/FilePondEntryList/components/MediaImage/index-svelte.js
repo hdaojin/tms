@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -9,8 +9,8 @@ import { push as se, pop as me } from "../../../../vendor/svelte/src/internal/cl
 import { first_child as fe, child as ue } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
 import { state as g, set as n } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
 import { user_effect as b, template_effect as P } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { comment as de, append as M, from_html as D } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
 import { user_derived as u } from "../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { comment as de, append as M, from_html as D } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
 import { if_block as ce } from "../../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
 import { each as pe } from "../../../../vendor/svelte/src/internal/client/dom/blocks/each.js";
 import { set_custom_element_data as R } from "../../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
@@ -23,8 +23,8 @@ import { isImageFile as I, isBlobOrFile as Pe, isURL as ve } from "../../../../u
 import { getAppContext as he } from "../../contexts/appContext.js";
 import { getEntryContext as ye } from "../../contexts/entryContext.js";
 import { filesAreProbablyEqual as Ee } from "../../../../utils/file.js";
-import { Status as _e } from "../../../../common/status.js";
-import xe from "./components/BitmapRenderer-svelte.js";
+import { Status as xe } from "../../../../common/status.js";
+import _e from "./components/BitmapRenderer-svelte.js";
 import Fe from "../MediaPane/index-svelte.js";
 var be = D("<media-image-item><!></media-image-item>", 2), Me = D("<media-image></media-image>", 2);
 function Ne(T, l) {
@@ -81,7 +81,7 @@ function Ne(T, l) {
   function W(t, r) {
     n(o, e(o).map((i) => i.file === t ? { ...i, isError: r } : i)), e(o).every((i) => i.isError) && E(r);
   }
-  const C = u(() => e(o).map(({ file: t, isPoster: r, isComplete: i, isError: a }, v, _) => ({
+  const C = u(() => e(o).map(({ file: t, isPoster: r, isComplete: i, isError: a }, v, x) => ({
     // use file as draw key
     key: t,
     // file object
@@ -89,7 +89,7 @@ function Ne(T, l) {
     // previous file was a poster, if this is true we instantly replace the previous image
     replacesPoster: !!e(o)[v - 1]?.isPoster,
     // always make last file active
-    active: v === _.length - 1 ? "" : void 0,
+    active: v === x.length - 1 ? "" : void 0,
     // did draw this file to bitmap
     complete: i ? "" : void 0,
     // is this a poster
@@ -100,7 +100,7 @@ function Ne(T, l) {
   function E(t) {
     A(c.current, {
       status: {
-        type: _e.Error,
+        type: xe.Error,
         code: "MEDIA_LOAD_ERROR",
         values: { error: t, fileMainType: "fileMainTypeImage" }
       }
@@ -117,15 +117,15 @@ function Ne(T, l) {
   {
     var Y = (t) => {
       var r = Me();
-      pe(r, 21, () => e(C), ({ key: i, file: a, active: v, complete: _, poster: h, replacesPoster: j }) => i, (i, a, v, _) => {
+      pe(r, 21, () => e(C), ({ key: i, file: a, active: v, complete: x, poster: h, replacesPoster: j }) => i, (i, a, v, x) => {
         let h = () => e(a).file, j = () => e(a).active, Z = () => e(a).complete, $ = () => e(a).poster, z = () => e(a).replacesPoster;
         var f = be();
         P(() => R(f, "active", j())), P(() => R(f, "complete", Z())), P(() => R(f, "poster", $()));
         var ee = ue(f);
         {
-          const te = (oe, x) => {
-            let ae = () => x?.().onInitMedia, ne = () => x?.().onLoadMedia, le = () => x?.().onRenderMedia;
-            xe(oe, {
+          const te = (oe, _) => {
+            let ae = () => (_?.()).onInitMedia, ne = () => (_?.()).onLoadMedia, le = () => (_?.()).onRenderMedia;
+            _e(oe, {
               get file() {
                 return h();
               },

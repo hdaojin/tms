@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -9,12 +9,12 @@ import { pop as gt, push as ft } from "../../../../vendor/svelte/src/internal/cl
 import { first_child as L, sibling as ut, child as ht } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
 import { set as P, state as O } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
 import { user_effect as N, template_effect as yt } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { user_derived as s } from "../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
 import { set_text as Dt } from "../../../../vendor/svelte/src/internal/client/render.js";
 import { snippet as vt } from "../../../../vendor/svelte/src/internal/client/dom/blocks/snippet.js";
-import { user_derived as s } from "../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { if_block as xt } from "../../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
-import { each as St } from "../../../../vendor/svelte/src/internal/client/dom/blocks/each.js";
-import { comment as U, append as R, from_html as It } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
+import { comment as U, append as R, from_html as xt } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
+import { if_block as St } from "../../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
+import { each as It } from "../../../../vendor/svelte/src/internal/client/dom/blocks/each.js";
 import { set_attribute as F } from "../../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
 import { set_style as _t } from "../../../../vendor/svelte/src/internal/client/dom/elements/style.js";
 import { proxy as Et } from "../../../../vendor/svelte/src/internal/client/proxy.js";
@@ -28,7 +28,7 @@ import { getDropContext as Lt } from "../../contexts/dropContext.js";
 import { isNumber as W } from "../../../../utils/test.js";
 import { noop as T } from "../../../../utils/placeholder.js";
 import { getUniqueId as Ot } from "../../../../utils/string.js";
-var Rt = It('<ul role="list" class="entry-list"></ul> <div class="implicit"> </div>', 1);
+var Rt = xt('<ul role="list" class="entry-list"></ul> <div class="implicit"> </div>', 1);
 function re(B, D) {
   ft(D, !0);
   const v = zt(), J = s(() => v.animatedEntries), K = s(() => v.locale), Q = s(() => v.enableDrag), X = s(() => v.updateEntryPlaceholderRect), Y = s(() => v.entryAnimationProps), Z = wt(), d = s(() => Z.current), $ = Lt(), j = s(() => $.current);
@@ -154,7 +154,7 @@ function re(B, D) {
     var mt = (e) => {
       var n = Rt(), i = L(n);
       let c;
-      St(
+      It(
         i,
         21,
         () => t(m).entries,
@@ -197,7 +197,7 @@ function re(B, D) {
         }), F(a, "id", G), Dt(p, t(K).ariaDragDescription);
       }), R(e, n);
     };
-    xt(lt, (e) => {
+    St(lt, (e) => {
       t(m).entries.length && e(mt);
     });
   }

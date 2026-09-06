@@ -1,6 +1,6 @@
-import { current_batch as l } from "../../reactivity/batch.js";
-import { resume_effect as u, destroy_effect as n, pause_effect as m, branch as a, move_effect as p } from "../../reactivity/effects.js";
-import { create_text as d, should_defer_append as _ } from "../operations.js";
+import { current_batch as u } from "../../reactivity/batch.js";
+import { resume_effect as n, destroy_effect as a, pause_effect as m, branch as d, move_effect as p } from "../../reactivity/effects.js";
+import { create_text as l, should_defer_append as _ } from "../operations.js";
 class w {
   /** @type {TemplateNode} */
   anchor;
@@ -54,25 +54,25 @@ class w {
         this.#t.get(t)
       ), e = this.#s.get(s);
       if (e)
-        u(e), this.#i.delete(s);
+        n(e), this.#i.delete(s);
       else {
         var f = this.#e.get(s);
-        f && (this.#s.set(s, f.effect), this.#e.delete(s), f.fragment.lastChild.remove(), this.anchor.before(f.fragment), e = f.effect);
+        f && (n(f.effect), this.#s.set(s, f.effect), this.#e.delete(s), f.fragment.lastChild.remove(), this.anchor.before(f.fragment), e = f.effect);
       }
       for (const [i, r] of this.#t) {
         if (this.#t.delete(i), i === t)
           break;
         const c = this.#e.get(r);
-        c && (n(c.effect), this.#e.delete(r));
+        c && (a(c.effect), this.#e.delete(r));
       }
       for (const [i, r] of this.#s) {
         if (i === s || this.#i.has(i)) continue;
         const c = () => {
           if (Array.from(this.#t.values()).includes(i)) {
-            var h = document.createDocumentFragment();
-            p(r, h), h.append(d()), this.#e.set(i, { effect: r, fragment: h });
+            var o = document.createDocumentFragment();
+            p(r, o), o.append(l()), this.#e.set(i, { effect: r, fragment: o });
           } else
-            n(r);
+            a(r);
           this.#i.delete(i), this.#s.delete(i);
         };
         this.#f || !e ? (this.#i.add(i), m(r, c, !1)) : c();
@@ -86,7 +86,7 @@ class w {
     this.#t.delete(t);
     const s = Array.from(this.#t.values());
     for (const [e, f] of this.#e)
-      s.includes(e) || (n(f.effect), this.#e.delete(e));
+      s.includes(e) || (a(f.effect), this.#e.delete(e));
   };
   /**
    *
@@ -96,25 +96,25 @@ class w {
   ensure(t, s) {
     var e = (
       /** @type {Batch} */
-      l
+      u
     ), f = _();
     if (s && !this.#s.has(t) && !this.#e.has(t))
       if (f) {
-        var i = document.createDocumentFragment(), r = d();
+        var i = document.createDocumentFragment(), r = l();
         i.append(r), this.#e.set(t, {
-          effect: a(() => s(r)),
+          effect: d(() => s(r)),
           fragment: i
         });
       } else
         this.#s.set(
           t,
-          a(() => s(this.anchor))
+          d(() => s(this.anchor))
         );
     if (this.#t.set(e, t), f) {
-      for (const [c, o] of this.#s)
-        c === t ? e.unskip_effect(o) : e.skip_effect(o);
-      for (const [c, o] of this.#e)
-        c === t ? e.unskip_effect(o.effect) : e.skip_effect(o.effect);
+      for (const [c, h] of this.#s)
+        c === t ? e.unskip_effect(h) : e.skip_effect(h);
+      for (const [c, h] of this.#e)
+        c === t ? e.unskip_effect(h.effect) : e.skip_effect(h.effect);
       e.oncommit(this.#r), e.ondiscard(this.#c);
     } else
       this.#r(e);

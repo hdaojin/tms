@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -8,9 +8,9 @@ import { get as u } from "../../../vendor/svelte/src/internal/client/runtime.js"
 import { pop as T, push as B } from "../../../vendor/svelte/src/internal/client/context.js";
 import { state as N, set as P } from "../../../vendor/svelte/src/internal/client/reactivity/sources.js";
 import { template_effect as j } from "../../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { delegate as q, delegated as w, event as l } from "../../../vendor/svelte/src/internal/client/dom/elements/events.js";
-import { from_html as A, append as C } from "../../../vendor/svelte/src/internal/client/dom/template.js";
-import { user_derived as D } from "../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { user_derived as q } from "../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { delegate as w, delegated as A, event as l } from "../../../vendor/svelte/src/internal/client/dom/elements/events.js";
+import { from_html as C, append as D } from "../../../vendor/svelte/src/internal/client/dom/template.js";
 import { set_value as G, set_attribute as a } from "../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
 import { set_class as H } from "../../../vendor/svelte/src/internal/client/dom/elements/class.js";
 import { clsx as J } from "../../../vendor/svelte/src/internal/shared/attributes.js";
@@ -19,7 +19,7 @@ import { prop as o } from "../../../vendor/svelte/src/internal/client/reactivity
 import { noop as r } from "../../../utils/placeholder.js";
 import { isFunction as M } from "../../../utils/test.js";
 import { routeKeyboardEvent as O, Key as Q } from "../../../utils/dom.js";
-var S = A("<input/>");
+var S = C("<input/>");
 function re(c, t) {
   B(t, !0);
   let d = o(t, "class", 3, void 0), m = o(t, "value", 7, ""), p = o(t, "type", 3, "text"), s = o(t, "inputmode", 3, "text"), v = o(t, "spellcheck", 3, "false"), h = o(t, "autocapitalize", 3, "off"), b = o(t, "autocorrect", 3, "off"), y = o(t, "autocomplete", 3, "off"), _ = o(t, "oninput", 3, r), k = o(t, "onfocus", 3, r), x = o(t, "onblur", 3, r), f = o(t, "onconfirm", 3, void 0), E = o(t, "disabled", 3, !1), n = N(void 0);
@@ -40,14 +40,14 @@ function re(c, t) {
   function I(i) {
     O(i, F);
   }
-  var e = S(), R = D(() => M(f()) ? I : void 0);
+  var e = S(), R = q(() => M(f()) ? I : void 0);
   L(e, (i) => P(n, i), () => u(n)), j(() => {
     H(e, 1, J(d())), G(e, m()), a(e, "type", p()), a(e, "spellcheck", v()), a(e, "autocapitalize", h()), a(e, "autocomplete", y()), a(e, "autocorrect", b()), a(e, "inputmode", s()), e.disabled = E();
-  }), w("input", e, g), l("focus", e, K), l("blur", e, z), l("keypress", e, function(...i) {
+  }), A("input", e, g), l("focus", e, K), l("blur", e, z), l("keypress", e, function(...i) {
     u(R)?.apply(this, i);
-  }), C(c, e), T();
+  }), D(c, e), T();
 }
-q(["input"]);
+w(["input"]);
 export {
   re as default
 };

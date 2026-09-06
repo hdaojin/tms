@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -9,10 +9,10 @@ import { push as Rt, pop as Ct } from "../../../vendor/svelte/src/internal/clien
 import { child as g, sibling as h } from "../../../vendor/svelte/src/internal/client/dom/operations.js";
 import { state as s, set as a } from "../../../vendor/svelte/src/internal/client/reactivity/sources.js";
 import { user_effect as K, template_effect as Q } from "../../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { user_derived as i } from "../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
 import { delegate as Ht, delegated as R, event as At } from "../../../vendor/svelte/src/internal/client/dom/elements/events.js";
 import { from_html as Dt, append as Ft } from "../../../vendor/svelte/src/internal/client/dom/template.js";
 import { snippet as Mt } from "../../../vendor/svelte/src/internal/client/dom/blocks/snippet.js";
-import { user_derived as i } from "../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
 import { attach as C } from "../../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
 import { set_custom_element_data as Ot, set_attribute as M, set_value as St } from "../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
 import { set_class as It } from "../../../vendor/svelte/src/internal/client/dom/elements/class.js";

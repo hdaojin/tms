@@ -1,69 +1,56 @@
-import { lifecycle_outside_component as c } from "../shared/errors.js";
-import { active_effect as l } from "./runtime.js";
-import { create_user_effect as f } from "./reactivity/effects.js";
-let o = null;
-function a(n) {
-  o = n;
+import { active_effect as f } from "./runtime.js";
+import { create_user_effect as c } from "./reactivity/effects.js";
+import { get_or_init_context_map as r } from "../shared/context.js";
+let n = null;
+function _(t) {
+  n = t;
 }
-function m(n) {
+function p(t) {
   return (
     /** @type {T} */
-    r().get(n)
+    r(n).get(t)
   );
 }
-function x(n, t) {
-  return r().set(n, t), t;
+function a(t, e) {
+  return r(n).set(t, e), e;
 }
-function d(n, t = !1, e) {
-  o = {
-    p: o,
+function x(t, e = !1, o) {
+  n = {
+    p: n,
     i: !1,
     c: null,
     e: null,
-    s: n,
+    s: t,
     x: null,
     r: (
       /** @type {Effect} */
-      l
+      f
     ),
     l: null
   };
 }
-function g(n) {
-  var t = (
+function m(t) {
+  var e = (
     /** @type {ComponentContext} */
-    o
-  ), e = t.e;
-  if (e !== null) {
-    t.e = null;
-    for (var u of e)
-      f(u);
+    n
+  ), o = e.e;
+  if (o !== null) {
+    e.e = null;
+    for (var u of o)
+      c(u);
   }
-  return n !== void 0 && (t.x = n), t.i = !0, o = t.p, n ?? /** @type {T} */
+  return t !== void 0 && (e.x = t), e.i = !0, n = e.p, t ?? /** @type {T} */
   {};
 }
 function v() {
   return !0;
 }
-function r(n) {
-  return o === null && c(), o.c ??= new Map(i(o) || void 0);
-}
-function i(n) {
-  let t = n.p;
-  for (; t !== null; ) {
-    const e = t.c;
-    if (e !== null)
-      return e;
-    t = t.p;
-  }
-  return null;
-}
 export {
-  o as component_context,
-  m as getContext,
+  n as component_context,
+  p as getContext,
   v as is_runes,
-  g as pop,
-  d as push,
-  x as setContext,
-  a as set_component_context
+  m as pop,
+  x as push,
+  a as setContext,
+  _ as set_component_context
 };

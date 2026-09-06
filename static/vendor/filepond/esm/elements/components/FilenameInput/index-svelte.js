@@ -1,17 +1,17 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import { get as e } from "../../../vendor/svelte/src/internal/client/runtime.js";
-import { pop as L, push as N } from "../../../vendor/svelte/src/internal/client/context.js";
+import { pop as K, push as L } from "../../../vendor/svelte/src/internal/client/context.js";
 import { child as o, sibling as x } from "../../../vendor/svelte/src/internal/client/dom/operations.js";
 import { state as m, set as i } from "../../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { user_effect as Q, template_effect as E } from "../../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { set_text as _ } from "../../../vendor/svelte/src/internal/client/render.js";
-import { from_html as S, append as U } from "../../../vendor/svelte/src/internal/client/dom/template.js";
+import { user_effect as N, template_effect as E } from "../../../vendor/svelte/src/internal/client/reactivity/effects.js";
 import { user_derived as a } from "../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { set_text as _ } from "../../../vendor/svelte/src/internal/client/render.js";
+import { from_html as Q, append as U } from "../../../vendor/svelte/src/internal/client/dom/template.js";
 import { attach as g } from "../../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
 import { set_custom_element_data as X } from "../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
 import { set_style as Y } from "../../../vendor/svelte/src/internal/client/dom/elements/style.js";
@@ -21,17 +21,17 @@ import { resizable as w } from "../../attachments/resizable.js";
 import { isNumber as d } from "../../../utils/test.js";
 import { getExtensionFromFilename as ie, getFilenameWithoutExtension as ne } from "../../../utils/file.js";
 import re from "../TextInput/index-svelte.js";
-var oe = S('<filename-input><!><span> </span> <div class="measure-island"><div class="measure" aria-hidden="true"> </div> <div class="measure" aria-hidden="true"> </div></div></filename-input>', 2);
-function We(I, s) {
-  N(s, !0);
-  let f = Z(s, "value", 3, ""), R = te(s, [
-    "$$slots",
-    "$$events",
-    "$$legacy",
-    "value",
-    "onblur",
-    "onconfirm"
-  ]);
+var oe = /* @__PURE__ */ new Set([
+  "$$slots",
+  "$$events",
+  "$$legacy",
+  "value",
+  "onblur",
+  "onconfirm"
+]), ae = Q('<filename-input><!><span> </span> <div class="measure-island"><div class="measure" aria-hidden="true"> </div> <div class="measure" aria-hidden="true"> </div></div></filename-input>', 2);
+function be(I, s) {
+  L(s, !0);
+  let f = Z(s, "value", 3, ""), R = te(s, oe);
   const u = a(() => ie(f()));
   let n = m(void 0), p = m(void 0), c = m(void 0), l = a(() => ({ current: f() })), v = !1;
   function z() {
@@ -62,18 +62,18 @@ function We(I, s) {
   function M(t) {
     i(c, t.width, !0);
   }
-  const P = a(() => d(e(n)) ? `${e(n)}px` : void 0), T = 1;
+  const P = a(() => d(e(n)) ? `${e(n)}px` : void 0), S = 1;
   let F = m("");
-  Q(() => {
-    d(e(n)) && d(e(p)) && j(e(n), e(p));
+  N(() => {
+    d(e(n)) && d(e(p)) && T(e(n), e(p));
   });
-  function j(t, K) {
+  function T(t, J) {
     requestAnimationFrame(() => {
-      i(F, t > K + T ? "" : void 0, !0);
+      i(F, t > J + S ? "" : void 0, !0);
     });
   }
-  const k = a(() => d(e(c)) ? `${e(c)}px` : void 0);
-  var r = oe();
+  const j = a(() => d(e(c)) ? `${e(c)}px` : void 0);
+  var r = ae();
   E(() => X(r, "data-overflow", e(F)));
   let W;
   var b = o(r);
@@ -94,16 +94,16 @@ function We(I, s) {
       }
     ));
   }
-  var y = x(b), D = o(y), G = x(y, 2), h = o(G), H = o(h);
+  var y = x(b), k = o(y), D = x(y, 2), h = o(D), G = o(h);
   g(h, () => w({ onresize: A }));
-  var $ = x(h, 2), J = o($);
+  var $ = x(h, 2), H = o($);
   g($, () => w({ onresize: M })), g(r, () => w({ onresize: B })), E(() => {
     W = Y(r, "", W, {
       "--value-width": e(P),
-      "--extension-width": e(k)
-    }), _(D, e(u)), _(H, e(l).current), _(J, e(u));
-  }), U(I, r), L();
+      "--extension-width": e(j)
+    }), _(k, e(u)), _(G, e(l).current), _(H, e(u));
+  }), U(I, r), K();
 }
 export {
-  We as default
+  be as default
 };

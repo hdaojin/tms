@@ -1,13 +1,13 @@
 import { teardown as f } from "../../../reactivity/effects.js";
 import { is_array as o } from "../../../../shared/utils.js";
-import { select_multiple_invalid_value as s } from "../../../warnings.js";
+import { select_multiple_invalid_value as _ } from "../../../warnings.js";
 import { is as a } from "../../../proxy.js";
 function l(e, r, u = !1) {
   if (e.multiple) {
     if (r == null)
       return;
     if (!o(r))
-      return s();
+      return _();
     for (var t of e.options)
       t.selected = r.includes(i(t));
     return;
@@ -23,7 +23,7 @@ function l(e, r, u = !1) {
 }
 function c(e) {
   var r = new MutationObserver(() => {
-    l(e, e.__value);
+    "__value" in e && l(e, e.__value);
   });
   r.observe(e, {
     // Listen to option element changes

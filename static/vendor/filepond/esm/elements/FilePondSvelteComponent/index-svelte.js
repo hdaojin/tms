@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -54,7 +54,7 @@ class L extends f {
       });
     }), Object.defineProperties(this, u.reduce(
       (i, r) => (i[r] = {
-        value(...n) {
+        value: function(...n) {
           if (!this.#t) {
             this.#i.push([r, n]);
             return;

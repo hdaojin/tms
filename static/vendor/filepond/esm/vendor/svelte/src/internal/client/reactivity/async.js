@@ -1,76 +1,73 @@
-import { DESTROYED as h } from "../constants.js";
-import { set_component_context as g, component_context as y } from "../context.js";
-import { invoke_error_boundary as d } from "../error-handling.js";
-import { active_effect as p, set_active_effect as b, set_active_reaction as x, active_reaction as D } from "../runtime.js";
+import { DESTROYED as g } from "../constants.js";
+import { set_component_context as b, component_context as D } from "../context.js";
+import { invoke_error_boundary as s } from "../error-handling.js";
+import { active_effect as f, set_active_effect as x, set_active_reaction as y, active_reaction as E } from "../runtime.js";
 import { current_batch as u } from "./batch.js";
-import { derived as E, async_derived as P } from "./deriveds.js";
-function z(t, n, r, i) {
-  const a = E;
-  var o = t.filter((e) => !e.settled);
-  if (r.length === 0 && o.length === 0) {
-    i(n.map(a));
+import { derived as P, async_derived as O } from "./deriveds.js";
+function A(e, i, t, n) {
+  const p = P;
+  var o = e.filter((r) => !r.settled), l = i.map(p);
+  if (t.length === 0 && o.length === 0) {
+    n(l);
     return;
   }
-  var c = (
+  var a = (
     /** @type {Effect} */
-    p
-  ), m = O(), f = o.length === 1 ? o[0].promise : o.length > 1 ? Promise.all(o.map((e) => e.promise)) : null;
-  function l(e) {
-    if ((c.f & h) === 0) {
-      m();
+    f
+  ), v = R(), c = o.length === 1 ? o[0].promise : o.length > 1 ? Promise.all(o.map((r) => r.promise)) : null;
+  function m(r) {
+    if ((a.f & g) === 0) {
+      v();
       try {
-        i(e);
+        n([...l, ...r]);
       } catch (k) {
-        d(k, c);
+        s(k, a);
       }
-      s();
+      h();
     }
   }
-  var _ = R();
-  if (r.length === 0) {
-    f.then(() => l(n.map(a))).finally(_);
+  var _ = S();
+  if (t.length === 0) {
+    c.then(() => m([])).finally(_);
     return;
   }
-  function v() {
-    Promise.all(r.map((e) => P(e))).then((e) => l([...n.map(a), ...e])).catch((e) => d(e, c)).finally(_);
+  function d() {
+    Promise.all(t.map((r) => O(r))).then(m).catch((r) => s(r, a)).finally(_);
   }
-  f ? f.then(() => {
-    m(), v(), s();
-  }) : v();
+  c ? c.then(() => {
+    v(), d(), h();
+  }) : d();
 }
-function O() {
-  var t = (
+function R() {
+  var e = (
     /** @type {Effect} */
-    p
-  ), n = D, r = y, i = (
+    f
+  ), i = E, t = D, n = (
     /** @type {Batch} */
     u
   );
   return function(o = !0) {
-    b(t), x(n), g(r), o && (t.f & h) === 0 && (i?.activate(), i?.apply());
+    x(e), y(i), b(t), o && (e.f & g) === 0 && (n?.activate(), n?.apply());
   };
 }
-function s(t = !0) {
-  b(null), x(null), g(null), t && u?.deactivate();
+function h(e = !0) {
+  x(null), y(null), b(null), e && u?.deactivate();
 }
-function R() {
-  var t = (
+function S() {
+  var e = (
     /** @type {Effect} */
-    p
-  ), n = (
-    /** @type {Boundary} */
-    t.b
-  ), r = (
+    f
+  ), i = e.b, t = (
     /** @type {Batch} */
     u
-  ), i = n.is_rendered();
-  return n.update_pending_count(1, r), r.increment(i, t), () => {
-    n.update_pending_count(-1, r), r.decrement(i, t);
+  ), n = !!i?.is_rendered();
+  return i?.update_pending_count(1, t), t.increment(n, e), () => {
+    i?.update_pending_count(-1, t), t.decrement(n, e);
   };
 }
 export {
-  O as capture,
-  z as flatten,
-  R as increment_pending,
-  s as unset_context
+  R as capture,
+  A as flatten,
+  S as increment_pending,
+  h as unset_context
 };

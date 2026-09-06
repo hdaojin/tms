@@ -1,7 +1,7 @@
 import { EACH_INDEX_REACTIVE as J, EACH_ITEM_REACTIVE as K, EACH_ITEM_IMMUTABLE as P, EACH_IS_CONTROLLED as V, EACH_IS_ANIMATED as Q } from "../../../../constants.js";
-import { EFFECT_OFFSCREEN as C, DESTROYED as W, INERT as N, BRANCH_EFFECT as Z } from "../../constants.js";
-import { should_defer_append as $, create_text as R, get_next_sibling as j, clear_text_content as y } from "../operations.js";
-import { block as ee, branch as z, resume_effect as U, pause_effect as X, move_effect as re, destroy_effect as ne } from "../../reactivity/effects.js";
+import { EFFECT_OFFSCREEN as C, DESTROYED as W, INERT as M, BRANCH_EFFECT as Z } from "../../constants.js";
+import { should_defer_append as $, create_text as N, get_next_sibling as j, clear_text_content as y } from "../operations.js";
+import { block as ee, branch as R, resume_effect as U, pause_effect as X, move_effect as re, destroy_effect as ne } from "../../reactivity/effects.js";
 import { internal_set as O, source as L, mutable_source as fe } from "../../reactivity/sources.js";
 import { array_from as H, is_array as ie } from "../../../shared/utils.js";
 import { queue_micro_task as le } from "../task.js";
@@ -33,7 +33,7 @@ function ve(e, n, o) {
     );
   }
   if (u === 0) {
-    var i = v.length === 0 && o !== null;
+    var i = v.length === 0 && o !== null && e.pending.size === 0;
     if (i) {
       var s = (
         /** @type {Element} */
@@ -80,14 +80,17 @@ function Te(e, n, o, v, d, l = null) {
       /** @type {Element} */
       e
     );
-    u = s.appendChild(R());
+    u = s.appendChild(N());
   }
   var f = null, _ = oe(() => {
     var p = o();
-    return ie(p) ? p : p == null ? [] : H(p);
+    return (
+      /** @type {V[]} */
+      ie(p) ? p : p == null ? [] : H(p)
+    );
   }), t, E = /* @__PURE__ */ new Map(), w = !0;
   function I(p) {
-    (A.effect.f & W) === 0 && (A.pending.delete(p), A.fallback = f, te(A, t, u, n, v), f !== null && (t.length === 0 ? (f.f & C) === 0 ? U(f) : (f.f ^= C, M(f, null, u)) : X(f, () => {
+    (A.effect.f & W) === 0 && (A.pending.delete(p), A.fallback = f, te(A, t, u, n, v), f !== null && (t.length === 0 ? (f.f & C) === 0 ? U(f) : (f.f ^= C, F(f, null, u)) : X(f, () => {
       f = null;
     })));
   }
@@ -104,7 +107,7 @@ function Te(e, n, o, v, d, l = null) {
       var x = t[h], b = v(x, h), m = w ? null : c.get(b);
       m ? (m.v && O(m.v, x), m.i && O(m.i, h), k && S.unskip_effect(m.e)) : (m = pe(
         c,
-        w ? u : B ??= R(),
+        w ? u : B ??= N(),
         x,
         b,
         h,
@@ -113,7 +116,7 @@ function Te(e, n, o, v, d, l = null) {
         o
       ), w || (m.e.f |= C), c.set(b, m)), g.add(b);
     }
-    if (p === 0 && l && !f && (w ? f = z(() => l(u)) : (f = z(() => l(B ??= R())), f.f |= C)), p > g.size && ae(), !w)
+    if (p === 0 && l && !f && (w ? f = R(() => l(u)) : (f = R(() => l(B ??= N())), f.f |= C)), p > g.size && ae(), !w)
       if (E.set(S, g), k) {
         for (const [Y, G] of c)
           g.has(Y) || S.skip_effect(G.e);
@@ -124,13 +127,13 @@ function Te(e, n, o, v, d, l = null) {
   }), A = { effect: a, items: c, pending: E, outrogroups: null, fallback: f };
   w = !1;
 }
-function F(e) {
+function z(e) {
   for (; e !== null && (e.f & Z) === 0; )
     e = e.next;
   return e;
 }
 function te(e, n, o, v, d) {
-  var l = (v & Q) !== 0, u = n.length, c = e.items, i = F(e.effect.first), s, f = null, _, t = [], E = [], w, I, r, a;
+  var l = (v & Q) !== 0, u = n.length, c = e.items, i = z(e.effect.first), s, f = null, _, t = [], E = [], w, I, r, a;
   if (l)
     for (a = 0; a < u; a += 1)
       w = n[a], I = d(w, a), r = /** @type {EachItem} */
@@ -140,12 +143,12 @@ function te(e, n, o, v, d) {
     c.get(I).e, e.outrogroups !== null)
       for (const m of e.outrogroups)
         m.pending.delete(r), m.done.delete(r);
-    if ((r.f & N) !== 0 && (U(r), l && (r.nodes?.a?.unfix(), (_ ??= /* @__PURE__ */ new Set()).delete(r))), (r.f & C) !== 0)
+    if ((r.f & M) !== 0 && (U(r), l && (r.nodes?.a?.unfix(), (_ ??= /* @__PURE__ */ new Set()).delete(r))), (r.f & C) !== 0)
       if (r.f ^= C, r === i)
-        M(r, null, o);
+        F(r, null, o);
       else {
         var A = f ? f.next : i;
-        r === e.effect.last && (e.effect.last = r.prev), r.prev && (r.prev.next = r.next), r.next && (r.next.prev = r.prev), T(e, f, r), T(e, r, A), M(r, A, o), f = r, t = [], E = [], i = F(f.next);
+        r === e.effect.last && (e.effect.last = r.prev), r.prev && (r.prev.next = r.next), r.next && (r.next.prev = r.prev), T(e, f, r), T(e, r, A), F(r, A, o), f = r, t = [], E = [], i = z(f.next);
         continue;
       }
     if (r !== i) {
@@ -155,20 +158,20 @@ function te(e, n, o, v, d) {
           f = p.prev;
           var S = t[0], k = t[t.length - 1];
           for (g = 0; g < t.length; g += 1)
-            M(t[g], p, o);
+            F(t[g], p, o);
           for (g = 0; g < E.length; g += 1)
             s.delete(E[g]);
           T(e, S.prev, k.next), T(e, f, S), T(e, k, p), i = p, f = k, a -= 1, t = [], E = [];
         } else
-          s.delete(r), M(r, i, o), T(e, r.prev, r.next), T(e, r, f === null ? e.effect.first : f.next), T(e, f, r), f = r;
+          s.delete(r), F(r, i, o), T(e, r.prev, r.next), T(e, r, f === null ? e.effect.first : f.next), T(e, f, r), f = r;
         continue;
       }
       for (t = [], E = []; i !== null && i !== r; )
-        (s ??= /* @__PURE__ */ new Set()).add(i), E.push(i), i = F(i.next);
+        (s ??= /* @__PURE__ */ new Set()).add(i), E.push(i), i = z(i.next);
       if (i === null)
         continue;
     }
-    (r.f & C) === 0 && t.push(r), f = r, i = F(r.next);
+    (r.f & C) === 0 && t.push(r), f = r, i = z(r.next);
   }
   if (e.outrogroups !== null) {
     for (const m of e.outrogroups)
@@ -179,9 +182,9 @@ function te(e, n, o, v, d) {
     var h = [];
     if (s !== void 0)
       for (r of s)
-        (r.f & N) === 0 && h.push(r);
+        (r.f & M) === 0 && h.push(r);
     for (; i !== null; )
-      (i.f & N) === 0 && i !== e.fallback && h.push(i), i = F(i.next);
+      (i.f & M) === 0 && i !== e.fallback && h.push(i), i = z(i.next);
     var x = h.length;
     if (x > 0) {
       var b = (v & V) !== 0 && u === 0 ? o : null;
@@ -205,12 +208,12 @@ function pe(e, n, o, v, d, l, u, c) {
   return {
     v: i,
     i: s,
-    e: z(() => (l(n, i ?? o, s ?? d, c), () => {
+    e: R(() => (l(n, i ?? o, s ?? d, c), () => {
       e.delete(v);
     }))
   };
 }
-function M(e, n, o) {
+function F(e, n, o) {
   if (e.nodes)
     for (var v = e.nodes.start, d = e.nodes.end, l = n && (n.f & C) === 0 ? (
       /** @type {EffectNodes} */

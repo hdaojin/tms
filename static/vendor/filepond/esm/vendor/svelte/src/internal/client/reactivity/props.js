@@ -1,5 +1,5 @@
 import { PROPS_IS_UPDATED as E, PROPS_IS_BINDABLE as R, PROPS_IS_IMMUTABLE as L, PROPS_IS_LAZY_INITIAL as T } from "../../../constants.js";
-import { get_descriptor as P, is_function as c } from "../../shared/utils.js";
+import { get_descriptor as h, is_function as a } from "../../shared/utils.js";
 import { set as B } from "./sources.js";
 import { derived as O, derived_safe_equal as Y } from "./deriveds.js";
 import { get as _, is_destroying_effect as j, active_effect as K, untrack as M } from "../runtime.js";
@@ -8,124 +8,121 @@ import { DESTROYED as U, STATE_SYMBOL as I, LEGACY_PROPS as x } from "../constan
 import { proxy as $ } from "../proxy.js";
 import { capture_store_binding as q } from "./store.js";
 const z = {
-  get(e, r) {
-    if (!e.exclude.includes(r))
-      return e.props[r];
+  get(r, e) {
+    if (!r.exclude.has(e))
+      return r.props[e];
   },
-  set(e, r) {
+  set(r, e) {
     return !1;
   },
-  getOwnPropertyDescriptor(e, r) {
-    if (!e.exclude.includes(r) && r in e.props)
+  getOwnPropertyDescriptor(r, e) {
+    if (!r.exclude.has(e) && e in r.props)
       return {
         enumerable: !0,
         configurable: !0,
-        value: e.props[r]
+        value: r.props[e]
       };
   },
-  has(e, r) {
-    return e.exclude.includes(r) ? !1 : r in e.props;
+  has(r, e) {
+    return r.exclude.has(e) ? !1 : e in r.props;
   },
-  ownKeys(e) {
-    return Reflect.ownKeys(e.props).filter((r) => !e.exclude.includes(r));
+  ownKeys(r) {
+    return Reflect.ownKeys(r.props).filter((e) => !r.exclude.has(e));
   }
 };
 // @__NO_SIDE_EFFECTS__
-function k(e, r, t) {
-  return new Proxy(
-    { props: e, exclude: r },
-    z
-  );
+function k(r, e, t) {
+  return new Proxy({ props: r, exclude: e }, z);
 }
 const C = {
-  get(e, r) {
-    let t = e.props.length;
+  get(r, e) {
+    let t = r.props.length;
     for (; t--; ) {
-      let n = e.props[t];
-      if (c(n) && (n = n()), typeof n == "object" && n !== null && r in n) return n[r];
+      let n = r.props[t];
+      if (a(n) && (n = n()), typeof n == "object" && n !== null && e in n) return n[e];
     }
   },
-  set(e, r, t) {
-    let n = e.props.length;
+  set(r, e, t) {
+    let n = r.props.length;
     for (; n--; ) {
-      let i = e.props[n];
-      c(i) && (i = i());
-      const u = P(i, r);
+      let i = r.props[n];
+      a(i) && (i = i());
+      const u = h(i, e);
       if (u && u.set)
         return u.set(t), !0;
     }
     return !1;
   },
-  getOwnPropertyDescriptor(e, r) {
-    let t = e.props.length;
+  getOwnPropertyDescriptor(r, e) {
+    let t = r.props.length;
     for (; t--; ) {
-      let n = e.props[t];
-      if (c(n) && (n = n()), typeof n == "object" && n !== null && r in n) {
-        const i = P(n, r);
+      let n = r.props[t];
+      if (a(n) && (n = n()), typeof n == "object" && n !== null && e in n) {
+        const i = h(n, e);
         return i && !i.configurable && (i.configurable = !0), i;
       }
     }
   },
-  has(e, r) {
-    if (r === I || r === x) return !1;
-    for (let t of e.props)
-      if (c(t) && (t = t()), t != null && r in t) return !0;
+  has(r, e) {
+    if (e === I || e === x) return !1;
+    for (let t of r.props)
+      if (a(t) && (t = t()), t != null && e in t) return !0;
     return !1;
   },
-  ownKeys(e) {
-    const r = [];
-    for (let t of e.props)
-      if (c(t) && (t = t()), !!t) {
+  ownKeys(r) {
+    const e = [];
+    for (let t of r.props)
+      if (a(t) && (t = t()), !!t) {
         for (const n in t)
-          r.includes(n) || r.push(n);
+          e.includes(n) || e.push(n);
         for (const n of Object.getOwnPropertySymbols(t))
-          r.includes(n) || r.push(n);
+          e.includes(n) || e.push(n);
       }
-    return r;
+    return e;
   }
 };
-function ee(...e) {
-  return new Proxy({ props: e }, C);
+function rr(...r) {
+  return new Proxy({ props: r }, C);
 }
-function re(e, r, t, n) {
-  var i = !0, u = (t & R) !== 0, h = (t & T) !== 0, a = (
+function er(r, e, t, n) {
+  var i = !0, u = (t & R) !== 0, P = (t & T) !== 0, c = (
     /** @type {V} */
     n
   ), v = !0, g = (
     /** @type {Derived<V> | undefined} */
     void 0
-  ), S = () => h && i ? (g ??= O(
+  ), S = () => P && i ? (g ??= O(
     /** @type {() => V} */
     n
-  ), _(g)) : (v && (v = !1, a = h ? M(
+  ), _(g)) : (v && (v = !1, c = P ? M(
     /** @type {() => V} */
     n
   ) : (
     /** @type {V} */
     n
-  )), a);
+  )), c);
   let o;
   if (u) {
-    var y = I in e || x in e;
-    o = P(e, r)?.set ?? (y && r in e ? (f) => e[r] = f : void 0);
+    var y = I in r || x in r;
+    o = h(r, e)?.set ?? (y && e in r ? (f) => r[e] = f : void 0);
   }
   var s, b = !1;
   u ? [s, b] = q(() => (
     /** @type {V} */
-    e[r]
+    r[e]
   )) : s = /** @type {V} */
-  e[r], s === void 0 && n !== void 0 && (s = S(), o && (N(), o(s)));
+  r[e], s === void 0 && n !== void 0 && (s = S(), o && (N(), o(s)));
   var l;
   if (l = () => {
     var f = (
       /** @type {V} */
-      e[r]
+      r[e]
     );
     return f === void 0 ? S() : (v = !0, f);
   }, (t & E) === 0)
     return l;
   if (o) {
-    var A = e.$$legacy;
+    var A = r.$$legacy;
     return (
       /** @type {() => V} */
       (function(f, d) {
@@ -144,14 +141,14 @@ function re(e, r, t, n) {
     (function(f, d) {
       if (arguments.length > 0) {
         const w = d ? _(p) : u ? $(f) : f;
-        return B(p, w), m = !0, a !== void 0 && (a = w), f;
+        return B(p, w), m = !0, c !== void 0 && (c = w), f;
       }
       return j && m || (D.f & U) !== 0 ? p.v : _(p);
     })
   );
 }
 export {
-  re as prop,
+  er as prop,
   k as rest_props,
-  ee as spread_props
+  rr as spread_props
 };

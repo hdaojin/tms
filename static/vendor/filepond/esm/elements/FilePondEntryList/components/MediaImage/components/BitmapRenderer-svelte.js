@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -9,8 +9,8 @@ import { user_effect as w } from "../../../../../vendor/svelte/src/internal/clie
 import { push as G, pop as J } from "../../../../../vendor/svelte/src/internal/client/context.js";
 import { get as e } from "../../../../../vendor/svelte/src/internal/client/runtime.js";
 import { state as l, set as o } from "../../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { from_html as K, append as N } from "../../../../../vendor/svelte/src/internal/client/dom/template.js";
 import { user_derived as v } from "../../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { from_html as K, append as N } from "../../../../../vendor/svelte/src/internal/client/dom/template.js";
 import { bind_this as V } from "../../../../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
 import { prop as d } from "../../../../../vendor/svelte/src/internal/client/reactivity/props.js";
 import { isFirefox as X } from "../../../../../utils/test.js";

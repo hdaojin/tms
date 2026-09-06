@@ -1,17 +1,18 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { setAttributes as N, addListener as q } from "../../utils/dom.js";
-import { pubsub as C } from "../../utils/pubsub.js";
-import { isFunction as P } from "../../utils/test.js";
-import { createExtension as T } from "./createExtension.js";
-function z(S) {
-  const { name: b, props: E, factory: x } = S;
-  return T({
-    name: b,
+import { arrayRemoveFalsy as C } from "../../utils/array.js";
+import { setAttributes as P, addListener as T } from "../../utils/dom.js";
+import { pubsub as R } from "../../utils/pubsub.js";
+import { isFunction as V } from "../../utils/test.js";
+import { createExtension as W } from "./createExtension.js";
+function G(y) {
+  const { name: E, props: h, factory: x } = y;
+  return W({
+    name: E,
     type: "source",
     props: {
       // by default insert to top of list
@@ -29,15 +30,15 @@ function z(S) {
         autocomplete: "off"
       },
       // overwrite with custom props
-      ...E
+      ...h
     },
     factory: (a, n) => {
-      const { pub: u, on: y } = C(), { didSetProps: h, props: p } = a, { setExtensionState: g, getExtensionState: v, insertEntries: I } = n, { createSourceElement: w, destroy: D } = x(
+      const { pub: u, on: g } = R(), { didSetProps: v, props: c } = a, { setExtensionState: I, getExtensionState: w, insertEntries: A } = n, { createSourceElement: D, destroy: F } = x(
         a,
         {
           ...n,
           setExtensionSourceState: (e) => {
-            const t = v()?.source;
+            const t = w()?.source;
             n.setExtensionState({
               source: {
                 ...t,
@@ -46,55 +47,65 @@ function z(S) {
             });
           },
           // @ts-ignore listen for events
-          on: (e, t) => e.startsWith("dialog") ? y(e, t) : n.on(e, t)
+          on: (e, t) => e.startsWith("dialog") ? g(e, t) : n.on(e, t)
         }
       );
       let o, r, s;
-      h(({ sourceIcon: e, sourceLabel: t, sourceType: c }) => {
-        g({
+      v(({ sourceIcon: e, sourceLabel: t, sourceType: i }) => {
+        I({
           // is adds source button
           source: {
-            type: c,
+            type: i,
             label: t,
             icon: e,
-            onopen: L,
-            onopened: O,
-            onclosed: F
+            onopen: O,
+            onopened: N,
+            onclosed: q
           }
         });
       });
-      function A(e) {
-        const { inputAttributes: t, insertIndex: c, beforeInsertSource: l } = p, { target: f } = e, m = f ? new FormData(f) : null;
-        if (!m)
+      function L(e) {
+        const { inputAttributes: t, insertIndex: i, beforeInsertSource: l } = c, { target: p } = e, f = p ? new FormData(p) : null;
+        if (!f)
           throw e.preventDefault(), new Error("No form reference");
-        const i = m.get(t.name);
-        if (!i)
-          throw e.preventDefault(), new Error(`No value for input with name "${t.name}"`);
-        const d = P(l) ? l({ src: i }) : i;
-        if (!d) {
+        const m = f.getAll(t.name);
+        if (!m.length)
+          throw e.preventDefault(), new Error(
+            `No values found for input with name "${t.name}"`
+          );
+        const d = C(
+          m.map((S) => {
+            if (V(l)) {
+              let b = l(S, c);
+              return b ? { src: b } : void 0;
+            }
+            return { src: S };
+          })
+        );
+        if (!d.length) {
           e.preventDefault();
           return;
         }
-        I({ src: d }, c);
-      }
-      function L(e) {
-        const { inputAttributes: t } = p;
-        r = e, o = o || w(), N(o, t), r.append(o), u("dialogOpen", e), s = q(r, "submit", A);
+        A(d, i);
       }
       function O(e) {
+        const { inputAttributes: t } = c;
+        r = e, o = o || D(), P(o, t), r.append(o), u("dialogOpen", e), s = T(r, "submit", L);
+      }
+      function N(e) {
         u("dialogOpened", e);
       }
-      function F() {
+      function q() {
         u("dialogClosed", r), s?.(), s = null, r?.querySelector("form")?.reset(), o.remove(), r = null;
       }
       return {
         destroy() {
-          D?.(), s?.();
+          F?.(), s?.();
         }
       };
     }
   });
 }
 export {
-  z as createSourceExtension
+  G as createSourceExtension
 };

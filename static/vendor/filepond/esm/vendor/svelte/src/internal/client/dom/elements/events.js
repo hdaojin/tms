@@ -1,104 +1,106 @@
 import { teardown as y } from "../../reactivity/effects.js";
-import { define_property as E } from "../../../shared/utils.js";
-import { set_active_reaction as _, set_active_effect as g, active_reaction as L, active_effect as S } from "../../runtime.js";
-import { queue_micro_task as k } from "../task.js";
+import { define_property as k } from "../../../shared/utils.js";
+import { set_active_reaction as v, set_active_effect as m, active_reaction as E, active_effect as L } from "../../runtime.js";
+import { queue_micro_task as T } from "../task.js";
 import { without_reactive_context as M } from "./bindings/shared.js";
-const o = /* @__PURE__ */ Symbol("events"), T = /* @__PURE__ */ new Set(), q = /* @__PURE__ */ new Set();
-function x(t, r, i, n = {}) {
-  function a(e) {
-    if (n.capture || B.call(r, e), !e.cancelBubble)
-      return M(() => i?.call(this, e));
+const o = /* @__PURE__ */ Symbol("events"), S = /* @__PURE__ */ new Set(), q = /* @__PURE__ */ new Set();
+function x(e, t, n, i = {}) {
+  function a(r) {
+    if (i.capture || B.call(t, r), !r.cancelBubble)
+      return M(() => n?.call(this, r));
   }
-  return t.startsWith("pointer") || t.startsWith("touch") || t === "wheel" ? k(() => {
-    r.addEventListener(t, a, n);
-  }) : r.addEventListener(t, a, n), a;
+  return e.startsWith("pointer") || e.startsWith("touch") || e === "wheel" ? T(() => {
+    t.addEventListener(e, a, i);
+  }) : t.addEventListener(e, a, i), a;
 }
-function P(t, r, i, n, a) {
-  var e = { capture: n, passive: a }, l = x(t, r, i, e);
-  (r === document.body || // @ts-ignore
-  r === window || // @ts-ignore
-  r === document || // Firefox has quirky behavior, it can happen that we still get "canplay" events when the element is already removed
-  r instanceof HTMLMediaElement) && y(() => {
-    r.removeEventListener(t, l, e);
+function j(e, t, n, i, a) {
+  var r = { capture: i, passive: a }, l = x(e, t, n, r);
+  (t === document.body || // @ts-ignore
+  t === window || // @ts-ignore
+  t === document || // Firefox has quirky behavior, it can happen that we still get "canplay" events when the element is already removed
+  t instanceof HTMLMediaElement) && y(() => {
+    t.removeEventListener(e, l, r);
   });
 }
-function j(t, r, i) {
-  (r[o] ??= {})[t] = i;
+function z(e, t, n) {
+  (t[o] ??= {})[e] = n;
 }
-function z(t) {
-  for (var r = 0; r < t.length; r++)
-    T.add(t[r]);
-  for (var i of q)
-    i(t);
+function A(e) {
+  for (var t = 0; t < e.length; t++)
+    S.add(e[t]);
+  for (var n of q)
+    n(e);
 }
-let w = null;
-function B(t) {
-  var r = this, i = (
+let s = null, d = !1;
+function B(e) {
+  var t = this, n = (
     /** @type {Node} */
-    r.ownerDocument
-  ), n = t.type, a = t.composedPath?.() || [], e = (
+    t.ownerDocument
+  ), i = e.type, a = e.composedPath?.() || [], r = (
     /** @type {null | Element} */
-    a[0] || t.target
+    a[0] || e.target
   );
-  w = t;
-  var l = 0, d = w === t && t[o];
-  if (d) {
-    var f = a.indexOf(d);
-    if (f !== -1 && (r === document || r === /** @type {any} */
+  s = e, d || (d = !0, setTimeout(() => {
+    d = !1, s = null;
+  }));
+  var l = 0, _ = s === e && e[o];
+  if (_) {
+    var u = a.indexOf(_);
+    if (u !== -1 && (t === document || t === /** @type {any} */
     window)) {
-      t[o] = r;
+      e[o] = t;
       return;
     }
-    var p = a.indexOf(r);
+    var p = a.indexOf(t);
     if (p === -1)
       return;
-    f <= p && (l = f);
+    u <= p && (l = u);
   }
-  if (e = /** @type {Element} */
-  a[l] || t.target, e !== r) {
-    E(t, "currentTarget", {
+  if (r = /** @type {Element} */
+  a[l] || e.target, r !== t) {
+    k(e, "currentTarget", {
       configurable: !0,
       get() {
-        return e || i;
+        return r || n;
       }
     });
-    var b = L, m = S;
-    _(null), g(null);
+    var b = E, w = L;
+    v(null), m(null);
     try {
-      for (var c, h = []; e !== null; ) {
-        var s = e.assignedSlot || e.parentNode || /** @type {any} */
-        e.host || null;
+      for (var c, h = []; r !== null && r !== t; ) {
         try {
-          var v = e[o]?.[n];
-          v != null && (!/** @type {any} */
-          e.disabled || // DOM could've been updated already by the time this is reached, so we check this as well
+          var g = r[o]?.[i];
+          g != null && (!/** @type {any} */
+          r.disabled || // DOM could've been updated already by the time this is reached, so we check this as well
           // -> the target could not have been disabled because it emits the event in the first place
-          t.target === e) && v.call(e, t);
-        } catch (u) {
-          c ? h.push(u) : c = u;
+          e.target === r) && g.call(r, e);
+        } catch (f) {
+          c ? h.push(f) : c = f;
         }
-        if (t.cancelBubble || s === r || s === null)
-          break;
-        e = s;
+        if (e.cancelBubble) break;
+        l++, r = l < a.length ? (
+          /** @type {Element} */
+          a[l]
+        ) : null;
       }
       if (c) {
-        for (let u of h)
+        for (let f of h)
           queueMicrotask(() => {
-            throw u;
+            throw f;
           });
         throw c;
       }
     } finally {
-      t[o] = r, delete t.currentTarget, _(b), g(m);
+      e[o] = t, delete e.currentTarget, v(b), m(w);
     }
   }
 }
 export {
-  T as all_registered_events,
+  S as all_registered_events,
   x as create_event,
-  z as delegate,
-  j as delegated,
-  P as event,
+  A as delegate,
+  z as delegated,
+  j as event,
   o as event_symbol,
   B as handle_event_propagation,
   q as root_event_handles

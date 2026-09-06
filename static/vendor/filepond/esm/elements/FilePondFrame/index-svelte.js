@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -10,8 +10,8 @@ import { push as b, pop as k } from "../../vendor/svelte/src/internal/client/con
 import { get as c } from "../../vendor/svelte/src/internal/client/runtime.js";
 import { child as _ } from "../../vendor/svelte/src/internal/client/dom/operations.js";
 import { state as w, set as A } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { from_html as C, append as D } from "../../vendor/svelte/src/internal/client/dom/template.js";
-import { user_derived as F } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { user_derived as C } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { from_html as D, append as F } from "../../vendor/svelte/src/internal/client/dom/template.js";
 import { if_block as M } from "../../vendor/svelte/src/internal/client/dom/blocks/if.js";
 import { attach as O } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
 import { prop as P } from "../../vendor/svelte/src/internal/client/reactivity/props.js";
@@ -21,7 +21,7 @@ import { createAnimationModeObserver as S } from "../common/animationPreference-
 import { rectFromBounds as j } from "../../utils/rect.js";
 import "../components/ElementPane/index.js";
 import B from "../components/ElementPane/index-svelte.js";
-var E = C('<div class="root"><!></div>');
+var E = D('<div class="root"><!></div>');
 function $(s, o) {
   b(o, !0);
   let p = P(o, "animations", 3, "auto");
@@ -35,7 +35,7 @@ function $(s, o) {
     i.computeRect = t;
   }
   let n = w(void 0);
-  const m = S(), d = F(() => m.current);
+  const m = S(), d = C(() => m.current);
   r(() => {
     m.setPreference(p());
   });
@@ -71,7 +71,7 @@ function $(s, o) {
       e.current && t(g);
     });
   }
-  return O(a, () => y({ onmeasure: l })), D(s, a), k(v);
+  return O(a, () => y({ onmeasure: l })), F(s, a), k(v);
 }
 export {
   $ as default

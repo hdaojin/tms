@@ -1,33 +1,38 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { isBlob as o, isBlobOrFile as t, isDirectoryEntry as l, isFile as n, isFileEntry as r, isImageFile as s, isVideoFile as m } from "./test.js";
-import { supportsInvokerCommands as p } from "./support.js";
-import { blobToFile as x, cloneBlob as d, cloneFile as E, cloneFileWithOptions as b, getExtensionFromFilename as g, getExtensionFromMimeType as y, getFilenameWithoutExtension as c, sanitizeFilename as f, updateFileType as u, updateFilename as h } from "./file.js";
-import { addListener as T, getAsElement as I, h as O } from "./dom.js";
+import { isBlob as i, isBlobOrFile as o, isDirectoryEntry as n, isFile as l, isFileEntry as r, isImageFile as s, isVideoFile as m } from "./test.js";
+import { supportsInvokerCommands as a } from "./support.js";
+import { blobToFile as b, cloneBlob as u, cloneFile as d, cloneFileWithOptions as g, getExtensionFromFilename as x, getExtensionFromMimeType as E, getFilenameWithoutExtension as y, sanitizeFilename as c, updateFileType as f, updateFilename as h } from "./file.js";
+import { addListener as B, createStyleSheet as S, defineCustomElement as T, getAsElement as C, getAttribute as I, h as O, setBooleanAttribute as W, setStringAttribute as k } from "./dom.js";
 export {
-  T as addListener,
-  x as blobToFile,
-  d as cloneBlob,
-  E as cloneFile,
-  b as cloneFileWithOptions,
-  I as getAsElement,
-  g as getExtensionFromFilename,
-  y as getExtensionFromMimeType,
-  c as getFilenameWithoutExtension,
+  B as addListener,
+  b as blobToFile,
+  u as cloneBlob,
+  d as cloneFile,
+  g as cloneFileWithOptions,
+  S as createStyleSheet,
+  T as defineCustomElement,
+  C as getAsElement,
+  I as getAttribute,
+  x as getExtensionFromFilename,
+  E as getExtensionFromMimeType,
+  y as getFilenameWithoutExtension,
   O as h,
-  o as isBlob,
-  t as isBlobOrFile,
-  l as isDirectoryEntry,
-  n as isFile,
+  i as isBlob,
+  o as isBlobOrFile,
+  n as isDirectoryEntry,
+  l as isFile,
   r as isFileEntry,
   s as isImageFile,
   m as isVideoFile,
-  f as sanitizeFilename,
-  p as supportsInvokerCommands,
-  u as updateFileType,
+  c as sanitizeFilename,
+  W as setBooleanAttribute,
+  k as setStringAttribute,
+  a as supportsInvokerCommands,
+  f as updateFileType,
   h as updateFilename
 };

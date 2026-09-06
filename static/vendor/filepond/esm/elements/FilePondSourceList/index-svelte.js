@@ -1,248 +1,251 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { onDestroy as Me } from "../../vendor/svelte/src/index-client.js";
-import { user_effect as g, template_effect as I } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { push as Te, pop as Be } from "../../vendor/svelte/src/internal/client/context.js";
+import { onDestroy as Ee } from "../../vendor/svelte/src/index-client.js";
+import { user_effect as p, template_effect as z } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { push as Me, pop as Te } from "../../vendor/svelte/src/internal/client/context.js";
 import { get as e } from "../../vendor/svelte/src/internal/client/runtime.js";
-import { child as v, first_child as Le, sibling as D } from "../../vendor/svelte/src/internal/client/dom/operations.js";
-import { state as h, set as d } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { set_text as Ne } from "../../vendor/svelte/src/internal/client/render.js";
+import { child as g, first_child as Be, sibling as x } from "../../vendor/svelte/src/internal/client/dom/operations.js";
+import { state as h, set as s } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
+import { set_text as Le } from "../../vendor/svelte/src/internal/client/render.js";
 import { user_derived as u } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { if_block as q } from "../../vendor/svelte/src/internal/client/dom/blocks/if.js";
-import { from_html as R, append as y } from "../../vendor/svelte/src/internal/client/dom/template.js";
-import { attach as ee } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
-import { delegate as qe, event as te, delegated as Fe } from "../../vendor/svelte/src/internal/client/dom/elements/events.js";
-import { set_style as re } from "../../vendor/svelte/src/internal/client/dom/elements/style.js";
-import { bind_this as J } from "../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
-import { prop as b, spread_props as K } from "../../vendor/svelte/src/internal/client/reactivity/props.js";
-import { Spring as oe } from "../../vendor/svelte/src/motion/spring.js";
+import { from_html as j, append as O } from "../../vendor/svelte/src/internal/client/dom/template.js";
+import { if_block as W } from "../../vendor/svelte/src/internal/client/dom/blocks/if.js";
+import { attach as Z } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
+import { set_attribute as Ne } from "../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
+import { delegate as qe, event as $, delegated as Fe } from "../../vendor/svelte/src/internal/client/dom/elements/events.js";
+import { set_style as ee } from "../../vendor/svelte/src/internal/client/dom/elements/style.js";
+import { bind_this as G } from "../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
+import { prop as v, spread_props as I } from "../../vendor/svelte/src/internal/client/reactivity/props.js";
+import { Spring as te } from "../../vendor/svelte/src/motion/spring.js";
 import { createAnimationModeObserver as Oe } from "../common/animationPreference-svelte.js";
 import ke from "../components/NodeList/index-svelte.js";
-import { withResources as Q } from "../common/string.js";
+import { withResources as J } from "../common/string.js";
 import "../components/Button/index.js";
 import "../components/ElementPane/index.js";
-import { measurable as ne } from "../attachments/measurable.js";
-import { rectFromBounds as ae, rectContainsPoint as je } from "../../utils/rect.js";
+import { measurable as re } from "../attachments/measurable.js";
+import { rectFromBounds as ne, rectContainsPoint as je } from "../../utils/rect.js";
 import { vectorCreate as He } from "../../utils/vector.js";
-import { supportsDisplayTransition as ie } from "../../utils/support.js";
+import { supportsDisplayTransition as oe } from "../../utils/support.js";
 import { passthrough as Ve, noop as Xe } from "../../utils/placeholder.js";
-import F from "../components/SpringElement/index-svelte.js";
+import k from "../components/SpringElement/index-svelte.js";
 import { dispatchCustomEvent as Ye, addListener as ze } from "../../utils/dom.js";
-import U from "../components/Button/index-svelte.js";
+import K from "../components/Button/index-svelte.js";
 import Ge from "../components/ElementPane/index-svelte.js";
-var Ie = R('<p part="dialog-title"> </p>'), Je = R('<div part="dialog-header"><!> <!></div>'), Ke = R('<div part="dialog-footer"><!> <!></div>'), Qe = R("<element-pane-wrapper><!></element-pane-wrapper>", 2), Ue = R('<dialog part="dialog" closedby="closerequest"><form method="dialog" part="dialog-form"><!> <div part="dialog-content"></div> <!></form> <!></dialog> <!>', 1), We = R('<div class="root"><!></div>');
-function Pt(le, o) {
-  Te(o, !0);
-  let se = b(o, "disabled", 3, !1), de = b(o, "animations", 3, "auto"), O = b(o, "sources", 19, () => []), E = b(o, "assets", 19, () => ({})), M = b(o, "locale", 19, () => ({})), T = b(o, "propResourceMap", 19, () => ({ title: "locale", label: "locale", icon: "assets" })), ce = b(o, "beforeRenderNode", 3, Ve);
-  const k = Oe(), m = u(() => k.current);
-  g(() => {
-    k.setPreference(de());
+var Ie = j('<p part="dialog-title"> </p>'), Je = j("<element-pane-wrapper><!></element-pane-wrapper>", 2), Ke = j('<dialog part="dialog" closedby="closerequest"><form method="dialog" part="dialog-form"><div part="dialog-header"><!> <!></div> <div part="dialog-content"></div> <div part="dialog-footer"><!> <!></div></form> <!></dialog> <!>', 1), Qe = j('<div class="root"><!></div>');
+function At(ie, o) {
+  Me(o, !0);
+  let ae = v(o, "disabled", 3, !1), le = v(o, "animations", 3, "auto"), H = v(o, "sources", 19, () => []), A = v(o, "assets", 19, () => ({})), P = v(o, "locale", 19, () => ({})), E = v(o, "propResourceMap", 19, () => ({ title: "locale", label: "locale", icon: "assets" })), se = v(o, "beforeRenderNode", 3, Ve);
+  const V = Oe(), M = u(() => V.current);
+  p(() => {
+    V.setPreference(le());
   });
-  let B = h(void 0);
-  g(() => {
-    e(B) && Ye(e(B), "sourceschange", { detail: O().length });
+  let T = h(void 0);
+  p(() => {
+    e(T) && Ye(e(T), "sourceschange", { detail: H().length });
   });
-  let n = h(void 0), w = h(void 0), L = h(!1);
-  const ue = u(() => Q({ icon: "close", label: "close" }, T(), { locale: M(), assets: E() })), me = u(() => Q({ label: "cancel" }, T(), { locale: M(), assets: E() })), fe = u(() => Q({ label: "import" }, T(), { locale: M(), assets: E() }));
-  let W = h("");
+  let a = h(void 0), m = h(void 0), D = h(!1);
+  const de = u(() => J({ icon: "close", label: "close" }, E(), { locale: P(), assets: A() })), ue = u(() => J({ label: "cancel" }, E(), { locale: P(), assets: A() })), ce = u(() => J({ label: "import" }, E(), { locale: P(), assets: A() }));
+  let Q = h("");
+  function me(t) {
+    t.command === "show-modal" && pe(t);
+  }
+  function fe(t) {
+    e(a)?.open || ge();
+  }
   function pe(t) {
-    t.command === "show-modal" && ve(t);
+    s(Q, t?.source?.textContent.trim() || "");
   }
   function ge(t) {
-    e(n)?.open || he();
-  }
-  function ve(t) {
-    d(W, t?.source?.textContent.trim() || ""), requestAnimationFrame(() => {
-      d(L, !0);
-    });
+    oe() || U();
   }
   function he(t) {
-    ie() || Z();
+    const i = t.currentTarget;
+    t.target !== i || !e(c) || je(e(c), He(t.clientX, t.clientY)) || i.close();
   }
+  function ve(t) {
+    t.propertyName !== "display" || e(a)?.open || U();
+  }
+  function U() {
+    s(c, null), l.set(null, { instant: !0 }), s(b, null), y.set(null, { instant: !0 }), s(D, !1);
+  }
+  let c = h(null), l = new te(null);
+  p(() => {
+    e(c) && l.set(e(c), { instant: !e(M) });
+  }), p(() => {
+    Object.assign(l, o.springDefaults);
+  });
   function be(t) {
-    const c = t.currentTarget;
-    t.target !== c || !e(_) || je(e(_), He(t.clientX, t.clientY)) || c.close();
-  }
-  function _e(t) {
-    t.propertyName !== "display" || e(n)?.open || Z();
-  }
-  function Z() {
-    d(_, null), a.set(null, { instant: !0 }), d(x, null), C.set(null, { instant: !0 }), d(L, !1);
-  }
-  let _ = h(null), a = new oe(null);
-  g(() => {
-    e(_) && a.set(e(_), { instant: !e(m) });
-  }), g(() => {
-    Object.assign(a, o.springDefaults);
-  });
-  function xe(t) {
-    e(n)?.open && d(_, ae(t), !0);
-  }
-  let x = h(null), C = new oe(null);
-  g(() => {
-    e(x) && C.set(e(x), { instant: !e(m) });
-  }), g(() => {
-    Object.assign(C, o.springDefaults);
-  });
-  const De = u(() => {
-    if (!e(x) || !C.current)
-      return "0px";
-    const { x: t, y: c, width: i, height: H } = e(x), { x: S, y: A, width: N, height: V } = C.current, P = A - c, X = t + i - (S + N), Y = c + H - (A + V), z = S - t;
-    return `${P}px ${X}px ${Y}px ${z}px`;
-  });
-  function ye(t) {
-    e(n)?.open && d(x, ae(t), !0);
-  }
-  function Re(...t) {
-    e(w)?.append(...t), e(w)?.querySelector("[autofocus]")?.focus(), e(w)?.querySelectorAll("button[command=close]").forEach((i) => {
-      i.commandForElement = e(n);
+    if (!e(a)?.open || !e(m)?.children.length)
+      return;
+    const i = ne(t);
+    if (e(D)) {
+      s(c, i, !0);
+      return;
+    }
+    const n = 10;
+    s(
+      c,
+      {
+        x: i.x + n,
+        y: i.y + n,
+        width: i.width - n * 2,
+        height: i.height - n * 2
+      },
+      !0
+    ), requestAnimationFrame(() => {
+      s(c, i, !0), s(D, !0);
     });
   }
-  g(() => {
-    if (!e(n))
+  let b = h(null), y = new te(null);
+  p(() => {
+    e(b) && y.set(e(b), { instant: !e(M) });
+  }), p(() => {
+    Object.assign(y, o.springDefaults);
+  });
+  const _e = u(() => {
+    if (!e(b) || !y.current)
       return;
-    e(n).append = Re;
-    const t = ze(e(n), "command", pe);
+    const { x: t, y: i, width: n, height: Y } = e(b), { x: w, y: R, width: L, height: N } = y.current, q = R - i, _ = t + n - (w + L), F = i + Y - (R + N), S = w - t;
+    if (!(q === 0 && _ === 0 && F === 0 && S === 0))
+      return `${q}px ${_}px ${F}px ${S}px`;
+  });
+  function xe(t) {
+    !e(a)?.open || !e(m)?.children.length || s(b, ne(t), !0);
+  }
+  function De(...t) {
+    e(m)?.append(...t), e(m)?.querySelector("[autofocus]")?.focus(), e(m)?.querySelectorAll("button[command=close]").forEach((n) => {
+      n.commandForElement = e(a);
+    });
+  }
+  p(() => {
+    if (!e(a))
+      return;
+    e(a).append = De;
+    const t = ze(e(a), "command", me);
     return () => {
       t();
     };
   });
-  const we = u(() => ({
-    disabled: se(),
-    dialog: e(n),
-    resources: { locale: M(), assets: E() },
-    propResourceMap: T(),
-    enableAnimations: e(m),
+  const B = u(() => e(M) && e(D)), ye = u(() => ({
+    disabled: ae(),
+    dialog: e(a),
+    resources: { locale: P(), assets: A() },
+    propResourceMap: E(),
+    enableAnimations: e(M),
     springDefaults: o.springDefaults
   }));
-  Me(() => {
-    k.destroy();
+  Ee(() => {
+    V.destroy();
   });
-  var j = We(), Ce = v(j);
+  var X = Qe(), we = g(X);
   {
-    var Se = (t) => {
-      var c = Ue(), i = Le(c), H = u(() => ie() ? _e : Xe);
-      let S;
-      var A = v(i), N = v(A);
-      {
-        var V = (r) => {
-          var l = Je(), s = v(l);
-          F(s, {
-            class: "dialog-title-spring",
-            get enableAnimations() {
-              return e(m);
+    var Re = (t) => {
+      var i = Ke(), n = Be(i), Y = u(() => oe() ? ve : Xe);
+      let w;
+      var R = g(n), L = g(R), N = g(L);
+      k(N, {
+        get enableAnimations() {
+          return e(B);
+        },
+        class: "dialog-title-spring",
+        get springDefaults() {
+          return o.springDefaults;
+        },
+        children: (r, d) => {
+          var f = Ie(), C = g(f);
+          z(() => Le(C, e(Q))), O(r, f);
+        },
+        $$slots: { default: !0 }
+      });
+      var q = x(N, 2);
+      k(q, {
+        class: "dialog-button-close-spring",
+        get enableAnimations() {
+          return e(B);
+        },
+        get springDefaults() {
+          return o.springDefaults;
+        },
+        children: (r, d) => {
+          K(r, I(() => e(de), {
+            part: "dialog-button-close",
+            command: "close",
+            get commandfor() {
+              return e(a);
+            }
+          }));
+        },
+        $$slots: { default: !0 }
+      });
+      var _ = x(L, 2);
+      G(_, (r) => s(m, r), () => e(m)), Z(_, () => re({ onmeasure: xe }));
+      var F = x(_, 2), S = g(F);
+      k(S, {
+        class: "dialog-button-cancel-spring",
+        get enableAnimations() {
+          return e(B);
+        },
+        get springDefaults() {
+          return o.springDefaults;
+        },
+        children: (r, d) => {
+          K(r, I(() => e(ue), {
+            part: "dialog-button-cancel",
+            get commandfor() {
+              return e(a);
             },
-            get springDefaults() {
-              return o.springDefaults;
-            },
-            children: (p, G) => {
-              var $ = Ie(), Ee = v($);
-              I(() => Ne(Ee, e(W))), y(p, $);
-            },
-            $$slots: { default: !0 }
-          });
-          var f = D(s, 2);
-          F(f, {
-            class: "dialog-button-close-spring",
-            get enableAnimations() {
-              return e(m);
-            },
-            get springDefaults() {
-              return o.springDefaults;
-            },
-            children: (p, G) => {
-              U(p, K(() => e(ue), {
-                part: "dialog-button-close",
-                command: "close",
-                get commandfor() {
-                  return e(n);
-                }
-              }));
-            },
-            $$slots: { default: !0 }
-          }), y(r, l);
-        };
-        q(N, (r) => {
-          e(L) && r(V);
-        });
-      }
-      var P = D(N, 2);
-      J(P, (r) => d(w, r), () => e(w)), ee(P, () => ne({ onmeasure: ye }));
-      var X = D(P, 2);
-      {
-        var Y = (r) => {
-          var l = Ke(), s = v(l);
-          F(s, {
-            class: "dialog-button-cancel-spring",
-            get enableAnimations() {
-              return e(m);
-            },
-            get springDefaults() {
-              return o.springDefaults;
-            },
-            children: (p, G) => {
-              U(p, K(() => e(me), {
-                part: "dialog-button-cancel",
-                get commandfor() {
-                  return e(n);
-                },
-                command: "close"
-              }));
-            },
-            $$slots: { default: !0 }
-          });
-          var f = D(s, 2);
-          F(f, {
-            class: "dialog-button-import-spring",
-            get enableAnimations() {
-              return e(m);
-            },
-            get springDefaults() {
-              return o.springDefaults;
-            },
-            children: (p, G) => {
-              U(p, K(() => e(fe), { part: "dialog-button-import", type: "submit" }));
-            },
-            $$slots: { default: !0 }
-          }), y(r, l);
-        };
-        q(X, (r) => {
-          e(L) && r(Y);
-        });
-      }
-      var z = D(A, 2);
+            command: "close"
+          }));
+        },
+        $$slots: { default: !0 }
+      });
+      var Se = x(S, 2);
+      k(Se, {
+        class: "dialog-button-import-spring",
+        get enableAnimations() {
+          return e(B);
+        },
+        get springDefaults() {
+          return o.springDefaults;
+        },
+        children: (r, d) => {
+          K(r, I(() => e(ce), { part: "dialog-button-import", type: "submit" }));
+        },
+        $$slots: { default: !0 }
+      });
+      var Ce = x(R, 2);
       {
         var Ae = (r) => {
-          var l = Qe();
-          let s;
-          var f = v(l);
-          Ge(f, {
+          var d = Je();
+          let f;
+          var C = g(d);
+          Ge(C, {
             get width() {
-              return a.current.width;
+              return l.current.width;
             },
             get height() {
-              return a.current.height;
+              return l.current.height;
             }
-          }), I(() => s = re(l, "", s, {
-            left: a.target ? `${-a.target.x}px` : void 0,
-            top: a.target ? `${-a.target.y}px` : void 0,
-            translate: a.current ? `${a.current.x}px ${a.current.y}px` : void 0
-          })), y(r, l);
+          }), z(() => f = ee(d, "", f, {
+            left: l.target ? `${-l.target.x}px` : void 0,
+            top: l.target ? `${-l.target.y}px` : void 0,
+            translate: l.current ? `${l.current.x}px ${l.current.y}px` : void 0
+          })), O(r, d);
         };
-        q(z, (r) => {
-          a.current && r(Ae);
+        W(Ce, (r) => {
+          l.current && r(Ae);
         });
       }
-      J(i, (r) => d(n, r), () => e(n)), ee(i, () => ne({ onmeasure: xe }));
-      var Pe = D(i, 2);
+      G(n, (r) => s(a, r), () => e(a)), Z(n, () => re({ onmeasure: be }));
+      var Pe = x(n, 2);
       {
-        let r = u(() => ({ items: O() }));
+        let r = u(() => ({ items: H() }));
         ke(Pe, {
-          beforeRenderNode: (l, s, f) => ce()(l, s, f),
+          beforeRenderNode: (d, f, C) => se()(d, f, C),
           get nodes() {
             return o.template;
           },
@@ -250,23 +253,25 @@ function Pt(le, o) {
             return e(r);
           },
           get sharedContext() {
-            return e(we);
+            return e(ye);
           }
         });
       }
-      I(() => S = re(i, "", S, {
-        "--dialog-content-clip-path": e(De)
-      })), te("transitionend", i, function(...r) {
-        e(H)?.apply(this, r);
-      }), Fe("click", i, be), te("toggle", i, ge), y(t, c);
+      z(() => {
+        Ne(n, "data-visible", e(D) ? "" : void 0), w = ee(n, "", w, {
+          "--dialog-content-clip-path": e(_e)
+        });
+      }), $("transitionend", n, function(...r) {
+        e(Y)?.apply(this, r);
+      }), Fe("click", n, he), $("toggle", n, fe), O(t, i);
     };
-    q(Ce, (t) => {
-      O().length && t(Se);
+    W(we, (t) => {
+      H().length && t(Re);
     });
   }
-  J(j, (t) => d(B, t), () => e(B)), y(le, j), Be();
+  G(X, (t) => s(T, t), () => e(T)), O(ie, X), Te();
 }
 qe(["click"]);
 export {
-  Pt as default
+  At as default
 };

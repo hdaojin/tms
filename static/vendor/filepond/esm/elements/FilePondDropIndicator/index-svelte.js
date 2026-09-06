@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.63
+* FilePond v5.0.0-beta.66
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -10,8 +10,8 @@ import { push as Q, pop as U } from "../../vendor/svelte/src/internal/client/con
 import { get as t } from "../../vendor/svelte/src/internal/client/runtime.js";
 import { child as I } from "../../vendor/svelte/src/internal/client/dom/operations.js";
 import { state as g, set as p } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { from_html as A, append as S } from "../../vendor/svelte/src/internal/client/dom/template.js";
 import { user_derived as e } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { from_html as A, append as S } from "../../vendor/svelte/src/internal/client/dom/template.js";
 import { if_block as W } from "../../vendor/svelte/src/internal/client/dom/blocks/if.js";
 import { attach as C } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
 import { set_style as Z } from "../../vendor/svelte/src/internal/client/dom/elements/style.js";

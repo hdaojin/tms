@@ -2,9 +2,9 @@
   "dependencies": {
     "@alpinejs/csp": "^3.15.12",
     "@tailwindcss/cli": "^4.1.12",
-    "@upstash/context7-mcp": "^2.2.1",
+    "@upstash/context7-mcp": "^4.0.5",
     "filepond": "beta",
-    "mermaid": "11.16.1",
+    "mermaid": "^11.16.1",
     "tailwindcss": "^4.1.12"
   },
   "devDependencies": {
@@ -14,7 +14,7 @@
     "daisyui": "^5.0.50",
     "prettier": "^3.6.2",
     "prettier-plugin-jinja-template": "^2.1.0",
-    "prettier-plugin-tailwindcss": "^0.7.1"
+    "prettier-plugin-tailwindcss": "^0.8.1"
   },
   "scripts": {
     "build:css": "tailwindcss --input static/css/main.css --output static/css/output.css --minify",
@@ -58,5 +58,8 @@
   "bugs": {
     "url": "https://github.com/hdaojin/tms/issues"
   },
-  "homepage": "https://github.com/hdaojin/tms#readme"
+  "homepage": "https://github.com/hdaojin/tms#readme",
+  "allowScripts": {
+    "@parcel/watcher@2.5.1": true
+  }
 }
