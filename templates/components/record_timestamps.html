@@ -1,0 +1,9 @@
+{% load tz %}
+<div class="py-3">
+  <dt class="text-base-content/60">创建时间</dt>
+  <dd class="mt-1">{% if created_at %}{{ created_at|localtime|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}</dd>
+</div>
+<div class="py-3">
+  <dt class="text-base-content/60">修改时间</dt>
+  <dd class="mt-1">{% if updated_at %}{{ updated_at|localtime|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}</dd>
+</div>

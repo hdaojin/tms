@@ -8,6 +8,7 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
+from core.models import TimestampedModel
 
 from core.uploads import (
     PrivateMediaStorage,
@@ -15,6 +16,7 @@ from core.uploads import (
     TRAINING_LOG_UPLOAD_SPEC,
     UploadSignatureValidator,
 )
+from .log_files import TrainingLogStorage
 
 
 training_storage = PrivateMediaStorage("training")
@@ -36,7 +38,7 @@ def training_upload_path(instance, filename):
         )
     if isinstance(instance, TrainingPlan):
         return str(Path("plans", instance.training_cycle.code, Path(filename).name))
-    return str(Path("logs", instance.training_cycle.code, str(instance.author_id or "unknown"), Path(filename).name))
+    return str(Path("logs", instance.training_cycle.code, f"{instance.training_date:%Y/%m}", Path(filename).name))
 
 
 class TrainingCycle(models.Model):
@@ -604,7 +606,8 @@ class TaskExecutionAttachment(models.Model):
         super().save(*args, **kwargs)
 
 
-class TrainingLog(models.Model):
+class TrainingLog(TimestampedModel):
+    canonical_filename = models.CharField("归档文件名", max_length=255, null=True, blank=True, editable=False)
     training_cycle = models.ForeignKey(
         TrainingCycle, verbose_name="训练周期", on_delete=models.PROTECT, related_name="training_logs"
     )
@@ -616,15 +619,14 @@ class TrainingLog(models.Model):
     summary = models.TextField("训练摘要", blank=True)
     document = models.FileField(
         "正式训练日志",
-        storage=training_storage,
+        storage=TrainingLogStorage("training"),
+        max_length=500,
         upload_to=training_upload_path,
         validators=[*TRAINING_LOG_UPLOAD_SPEC.validators(), UploadSignatureValidator()],
         null=True,
         blank=True,
     )
     executions = models.ManyToManyField(TaskExecution, through="TrainingLogExecution", related_name="training_logs")
-    created_at = models.DateTimeField("创建时间", auto_now_add=True)
-    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
     class Meta:
         verbose_name = verbose_name_plural = "训练日志"
@@ -632,11 +634,15 @@ class TrainingLog(models.Model):
         constraints = [
             models.UniqueConstraint(
                 fields=["training_cycle", "author", "training_date"], name="uniq_traininglog_cycle_author_date"
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["training_cycle", "canonical_filename"], name="uniq_traininglog_cycle_filename"
+            ),
         ]
         permissions = [
             ("view_all_traininglog", "查看全部训练日志"),
             ("change_all_traininglog", "修改全部训练日志"),
+            ("delete_all_traininglog", "删除全部训练日志"),
             ("view_traininglog_statistics", "查看训练日志统计"),
             ("export_traininglog_archive", "导出训练日志归档"),
         ]

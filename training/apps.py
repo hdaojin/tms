@@ -12,6 +12,6 @@ class TrainingConfig(AppConfig):
         register_file_cleanup_signals(TrainingPlan, file_field="source_file")
         register_file_cleanup_signals(TrainingTaskAttachment, file_field="file")
         register_file_cleanup_signals(TaskExecutionAttachment, file_field="file")
-        register_file_cleanup_signals(TrainingLog, file_field="document")
+        register_file_cleanup_signals(TrainingLog, file_field="document", delete_on_commit=True)
 
     verbose_name = "训练管理"

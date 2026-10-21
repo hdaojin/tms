@@ -1,16 +1,22 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.core.exceptions import ValidationError
+from django.db.models import Count
 from pathlib import Path
 
-from django.http import FileResponse, HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import render
 from django.urls import reverse
 from django.views.decorators.http import require_GET
-from django.views.generic import CreateView, DetailView, FormView, UpdateView
+from django.views.generic import CreateView, DeleteView, DetailView, FormView, UpdateView
 from django_tables2 import SingleTableView
 
 from core.utils.breadcrumbs import breadcrumb_link
 from core.utils.mixins import TitleMixin
+from accounts.services.users import get_user_display_name
+from core.file_preview import (
+    FilePreviewMetadata, build_file_preview_descriptor, build_inline_preview_response, build_download_response,
+)
 
 from .forms import (
     CoachFeedbackForm,
@@ -24,6 +30,7 @@ from .models import TaskExecution, TrainingCycle, TrainingLog, TrainingPlan, Tra
 from .selectors import (
     manageable_training_tasks_for,
     training_logs_changeable_by,
+    training_logs_deletable_by,
     training_logs_visible_to,
     visible_task_executions_for,
     visible_training_tasks_for,
@@ -341,7 +348,11 @@ class TrainingLogListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, Si
     create_label = "新增训练日志"
 
     def get_queryset(self):
-        return training_logs_visible_to(self.request.user).select_related("training_cycle", "author")
+        return (
+            training_logs_visible_to(self.request.user)
+            .select_related("training_cycle", "author")
+            .annotate(execution_count=Count("executions"))
+        )
 
 
 class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -358,6 +369,27 @@ class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
 
     def get_queryset(self):
         return training_logs_visible_to(self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        log = self.object
+        user = self.request.user
+        context["can_edit"] = user.has_perm("training.change_traininglog") and (
+            training_logs_changeable_by(user).filter(pk=log.pk).exists()
+        )
+        context["can_delete"] = training_logs_deletable_by(user).filter(pk=log.pk).exists()
+        context["file_preview"] = build_file_preview_descriptor(
+            file=log.document,
+            filename=Path(log.document.name).name if log.document else "尚未上传日志文件",
+            download_url=reverse("training:log_download", args=[log.pk]),
+            preview_url=reverse("training:log_preview", args=[log.pk]),
+            uploader_name=get_user_display_name(log.author), uploaded_at=log.created_at,
+            source_label="训练日志", source_url=reverse("training:log_list"),
+            title=log.topic, description=log.summary,
+            metadata=(FilePreviewMetadata("训练周期", log.training_cycle.name),
+                      FilePreviewMetadata("训练日期", log.training_date.strftime("%Y-%m-%d"))),
+        )
+        return context
 
 
 class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
@@ -380,6 +412,13 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     def get_success_url(self):
         return reverse("training:log_detail", args=[self.object.pk])
 
+    def form_valid(self, form):
+        try:
+            return super().form_valid(form)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
+
 
 class TrainingLogUpdateView(TrainingLogCreateView, UpdateView):
     title = "编辑训练日志"
@@ -398,14 +437,26 @@ class TrainingLogDownloadView(PermissionRequiredMixin, DetailView):
 
     def get(self, request, *args, **kwargs):
         log = self.get_object()
-        response = FileResponse(
-            log.document.open("rb"),
-            as_attachment=True,
-            filename=Path(log.document.name).name,
-        )
-        response["X-Content-Type-Options"] = "nosniff"
-        response["Cache-Control"] = "private, no-store"
-        return response
+        return build_download_response(log.document, Path(log.document.name or "").name)
+
+
+class TrainingLogPreviewView(TrainingLogDownloadView):
+    def get(self, request, *args, **kwargs):
+        log = self.get_object()
+        return build_inline_preview_response(log.document, Path(log.document.name or "").name)
+
+
+class TrainingLogDeleteView(TitleMixin, PermissionRequiredMixin, DeleteView):
+    model = TrainingLog
+    template_name = "training/log_confirm_delete.html"
+    title = "删除训练日志"
+    permission_required = "training.delete_traininglog"
+
+    def get_queryset(self):
+        return training_logs_deletable_by(self.request.user)
+
+    def get_success_url(self):
+        return reverse("training:log_list")
 
 
 class TrainingLogArchiveExportView(PermissionRequiredMixin, SingleTableView):

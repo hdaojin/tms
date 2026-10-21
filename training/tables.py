@@ -1,3 +1,10 @@
+from pathlib import Path
+
+import django_tables2 as tables
+from django.urls import reverse
+from django.utils.html import format_html
+
+from accounts.services.users import get_user_display_name
 from core.tables import ActionsColumn, BaseDateColumn, BaseTable
 
 from .models import TaskExecution, TrainingCycle, TrainingLog, TrainingPlan, TrainingTask
@@ -44,8 +51,24 @@ class TaskExecutionTable(BaseTable):
 
 class TrainingLogTable(BaseTable):
     training_date = BaseDateColumn()
+    topic = tables.TemplateColumn(
+        template_name="training/_log_content_cell.html", verbose_name="训练内容", order_by="topic"
+    )
+    document = tables.Column(verbose_name="日志附件", empty_values=(), orderable=False)
     actions = ActionsColumn("training:log_detail", "training:log_edit", edit_perm="training.change_traininglog")
+
+    def render_author(self, value):
+        return get_user_display_name(value)
+
+    def render_document(self, record):
+        if not record.document:
+            return "未附文件"
+        return format_html(
+            '<a class="link link-primary break-all" href="{}">{}</a>',
+            reverse("training:log_detail", args=[record.pk]),
+            Path(record.document.name).name,
+        )
 
     class Meta(BaseTable.Meta):
         model = TrainingLog
-        fields = ["training_date", "training_cycle", "author", "topic", "actions"]
+        fields = ["training_date", "training_cycle", "author", "topic", "document", "actions"]

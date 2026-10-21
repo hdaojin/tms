@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Type
 
-from django.db import models
+from django.db import models, transaction
 from django.db.models.signals import post_delete, pre_save
 
 
@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 def register_file_cleanup_signals(
     model: Type[models.Model],
     file_field: str = "file",
+    *,
+    delete_on_commit: bool = False,
 ) -> None:
     """
     为模型注册文件清理信号处理器
@@ -41,12 +43,20 @@ def register_file_cleanup_signals(
         file_obj = getattr(instance, file_field, None)
         if file_obj and getattr(file_obj, 'name', None):
             storage = file_obj.storage
-            try:
-                if storage.exists(file_obj.name):
-                    storage.delete(file_obj.name)
-                    logger.debug(f"已删除文件: {file_obj.name}")
-            except Exception as e:
-                logger.exception(f"删除文件失败 {file_obj.name}: {e}")
+            name = file_obj.name
+
+            def delete_file():
+                try:
+                    if storage.exists(name):
+                        storage.delete(name)
+                        logger.debug(f"已删除文件: {name}")
+                except Exception as e:
+                    logger.exception(f"删除文件失败 {name}: {e}")
+
+            if delete_on_commit:
+                transaction.on_commit(delete_file, using=kwargs.get("using"))
+            else:
+                delete_file()
     
     def delete_old_file_on_change(sender: Type[models.Model], instance: Any, **kwargs: Any) -> None:
         """更新记录时，若文件被替换则删除旧文件"""

@@ -23,7 +23,17 @@ class UploadedDocumentModel(models.Model):
         return Path(file_obj.name).name if file_obj else ''
 
 
-class AuditedModel(models.Model):
+class TimestampedModel(models.Model):
+    """业务记录的创建时间与最后保存时间；批量写入需显式维护更新时间。"""
+
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class AuditedModel(TimestampedModel):
     """通用创建/更新审计字段。"""
 
     created_by = models.ForeignKey(
@@ -34,7 +44,6 @@ class AuditedModel(models.Model):
         related_name='+',
         verbose_name='创建人',
     )
-    created_at = models.DateTimeField('创建时间', auto_now_add=True)
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -43,7 +52,6 @@ class AuditedModel(models.Model):
         related_name='+',
         verbose_name='更新人',
     )
-    updated_at = models.DateTimeField('更新时间', auto_now=True)
 
     class Meta:
         abstract = True

@@ -23,7 +23,8 @@ from .models import (
     TrainingTaskDomain,
     TrainingTaskSkill,
 )
-from .services import publish_training_task
+from .services import publish_training_task, save_training_log
+from .log_files import DUPLICATE_LOG_MESSAGE, build_log_filename
 
 
 User = get_user_model()
@@ -445,14 +446,33 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
         model = TrainingLog
         fields = ["training_cycle", "training_date", "topic", "summary", "document"]
         widgets = {
-            "training_date": forms.DateInput(attrs={"type": "date"}),
+            "training_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "summary": forms.Textarea(attrs={"rows": 5}),
         }
 
     def __init__(self, *args, **kwargs):
         self.author = kwargs.pop("author", None)
         super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.author = self.instance.author
+        elif self.author:
+            self.instance.author = self.author
+            today = timezone.localdate()
+            default_cycle = (
+                TrainingCycle.objects.filter(members__user=self.author, status=TrainingCycle.Status.ACTIVE,
+                                             start_date__lte=today)
+                .filter(models.Q(end_date__isnull=True) | models.Q(end_date__gte=today))
+                .order_by("-start_date", "name", "pk").first()
+            )
+            if default_cycle:
+                self.initial.setdefault("training_cycle", default_cycle.pk)
         self.fields["document"].widget.attrs.update(TRAINING_LOG_UPLOAD_SPEC.widget_attrs())
+        if self.instance.pk and self.instance.document:
+            # 不把已有文件再次交给 FileField 校验，避免读取旧文件或触发替换。
+            self.fields.pop("document")
+            for field in ("training_cycle", "training_date"):
+                self.fields[field].disabled = True
+                self.fields[field].help_text = "已有日志文件，如需修改请先删除日志后重新上传。"
         if self.author:
             self.fields["executions"].queryset = TaskExecution.objects.filter(user=self.author).select_related(
                 "training_task"
@@ -464,6 +484,23 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
         cleaned = super().clean()
         cycle = cleaned.get("training_cycle")
         training_date = cleaned.get("training_date")
+        if cycle and training_date and self.author:
+            others = TrainingLog.objects.filter(training_cycle=cycle).exclude(pk=self.instance.pk)
+            if others.filter(author=self.author, training_date=training_date).exists():
+                self.add_error(None, DUPLICATE_LOG_MESSAGE)
+            document = cleaned.get("document")
+            if document and not getattr(document, "_committed", False):
+                candidate = TrainingLog(training_cycle=cycle, author=self.author, training_date=training_date)
+                try:
+                    filename = build_log_filename(candidate, document.name)
+                except forms.ValidationError as exc:
+                    self.add_error("document", exc)
+                else:
+                    if others.filter(
+                        models.Q(canonical_filename=filename) | models.Q(document__endswith="/" + filename)
+                        | models.Q(document__endswith="\\" + filename)
+                    ).exists():
+                        self.add_error("document", DUPLICATE_LOG_MESSAGE)
         for execution in cleaned.get("executions") or []:
             if self.author and execution.user_id != self.author.pk:
                 self.add_error("executions", "训练日志只能关联作者本人的任务执行。")
@@ -485,6 +522,5 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
         if self.author and not log.author_id:
             log.author = self.author
         if commit:
-            log.save()
-            log.executions.set(self.cleaned_data.get("executions"))
+            save_training_log(log, self.cleaned_data.get("executions"))
         return log

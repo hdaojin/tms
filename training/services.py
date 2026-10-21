@@ -5,10 +5,43 @@ from io import BytesIO
 from pathlib import PurePosixPath
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from .models import TaskExecution, TrainingCycleMember, TrainingTask
+from .models import TaskExecution, TrainingCycleMember, TrainingLog, TrainingTask
+from .log_files import DUPLICATE_LOG_MESSAGE, build_log_filename
+
+
+def save_training_log(log, executions):
+    """先预留数据库唯一键，再保存文件；失败时清理本次新增文件。"""
+    upload = log.document if log.document and not log.document._committed else None
+    saved_name = None
+    storage = log.document.storage
+    try:
+        with transaction.atomic():
+            if log.pk:
+                previous = TrainingLog.objects.select_for_update().get(pk=log.pk)
+                if previous.document and (
+                    upload or previous.document.name != log.document.name
+                    or previous.training_cycle_id != log.training_cycle_id
+                    or previous.training_date != log.training_date
+                ):
+                    raise ValidationError("已有日志文件，如需修改请先删除日志后重新上传。")
+            if upload:
+                log.canonical_filename = build_log_filename(log, upload.name)
+                log.document = None
+            log.save()
+            if upload:
+                log.document.save(log.canonical_filename, upload, save=False)
+                saved_name = log.document.name
+                log.save(update_fields=["document", "updated_at"])
+            log.executions.set(executions)
+    except Exception as exc:
+        if saved_name:
+            storage.delete(saved_name)
+        if isinstance(exc, IntegrityError):
+            raise ValidationError(DUPLICATE_LOG_MESSAGE) from exc
+        raise
 
 
 @transaction.atomic

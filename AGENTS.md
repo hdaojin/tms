@@ -68,6 +68,9 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 
 模型负责持久化结构和**单个实体自身**的业务不变量。
 
+- 新增的自有业务模型默认继承 `core.models.TimestampedModel`，统一记录 `created_at`（创建时间）与 `updated_at`（最后保存时间）；同时需要创建人、更新人时继承 `core.models.AuditedModel`，它复用前者。显式业务关联模型同样遵循；Django/第三方模型、框架自动生成的关联表不要求改造，确有例外时须说明原因。既有模型按任务范围逐步接入，不为此批量重构。
+- 创建时间创建后保持不变；修改时间表示最近一次成功保存，即使内容未变也刷新。应用页面、后台和导入入口均须遵循；`save(update_fields=...)` 涉及业务修改时应包含 `updated_at`，`QuerySet.update()` / `bulk_update()` 等批量更新须显式设置修改时间，批量创建须保证两组时间完整。关系修改若属于父记录的一次业务保存，由 service 同步更新父记录时间。直接执行 SQL 不提供数据库触发器自动追踪保证；这些时间不是完整审计历史。
+- 展示两组时间时，列表复用 `core.tables.BaseDateTimeColumn`，详情的 `<dl>` 内复用 `templates/components/record_timestamps.html`，传入 `created_at`、`updated_at`，按默认 `Asia/Shanghai` 时区显示到秒。业务发生日期、附件上传时间与记录创建时间不得混用。
 - 能由数据库可靠表达的唯一性、条件唯一性和完整性优先使用 `UniqueConstraint`、`CheckConstraint`、字段约束等数据库机制。
 - `Model.clean()` 适合实体内的跨字段校验以及需要被 ModelForm 展示的业务错误。
 - 不要把跨多个模型的工作流、导入编排、外部副作用或复杂统计塞进 `save()`。

@@ -25,6 +25,7 @@
           文件不可用
         </button>
       {% endif %}
+      {% block file_actions %}{% endblock %}
     </div>
 
     <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -63,7 +64,7 @@
               <p class="max-w-lg text-sm text-base-content/60">可下载后使用本地应用打开。系统不会内联展示 Office、压缩包、HTML 或 SVG 文件。</p>
             {% else %}
               <p class="font-medium">文件不可用</p>
-              <p class="max-w-lg text-sm text-base-content/60">文件记录仍然保留，但存储中的实际文件无法读取。</p>
+              <p class="max-w-lg text-sm text-base-content/60">{% block file_unavailable_message %}文件记录仍然保留，但存储中的实际文件无法读取。{% endblock %}</p>
             {% endif %}
           </div>
         {% endif %}
@@ -93,10 +94,12 @@
             <dt class="text-base-content/60">上传者</dt>
             <dd class="mt-1 break-words">{{ file_preview.uploader_name|default:"—" }}</dd>
           </div>
+          {% block file_timestamps %}
           <div class="py-3">
             <dt class="text-base-content/60">上传时间</dt>
             <dd class="mt-1">{% if file_preview.uploaded_at %}{{ file_preview.uploaded_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</dd>
           </div>
+          {% endblock %}
           <div class="py-3">
             <dt class="text-base-content/60">业务归属</dt>
             <dd class="mt-1"><a class="link link-primary break-words" href="{{ file_preview.source_url }}">{{ file_preview.source_label }}</a></dd>

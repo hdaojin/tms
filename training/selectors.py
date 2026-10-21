@@ -53,3 +53,12 @@ def training_logs_changeable_by(user, queryset=None):
     if user.has_perm("training.change_all_traininglog") or user.is_superuser:
         return queryset
     return queryset.filter(author=user)
+
+
+def training_logs_deletable_by(user, queryset=None):
+    queryset = queryset if queryset is not None else TrainingLog.objects.all()
+    if not user.has_perm("training.delete_traininglog"):
+        return queryset.none()
+    if user.has_perm("training.delete_all_traininglog") or user.is_superuser:
+        return queryset
+    return queryset.filter(author=user)

@@ -59,6 +59,14 @@ bundles:
     name: 训练管理 | 查看训练统计
     description: 查看训练日志统计。
     permissions: [training.view_traininglog_statistics]
+  - code: training.delete_own_logs
+    name: 训练管理 | 删除本人日志
+    description: 删除本人训练日志及其文件。
+    permissions: [training.view_traininglog, training.delete_traininglog]
+  - code: training.delete_all_logs
+    name: 训练管理 | 删除全部日志
+    description: 查看并删除全部人员的训练日志及其文件。
+    permissions: [training.view_traininglog, training.view_all_traininglog, training.delete_traininglog, training.delete_all_traininglog]
   - code: training.export_logs
     name: 训练管理 | 导出训练日志
     description: 导出有权查看的训练日志归档。

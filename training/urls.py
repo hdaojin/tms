@@ -26,5 +26,7 @@ urlpatterns = [
     path("logs/<int:pk>/", views.TrainingLogDetailView.as_view(), name="log_detail"),
     path("logs/<int:pk>/edit/", views.TrainingLogUpdateView.as_view(), name="log_edit"),
     path("logs/<int:pk>/download/", views.TrainingLogDownloadView.as_view(), name="log_download"),
+    path("logs/<int:pk>/preview/", views.TrainingLogPreviewView.as_view(), name="log_preview"),
+    path("logs/<int:pk>/delete/", views.TrainingLogDeleteView.as_view(), name="log_delete"),
     path("logs/export/", views.TrainingLogArchiveExportView.as_view(), name="log_export"),
 ]

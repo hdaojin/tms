@@ -1,22 +1,14 @@
-{% extends "layouts/app.html" %}
+{% extends "common/file_preview_detail.html" %}
 
-{% block content %}
-<div class="card bg-base-100 shadow-sm">
-  <div class="card-body">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <h2 class="card-title">训练日志信息</h2>
-        <p class="text-sm text-base-content/70">{{ log.training_date }} / {{ log.author }}</p>
-      </div>
-      {% if perms.training.change_traininglog %}
-        <a href="{% url 'training:log_edit' log.pk %}" class="btn btn-outline btn-sm">编辑</a>
-      {% endif %}
-    </div>
-    <p>{{ log.training_cycle }}</p>
-    <p class="whitespace-pre-line">{{ log.summary|default:"暂无摘要" }}</p>
-    {% if log.document %}
-      <a href="{% url 'training:log_download' log.pk %}" class="btn btn-primary btn-sm">下载日志文件</a>
-    {% endif %}
-  </div>
-</div>
+{% block file_timestamps %}
+  {% include "components/record_timestamps.html" with created_at=log.created_at updated_at=log.updated_at only %}
+{% endblock %}
+
+{% block file_actions %}
+  {% if can_edit %}<a href="{% url 'training:log_edit' log.pk %}" class="btn btn-outline btn-sm">编辑</a>{% endif %}
+  {% if can_delete %}<a href="{% url 'training:log_delete' log.pk %}" class="btn btn-error btn-outline btn-sm">删除日志</a>{% endif %}
+{% endblock %}
+
+{% block file_unavailable_message %}
+  {% if log.document %}文件记录仍然保留，但存储中的实际文件无法读取。{% else %}这是一条文字日志，尚未上传附件，可通过编辑添加日志文件。{% endif %}
 {% endblock %}
