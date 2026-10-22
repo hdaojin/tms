@@ -1,16 +1,16 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { withNodeTree as d } from "../../elements/common/nodeTree.js";
-import { isDataTransferEntry as p, isFileEntry as k, isString as S, isNumber as g } from "../../utils/test.js";
-import { bytesToNaturalFileSize as U } from "../../utils/file.js";
-import { fade as A } from "../../elements/common/transition.js";
-import { quadInOut as D } from "../../vendor/svelte/src/easing/index.js";
-import { hasExtensionWithStatusCode as s, createDefaultSpringElement as f, createButton as i, hasExtensionWithAction as L, getExtensionStatusWithCode as b } from "../common/index.js";
-import { cache as B } from "../../utils/cache.js";
+import { withNodeTree as S } from "../../elements/common/nodeTree.js";
+import { isDataTransferEntry as f, isFileEntry as g, isString as b, isNumber as U } from "../../utils/test.js";
+import { bytesToNaturalFileSize as A } from "../../utils/file.js";
+import { fade as D } from "../../elements/common/transition.js";
+import { quadInOut as B } from "../../vendor/svelte/src/easing/index.js";
+import { hasExtensionWithStatusCode as s, createDefaultSpringElement as E, createButton as l, hasExtensionWithAction as L, getExtensionStatusWithCode as R } from "../common/index.js";
+import { cache as Y } from "../../utils/cache.js";
 import "../../elements/components/BooleanInput/index.js";
 import "../../elements/components/ElementSkeleton/index.js";
 import "../../elements/components/FilenameInput/index.js";
@@ -19,21 +19,22 @@ import "../../elements/FilePondEntryList/components/EntryStatus/index.js";
 import "../../elements/FilePondEntryList/components/EntryList/index.js";
 import "../../elements/FilePondEntryList/components/EntryListItem/index.js";
 import "../../elements/FilePondEntryList/components/Entry/index.js";
-import Y from "../../elements/FilePondEntryList/components/EntryListItemPlaceholder/index-svelte.js";
-import { toSpaceSeparatedString as l } from "../../elements/common/string.js";
-import $ from "../../elements/FilePondEntryList/components/EntryListItem/index-svelte.js";
-import F from "../../elements/FilePondEntryList/components/EntryList/index-svelte.js";
-import v from "../../elements/FilePondEntryList/components/Entry/index-svelte.js";
-import P from "../../elements/FilePondEntryList/components/EntryStatus/index-svelte.js";
-import E from "../../elements/components/ElementSkeleton/index-svelte.js";
-import R from "../../elements/FilePondEntryList/components/EntryActivityIndicator/index-svelte.js";
-import M from "../../elements/components/BooleanInput/index-svelte.js";
-import C from "../../elements/components/FilenameInput/index-svelte.js";
-function Rt() {
+import $ from "../../elements/FilePondEntryList/components/EntryListItemPlaceholder/index-svelte.js";
+import { toSpaceSeparatedString as u } from "../../elements/common/string.js";
+import { EMPTY_OBJECT as c } from "../../utils/object.js";
+import F from "../../elements/FilePondEntryList/components/EntryListItem/index-svelte.js";
+import v from "../../elements/FilePondEntryList/components/EntryList/index-svelte.js";
+import P from "../../elements/FilePondEntryList/components/Entry/index-svelte.js";
+import M from "../../elements/FilePondEntryList/components/EntryStatus/index-svelte.js";
+import d from "../../elements/components/ElementSkeleton/index-svelte.js";
+import O from "../../elements/FilePondEntryList/components/EntryActivityIndicator/index-svelte.js";
+import C from "../../elements/components/BooleanInput/index-svelte.js";
+import N from "../../elements/components/FilenameInput/index-svelte.js";
+function Tt() {
   return [
     {
       key: "entry-list",
-      component: F,
+      component: v,
       props: ({ entries: t }) => ({
         part: "entry-list",
         entries: t
@@ -42,78 +43,85 @@ function Rt() {
         if: {
           test: ({ isPlaceholder: t }) => t,
           then: {
-            component: Y,
-            props: ({ onmeasureitem: t }) => ({
+            component: $,
+            props: ({ id: t, index: e, onmeasureitem: r }) => ({
+              id: t,
+              index: e,
               part: "entry-list-item-placeholder",
-              onmeasureitem: t
+              onmeasureitem: r
             })
           }
         },
         else: {
           key: "entry-list-item",
-          component: $,
+          component: F,
           props: ({
-            entry: t,
-            ariaId: e,
-            spring: r,
-            isDetached: n,
-            isRemoving: o,
+            id: t,
+            index: e,
+            entry: r,
+            ariaId: n,
+            isDetached: o,
+            isRemoving: i,
             isDraggable: a,
-            isDragging: c,
-            isLastDraggedItem: O,
-            translation: T,
-            springAnimation: _,
-            onmeasureitem: h
+            isDragging: T,
+            isLastDraggedItem: _,
+            translation: h,
+            onmeasureitem: k
           }) => ({
-            part: p(t) ? "entry-list-item data-transfer-item" : "entry-list-item file-item",
+            id: t,
+            index: e,
+            part: f(r) ? "entry-list-item data-transfer-item" : "entry-list-item file-item",
             class: "entry-list-item",
-            entry: t,
-            spring: r,
-            isDetached: n,
-            isRemoving: o,
+            entry: r,
+            isDetached: o,
+            isRemoving: i,
             isDraggable: a,
-            isDragging: c,
-            isLastDraggedItem: O,
-            springAnimation: _,
-            translation: T,
-            onmeasureitem: h,
-            ariaDescribedby: l(
-              `${e}-status`,
-              `${e}-store-info`
+            isDragging: T,
+            isLastDraggedItem: _,
+            translation: h,
+            onmeasureitem: k,
+            ariaDescribedby: u(
+              `${n}-status`,
+              `${n}-store-info`
             )
           }),
-          children: x()
+          children: z()
         }
       }
     }
   ];
 }
-function x() {
+function z() {
   return {
     key: "entry",
-    component: v,
+    component: P,
     props: ({ entry: t, ariaId: e }) => ({
       legendId: `${e}-name`,
-      part: p(t) ? "entry entry-data-transfer" : "entry"
+      part: f(t) ? "entry entry-data-transfer" : "entry"
+    }),
+    data: ({ id: t, ariaId: e, entry: r } = c) => ({
+      id: t,
+      ariaId: e,
+      entry: r
     }),
     children: [
-      q(),
+      Z(),
       {
         if: {
-          test: ({ entry: t }) => p(t),
-          then: I()
+          test: ({ entry: t }) => f(t),
+          then: x()
         },
         elseif: {
-          test: ({ entry: t }) => k(t),
-          then: z()
+          test: ({ entry: t }) => g(t),
+          then: I()
         }
       },
-      Z(),
-      N()
+      w(),
+      Q()
     ]
   };
 }
-function u(t, e, { main: r, sub: n }) {
+function m(t, e, { main: r, sub: n }) {
   return {
     if: {
       test: ({ entry: o }) => s(o, e),
@@ -124,7 +132,7 @@ function u(t, e, { main: r, sub: n }) {
           layout: "col"
         },
         children: [
-          S(r) ? {
+          b(r) ? {
             key: `${t}-main`,
             tag: "div",
             attrs: {
@@ -145,8 +153,8 @@ function u(t, e, { main: r, sub: n }) {
     }
   };
 }
-function z() {
-  return f({
+function I() {
+  return E({
     key: "entry-info",
     props: {
       class: "entry-info",
@@ -156,11 +164,11 @@ function z() {
         layout: "split"
       }
     },
-    children: [Q(), W()]
+    children: [W(), q()]
   });
 }
-function I() {
-  return f({
+function x() {
+  return E({
     key: "data-transfer-info",
     props: {
       class: "entry-info",
@@ -170,8 +178,9 @@ function I() {
         layout: "col"
       }
     },
-    context: ({ entry: t }) => {
-      const e = b(t, "LOAD_BUSY");
+    // adds { processedFiles, totalFiles } values to dataset
+    data: ({ entry: t } = c) => {
+      const e = R(t, "LOAD_BUSY");
       return {
         processedFiles: e?.values?.processed,
         totalFiles: e?.values?.total
@@ -197,10 +206,10 @@ function I() {
     ]
   });
 }
-function N() {
+function Q() {
   return {
     key: "entry-status",
-    component: P,
+    component: M,
     props: ({ ariaId: t }) => ({
       part: "entry-status",
       class: "entry-status",
@@ -208,71 +217,74 @@ function N() {
     })
   };
 }
-function Q() {
+function W() {
   return {
     key: "file-info",
     tag: "element-stack",
-    attrs: {
-      layout: "col"
-    },
-    context: ({ entry: t }) => {
-      const e = s(t, [
+    // adds { isWaiting, isFrozen } props to dataset
+    data: (t = c) => {
+      const { entry: e } = t, r = s(e, [
         "LOAD_QUEUED",
         "LOAD_BUSY",
         "STORE_RESTORE_BUSY"
-      ]), r = s(t, [
+      ]), n = s(e, [
         "LOAD_ERROR",
         "STORE_RESTORE_ERROR"
       ]);
       return {
-        isWaiting: e,
-        isFrozen: r
+        name: e.name,
+        size: e.size,
+        isWaiting: r,
+        isFrozen: n
       };
+    },
+    attrs: {
+      layout: "col"
     },
     children: [
       {
         key: "file-info-main",
-        component: E,
+        component: d,
         props: ({ isWaiting: t, isFrozen: e }) => ({
           class: "entry-info-main",
           part: "entry-info-main",
           isWaiting: t,
           isFrozen: e
         }),
-        children: "{{entry.name}}"
+        children: "{{name}}"
       },
       {
         key: "file-info-sub",
-        component: E,
+        component: d,
+        // adds { size, sizeUnit } props to dataset and retains { isWaiting, isFrozen }
+        data: ({ size: t, isWaiting: e, isFrozen: r } = c, { byteUnits: n } = c) => {
+          if (!U(t))
+            return c;
+          const o = Y(A, [t, { byteUnits: n }]), [i, a] = o.split(" ");
+          return {
+            sizeNatural: i,
+            sizeUnit: `unit${a}`,
+            isWaiting: e,
+            isFrozen: r
+          };
+        },
         props: ({ isWaiting: t, isFrozen: e }) => ({
           class: "entry-info-sub",
           part: "entry-info-sub",
           isWaiting: t,
           isFrozen: e
         }),
-        context: ({ entry: t, byteUnits: e }) => {
-          if (!g(t.size))
-            return {};
-          const r = B(U, [
-            t.size,
-            { byteUnits: e }
-          ]), [n, o] = r.split(" ");
-          return {
-            size: n,
-            sizeUnit: `unit${o}`
-          };
-        },
-        children: "{{size}} {{sizeUnit}}"
+        children: "{{sizeNatural}} {{sizeUnit}}"
       }
     ]
   };
 }
-const m = ({ ariaId: t }) => ({
+const p = ({ ariaId: t }) => ({
   id: `${t}-store-info`,
   class: "entry-info-main"
 });
-function W() {
-  return f({
+function q() {
+  return E({
     key: "file-store-spring",
     props: {
       subtag: "element-stack",
@@ -281,9 +293,9 @@ function W() {
       }
     },
     transition: {
-      fn: A,
+      fn: D,
       duration: 150,
-      easing: D,
+      easing: B,
       when: ({ entry: t }) => s(t, [
         "STORE_QUEUED",
         "STORE_BUSY",
@@ -291,38 +303,41 @@ function W() {
       ])
     },
     children: [
-      u("file-store-queued-info", ["STORE_QUEUED"], {
+      m("file-store-queued-info", ["STORE_QUEUED"], {
         main: {
           key: "file-store-queued-info-main",
           tag: "div",
-          attrs: m,
+          attrs: p,
           children: "storeStorageQueued"
         },
         sub: "assistAbort"
       }),
-      u("file-store-busy-info", ["STORE_BUSY"], {
+      m("file-store-busy-info", ["STORE_BUSY"], {
         sub: "assistAbort",
         main: {
           key: "file-store-busy-info-main",
           tag: "div",
-          attrs: m,
-          spring: ({ entry: t }) => {
-            const { progress: e } = b(t, "STORE_BUSY") ?? {};
+          data: ({ entry: t } = c) => {
+            const { progress: e } = R(t, "STORE_BUSY") ?? {};
             return {
-              progress: {
-                value: e === 1 / 0 ? 0 : e,
-                transform: (r) => Math.round(r * 100)
-              }
+              progress: e
             };
           },
+          spring: ({ progress: t }) => ({
+            progress: {
+              value: t === 1 / 0 ? 0 : t,
+              transform: (e) => Math.round(e * 100)
+            }
+          }),
+          attrs: p,
           children: "storeStorageProgress"
         }
       }),
-      u("file-store-complete-info", ["STORE_COMPLETE"], {
+      m("file-store-complete-info", ["STORE_COMPLETE"], {
         main: {
           key: "file-store-complete-info-main",
           tag: "div",
-          attrs: m,
+          attrs: p,
           children: "storeStorageComplete"
         },
         sub: "assistUndo"
@@ -330,10 +345,10 @@ function W() {
     ]
   });
 }
-function q() {
+function Z() {
   return {
     key: "entry-load-state",
-    component: R,
+    component: O,
     props: ({ id: t, ariaId: e, entry: r }, { updateEntryState: n, removeEntries: o }) => ({
       class: "entry-load-state",
       part: "entry-load-state",
@@ -342,11 +357,13 @@ function q() {
         {
           codes: ["LOAD_QUEUED", "LOAD_BUSY", "STORE_RESTORE_BUSY"],
           progress: !0,
-          button: i("button-load-abort", {
+          button: l("button-load-abort", {
             title: "abort",
             icon: "remove",
             disabled: s(r, ["TRANSFORM_BUSY"]),
-            onclick: () => n(t, { abort: !0 }),
+            onclick: () => {
+              n(t, { abort: !0 });
+            },
             ariaDescribedby: `${e}-name`
           })
         },
@@ -359,11 +376,13 @@ function q() {
             "STORE_RESTORE_COMPLETE",
             "STORE_RESTORE_ERROR"
           ],
-          button: i("button-entry-remove", {
+          button: l("button-entry-remove", {
             icon: "remove",
             disabled: s(r, ["TRANSFORM_BUSY"]),
-            onclick: () => o(t),
-            ariaDescribedby: l(
+            onclick: () => {
+              o(t);
+            },
+            ariaDescribedby: u(
               `${e}-name`,
               `${e}-status`
             )
@@ -373,10 +392,10 @@ function q() {
     })
   };
 }
-function Z() {
+function w() {
   return {
     key: "entry-store-state",
-    component: R,
+    component: O,
     props: ({ id: t, ariaId: e, entry: r }, { updateEntryState: n }) => ({
       class: "entry-store-state",
       part: "entry-store-state",
@@ -390,7 +409,7 @@ function Z() {
             "STORE_RELEASE_COMPLETE",
             "STORE_RELEASE_ABORT"
           ],
-          button: i("button-store-idle", {
+          button: l("button-store-idle", {
             icon: "store",
             disabled: s(r, ["TRANSFORM_BUSY"]),
             styles: y({
@@ -398,16 +417,18 @@ function Z() {
               idle: "translateY(0)",
               outro: "translateY(-0.125em)"
             }),
-            onclick: () => n(t, {
-              store: !0
-            }),
+            onclick: () => {
+              n(t, {
+                store: !0
+              });
+            },
             ariaDescribedby: `${e}-name`
           })
         },
         {
           codes: ["STORE_QUEUED", "STORE_BUSY"],
           progress: !0,
-          button: i("button-store-busy", {
+          button: l("button-store-busy", {
             icon: "abort",
             disabled: s(r, ["TRANSFORM_BUSY"]),
             onclick: () => {
@@ -415,7 +436,7 @@ function Z() {
                 abort: !0
               });
             },
-            ariaDescribedby: l(
+            ariaDescribedby: u(
               `${e}-name`,
               `${e}-store-info`
             )
@@ -426,18 +447,20 @@ function Z() {
           progress: {
             direction: "reverse"
           },
-          button: i("button-store-busy", {
+          button: l("button-store-busy", {
             icon: "abort",
             disabled: s(r, ["TRANSFORM_BUSY"]),
-            onclick: () => n(t, {
-              abort: !0
-            }),
+            onclick: () => {
+              n(t, {
+                abort: !0
+              });
+            },
             ariaDescribedby: `${e}-name`
           })
         },
         {
           codes: ["STORE_COMPLETE", "STORE_RESTORE_COMPLETE", "STORE_RELEASE_ABORT"],
-          button: i("button-store-complete", {
+          button: l("button-store-complete", {
             icon: "revert",
             styles: y({
               intro: "rotateZ(45deg)",
@@ -445,10 +468,12 @@ function Z() {
               outro: "rotaetZ(-45deg)"
             }),
             disabled: s(r, ["TRANSFORM_BUSY"]),
-            onclick: () => n(t, {
-              store: !1
-            }),
-            ariaDescribedby: l(
+            onclick: () => {
+              n(t, {
+                store: !1
+              });
+            },
+            ariaDescribedby: u(
               `${e}-name`,
               `${e}-status`,
               `${e}-store-info`
@@ -467,21 +492,21 @@ function y({ intro: t, idle: e, outro: r }) {
     [`${n}outro`]: r
   };
 }
-function w(t) {
+function J(t) {
   const { key: e = "entry-checkbox", stateKey: r = "checked" } = t ?? {};
   return {
     key: e,
-    component: M,
-    props: ({ id: n, entry: o }, { updateEntryState: a }) => ({
+    component: C,
+    props: ({ id: n, entry: o }, { updateEntryState: i }) => ({
       class: e,
       part: e,
       icon: "check",
       label: "Select",
       labelIsImplicit: !0,
       checked: o.state[r],
-      onchange: (c) => {
-        a(n, {
-          [r]: c
+      onchange: (a) => {
+        i(n, {
+          [r]: a
         });
       }
     })
@@ -491,16 +516,16 @@ function K(t) {
   const { key: e = "file-rename", extensionAction: r = "renameFile" } = t ?? {};
   return {
     if: {
-      test: ({ entry: n }) => S(n.name) && L(n, r),
+      test: ({ entry: n }) => b(n.name) && L(n, r),
       then: {
         key: e,
-        component: C,
-        props: ({ id: n, entry: o }, { updateEntryState: a }) => ({
+        component: N,
+        props: ({ id: n, entry: o }, { updateEntryState: i }) => ({
           disabled: s(o, ["STORE_QUEUED", "STORE_BUSY"]),
           value: o.name,
-          onconfirm: (c) => {
-            a(n, {
-              [r]: c
+          onconfirm: (a) => {
+            i(n, {
+              [r]: a
             });
           }
         })
@@ -513,14 +538,14 @@ function K(t) {
     }
   };
 }
-function Ot(t) {
-  return d(t).remove("entry-store-state").replace("entry-load-state", w()).update("entry-list-item", (e) => {
+function _t(t) {
+  return S(t).remove("entry-store-state").replace("entry-load-state", J()).update("entry-list-item", (e) => {
     const r = e.props;
     e.props = (n) => {
       const o = r(n);
       return {
         ...o,
-        part: l(
+        part: u(
           o.part,
           n.entry.state.checked ? "selected" : void 0
         )
@@ -528,24 +553,24 @@ function Ot(t) {
     };
   }), t;
 }
-function Tt(t) {
-  return d(t).update("file-info-main", (e) => {
+function ht(t) {
+  return S(t).update("file-info-main", (e) => {
     e.children = K();
   }), t;
 }
 export {
-  Ot as appendEntryCheckbox,
-  Tt as appendEntryRenameInput,
-  w as createEntryCheckbox,
-  I as createEntryDataTransferInfo,
-  z as createEntryInfo,
-  u as createEntryInfoBlock,
-  q as createEntryLoadState,
-  N as createEntryStatus,
-  Z as createEntryStoreState,
-  Q as createFileLoadInfo,
-  x as createFilePondEntry,
-  Rt as createFilePondEntryList,
+  _t as appendEntryCheckbox,
+  ht as appendEntryRenameInput,
+  J as createEntryCheckbox,
+  x as createEntryDataTransferInfo,
+  I as createEntryInfo,
+  m as createEntryInfoBlock,
+  Z as createEntryLoadState,
+  Q as createEntryStatus,
+  w as createEntryStoreState,
+  W as createFileLoadInfo,
+  z as createFilePondEntry,
+  Tt as createFilePondEntryList,
   K as createFileRenameInput,
-  W as createFileStoreInfo
+  q as createFileStoreInfo
 };

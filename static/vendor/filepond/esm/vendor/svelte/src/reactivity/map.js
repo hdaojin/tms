@@ -11,8 +11,8 @@ class M extends Map {
    */
   constructor(e) {
     if (super(), e) {
-      for (var [r, s] of e)
-        super.set(r, s);
+      for (var [s, r] of e)
+        super.set(s, r);
       this.#r.v = super.size;
     }
   }
@@ -30,42 +30,58 @@ class M extends Map {
   }
   /** @param {K} key */
   has(e) {
-    var r = this.#e, s = r.get(e);
-    if (s === void 0)
+    var s = this.#e, r = s.get(e);
+    if (r === void 0)
       if (super.has(e))
-        s = this.#t(0), r.set(e, s);
+        r = this.#t(0), s.set(e, r);
       else
         return i(this.#s), !1;
-    return i(s), !0;
+    return i(r), !0;
   }
   /**
    * @param {(value: V, key: K, map: Map<K, V>) => void} callbackfn
    * @param {any} [this_arg]
    */
-  forEach(e, r) {
-    this.#i(), super.forEach(e, r);
+  forEach(e, s) {
+    this.#i(), super.forEach(e, s);
   }
   /** @param {K} key */
   get(e) {
-    var r = this.#e, s = r.get(e);
-    if (s === void 0)
+    var s = this.#e, r = s.get(e);
+    if (r === void 0)
       if (super.has(e))
-        s = this.#t(0), r.set(e, s);
+        r = this.#t(0), s.set(e, r);
       else {
         i(this.#s);
         return;
       }
-    return i(s), super.get(e);
+    return i(r), super.get(e);
   }
   /**
    * @param {K} key
    * @param {V} value
    * */
-  set(e, r) {
-    var s = this.#e, t = s.get(e), p = super.get(e), v = super.set(e, r), n = this.#s;
+  getOrInsert(e, s) {
+    return super.has(e) || this.set(e, s), /** @type {V} */
+    this.get(e);
+  }
+  /**
+   * @param {K} key
+   * @param {(key: K) => V} callbackFn
+   */
+  getOrInsertComputed(e, s) {
+    return super.has(e) || this.set(e, s(e)), /** @type {V} */
+    this.get(e);
+  }
+  /**
+   * @param {K} key
+   * @param {V} value
+   * */
+  set(e, s) {
+    var r = this.#e, t = r.get(e), p = super.get(e), v = super.set(e, s), n = this.#s;
     if (t === void 0)
-      t = this.#t(0), s.set(e, t), u(this.#r, super.size), a(n);
-    else if (p !== r) {
+      t = this.#t(0), r.set(e, t), u(this.#r, super.size), a(n);
+    else if (p !== s) {
       a(t);
       var o = n.reactions === null ? null : new Set(n.reactions), l = o === null || !t.reactions?.every(
         (c) => (
@@ -79,16 +95,16 @@ class M extends Map {
   }
   /** @param {K} key */
   delete(e) {
-    var r = this.#e, s = r.get(e), t = super.delete(e);
-    return s !== void 0 && (r.delete(e), u(s, -1)), t && (u(this.#r, super.size), a(this.#s)), t;
+    var s = this.#e, r = s.get(e), t = super.delete(e);
+    return r !== void 0 && (s.delete(e), u(r, -1)), t && (u(this.#r, super.size), a(this.#s)), t;
   }
   clear() {
     if (super.size !== 0) {
       super.clear();
       var e = this.#e;
       u(this.#r, 0);
-      for (var r of e.values())
-        u(r, -1);
+      for (var s of e.values())
+        u(s, -1);
       a(this.#s), e.clear();
     }
   }
@@ -96,14 +112,14 @@ class M extends Map {
     i(this.#s);
     var e = this.#e;
     if (this.#r.v !== e.size) {
-      for (var r of super.keys())
-        if (!e.has(r)) {
-          var s = this.#t(0);
-          e.set(r, s);
+      for (var s of super.keys())
+        if (!e.has(s)) {
+          var r = this.#t(0);
+          e.set(s, r);
         }
     }
-    for ([, s] of this.#e)
-      i(s);
+    for ([, r] of this.#e)
+      i(r);
   }
   keys() {
     return i(this.#s), super.keys();

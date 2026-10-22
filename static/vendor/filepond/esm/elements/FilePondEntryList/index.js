@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -13,7 +13,6 @@ import r from "./index.css.js";
 const o = [
   "disabled",
   "assets",
-  "locale",
   "template",
   "propResourceMap",
   "drag",
@@ -23,11 +22,9 @@ const o = [
   "drop",
   "dropRoot",
   "dropPadding",
-  "animations",
   "entryAnimationProps",
   "entryAnimationOriginMap",
   "entryAnimationStaggerInterval",
-  "springDefaults",
   "byteUnits",
   "beforeRenderNode"
 ], p = [
@@ -50,8 +47,9 @@ class E extends e {
     super(i, {
       properties: o,
       methods: p,
-      events: l
-    }), s(this._root, a + r);
+      events: l,
+      styles: [a]
+    }), s(this._root, "entry-list", r);
   }
   connectedCallback() {
     super.connectedCallback(), this.addListener("entrieschange", (t) => {

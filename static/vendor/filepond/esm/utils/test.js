@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -12,25 +12,25 @@ function e(t, n = !0) {
 function g(t) {
   return t === void 0;
 }
-function m(t) {
+function b(t) {
   return t == null;
 }
 function o(t) {
   return typeof t == "string";
 }
-function b(t) {
+function m(t) {
   return typeof t == "number";
 }
-function F(t) {
+function O(t) {
   return typeof t == "boolean";
 }
-function A(t) {
+function F(t) {
   return typeof t == "function";
 }
-function O(t) {
+function j(t) {
   return t instanceof HTMLElement;
 }
-function E(t) {
+function A(t) {
   let n;
   try {
     n = new URL(t);
@@ -39,14 +39,19 @@ function E(t) {
   }
   return n.protocol === "http:" || n.protocol === "https:";
 }
-function h(t) {
+function E(t) {
   return t instanceof RegExp;
 }
 function s(t) {
   return Object.getPrototypeOf(t) === Object.prototype;
 }
-function D(t) {
+function h(t) {
   return t && typeof t == "object" && !Array.isArray(t);
+}
+function D(t) {
+  if (t === null || typeof t != "object") return !1;
+  const n = Object.getPrototypeOf(t);
+  return n === Object.prototype || n === null;
 }
 function w(t) {
   return t && typeof t == "object";
@@ -57,13 +62,13 @@ function u(t) {
 function L(t) {
   return o(t) && /data:/.test(t);
 }
-function T(t) {
+function P(t) {
   return t instanceof HTMLCanvasElement;
 }
 function c(t) {
   return t instanceof Blob;
 }
-function j(t) {
+function T(t) {
   return t instanceof Blob && !a(t);
 }
 function a(t) {
@@ -78,68 +83,69 @@ function B(t) {
 function x(t) {
   return !!(c(t) && /image/i.test(t.type));
 }
-function P(t) {
+function R(t) {
   return l(t.src);
 }
-function R(t) {
+function U(t) {
   return o(t) && t.startsWith("unit");
 }
-function U(t) {
+function S(t) {
   return f(t, "template");
 }
-function S(t) {
+function M(t) {
   return !!(t && s(t) && !u(t.entries));
 }
-function M(t) {
+function C(t) {
   return !!(t && s(t) && u(t.entries));
 }
-function C(t) {
+function H(t) {
   return t?.isDirectory;
 }
-function H(t) {
+function I(t) {
   return t?.isFile;
 }
 function y() {
   return i === null && (i = typeof window < "u" && typeof window.document < "u"), i;
 }
 let i = null;
-const I = e(() => /^((?!chrome|android).)*(safari|iphone|ipad)/i.test(navigator.userAgent)), N = e(() => /Firefox/.test(navigator.userAgent)), K = e(() => /iPhone|iPad|iPod/.test(navigator.userAgent) || p() && navigator.maxTouchPoints >= 1), p = e(() => {
+const N = e(() => /^((?!chrome|android).)*(safari|iphone|ipad)/i.test(navigator.userAgent)), K = e(() => /Firefox/.test(navigator.userAgent)), V = e(() => /iPhone|iPad|iPod/.test(navigator.userAgent) || p() && navigator.maxTouchPoints >= 1), p = e(() => {
   const { platform: t } = "userAgentData" in navigator ? navigator.userAgentData : navigator;
   return /^mac/i.test(t);
 });
 export {
   e as createTest,
   u as isArray,
-  j as isBlob,
+  T as isBlob,
   c as isBlobOrFile,
-  F as isBoolean,
+  O as isBoolean,
   y as isBrowser,
-  T as isCanvas,
+  P as isCanvas,
   l as isDataTransfer,
-  P as isDataTransferEntry,
+  R as isDataTransferEntry,
   L as isDataURL,
-  M as isDirectoryEntry,
-  O as isElement,
+  C as isDirectoryEntry,
+  j as isElement,
   a as isFile,
-  S as isFileEntry,
-  C as isFileSystemDirectoryEntry,
-  H as isFileSystemFileEntry,
-  N as isFirefox,
-  A as isFunction,
-  K as isIOS,
+  M as isFileEntry,
+  H as isFileSystemDirectoryEntry,
+  I as isFileSystemFileEntry,
+  K as isFirefox,
+  F as isFunction,
+  V as isIOS,
   x as isImageFile,
-  U as isLocaleTemplate,
-  R as isLocaleUnitKey,
+  S as isLocaleTemplate,
+  U as isLocaleUnitKey,
   p as isMac,
-  m as isNullOrUndefined,
-  b as isNumber,
-  D as isObject,
+  b as isNullOrUndefined,
+  m as isNumber,
+  h as isObject,
   s as isObjectLiteral,
   w as isObjectOrArray,
-  h as isRegExp,
-  I as isSafari,
+  D as isPlainObject,
+  E as isRegExp,
+  N as isSafari,
   o as isString,
-  E as isURL,
+  A as isURL,
   g as isUndefined,
   B as isVideoFile
 };

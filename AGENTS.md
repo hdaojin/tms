@@ -195,6 +195,8 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - 聚焦测试：`uv run pytest <app-or-test-path>`
 - 构建 CSS：`npm run build:css`
 - 监听 CSS：`npm run watch:css`
+- 完整同步第三方前端资源并构建 CSS：`npm run build:frontend`
+- 检查第三方前端资源并运行前端聚焦测试：`npm run test:frontend`
 
 项目 uv cache 固定在 `.uv-cache/`；正常从仓库根目录运行 uv 即可。
 
@@ -209,11 +211,11 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - Model/迁移改动：增加或修改相关测试，并运行 `uv run manage.py makemigrations --check --dry-run`；确需 schema 变化时生成并检查 migration。
 - 跨 APP service、权限、公共核心组件、关键统计口径或高风险数据流程改动：运行相关 APP 测试，并根据影响范围决定是否运行全量 `uv run pytest`。只有确有跨仓回归风险时才默认升级为全量测试。
 - 仅当修改涉及 Django 项目配置、URL 装配、AppConfig、中间件或 system check 可发现的问题，或准备提交重要改动时，才需要 `uv run manage.py check`；普通局部修改不机械执行。
-- 当本次变更涉及模板中的 Tailwind/Iconify class、CSS 源码、Alpine 前端代码、Tailwind/DaisyUI/Iconify 配置或前端依赖时，运行 `npm run build:css` 并检查 `static/css/output.css`；纯 Python、后端配置或文档修改不为 push 机械执行 CSS 构建。
+- 当本次变更只涉及模板中的 Tailwind/Iconify class 或 CSS 源码时，运行 `npm run build:css` 并检查 `static/css/output.css`。当升级 Alpine、Mermaid、FilePond、Tailwind、DaisyUI、Iconify 等 npm 前端依赖时，运行 `npm run build:frontend` 与 `npm run test:frontend`，并检查对应静态产物；纯 Python、后端配置或文档修改不为 push 机械执行前端构建。
 
 验证失败时先判断失败是否由本次修改引起。不要为了让无关历史失败通过而扩大修改范围。
 
-CI 的基准流程仍为 Ruff -> Django check -> migration drift check -> migrate -> pytest，以及独立的前端 `npm ci` -> `npm run build:css`。CI 是合并级安全网，不等于每次本地小修改都必须完整重放。
+CI 的基准流程仍为 Ruff -> Django check -> migration drift check -> migrate -> pytest，以及独立的前端 `npm ci` -> `npm run build:frontend` -> `npm run test:frontend` -> 生成产物漂移检查 -> 生产 npm 依赖审计。CI 是合并级安全网，不等于每次本地小修改都必须完整重放。
 
 ## 性能与可维护性检查
 

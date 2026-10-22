@@ -1,102 +1,115 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { boundsCreate as w, boundsUpdate as V, boundsEqual as C, boundsUpdateWithBounds as E } from "../../utils/bounds.js";
-import { noop as I } from "../../utils/placeholder.js";
-import { getSuspensionObserver as R } from "../common/dom.js";
-const O = 100, b = /* @__PURE__ */ new Map();
-let r = null;
-function A() {
-  function e() {
+import { arrayRemoveInPlace as R } from "../../utils/array.js";
+import { boundsCreate as w, boundsUpdate as V, boundsEqual as C, boundsUpdateWithBounds as A } from "../../utils/bounds.js";
+import { getSuspensionObserver as B } from "../common/dom.js";
+const y = 100, l = /* @__PURE__ */ new Map();
+let o = null;
+function M() {
+  function t() {
     return !document.hidden;
   }
-  r = {
-    visible: e(),
+  o = {
+    visible: t(),
     destroy: () => {
-      document.removeEventListener("visibilitychange", t);
+      document.removeEventListener("visibilitychange", e);
     }
   };
-  function t() {
-    r && (r.visible = e()), e() ? p() : g();
+  function e() {
+    o && (o.visible = t()), t() ? h() : O();
   }
-  document.addEventListener("visibilitychange", t), t();
+  document.addEventListener("visibilitychange", e), e();
 }
-let m;
-function B() {
-  m = R(), m.on("suspend", (e) => {
-    for (const t of l)
-      e.contains(t) && h.add(t);
+let p;
+function N() {
+  p = B(), p.on("suspend", (t) => {
+    for (const e of a)
+      t.contains(e) && g.add(e);
   });
 }
 let u = null;
-function M() {
-  const e = {
+function S() {
+  const t = {
     // viewport
     root: null,
     // we're interested in elements near the viewport
     // rootMargin: `0px 0px 0px 0px`,
-    rootMargin: `${O}px 0px 0px ${O}px`,
+    rootMargin: `${y}px 0px 0px ${y}px`,
     // if one pixel is visible we detect it
-    threshold: 1
-  }, t = new IntersectionObserver((o) => {
-    o.forEach((n) => {
-      const s = n.boundingClientRect, i = n.target;
-      if (f.has(i) && !n.isIntersecting && s.x === 0 && s.y === 0 && s.width === 0 && s.height === 0)
+    threshold: 0
+  }, e = new IntersectionObserver((r) => {
+    r.forEach((n) => {
+      const i = n.boundingClientRect, s = n.target;
+      if (!l.has(s) || d.has(s) && !n.isIntersecting && i.x === 0 && i.y === 0 && i.width === 0 && i.height === 0)
         return;
-      f.set(i, n.isIntersecting);
-      const d = Array.from(f.values()).some(Boolean);
-      u && (u.visible = d), d ? p() : g(), !a.has(i) && (x(i, s.top, s.right, s.bottom, s.left), l.push(i), d && p());
+      d.set(s, n.isIntersecting);
+      const b = Array.from(d.values()).some(Boolean);
+      if (u && (u.visible = b), b ? h() : O(), c.has(s))
+        return;
+      const I = x(s, i.top, i.right, i.bottom, i.left);
+      l.get(s).onmeasuresync?.(I), m.push(s), a.push(s), b && h();
     });
-  }, e);
+  }, t);
   u = {
-    unobserve: (o) => {
-      t.unobserve(o);
+    unobserve: (r) => {
+      e.unobserve(r);
     },
-    observe: (o) => {
-      t.observe(o);
+    observe: (r) => {
+      e.observe(r);
     },
     visible: !1
   };
 }
-const v = w(), a = /* @__PURE__ */ new Map(), f = /* @__PURE__ */ new Map(), h = /* @__PURE__ */ new Set(), x = (e, t, o, n, s) => {
-  if (!b.has(e) || h.has(e))
+const v = w(), c = /* @__PURE__ */ new Map(), d = /* @__PURE__ */ new Map(), g = /* @__PURE__ */ new Set(), m = [];
+function x(t, e, r, n, i) {
+  if (!l.has(t) || g.has(t))
     return;
-  a.has(e) || a.set(e, w());
-  const i = a.get(e);
-  if (V(v, t, o, n, s), !C(i, v))
-    return E(i, v), b.get(e)(i), i;
-}, S = (e) => {
-  const t = e.getBoundingClientRect();
-  x(e, t.top, t.right, t.bottom, t.left);
-}, l = [];
-let c = null;
-function y() {
-  l.forEach(S), c = requestAnimationFrame(y);
+  c.has(t) || c.set(t, w());
+  const s = c.get(t);
+  if (V(v, e, r, n, i), !C(s, v))
+    return A(s, v), s;
 }
-function p() {
-  !r?.visible || !u?.visible || c === null && (c = requestAnimationFrame(y));
+function q(t) {
+  const e = t.getBoundingClientRect();
+  return x(
+    t,
+    e.top,
+    e.right,
+    e.bottom,
+    e.left
+  );
 }
-function g() {
-  c !== null && (cancelAnimationFrame(c), c = null);
+const a = [];
+let f = null;
+function E() {
+  a.filter((e) => q(e)).forEach((e) => {
+    l.get(e)?.onmeasure?.(c.get(e));
+  }), m.forEach((e) => {
+    l.get(e)?.onmeasure?.(c.get(e));
+  }), m.length = 0, f = requestAnimationFrame(E);
 }
-function k(e = {}) {
-  const { disabled: t, onmeasure: o = I } = e;
+function h() {
+  f === null && (!o?.visible || !u?.visible || (f = requestAnimationFrame(E)));
+}
+function O() {
+  f !== null && (cancelAnimationFrame(f), f = null);
+}
+function L(t = {}) {
+  const { onmeasure: e, onmeasuresync: r } = t;
   return (n) => {
-    if (t)
-      return () => {
-      };
-    u || M(), r || A(), m || B(), b.set(n, o), u?.observe(n);
-    function s() {
-      const i = l.indexOf(n);
-      i >= 0 && l.splice(i, 1), u?.unobserve(n), h.delete(n), f.delete(n), a.delete(n), b.delete(n), l.length || (g(), r?.destroy(), r = null);
+    u || S(), o || M(), p || N(), l.set(n, { onmeasure: e, onmeasuresync: r }), u?.observe(n);
+    function i() {
+      const s = a.indexOf(n);
+      s >= 0 && a.splice(s, 1), u?.unobserve(n), R(m, (b) => b === n), g.delete(n), d.delete(n), c.delete(n), l.delete(n), a.length || (O(), o?.destroy(), o = null);
     }
-    return s;
+    return i;
   };
 }
 export {
-  O as VIEWPORT_MARGIN,
-  k as measurable
+  y as VIEWPORT_MARGIN,
+  L as measurable
 };

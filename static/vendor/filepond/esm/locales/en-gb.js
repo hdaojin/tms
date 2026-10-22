@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -46,10 +46,6 @@ const i = {
   success: "Success",
   info: "Info",
   system: "System",
-  // sources
-  device: "Device",
-  camera: "Camera",
-  link: "Link",
   // capabilities labels
   descriptionBrowse: "[Select {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Drop {{maxFilesUnit}} here, or [browse]",
@@ -145,10 +141,10 @@ const i = {
       }
     }
   }
-}, l = {
+}, s = {
   validationFileNameMissing: "File name missing.",
   validationFileNameMismatch: "This file name is invalid."
-}, s = {
+}, l = {
   validationFileSizeUnderflow: "This file is too small. Minimum size is {{minSize}} {{minSizeUnit}}.",
   validationFileSizeOverflow: "This file is too large. Maximum size is {{maxSize}} {{maxSizeUnit}}."
 }, r = {
@@ -169,31 +165,48 @@ const i = {
   validationListEntryCountUnderflow: "Too few files in the list. Minimum amount is {{minFiles}} {{minFilesUnit}}.",
   validationListEntryCountOverflow: "Too many files in the list. Maximum amount is {{maxFiles}} {{maxFilesUnit}}."
 }, c = {
-  ...s,
+  ...l,
   ...o,
   ...n,
-  ...l,
+  ...s,
   ...d,
   ...r,
   ...m
+}, u = {
+  device: "Device"
 }, p = {
+  link: "Link"
+}, f = {
+  camera: "Camera",
+  capture: "Capture",
+  record: "Record"
+}, v = {
+  ...u,
+  ...p,
+  ...f
+}, h = {
   ...i,
   ...t,
   ...e,
   ...c,
-  ...a
+  ...a,
+  ...v
 };
 export {
   i as core,
-  p as locale,
+  h as locale,
   e as media,
+  v as source,
+  f as sourceCamera,
+  u as sourceDevice,
+  p as sourceLink,
   t as store,
   a as transform,
   c as validation,
   n as validationFileExtension,
   o as validationFileMimeType,
-  l as validationFileName,
-  s as validationFileSize,
+  s as validationFileName,
+  l as validationFileSize,
   m as validationListCount,
   r as validationListSize,
   d as validationMediaResolution

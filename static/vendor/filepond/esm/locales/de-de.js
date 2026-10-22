@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const e = {
   success: "Erfolgreich",
   info: "Info",
   system: "System",
-  // sources
-  device: "Gerät",
-  camera: "Kamera",
-  link: "Link",
   // capabilities labels
   descriptionBrowse: "[{{maxFilesUnit}} auswählen]",
   descriptionBrowseDrop: "{{maxFilesUnit}} hier ablegen oder [durchsuchen]",
@@ -113,9 +109,9 @@ const e = {
   transformError: "Datei konnte nicht bearbeitet werden. Bitte erneut versuchen."
 }, a = {
   validationFileMimeTypeMismatch: {
-    template: "Dieser Dateityp ist nicht erlaubt. {{details}}.",
+    template: "Dieser Dateityp ist nicht erlaubt. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Datei muss vom Typ {{accept}} sein",
@@ -124,11 +120,11 @@ const e = {
       }
     }
   }
-}, l = {
+}, s = {
   validationFileExtensionMismatch: {
-    template: "Diese Dateierweiterung ist nicht erlaubt. {{details}}.",
+    template: "Diese Dateierweiterung ist nicht erlaubt. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Datei muss die Erweiterung {{accept}} haben",
@@ -137,7 +133,7 @@ const e = {
       }
     }
   }
-}, s = {
+}, l = {
   validationFileNameMissing: "Dateiname fehlt",
   validationFileNameMismatch: "Dieser Dateiname ist ungültig."
 }, r = {
@@ -163,28 +159,45 @@ const e = {
 }, m = {
   ...r,
   ...a,
-  ...l,
   ...s,
+  ...l,
   ...d,
   ...o,
   ...u
+}, c = {
+  device: "Gerät"
 }, g = {
+  link: "Link"
+}, h = {
+  camera: "Kamera",
+  capture: "Aufnehmen",
+  record: "Aufzeichnen"
+}, p = {
+  ...c,
+  ...g,
+  ...h
+}, D = {
   ...e,
   ...t,
   ...i,
   ...m,
-  ...n
+  ...n,
+  ...p
 };
 export {
   e as core,
-  g as locale,
+  D as locale,
   i as media,
+  p as source,
+  h as sourceCamera,
+  c as sourceDevice,
+  g as sourceLink,
   t as store,
   n as transform,
   m as validation,
-  l as validationFileExtension,
+  s as validationFileExtension,
   a as validationFileMimeType,
-  s as validationFileName,
+  l as validationFileName,
   r as validationFileSize,
   u as validationListCount,
   o as validationListSize,

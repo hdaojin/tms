@@ -1,64 +1,57 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { onDestroy as R } from "../../vendor/svelte/src/index-client.js";
-import { user_effect as r } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { push as b, pop as k } from "../../vendor/svelte/src/internal/client/context.js";
-import { get as c } from "../../vendor/svelte/src/internal/client/runtime.js";
-import { child as _ } from "../../vendor/svelte/src/internal/client/dom/operations.js";
-import { state as w, set as A } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { user_derived as C } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { from_html as D, append as F } from "../../vendor/svelte/src/internal/client/dom/template.js";
-import { if_block as M } from "../../vendor/svelte/src/internal/client/dom/blocks/if.js";
-import { attach as O } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
-import { prop as P } from "../../vendor/svelte/src/internal/client/reactivity/props.js";
+import { onDestroy as g } from "../../vendor/svelte/src/index-client.js";
+import { user_effect as n } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { push as b, pop as M } from "../../vendor/svelte/src/internal/client/context.js";
+import { get as u } from "../../vendor/svelte/src/internal/client/runtime.js";
+import { child as O } from "../../vendor/svelte/src/internal/client/dom/operations.js";
+import { state as k, set as S } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
+import { user_derived as _ } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { from_html as w, append as C } from "../../vendor/svelte/src/internal/client/dom/template.js";
+import { if_block as F } from "../../vendor/svelte/src/internal/client/dom/blocks/if.js";
+import { attach as P } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
 import { Spring as x } from "../../vendor/svelte/src/motion/spring.js";
 import { measurable as y } from "../attachments/measurable.js";
-import { createAnimationModeObserver as S } from "../common/animationPreference-svelte.js";
 import { rectFromBounds as j } from "../../utils/rect.js";
 import "../components/ElementPane/index.js";
-import B from "../components/ElementPane/index-svelte.js";
-var E = D('<div class="root"><!></div>');
-function $(s, o) {
-  b(o, !0);
-  let p = P(o, "animations", 3, "auto");
-  const i = { updateRect: (t) => {
+import { createMotionStateObserver as B, shouldReduceMotion as D } from "../common/motionState-svelte.js";
+import E from "../components/ElementPane/index-svelte.js";
+var U = w('<div class="root"><!></div>');
+function Z(p, r) {
+  b(r, !0);
+  const o = { updateRect: (t) => {
   }, computeRect: (t) => {
   } };
-  function u(t) {
-    i.updateRect = t;
+  function s(t) {
+    o.updateRect = t;
   }
   function f(t) {
-    i.computeRect = t;
+    o.computeRect = t;
   }
-  let n = w(void 0);
-  const m = S(), d = C(() => m.current);
-  r(() => {
-    m.setPreference(p());
-  });
-  const e = new x(void 0, { precision: 1 });
-  r(() => {
-    o.springDefaults && Object.assign(e, o.springDefaults);
-  }), r(() => {
-    e.set(c(n), { instant: !c(d) });
+  let c = k(void 0);
+  const m = B(), d = _(() => D(m.current, r.reducedMotionPreference)), e = new x(void 0, { precision: 1 });
+  n(() => {
+    r.springOptions && Object.assign(e, r.springOptions);
+  }), n(() => {
+    e.set(u(c), { instant: u(d) });
   });
   function l(t) {
-    A(n, j(t));
+    const a = j(t);
+    o.computeRect(a), S(c, a);
   }
-  r(() => {
-    i.computeRect(c(n));
-  }), r(() => {
-    i.updateRect(e.current);
-  }), R(() => {
+  n(() => {
+    o.updateRect(e.current);
+  }), g(() => {
     m.destroy();
   });
-  var v = { setUpdateRectCallback: u, setComputeRectCallback: f }, a = E(), h = _(a);
+  var h = { setUpdateRectCallback: s, setComputeRectCallback: f }, i = U(), v = O(i);
   {
-    var g = (t) => {
-      B(t, {
+    var R = (t) => {
+      E(t, {
         get width() {
           return e.current.width;
         },
@@ -67,12 +60,12 @@ function $(s, o) {
         }
       });
     };
-    M(h, (t) => {
-      e.current && t(g);
+    F(v, (t) => {
+      e.current && t(R);
     });
   }
-  return O(a, () => y({ onmeasure: l })), F(s, a), k(v);
+  return P(i, () => y({ onmeasure: l })), C(p, i), M(h);
 }
 export {
-  $ as default
+  Z as default
 };

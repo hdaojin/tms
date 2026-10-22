@@ -1,25 +1,25 @@
-import { DESTROYED as D, INERT as x, WAS_MARKED as N, STALE_REACTION as b, EFFECT_PRESERVED as S, DERIVED as O, DIRTY as j, REACTION_RAN as q, ERROR_VALUE as d, CLEAN as L } from "../constants.js";
-import { increment_write_version as k, update_effect as C, set_active_effect as y, update_reaction as P, remove_reactions as V, active_effect as s, push_reaction_value as z, is_destroying_effect as A, active_reaction as F } from "../runtime.js";
-import { without_reactive_context as U } from "../dom/elements/bindings/shared.js";
-import { equals as Y, safe_equals as B } from "./equality.js";
-import { async_derived_orphan as K } from "../errors.js";
-import { derived_inert as M } from "../warnings.js";
-import { destroy_effect as W, destroy_effect_children as Z, async_effect as G, teardown as H, effect_tracking as J } from "./effects.js";
-import { source as Q, internal_set as R } from "./sources.js";
-import { noop as X, deferred as $ } from "../../shared/utils.js";
-import { component_context as ee } from "../context.js";
+import { DESTROYED as A, INERT as D, STALE_REACTION as b, EFFECT_PRESERVED as N, DERIVED as O, DIRTY as S, REACTION_RAN as j, ERROR_VALUE as d, CLEAN as q } from "../constants.js";
+import { increment_write_version as L, update_effect as k, set_active_effect as y, update_reaction as C, remove_reactions as P, active_effect as s, push_reaction_value as V, is_destroying_effect as I, active_reaction as z } from "../runtime.js";
+import { without_reactive_context as F } from "../dom/elements/bindings/shared.js";
+import { equals as U, safe_equals as Y } from "./equality.js";
+import { async_derived_orphan as B } from "../errors.js";
+import { derived_inert as Z } from "../warnings.js";
+import { destroy_effect as G, destroy_effect_children as H, async_effect as J, teardown as K, effect_tracking as M } from "./effects.js";
+import { source as Q, internal_set as g } from "./sources.js";
+import { noop as W, deferred as X } from "../../shared/utils.js";
+import { component_context as $ } from "../context.js";
 import { UNINITIALIZED as E } from "../../../constants.js";
-import { current_batch as l, previous_batch as te, batch_values as g } from "./batch.js";
-import { unset_context as w, increment_pending as ne } from "./async.js";
-import { set_signal_status as re, update_derived_status as fe } from "./status.js";
+import { current_batch as l, previous_batch as ee, batch_values as w } from "./batch.js";
+import { unset_context as R, increment_pending as te } from "./async.js";
+import { set_signal_status as ne, update_derived_status as re } from "./status.js";
 // @__NO_SIDE_EFFECTS__
-function I(t) {
-  var e = O | j;
-  return s !== null && (s.f |= S), {
-    ctx: ee,
+function T(t) {
+  var e = O | S;
+  return s !== null && (s.f |= N), {
+    ctx: $,
     deps: null,
     effects: null,
-    equals: Y,
+    equals: U,
     f: e,
     fn: t,
     reactions: null,
@@ -40,7 +40,7 @@ function ge(t, e, f) {
     /** @type {Effect | null} */
     s
   );
-  c === null && K();
+  c === null && B();
   var u = (
     /** @type {Promise<V>} */
     /** @type {unknown} */
@@ -48,27 +48,27 @@ function ge(t, e, f) {
   ), i = Q(
     /** @type {V} */
     E
-  ), T = !F, _ = /* @__PURE__ */ new Set();
-  return G(() => {
+  ), x = !z, _ = /* @__PURE__ */ new Set();
+  return J(() => {
     var o = (
       /** @type {Effect} */
       s
-    ), n = $();
+    ), n = X();
     u = n.promise;
     try {
       Promise.resolve(t()).then(n.resolve, (r) => {
         r !== b && n.reject(r);
-      }).finally(w);
+      }).finally(R);
     } catch (r) {
-      n.reject(r), w();
+      n.reject(r), R();
     }
     var a = (
       /** @type {Batch} */
       l
     );
-    if (T) {
-      if ((o.f & q) !== 0)
-        var m = ne();
+    if (x) {
+      if ((o.f & j) !== 0)
+        var m = te();
       if (
         // boundary can be null if the async derived is inside an $effect.root not connected to the component render tree
         c.b?.is_rendered()
@@ -80,10 +80,10 @@ function ge(t, e, f) {
       _.add(n), a.async_deriveds.set(o, n);
     }
     const h = (r, v = void 0) => {
-      m?.(), _.delete(n), v !== p && (a.activate(), v ? (i.f |= d, R(i, v)) : ((i.f & d) !== 0 && (i.f ^= d), R(i, r)), a.deactivate());
+      m?.(), _.delete(n), v !== p && (a.activate(), v ? (i.f |= d, g(i, v)) : ((i.f & d) !== 0 && (i.f ^= d), g(i, r)), a.deactivate());
     };
     n.promise.then(h, (r) => h(null, r || "unknown"));
-  }), H(() => {
+  }), K(() => {
     for (const o of _)
       o.reject(p);
   }), new Promise((o) => {
@@ -98,67 +98,67 @@ function ge(t, e, f) {
 }
 // @__NO_SIDE_EFFECTS__
 function we(t) {
-  const e = /* @__PURE__ */ I(t);
-  return z(e), e;
+  const e = /* @__PURE__ */ T(t);
+  return V(e), e;
 }
 // @__NO_SIDE_EFFECTS__
-function be(t) {
-  const e = /* @__PURE__ */ I(t);
-  return e.equals = B, e;
+function Re(t) {
+  const e = /* @__PURE__ */ T(t);
+  return e.equals = Y, e;
 }
-function oe(t) {
+function fe(t) {
   var e = t.effects;
   if (e !== null) {
     t.effects = null;
     for (var f = 0; f < e.length; f += 1)
-      W(
+      G(
         /** @type {Effect} */
         e[f]
       );
   }
 }
-function ae(t) {
+function oe(t) {
   var e, f = s, c = t.parent;
-  if (!A && c !== null && t.v !== E && // if it was never evaluated before, it's guaranteed to fail downstream, so we try to execute instead
-  (c.f & (D | x)) !== 0)
-    return M(), t.v;
+  if (!I && c !== null && t.v !== E && // if it was never evaluated before, it's guaranteed to fail downstream, so we try to execute instead
+  (c.f & (A | D)) !== 0)
+    return Z(), t.v;
   y(c);
   try {
-    t.f &= ~N, oe(t), e = P(t);
+    fe(t), e = C(t);
   } finally {
     y(f);
   }
   return e;
 }
-function Ae(t) {
-  var e = ae(t);
-  if (!t.equals(e) && (t.wv = k(), (!l?.is_fork || t.deps === null) && (l !== null ? (l.capture(t, e, !0), te?.capture(t, e, !0)) : t.v = e, t.deps === null))) {
-    re(t, L);
+function be(t) {
+  var e = oe(t);
+  if (!t.equals(e) && (t.wv = L(), (!l?.is_fork || t.deps === null) && (l !== null ? (l.capture(t, e, !0), ee?.capture(t, e, !0)) : t.v = e, t.deps === null))) {
+    ne(t, q);
     return;
   }
-  A || (g !== null ? (J() || l?.is_fork) && g.set(t, e) : fe(t));
+  I || (w !== null ? (M() || l?.is_fork) && w.set(t, e) : re(t));
 }
 function Ie(t) {
   if (t.effects !== null)
     for (const e of t.effects)
-      (e.teardown || e.ac) && (e.teardown?.(), e.ac !== null && U(() => {
+      (e.teardown || e.ac) && (e.teardown?.(), e.ac !== null && F(() => {
         e.ac.abort(b), e.ac = null;
-      }), e.fn !== null && (e.teardown = X), V(e, 0), Z(e));
+      }), e.fn !== null && (e.teardown = W), P(e, 0), H(e));
 }
 function Te(t) {
   if (t.effects !== null)
     for (const e of t.effects)
-      e.teardown && e.fn !== null && C(e);
+      e.teardown && e.fn !== null && k(e);
 }
 export {
   p as OBSOLETE,
   ge as async_derived,
-  I as derived,
-  be as derived_safe_equal,
-  oe as destroy_derived_effects,
-  ae as execute_derived,
+  T as derived,
+  Re as derived_safe_equal,
+  fe as destroy_derived_effects,
+  oe as execute_derived,
   Ie as freeze_derived_effects,
   Te as unfreeze_derived_effects,
-  Ae as update_derived,
+  be as update_derived,
   we as user_derived
 };

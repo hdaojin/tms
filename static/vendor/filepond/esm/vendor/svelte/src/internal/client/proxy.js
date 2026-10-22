@@ -1,24 +1,24 @@
-import { get as m, active_effect as E, update_version as x, set_active_reaction as D, set_update_version as N, active_reaction as K } from "./runtime.js";
-import { object_prototype as L, array_prototype as M, get_descriptor as P, get_prototype_of as S, is_array as B } from "../shared/utils.js";
-import { state as v, set as l, increment as O } from "./reactivity/sources.js";
-import { STATE_SYMBOL as _ } from "./constants.js";
+import { get as g, active_effect as E, update_version as O, set_active_reaction as j, set_update_version as D, active_reaction as L } from "./runtime.js";
+import { object_prototype as S, array_prototype as A, get_descriptor as x, get_prototype_of as B, is_array as K } from "../shared/utils.js";
+import { state as d, set as l, increment as P } from "./reactivity/sources.js";
+import { STATE_SYMBOL as _, COMPONENT_SYMBOL as Y } from "./constants.js";
 import { UNINITIALIZED as u } from "../../constants.js";
-import { state_prototype_fixed as U, state_descriptors_fixed as Y } from "./errors.js";
+import { state_prototype_fixed as C, state_descriptors_fixed as U } from "./errors.js";
 function b(f) {
-  if (typeof f != "object" || f === null || _ in f)
+  if (typeof f != "object" || f === null || _ in f || Y in f)
     return f;
-  const y = S(f);
-  if (y !== L && y !== M)
+  const y = B(f);
+  if (y !== S && y !== A)
     return f;
-  var s = /* @__PURE__ */ new Map(), w = B(f), g = v(0), I = x, d = (t) => {
-    if (x === I)
+  var s = /* @__PURE__ */ new Map(), w = K(f), m = d(0), N = O, v = (t) => {
+    if (O === N)
       return t();
-    var e = K, r = x;
-    D(null), N(I);
+    var e = L, r = O;
+    j(null), D(N);
     var n = t();
-    return D(e), N(r), n;
+    return j(e), D(r), n;
   };
-  return w && s.set("length", v(
+  return w && s.set("length", d(
     /** @type {any[]} */
     f.length
   )), new Proxy(
@@ -26,10 +26,10 @@ function b(f) {
     f,
     {
       defineProperty(t, e, r) {
-        (!("value" in r) || r.configurable === !1 || r.enumerable === !1 || r.writable === !1) && Y();
+        (!("value" in r) || r.configurable === !1 || r.enumerable === !1 || r.writable === !1) && U();
         var n = s.get(e);
-        return n === void 0 ? d(() => {
-          var i = v(r.value);
+        return n === void 0 ? v(() => {
+          var i = d(r.value);
           return s.set(e, i), i;
         }) : l(n, r.value, !0), !0;
       },
@@ -37,38 +37,40 @@ function b(f) {
         var r = s.get(e);
         if (r === void 0) {
           if (e in t) {
-            const n = d(() => v(u));
-            s.set(e, n), O(g);
+            const n = v(() => d(u));
+            s.set(e, n), P(m);
           }
         } else
-          l(r, u), O(g);
+          l(r, u), P(m);
         return !0;
       },
       get(t, e, r) {
         if (e === _)
           return f;
         var n = s.get(e), i = e in t;
-        if (n === void 0 && (!i || P(t, e)?.writable) && (n = d(() => {
-          var o = b(i ? t[e] : u), c = v(o);
+        if (n === void 0 && (!i || x(t, e)?.writable) && (n = v(() => {
+          var o = b(i ? t[e] : u), c = d(o);
           return c;
         }), s.set(e, n)), n !== void 0) {
-          var a = m(n);
+          var a = g(n);
           return a === u ? void 0 : a;
         }
         return Reflect.get(t, e, r);
       },
       getOwnPropertyDescriptor(t, e) {
-        var r = Reflect.getOwnPropertyDescriptor(t, e);
-        if (r && "value" in r) {
-          var n = s.get(e);
-          n && (r.value = m(n));
-        } else if (r === void 0) {
-          var i = s.get(e), a = i?.v;
-          if (i !== void 0 && a !== u)
+        this.has?.(t, e);
+        var r = Reflect.getOwnPropertyDescriptor(t, e), n = s.get(e);
+        if (n !== void 0) {
+          var i = g(n);
+          if (i === u)
+            return;
+          if (r && "value" in r)
+            r.value = i;
+          else
             return {
               enumerable: !0,
               configurable: !0,
-              value: a,
+              value: i,
               writable: !0
             };
         }
@@ -78,12 +80,12 @@ function b(f) {
         if (e === _)
           return !0;
         var r = s.get(e), n = r !== void 0 && r.v !== u || Reflect.has(t, e);
-        if (r !== void 0 || E !== null && (!n || P(t, e)?.writable)) {
-          r === void 0 && (r = d(() => {
-            var a = n ? b(t[e]) : u, o = v(a);
+        if (r !== void 0 || E !== null && (!n || x(t, e)?.writable)) {
+          r === void 0 && (r = v(() => {
+            var a = n ? b(t[e]) : u, o = d(a);
             return o;
           }), s.set(e, r));
-          var i = m(r);
+          var i = g(r);
           if (i === u)
             return !1;
         }
@@ -95,30 +97,30 @@ function b(f) {
           for (var o = r; o < /** @type {Source<number>} */
           i.v; o += 1) {
             var c = s.get(o + "");
-            c !== void 0 ? l(c, u) : o in t && (c = d(() => v(u)), s.set(o + "", c));
+            c !== void 0 ? l(c, u) : o in t && (c = v(() => d(u)), s.set(o + "", c));
           }
         if (i === void 0)
-          (!a || P(t, e)?.writable) && (i = d(() => v(void 0)), l(i, b(r)), s.set(e, i));
+          (!a || x(t, e)?.writable) && (i = v(() => d(void 0)), l(i, b(r)), s.set(e, i));
         else {
           a = i.v !== u;
-          var A = d(() => b(r));
-          l(i, A);
+          var T = v(() => b(r));
+          l(i, T);
         }
-        var R = Reflect.getOwnPropertyDescriptor(t, e);
-        if (R?.set && R.set.call(n, r), !a) {
+        var I = Reflect.getOwnPropertyDescriptor(t, e);
+        if (I?.set && I.set.call(n, r), !a) {
           if (w && typeof e == "string") {
-            var j = (
+            var R = (
               /** @type {Source<number>} */
               s.get("length")
             ), h = Number(e);
-            Number.isInteger(h) && h >= j.v && l(j, h + 1);
+            Number.isInteger(h) && h >= R.v && l(R, h + 1);
           }
-          O(g);
+          P(m);
         }
         return !0;
       },
       ownKeys(t) {
-        m(g);
+        g(m);
         var e = Reflect.ownKeys(t).filter((i) => {
           var a = s.get(i);
           return a === void 0 || a.v !== u;
@@ -128,12 +130,12 @@ function b(f) {
         return e;
       },
       setPrototypeOf() {
-        U();
+        C();
       }
     }
   );
 }
-function T(f) {
+function M(f) {
   try {
     if (f !== null && typeof f == "object" && _ in f)
       return f[_];
@@ -141,11 +143,11 @@ function T(f) {
   }
   return f;
 }
-function G(f, y) {
-  return Object.is(T(f), T(y));
+function H(f, y) {
+  return Object.is(M(f), M(y));
 }
 export {
-  T as get_proxied_value,
-  G as is,
+  M as get_proxied_value,
+  H as is,
   b as proxy
 };

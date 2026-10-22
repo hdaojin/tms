@@ -1,83 +1,93 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { FilePondInputElement as A } from "../FilePondInput/index.js";
-import { FilePondEntryListElement as E, getDefaultEntryAnimationOriginMap as P, getDefaultEntryAnimationProps as L, getDefaultSpringOptions as C } from "../FilePondEntryList/index.js";
-import { FilePondFrameElement as D } from "../FilePondFrame/index.js";
-import { FilePondDropIndicatorElement as S } from "../FilePondDropIndicator/index.js";
+import { FilePondInputElement as P } from "../FilePondInput/index.js";
+import { FilePondEntryListElement as E, getDefaultEntryAnimationOriginMap as A, getDefaultEntryAnimationProps as L, getDefaultSpringOptions as S } from "../FilePondEntryList/index.js";
+import { FilePondFrameElement as C } from "../FilePondFrame/index.js";
+import { FilePondDropIndicatorElement as D } from "../FilePondDropIndicator/index.js";
 import { FilePondSourceListElement as w } from "../FilePondSourceList/index.js";
-import { hasDefinedTag as x, defineCustomElements as F, defineCustomElement as k, setStringAttribute as O, setBooleanAttribute as d, h as a, addListener as l, dispatchCustomEvent as m } from "../../utils/dom.js";
-import { isBrowser as _, isBoolean as f, isString as p } from "../../utils/test.js";
+import { hasDefinedTag as _, defineCustomElements as O, defineCustomElement as k, setStringAttribute as x, setBooleanAttribute as p, h as c, addListener as d, dispatchCustomEvent as f } from "../../utils/dom.js";
+import { isBrowser as F, isBoolean as m, isString as l } from "../../utils/test.js";
 import { assets as g } from "../../assets/index.js";
-import I from "./index.css.js";
+import M from "./index.css.js";
 import { createFilePondEntryList as R } from "../../templates/entry-list/index.js";
-import { createFilePondSourceList as j } from "../../templates/source-list/index.js";
-import { createFilePondExtensionSet as V } from "./createFilePondExtensionSet.js";
+import { createFilePondSourceList as I } from "../../templates/source-list/index.js";
+import { createFilePondExtensionSet as T } from "./createFilePondExtensionSet.js";
 let u;
-const N = ["auto", "never", "always"];
 function b(s, t = /* @__PURE__ */ new Set([])) {
   return (e) => {
     if (!e || t.has(e))
       return;
-    const i = Array.from(t.add(e)).join(",");
-    s.setAttribute("exportparts", i.replace(/ /g, ","));
+    const r = Array.from(t.add(e)).join(",");
+    s.setAttribute("exportparts", r.replace(/ /g, ","));
   };
 }
-class $ extends A {
+const N = [
+  // macOS hidden files
+  /^\.(DS_Store|Trashes|Spotlight)/,
+  /^__MACOSX/,
+  // Windows hidden files
+  /^(desktop\.ini|Thumbs\.db)$/,
+  // basic files and folders in project dirs
+  /^\.(git|env|idea|vscode)/
+];
+class j extends P {
   // Child components
   #t = {};
   /** Holds reference to attribution link element */
   #e;
   /** Holds references to event subscriptions so we can more easily unsub */
-  #o = [];
+  #n = [];
   /** Stores the current animation mode */
-  #i = "auto";
+  #r = "auto";
   /** Stores the current nodrop state */
-  #r = !1;
+  #i = !1;
   /** Stores the current attribution state */
   #s = !1;
   /** Calls a function for each component */
-  #n(t) {
+  #o(t) {
     Object.values(this.#t).forEach(t);
   }
   /** Wraps `createFilePondExtensionSet` so we always set the default extension set */
   set extensions(t) {
-    super.extensions = V(t);
+    super.extensions = T(t);
   }
   /** Automatically passes value to child elements, for usage see `FilePondSvelteComponentElement` */
-  set springDefaults(t) {
-    this.#n((e) => e.springDefaults = t);
+  set springOptions(t) {
+    this.#o((e) => e.springOptions = t);
   }
   /** Returns the current animation mode */
-  get animations() {
-    return this.#i;
+  get reducedMotionPreference() {
+    return this.#r;
   }
-  /** Setting to toggle animations, automatically passes `animations` setting to child elements, for usage see `FilePondSvelteComponentElement` */
-  set animations(t) {
-    N.includes(t) && (this.#i = t, this.#a());
+  /** Setting to toggle motion, automatically passes `reducedMotionPreference` setting to child elements, for usage see `FilePondSvelteComponentElement` */
+  set reducedMotionPreference(t) {
+    ["", "on", "off", "auto"].includes(t) && (this.#r = t === "" ? "on" : t, this.#c());
   }
-  #a() {
-    this.isConnected && (this.isConnected && this.getAttribute("animations") !== this.#i && O(
+  #c() {
+    this.isConnected && (this.isConnected && this.getAttribute("reduced-motion") !== this.#r && x(
       this,
-      "animations",
-      this.#i === "auto" ? void 0 : this.#i
-    ), this.#n((t) => t.animations = this.#i));
+      "reduced-motion",
+      this.#r === "auto" ? void 0 : this.#r
+    ), this.#o(
+      (t) => t.reducedMotionPreference = this.#r
+    ));
   }
   /** Set to `true` to remove drop area */
   set noDrop(t) {
-    f(t) && (this.#r = t, this.#c());
+    m(t) && (this.#i = t, this.#a());
   }
   /** Returns current nodrop state */
   get noDrop() {
-    return this.#r;
+    return this.#i;
   }
-  #c() {
-    this.isConnected && (d(this, "nodrop", this.#r), this.#r ? this.#t.dropIndicator.remove() : this._root.prepend(this.#t.dropIndicator), Object.assign(this, {
+  #a() {
+    this.isConnected && (p(this, "nodrop", this.#i), this.#i ? this.#t.dropIndicator.remove() : this._root.prepend(this.#t.dropIndicator), Object.assign(this, {
       EntryListView: {
-        drop: !this.#r
+        drop: !this.#i
       }
     }));
   }
@@ -92,63 +102,63 @@ class $ extends A {
       ```
       */
   set noAttribution(t) {
-    f(t) && (this.#s = t, this.#l());
+    m(t) && (this.#s = t, this.#d());
   }
   /** Returns current noattribution state */
   get noAttribution() {
     return this.#s;
   }
-  #l() {
-    this.isConnected && (d(this, "noattribution", this.noAttribution), this.#s ? this.#e.remove() : this._root.append(this.#e));
+  #d() {
+    this.isConnected && (p(this, "noattribution", this.noAttribution), this.#s ? this.#e.remove() : this._root.append(this.#e));
   }
   /** Sets the locale on parent */
   set locale(t) {
-    super.locale = t, this.#n((e) => e.locale = t);
+    super.locale = t, this.#o((e) => e.locale = t);
   }
   static get observedAttributes() {
-    return [...super.observedAttributes, "animations", "noattribution", "nodrop"];
+    return [...super.observedAttributes, "reduced-motion", "noattribution", "nodrop"];
   }
-  attributeChangedCallback(t, e, i) {
+  attributeChangedCallback(t, e, r) {
     if (t === "noattribution") {
-      this.noAttribution = p(i);
+      this.noAttribution = l(r);
       return;
     }
     if (t === "nodrop") {
-      this.noDrop = p(i);
+      this.noDrop = l(r);
       return;
     }
-    if (t === "nobrowse" && p(i)) {
-      this.noDrop = p(i), super.attributeChangedCallback(t, e, i);
+    if (t === "nobrowse" && l(r)) {
+      this.noDrop = l(r), super.attributeChangedCallback(t, e, r);
       return;
     }
-    t === "animations" && (this.animations = i), super.attributeChangedCallback(t, e, i);
+    t === "reduced-motion" && (this.reducedMotionPreference = r), super.attributeChangedCallback(t, e, r);
   }
   constructor() {
     super({
-      styles: [I]
+      styles: [M]
     });
-    const t = a("file-pond-entry-list", {
+    const t = c("file-pond-entry-list", {
       part: "entry-list-element"
-    }), e = a("file-pond-source-list", {
+    }), e = c("file-pond-source-list", {
       part: "source-list-element"
-    }), i = a("file-pond-source-description", {
+    }), r = c("file-pond-source-description", {
       part: "source-description-element"
-    }), c = a("file-pond-frame", {
+    }), a = c("file-pond-frame", {
       part: "frame-element"
-    }), h = a("file-pond-drop-indicator", {
+    }), h = c("file-pond-drop-indicator", {
       part: "drop-indicator-element"
     });
     this.#t = {
       entryList: t,
       sourceList: e,
-      frame: c,
+      frame: a,
       dropIndicator: h,
-      sourceDescription: i
+      sourceDescription: r
     };
-    const r = b(
+    const i = b(
       t,
       /* @__PURE__ */ new Set(["dragging", "virtualized", "selected", "checked"])
-    ), n = b(
+    ), o = b(
       e,
       /* @__PURE__ */ new Set([
         "dialog",
@@ -163,9 +173,11 @@ class $ extends A {
       // add items view
       extensions: this.extensions,
       // default spring values
-      springDefaults: C(),
+      springOptions: S(),
       // default animation state
-      animations: "auto",
+      reducedMotionPreference: "auto",
+      // ignored file entry patterns
+      ignoredEntryPatterns: N,
       // show progress indicator for data transfers
       DataTransferLoader: {
         perceivedPerformance: !0
@@ -178,12 +190,12 @@ class $ extends A {
       SourceListView: {
         element: this.#t.sourceList,
         // the nodes to render
-        template: j(),
+        template: I(),
         // assets to use
         assets: g,
         // sync source entry list parts
-        beforeRenderNode(o) {
-          return n(o.props?.part || o.attrs?.part), o;
+        beforeRenderNode(n) {
+          return o(n.props?.part || n.attrs?.part), n;
         }
       },
       // set up entry list view extension
@@ -197,56 +209,52 @@ class $ extends A {
         // the nodes to render
         template: y,
         // called before rendering a node, allows dynamically modifying a node or adding nodes
-        beforeRenderNode(o) {
-          return r(o.props?.part || o.attrs?.part), o;
+        beforeRenderNode(n) {
+          return i(n.props?.part || n.attrs?.part), n;
         },
-        // animations
+        // entry animation
         entryAnimationProps: L(),
-        entryAnimationOriginMap: P()
+        entryAnimationOriginMap: A()
       }
-    }), this.#e = B({
+    }), this.#e = V({
       caption: "Powered by FilePond"
     }), Object.assign(this, u);
   }
   connectedCallback() {
     super.connectedCallback();
-    const { entryList: t, sourceList: e, sourceDescription: i, frame: c, dropIndicator: h } = this.#t;
-    this._root.prepend(c, i), this._root.append(e, t), this.#c(), this.#l(), this.#a(), this.#o.push(
+    const { entryList: t, sourceList: e, sourceDescription: r, frame: a, dropIndicator: h } = this.#t;
+    this._root.prepend(a, r), this._root.append(e, t), this.#a(), this.#d(), this.#c(), this.#n.push(
       // did compute target rect
-      l(c, "rectcompute", (r) => {
-        if (!r.detail)
-          return;
-        const n = r.detail;
-        m(this, "rectcompute", { detail: n });
+      d(a, "rectcompute", (i) => {
+        const o = i.detail;
+        this._root.dataset.rect = "", f(this, "rectcompute", { detail: o });
       }),
       // did update visual rect
-      l(c, "rectchange", (r) => {
-        if (!r.detail)
-          return;
-        const n = r.detail;
-        this._root.style.setProperty("--width", n.width), this._root.style.setProperty("--height", n.height), m(this, "rectchange", { detail: n });
+      d(a, "rectchange", (i) => {
+        const o = i.detail;
+        this._root.style.setProperty("--width", o.width), this._root.style.setProperty("--height", o.height), f(this, "rectchange", { detail: o });
       }),
       // link up placeholder position with drop indicator
-      l(t, "placeholderchange", (r) => {
-        h.indicatorRect = r.detail;
+      d(t, "placeholderchange", (i) => {
+        h.indicatorRect = i.detail;
       }),
       // these two listeners toggle the dragging attribute to the file-pond element, we do this so we can move the file-pond element that is being interacted with to the front, so the dragged item also renders on top. Additionally they prevent interaction with slot content and attribution link while dragging
-      l(t, "entrydragstart", () => {
-        d(this, "dragging", !0), this._slot.inert = !0, this.#e.inert = !0;
+      d(t, "entrydragstart", () => {
+        p(this, "dragging", !0), this._slot.inert = !0, this.#e.inert = !0;
       }),
-      l(t, "entrydragend", () => {
-        d(this, "dragging", !1), this._slot.inert = !1, this.#e.inert = !1;
+      d(t, "entrydragend", () => {
+        p(this, "dragging", !1), this._slot.inert = !1, this.#e.inert = !1;
       })
     );
   }
   /** Called each time the element is removed from the document. */
   disconnectedCallback() {
-    super.disconnectedCallback(), this.#n((t) => t.remove()), this.#e.remove(), this.#o.forEach((t) => t()), this.#o = [];
+    super.disconnectedCallback(), this.#o((t) => t.remove()), this.#e.remove(), this.#n.forEach((t) => t()), this.#n = [];
   }
 }
-function B(s) {
+function V(s) {
   const { caption: t = "" } = s || {};
-  return a("a", {
+  return c("a", {
     textContent: t,
     href: "https://filepond.com",
     target: "_tab",
@@ -258,18 +266,19 @@ function B(s) {
     "aria-hidden": "true"
   });
 }
-function X(s) {
-  if (!_())
+function U(s) {
+  if (!F())
     return [];
   const t = "file-pond";
-  return u = s, x(t) || (F({
+  return u = s, _(t) || (O({
     [`${t}-source-list`]: w,
     [`${t}-entry-list`]: E,
-    [`${t}-frame`]: D,
-    [`${t}-drop-indicator`]: S
-  }), k(t, $)), Array.from(document.querySelectorAll(t));
+    [`${t}-frame`]: C,
+    [`${t}-drop-indicator`]: D
+  }), k(t, j)), Array.from(document.querySelectorAll(t));
 }
 export {
-  $ as FilePondElement,
-  X as defineFilePond
+  j as FilePondElement,
+  N as IGNORED_ENTRY_PATTERNS,
+  U as defineFilePond
 };

@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const e = {
   success: "Siker",
   info: "Információ",
   system: "Rendszer",
-  // sources
-  device: "Eszköz",
-  camera: "Kamera",
-  link: "Hivatkozás",
   // capabilities labels
   descriptionBrowse: "[{{maxFilesUnit}} kiválasztása]",
   descriptionBrowseDrop: "Húzza ide: {{maxFilesUnit}}, vagy [tallózzon]",
@@ -113,9 +109,9 @@ const e = {
   transformError: "A fájladatok szerkesztése nem sikerült. Próbálja újra."
 }, l = {
   validationFileMimeTypeMismatch: {
-    template: "Ez a fájltípus nem engedélyezett. {{details}}.",
+    template: "Ez a fájltípus nem engedélyezett. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "A fájlnak {{accept}} típusúnak kell lennie",
@@ -126,9 +122,9 @@ const e = {
   }
 }, n = {
   validationFileExtensionMismatch: {
-    template: "Ez a fájlkiterjesztés nem engedélyezett. {{details}}.",
+    template: "Ez a fájlkiterjesztés nem engedélyezett. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "A fájlnak {{accept}} kiterjesztéssel kell rendelkeznie",
@@ -169,16 +165,33 @@ const e = {
   ...r,
   ...d
 }, v = {
+  device: "Eszköz"
+}, c = {
+  link: "Hivatkozás"
+}, f = {
+  camera: "Kamera",
+  capture: "Rögzítés",
+  record: "Felvétel"
+}, g = {
+  ...v,
+  ...c,
+  ...f
+}, p = {
   ...e,
   ...t,
   ...i,
   ...z,
-  ...a
+  ...a,
+  ...g
 };
 export {
   e as core,
-  v as locale,
+  p as locale,
   i as media,
+  g as source,
+  f as sourceCamera,
+  v as sourceDevice,
+  c as sourceLink,
   t as store,
   a as transform,
   z as validation,

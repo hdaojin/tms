@@ -1,37 +1,36 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { onDestroy as At } from "../../vendor/svelte/src/index-client.js";
-import { user_effect as I, template_effect as It } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { push as Rt, pop as Ct } from "../../vendor/svelte/src/internal/client/context.js";
-import { get as t, untrack as h } from "../../vendor/svelte/src/internal/client/runtime.js";
-import { $window as Tt, child as xe, sibling as kt } from "../../vendor/svelte/src/internal/client/dom/operations.js";
-import { set as n, state as u } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
+import { onDestroy as xt } from "../../vendor/svelte/src/index-client.js";
+import { user_effect as k, template_effect as It } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { push as Rt, pop as At } from "../../vendor/svelte/src/internal/client/context.js";
+import { get as t, untrack as b } from "../../vendor/svelte/src/internal/client/runtime.js";
+import { $window as Ct, child as Tt, sibling as kt, only_child as Mt } from "../../vendor/svelte/src/internal/client/dom/operations.js";
+import { set as n, state as c } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
 import { set_text as wt } from "../../vendor/svelte/src/internal/client/render.js";
 import { user_derived as l } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { from_html as Mt, append as Pt } from "../../vendor/svelte/src/internal/client/dom/template.js";
-import { attach as $ } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
-import { delegate as Ot, event as _t, delegated as Ae } from "../../vendor/svelte/src/internal/client/dom/elements/events.js";
-import { proxy as Nt } from "../../vendor/svelte/src/internal/client/proxy.js";
-import { bind_this as Ft } from "../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
+import { from_html as Ot, append as Pt } from "../../vendor/svelte/src/internal/client/dom/template.js";
+import { attach as Z } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
+import { delegate as _t, event as Nt, delegated as xe } from "../../vendor/svelte/src/internal/client/dom/elements/events.js";
+import { proxy as Ft } from "../../vendor/svelte/src/internal/client/proxy.js";
+import { bind_this as Gt } from "../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
 import { bind_window_size as Ie } from "../../vendor/svelte/src/internal/client/dom/elements/bindings/window.js";
 import { prop as s } from "../../vendor/svelte/src/internal/client/reactivity/props.js";
-import { dragArea as Gt } from "../attachments/drag-area.js";
-import { dropArea as Kt } from "../attachments/drop-area.js";
-import { arrayMove as Re, arrayInsertAtIndex as Ce } from "../../utils/array.js";
-import { ORIGIN as O, vectorCreate as ee, vectorEqual as Bt, vectorSubtract as Lt, vectorAdd as Ut } from "../../utils/vector.js";
-import { rectPad as te, rectContainsPoint as re, rectFromBounds as Te, rectCenter as zt } from "../../utils/rect.js";
-import { passthrough as jt, noop as _ } from "../../utils/placeholder.js";
-import { measurable as ke } from "../attachments/measurable.js";
-import { dispatchCustomEvent as N, setBooleanAttribute as Vt } from "../../utils/dom.js";
-import { createAnimationModeObserver as qt } from "../common/animationPreference-svelte.js";
+import { dragArea as Kt } from "../attachments/drag-area.js";
+import { dropArea as Bt } from "../attachments/drop-area.js";
+import { arrayMove as Re, arrayInsertAtIndex as Ae } from "../../utils/array.js";
+import { ORIGIN as P, vectorCreate as $, vectorEqual as Lt, vectorSubtract as Ut, vectorAdd as zt } from "../../utils/vector.js";
+import { rectPad as ee, rectContainsPoint as te, rectFromBounds as Ce, rectCenter as jt } from "../../utils/rect.js";
+import { passthrough as Vt, noop as _ } from "../../utils/placeholder.js";
+import { measurable as Te } from "../attachments/measurable.js";
+import { dispatchCustomEvent as N, setBooleanAttribute as qt } from "../../utils/dom.js";
 import { setAppContext as Ht } from "./contexts/appContext.js";
 import { setDragContext as Wt } from "./contexts/dragContext.js";
 import { setDropContext as Xt } from "./contexts/dropContext.js";
-import { getUniqueId as we } from "../../utils/string.js";
+import { getUniqueId as ke } from "../../utils/string.js";
 import { setSpringElementTreeContext as Jt } from "./contexts/springElementTreeContext.js";
 import { sizeFromRect as Qt } from "../../utils/size.js";
 import { isNumber as Me } from "../../utils/test.js";
@@ -39,24 +38,21 @@ import Yt from "../components/NodeList/index-svelte.js";
 import { hasOwnProp as Zt } from "../../utils/object.js";
 import { getDragTargetIndex as $t, getDropTargetIndex as er } from "../common/dragDrop.js";
 import { clamp as tr } from "../../utils/math.js";
-import { isActivationKeyboardEvent as Pe, isArrowKeyboardEvent as rr, getDirectionFromKeyboardEvent as nr, isTabKeyboardEvent as ir, isCancelKeyboardEvent as or } from "../../utils/keyboard.js";
+import { isActivationKeyboardEvent as we, isArrowKeyboardEvent as rr, getDirectionFromKeyboardEvent as nr, isTabKeyboardEvent as ir, isCancelKeyboardEvent as or } from "../../utils/keyboard.js";
 import { stringReplaceVariables as ar } from "../common/string.js";
-var sr = Mt('<div class="root" role="group"><!> <div role="status" aria-live="polite" class="implicit"> </div></div>');
-function qr(Oe, i) {
+import { createMotionStateObserver as sr, shouldReduceMotion as dr } from "../common/motionState-svelte.js";
+var ur = Ot('<div class="root" role="group"><!> <div role="status" aria-live="polite" class="implicit"> </div></div>');
+function Wr(Oe, i) {
   Rt(i, !0);
-  let W = s(i, "disabled", 3, !1), X = s(i, "assets", 19, () => ({})), F = s(i, "locale", 19, () => ({})), _e = s(i, "template", 19, () => []), ne = s(i, "propResourceMap", 19, () => ({ title: "locale", label: "locale", icon: "assets" })), ie = s(i, "drag", 3, !0), Ne = s(i, "dragGrabTimeout", 3, 100), Fe = s(i, "dragDetachMargin", 3, 40), oe = s(i, "dragSafetyMargin", 3, 80), ae = s(i, "drop", 3, !0), Ge = s(i, "dropRoot", 3, void 0), se = s(i, "dropPadding", 3, 20), Ke = s(i, "animations", 3, "auto"), Be = s(i, "entryAnimationOriginMap", 19, () => ({})), Le = s(i, "entryAnimationProps", 19, () => ({})), de = s(i, "entryAnimationStaggerInterval", 3, 50), Ue = s(i, "beforeRenderNode", 3, jt), ze = s(i, "byteUnits", 3, void 0);
-  const J = qt(), z = l(() => J.current);
-  I(() => {
-    J.setPreference(Ke());
-  });
-  const je = 50;
-  let g = u(void 0), ue = u(void 0), Q = u(void 0), p = u([]), D = u([]), f = u({}), ce = u(0), le = u(0);
-  const Ve = l(() => ({
+  let W = s(i, "disabled", 3, !1), X = s(i, "assets", 19, () => ({})), F = s(i, "locale", 19, () => ({})), Pe = s(i, "template", 19, () => []), re = s(i, "propResourceMap", 19, () => ({ title: "locale", label: "locale", icon: "assets" })), ne = s(i, "drag", 3, !0), _e = s(i, "dragGrabTimeout", 3, 100), Ne = s(i, "dragDetachMargin", 3, 40), ie = s(i, "dragSafetyMargin", 3, 80), oe = s(i, "drop", 3, !0), Fe = s(i, "dropRoot", 3, void 0), ae = s(i, "dropPadding", 3, 20), Ge = s(i, "entryAnimationOriginMap", 19, () => ({})), Ke = s(i, "entryAnimationProps", 19, () => ({})), se = s(i, "entryAnimationStaggerInterval", 3, 50), Be = s(i, "beforeRenderNode", 3, Vt), Le = s(i, "byteUnits", 3, void 0);
+  const de = sr(), z = l(() => dr(de.current, i.reducedMotionPreference)), Ue = 50;
+  let g = c(void 0), ue = c(void 0), J = c(void 0), p = c([]), h = c([]), f = c({}), ce = c(0), le = c(0);
+  const ze = l(() => ({
     top: 0,
     right: t(ce),
     bottom: t(le),
     left: 0
-  })), o = Nt({
+  })), o = Ft({
     setEntries: fe,
     insertEntries: _,
     removeEntries: _,
@@ -66,43 +62,43 @@ function qr(Oe, i) {
     pushTask: _,
     abortTask: _
   });
-  function qe(e) {
+  function je(e) {
     o.setEntries = e;
   }
-  function He(e) {
+  function Ve(e) {
     o.insertEntries = e;
   }
-  function We(e) {
+  function qe(e) {
     o.removeEntries = e;
   }
-  function Xe(e) {
+  function He(e) {
     o.updateEntry = e;
   }
-  function Je(e) {
+  function We(e) {
     o.getEntryExtensionState = e;
   }
-  function Qe(e) {
+  function Xe(e) {
     o.setEntryExtensionState = e;
   }
-  function Ye(e) {
+  function Je(e) {
     o.pushTask = e;
   }
-  function Ze(e) {
+  function Qe(e) {
     o.abortTask = e;
   }
   function fe(e) {
     e && n(p, e);
   }
-  function $e(e) {
-    const r = Be()[e.origin];
-    r && G(e, r, { stagger: de() });
+  function Ye(e) {
+    const r = Ge()[e.origin];
+    r && G(e, r, { stagger: se() });
   }
-  function et({ entry: e, index: r }) {
-    r[0] !== -1 && (rt(e, r[0]), G(e, "fall", {
-      stagger: de(),
+  function Ze({ entry: e, index: r }) {
+    r[0] !== -1 && (et(e, r[0]), G(e, "fall", {
+      stagger: se(),
       oncomplete: () => {
         me(() => {
-          nt(e.id);
+          tt(e.id);
         });
       }
     }));
@@ -115,72 +111,72 @@ function qr(Oe, i) {
       0
     );
   }
-  function tt(e) {
+  function $e(e) {
     t(m) && N(t(m), "placeholderchange", { detail: e || null });
   }
-  function rt(e, r) {
-    n(D, [...t(D), { index: r, entry: e }]);
+  function et(e, r) {
+    n(h, [...t(h), { index: r, entry: e }]);
   }
-  function nt(e) {
-    n(D, t(D).filter(({ entry: r }) => r.id !== e));
+  function tt(e) {
+    n(h, t(h).filter(({ entry: r }) => r.id !== e));
   }
-  const it = l(() => Math.max(t(D).length, t(p).length));
-  I(() => {
-    N(t(m), "entrieschange", { detail: t(it) });
+  const rt = l(() => Math.max(t(h).length, t(p).length));
+  k(() => {
+    N(t(m), "entrieschange", { detail: t(rt) });
   });
   const ge = {};
   function G(e, r, d) {
     if (!e)
       return;
-    const { stagger: v, oncomplete: y, retain: M = !1 } = d ?? {};
-    if (!t(z)) {
+    const { stagger: R, oncomplete: y, retain: w = !1 } = d ?? {};
+    if (t(z)) {
       y && y();
       return;
     }
     if (t(f)[e.id]?.animation === r)
       return;
-    if (Object.keys(t(f)).length > je) {
+    if (Object.keys(t(f)).length > Ue) {
       y && y();
       return;
     }
-    let C = !1, B = !1, T = 0;
-    if (Me(v)) {
-      const E = ge[r] || 0, k = Date.now();
-      if (E + v > k) {
-        const L = k - E;
-        T = v - L;
+    let A = !1, B = !1, C = 0;
+    if (Me(R)) {
+      const E = ge[r] || 0, T = Date.now();
+      if (E + R > T) {
+        const L = T - E;
+        C = R - L;
       }
-      ge[r] = k + T;
+      ge[r] = T + C;
     }
-    let P;
-    const x = {
+    let O;
+    const D = {
       entry: e,
       animation: r,
       oncancel: () => {
-        C || !P || (C = !0, clearTimeout(P), h(() => {
+        A || !O || (A = !0, clearTimeout(O), b(() => {
           pe(e, r);
         }), y && y());
       },
       oncomplete: () => {
-        B || (B = !0, M || h(() => {
+        B || (B = !0, w || b(() => {
           pe(e, r);
         }), y && y());
       }
     };
     n(f, {
       ...t(f),
-      [e.id]: { ...x, delayed: T > 0 }
-    }), T > 0 && (P = setTimeout(
+      [e.id]: { ...D, delayed: C > 0 }
+    }), C > 0 && (O = setTimeout(
       () => {
         n(f, {
           ...t(f),
-          [e.id]: { ...x, delayed: !1 }
+          [e.id]: { ...D, delayed: !1 }
         });
       },
-      T
+      C
     ));
   }
-  function ot(e) {
+  function nt(e) {
     for (const r of Object.values(t(f)))
       if (e === r.animation)
         return r.entry;
@@ -190,11 +186,11 @@ function qr(Oe, i) {
     t(f)[e.id]?.animation === r && (delete t(f)[e.id], n(f, { ...t(f) }));
   }
   Ht({
-    get enableAnimations() {
+    get reduceMotion() {
       return t(z);
     },
     get enableDrag() {
-      return ie();
+      return ne();
     },
     get locale() {
       return F();
@@ -205,185 +201,188 @@ function qr(Oe, i) {
     get resources() {
       return { locale: F(), assets: X() };
     },
-    get springDefaults() {
-      return i.springDefaults;
+    get springOptions() {
+      return i.springOptions;
     },
     get propResourceMap() {
-      return ne();
+      return re();
     },
     get retainedEntries() {
-      return t(D);
+      return t(h);
     },
     get animatedEntries() {
       return t(f);
     },
     get entryAnimationProps() {
-      return Le();
+      return Ke();
     },
     // so others can know of the placeholder rectangle location
-    updateEntryPlaceholderRect: tt,
+    updateEntryPlaceholderRect: $e,
     // copy over AppCallbacks to AppContext
     ...Object.keys(o).reduce(
       (e, r) => (e[r] = (...d) => o[r](...d), e),
       {}
     )
   });
-  let j = u(void 0);
-  function at(e) {
-    n(j, Te(e));
+  let j = c(void 0);
+  function it(e) {
+    n(j, Ce(e));
   }
-  let m = u(void 0), a = u(void 0);
-  const ye = l(ae), Ee = l(() => t(ye) ? Ge() ?? t(m) : void 0);
-  let b = u(void 0);
-  I(() => {
-    if (!t(a) || oe() === 1 / 0)
+  let m = c(void 0), a = c(void 0);
+  const ye = l(oe), Ee = l(() => t(ye) ? Fe() ?? t(m) : void 0);
+  let v = c(void 0);
+  k(() => {
+    if (!t(a) || ie() === 1 / 0)
       return;
     const { viewPosition: e } = t(a);
     if (!e)
       return;
-    const r = te(h(() => t(j) ?? t(g)), oe());
-    re(r, e) ? t(b) && n(b, void 0) : t(b) || n(b, { remove: !0 });
+    const r = ee(b(() => t(j) ?? t(g)), ie());
+    te(r, e) ? t(v) && n(v, void 0) : t(v) || n(v, { remove: !0 });
   });
-  let V, K, q, w = u(O);
-  I(() => {
+  let V, K, q, M = c(P);
+  k(() => {
     if (!t(g)) {
-      n(w, O);
+      n(M, P);
       return;
     }
     if (!t(a)) {
-      V = { ...t(g) }, n(w, O), q = O;
+      V = { ...t(g) }, n(M, P), q = P;
       return;
     }
-    const e = V ? ee(V.x - t(g).x, V.y - t(g).y) : O;
-    if (K && Bt(e, K)) {
-      q = O;
+    const e = V ? $(V.x - t(g).x, V.y - t(g).y) : P;
+    if (K && Lt(e, K)) {
+      q = P;
       return;
     }
-    K && (q = Lt(e, K)), K = { ...e }, me(() => {
-      n(w, e);
+    K && (q = Ut(e, K)), K = { ...e }, me(() => {
+      n(M, e);
     });
   });
-  let be = -1, c = u(void 0);
-  I(() => {
+  let ve = -1, u = c(void 0);
+  k(() => {
     if (!t(a)) {
-      n(c, void 0);
+      n(u, void 0);
       return;
     }
     const {
       id: e,
       element: r,
       offset: d,
-      translation: v,
-      vector: y = ee(),
-      viewPosition: M = ee(),
-      direction: C
+      translation: R,
+      vector: y = $(),
+      viewPosition: w = $(),
+      direction: A
     } = t(a);
-    if (!r && t(ye) && se() < 1 / 0) {
-      const E = te(h(() => t(j) ?? t(g)), se());
-      if (!re(E, M)) {
-        n(c, void 0);
+    if (!r && t(ye) && ae() < 1 / 0) {
+      const E = ee(b(() => t(j) ?? t(g)), ae());
+      if (!te(E, w)) {
+        n(u, void 0);
         return;
       }
     }
-    if (r && C) {
+    if (r && A) {
       let E;
       const L = r.closest("ul").children, U = Array.from(L).indexOf(r);
-      if (C !== "none") {
-        let A = U;
-        C === "up" ? A-- : C === "down" && A++, A = tr(A, 0, L.length - 1), h(() => {
-          o.setEntries(Re([...t(p)], U, A));
-        }), E = A, h(() => {
-          n(R, {
+      if (A !== "none") {
+        let x = U;
+        A === "up" ? x-- : A === "down" && x++, x = tr(x, 0, L.length - 1), b(() => {
+          o.setEntries(Re([...t(p)], U, x));
+        }), E = x, b(() => {
+          n(I, {
             key: "ariaDragStateSort",
-            name: t(p)[A].name,
-            position: A + 1,
+            name: t(p)[x].name,
+            position: x + 1,
             total: L.length
           });
         });
       } else
-        E = U, h(() => {
-          n(R, {
+        E = U, b(() => {
+          n(I, {
             key: "ariaDragStateGrab",
             name: t(p)[U].name,
             position: U + 1
           });
         });
-      n(c, { id: e, index: E, element: r });
+      n(u, { id: e, index: E, element: r });
       return;
     }
-    const B = !re(te(h(() => t(j) ?? t(g)), Fe()), M), T = t(w).x !== 0 || t(w).y !== 0, Z = {
-      searchBounds: t(Ve),
-      cacheClientRectangles: T ? 0 : 250
-    }, P = Ut(q, y), x = B ? be : r ? $t(r, M, P, Z) : er(t(m), M, P, Z);
-    if (r && x > -1) {
-      const E = r.closest("ul"), k = Array.from(E.children).indexOf(r);
-      k !== x && h(() => {
-        o.setEntries(Re([...t(p)], k, x));
+    const B = !te(ee(b(() => t(j) ?? t(g)), Ne()), w), C = t(M).x !== 0 || t(M).y !== 0, Y = {
+      searchBounds: t(ze),
+      cacheClientRectangles: C ? 0 : 250
+    }, O = zt(q, y), D = B ? ve : r ? $t(r, w, O, Y) : er(t(m), w, O, Y);
+    if (r && D > -1) {
+      const E = r.closest("ul"), T = Array.from(E.children).indexOf(r);
+      T !== D && b(() => {
+        o.setEntries(Re([...t(p)], T, D));
       });
     }
-    be = x, n(c, {
+    ve = D, n(u, {
       id: e,
-      index: x,
+      index: D,
       element: r,
       offset: d,
-      translation: v,
-      parentTranslation: t(w),
+      translation: R,
+      parentTranslation: t(M),
       outside: B
     });
   });
-  const st = l(() => t(c) ? t(c).id : void 0), H = l(() => t(c) ? t(c).index : void 0), ve = l(() => t(c) ? t(c).element : void 0), dt = l(() => !!(t(c) && !t(ve) && t(H) !== void 0));
-  I(() => {
-    if (!t(ve)) {
-      const r = ot("lift");
+  const ot = l(() => t(u) ? t(u).id : void 0), H = l(() => t(u) ? t(u).index : void 0), be = l(() => t(u) ? t(u).element : void 0), at = l(() => !!(t(u) && !t(be) && t(H) !== void 0));
+  k(() => {
+    if (!t(be)) {
+      const r = nt("lift");
       r && G(r, "release");
       return;
     }
     if (!Me(t(H)))
       return;
     const e = t(p)[t(H)];
-    if (t(b)?.remove) {
+    if (t(v)?.remove) {
       G(e, "dissolve", { retain: !0 });
       return;
     }
     G(e, "lift", { retain: !0 });
   });
-  function ut(e) {
+  function st(e) {
     N(t(m), "entrydragstart"), n(a, e);
   }
-  function ct(e) {
+  function dt(e) {
   }
   function he(e) {
     N(t(m), "entrydrag"), n(a, e);
   }
-  function lt(e) {
+  function ut(e) {
     n(a, e);
   }
-  function ft(e) {
+  function ct(e) {
     n(a, void 0);
   }
-  function mt() {
+  function lt() {
     N(t(m), "entrydragend"), n(a, void 0);
   }
-  function De(e) {
-    if (N(t(m), "entrydragend"), !t(c))
+  function ft(e) {
+    return !!t(u);
+  }
+  function Se(e) {
+    if (N(t(m), "entrydragend"), !t(u))
       return;
-    const { index: r } = t(c);
+    const { index: r } = t(u);
     if (n(a, void 0), Zt(e, "dataTransfer")) {
       const d = e.dataTransfer;
       if (!d.types.includes("Files"))
         return;
-      o.insertEntries({ id: we(), src: d, origin: "drop" }, r);
+      o.insertEntries({ id: ke(), src: d, origin: "drop" }, r);
       return;
     }
-    if (t(b)?.remove) {
+    if (t(v)?.remove) {
       const d = t(p)[r].id;
-      n(b, { ...t(b), id: d }), o.removeEntries(d);
+      n(v, { ...t(v), id: d }), o.removeEntries(d);
       return;
     }
   }
-  const gt = l(() => {
+  const mt = l(() => {
     let e = t(p);
-    if (t(dt) && (e = Ce(
+    if (t(at) && (e = Ae(
       // array to insert the placeholder into
       [...t(p)],
       t(
@@ -391,45 +390,42 @@ function qr(Oe, i) {
         H
       ),
       // item placeholder when dropping a new file
-      { id: t(st) }
-    )), !t(D).length)
+      { id: t(ot) }
+    )), !t(h).length)
       return e;
     let r = [...e];
-    return t(D).forEach(({ entry: d, index: v }) => {
-      r = Ce(r, v, d);
+    return t(h).forEach(({ entry: d, index: R }) => {
+      r = Ae(r, R, d);
     }), r;
   });
   Wt({
     get current() {
-      return t(c);
+      return t(u);
     }
   }), Xt({
     get current() {
-      return t(b);
+      return t(v);
     }
-  }), I(() => {
+  }), k(() => {
     if (!t(Ee))
       return;
-    const e = ke({ onmeasure: at })(t(Ee));
+    const e = Te({ onmeasure: it })(t(Ee));
     return () => {
       e();
     };
-  }), I(() => {
-    Vt(t(m), "data-disabled", W());
+  }), k(() => {
+    qt(t(m), "data-disabled", W());
   });
-  const pt = l(() => ({
-    insertEntries: o.insertEntries,
-    removeEntries: o.removeEntries,
-    updateEntry: o.updateEntry,
+  const gt = {
+    insertEntries: (e, r) => o.insertEntries(e, r),
+    removeEntries: (...e) => o.removeEntries(...e),
+    updateEntry: (e, ...r) => o.updateEntry(e, ...r),
     updateEntryState: (e, r) => {
       o.updateEntry(e, { state: r });
-    },
-    resources: { locale: F(), assets: X() },
-    propResourceMap: ne(),
-    enableAnimations: t(z)
-  }));
-  function yt(e) {
-    n(g, Te(e), !0), n(ue, zt(t(g)), !0), n(Q, Qt(t(g)), !0);
+    }
+  };
+  function pt(e) {
+    n(g, Ce(e), !0), n(ue, jt(t(g)), !0), n(J, Qt(t(g)), !0);
   }
   Jt({
     parent: null,
@@ -443,10 +439,10 @@ function qr(Oe, i) {
       return t(ue);
     },
     get targetSize() {
-      return t(Q);
+      return t(J);
     },
     get currentSize() {
-      return t(Q);
+      return t(J);
     },
     get currentScale() {
       return 1;
@@ -454,18 +450,18 @@ function qr(Oe, i) {
     childSpringCount: 0,
     childSpringReadyCount: 0
   });
-  function Et(e) {
+  function yt(e) {
     t(a) && e.preventDefault();
   }
-  function Y() {
-    return t(a) ? (n(a, void 0), n(R, {
+  function Q() {
+    return t(a) ? (n(a, void 0), n(I, {
       key: "ariaDragStateDrop",
-      name: t(R).name,
-      position: t(R).position
+      name: t(I).name,
+      position: t(I).position
     }), !0) : !1;
   }
-  function bt(e) {
-    if (e.target.dataset.draggable === "" && Pe(e) && e.preventDefault(), t(a) && rr(e)) {
+  function Et(e) {
+    if (e.target.dataset.draggable === "" && we(e) && e.preventDefault(), t(a) && rr(e)) {
       n(a, {
         ...t(a),
         direction: nr(e)
@@ -475,86 +471,100 @@ function qr(Oe, i) {
   }
   function vt(e) {
     if (ir(e)) {
-      Y();
+      Q();
       return;
     }
-    if (Pe(e)) {
+    if (we(e)) {
       const r = e.target;
-      if (!(r?.dataset.draggable === "") || (e.preventDefault(), Y()))
+      if (!(r?.dataset.draggable === "") || (e.preventDefault(), Q()))
         return;
-      n(a, { id: we(), element: r, direction: "none" });
+      n(a, { id: ke(), element: r, direction: "none" });
       return;
     }
-    if (or(e) && Y()) {
+    if (or(e) && Q()) {
       e.preventDefault();
       return;
     }
   }
-  let R = u(void 0);
-  const ht = l(() => {
-    if (!t(R))
+  let I = c(void 0);
+  const bt = l(() => {
+    if (!t(I))
       return "";
-    const { key: e, ...r } = t(R);
+    const { key: e, ...r } = t(I);
     return ar(F()[e], r, F());
   });
-  At(() => {
-    J.destroy();
+  xt(() => {
+    de.destroy();
   });
-  var Dt = {
-    setSetEntriesCallback: qe,
-    setInsertEntriesCallback: He,
-    setRemoveEntriesCallback: We,
-    setUpdateEntryCallback: Xe,
-    setGetEntryExtensionStateCallback: Je,
-    setSetEntryExtensionStateCallback: Qe,
-    setPushTaskCallback: Ye,
-    setAbortTaskCallback: Ze,
+  var ht = {
+    setSetEntriesCallback: je,
+    setInsertEntriesCallback: Ve,
+    setRemoveEntriesCallback: qe,
+    setUpdateEntryCallback: He,
+    setGetEntryExtensionStateCallback: We,
+    setSetEntryExtensionStateCallback: Xe,
+    setPushTaskCallback: Je,
+    setAbortTaskCallback: Qe,
     onSetEntries: fe,
-    onInsertEntry: $e,
-    onRemoveEntry: et
-  }, S = sr();
-  _t("contextmenu", Tt, Et);
-  var Se = xe(S);
+    onInsertEntry: Ye,
+    onRemoveEntry: Ze
+  }, S = ur();
+  Nt("contextmenu", Ct, yt);
+  var De = Tt(S);
   {
-    let e = l(() => ({ entries: t(gt) }));
-    Yt(Se, {
-      get nodes() {
-        return _e();
+    let e = l(() => ({ locale: F(), assets: X() })), r = l(() => ({ entries: t(mt) })), d = l(() => ({
+      ...gt,
+      byteUnits: Le(),
+      reduceMotion: t(z),
+      springOptions: i.springOptions
+    }));
+    Yt(De, {
+      get reduceMotion() {
+        return t(z);
       },
-      get context() {
+      get springOptions() {
+        return i.springOptions;
+      },
+      get resources() {
         return t(e);
       },
-      get sharedContext() {
-        return t(pt);
+      get propResourceMap() {
+        return re();
       },
-      beforeRenderNode: (r, d, v) => Ue()(r, d, v),
-      beforeSetProps: (r) => ({
-        ...r,
-        byteUnits: ze(),
-        enableAnimations: t(z),
-        springDefaults: i.springDefaults
-      })
+      get nodes() {
+        return Pe();
+      },
+      get data() {
+        return t(r);
+      },
+      get context() {
+        return t(d);
+      },
+      get beforeRenderNode() {
+        return Be();
+      }
     });
   }
-  var St = kt(Se, 2), xt = xe(St);
-  return Ft(S, (e) => n(m, e), () => t(m)), $(S, () => ke({ onmeasure: yt })), $(S, () => Gt({
-    disabled: !ie() || W(),
+  var St = kt(De, 2), Dt = Mt(St, !0);
+  return Gt(S, (e) => n(m, e), () => t(m)), Z(S, () => Te({ onmeasure: pt })), Z(S, () => Kt({
+    disabled: !ne() || W(),
     itemSelector: "[data-draggable]",
-    grabTimeout: Ne(),
-    onitemgrab: ut,
-    onitemgrabcancel: ct,
+    grabTimeout: _e(),
+    onitemgrab: st,
+    onitemgrabcancel: dt,
     onitemdrag: he,
-    onitemdrop: De
-  })), $(S, () => Kt({
-    disabled: !ae() || W(),
+    onitemdrop: Se
+  })), Z(S, () => Bt({
+    disabled: !oe() || W(),
+    willAcceptDrop: ft,
     onitemdrag: he,
-    onitemdragin: lt,
-    onitemdragout: ft,
-    onitemdropcancel: mt,
-    onitemdrop: De
-  })), It(() => wt(xt, t(ht))), Ie("innerWidth", (e) => n(ce, e, !0)), Ie("innerHeight", (e) => n(le, e, !0)), Ae("keydown", S, bt), Ae("keyup", S, vt), Pt(Oe, S), Ct(Dt);
+    onitemdragin: ut,
+    onitemdragout: ct,
+    onitemdropcancel: lt,
+    onitemdrop: Se
+  })), It(() => wt(Dt, t(bt))), Ie("innerWidth", (e) => n(ce, e, !0)), Ie("innerHeight", (e) => n(le, e, !0)), xe("keydown", S, Et), xe("keyup", S, vt), Pt(Oe, S), At(ht);
 }
-Ot(["keydown", "keyup"]);
+_t(["keydown", "keyup"]);
 export {
-  qr as default
+  Wr as default
 };

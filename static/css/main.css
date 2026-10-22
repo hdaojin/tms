@@ -5,6 +5,16 @@
 @source not "../../.venv";
 @source not "../../node_modules";
 @source not "../../staticfiles";
+@source not "../../docs";
+@source not "../../archives";
+@source not "../../backups";
+@source not "../../media";
+@source not "../../media-private";
+@source not "../../static/vendor";
+@source not "../../static/css/output.css";
+@source not "../../static/js/alpinejs.min.js";
+@source not "../../static/js/mermaid.min.js";
+@source not "../../static/js/prism.js";
 @plugin "@tailwindcss/typography";
 @plugin "daisyui" {
   themes:
@@ -428,15 +438,12 @@
         .file-input-primary
       ):not(.file-input-secondary):not(.file-input-accent):not(
         .file-input-info
-      ):not(.file-input-success):not(.file-input-warning):not(
-        .file-input-error
-      )
+      ):not(.file-input-success):not(.file-input-warning):not(.file-input-error)
   ) {
     --input-color: var(--tms-border-color);
   }
 
-  .table:not(.tms-print-table)
-    :where(tfoot tr:first-child :is(td, th)) {
+  .table:not(.tms-print-table) :where(tfoot tr:first-child :is(td, th)) {
     border-top-color: var(--tms-table-border-color);
   }
 

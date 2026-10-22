@@ -1,0 +1,3 @@
+interface:
+  display_name: "远程服务器配置"
+  short_description: "安全检查或配置指定远程服务器"

@@ -1,15 +1,15 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { xhr as T, getResponseHeaderValue as z, getResponseHeaders as F, getFilenameFromResponseHeaders as V } from "../utils/xhr.js";
+import { xhr as T, getResponseHeaderValue as z, getResponseHeaders as D, getFilenameFromResponseHeaders as V } from "../utils/xhr.js";
 import { urlToFilename as $ } from "../utils/url.js";
-import { isFileEntry as C, isBlobOrFile as G, isString as L, isNumber as j, isDataURL as D } from "../utils/test.js";
+import { isFileEntry as C, isBlobOrFile as G, isString as L, isNumber as j, isDataURL as F } from "../utils/test.js";
 import { blobToFile as J, getExtensionFromMimeType as K } from "../utils/file.js";
-import { didAbort as M } from "../utils/abort.js";
-import { passthrough as A } from "../utils/placeholder.js";
+import { didAbort as A } from "../utils/abort.js";
+import { passthrough as M } from "../utils/placeholder.js";
 import { createExtension as N } from "./common/createExtension.js";
 import { Status as p } from "../common/status.js";
 const X = ({ value: f }) => f, ce = N({
@@ -33,30 +33,30 @@ const X = ({ value: f }) => f, ce = N({
       removeEntries: O,
       updateEntry: b,
       pushTask: R,
-      abortTask: q,
-      getEntryExtensionStatus: x,
-      getEntryExtensionState: B,
+      abortTask: B,
+      getEntryExtensionStatus: q,
+      getEntryExtensionState: x,
       setEntryExtensionStatus: h,
       createProgressHandler: _
     } = k;
     function g(e, t) {
-      const { src: a } = e, { response: o } = t, u = F(t), i = a, n = V(u);
+      const { src: a } = e, { response: o } = t, u = D(t), i = a, n = V(u);
       if (n)
         return n;
-      if (D(i)) {
+      if (F(i)) {
         const { getBasename: r, mimeTypeMap: s } = m;
         return `${r(e, o)}${K(o.type, s)}`;
       }
       return $(i);
     }
-    function y(e, t) {
+    function U(e, t) {
       throw h(e, {
         type: p.Error,
         code: "LOAD_ERROR",
         values: { error: t }
       }), t;
     }
-    function U(e) {
+    function S(e) {
       if (L(e) && e.length)
         return !0;
       throw "FilePondEntry has invalid src property";
@@ -76,10 +76,10 @@ const X = ({ value: f }) => f, ce = N({
         progress: 1 / 0
       });
       try {
-        if (!U(a))
+        if (!S(a))
           return;
         const {
-          resolveRequest: { metadata: o = A },
+          resolveRequest: { metadata: o = M },
           useWebWorkers: u,
           workersURL: i
         } = m, n = await o({
@@ -93,7 +93,7 @@ const X = ({ value: f }) => f, ce = N({
           signal: t,
           useWebWorkers: u,
           workersURL: i
-        }), { contentType: s, contentLength: d, lastModified: l } = F(r), c = {
+        }), { contentType: s, contentLength: d, lastModified: l } = D(r), c = {
           name: g(e, r)
         };
         s && (c.type = s), d && (c.size = parseInt(d, 10)), l && (c.lastModified = new Date(l).getTime()), b(e, {
@@ -105,23 +105,23 @@ const X = ({ value: f }) => f, ce = N({
           }
         });
       } catch (o) {
-        if (M(t, o))
+        if (A(t, o))
           return;
-        y(e, o);
+        U(e, o);
       }
     }
     async function v(e, { signal: t }) {
       const { src: a } = e;
-      h(e, {
+      e = h(e, {
         type: p.System,
         code: "LOAD_BUSY",
         progress: 1 / 0
       });
       try {
-        if (!U(a))
+        if (!S(a))
           return;
         const {
-          resolveRequest: { load: o = A },
+          resolveRequest: { load: o = M },
           resolveResponse: { load: u = X },
           useWebWorkers: i,
           workersURL: n
@@ -137,13 +137,13 @@ const X = ({ value: f }) => f, ce = N({
           signal: t,
           useWebWorkers: i,
           workersURL: n,
-          onprogress: _(e)
+          onprogress: _(e, { code: "LOAD_BUSY" })
         }), { response: d } = s, l = z(
           "content-type",
           s.getAllResponseHeaders()
-        ), c = new Blob([d], { type: l }), S = g(e, s), E = u({
+        ), c = new Blob([d], { type: l }), y = g(e, s), E = u({
           response: s,
-          value: J(c, S),
+          value: J(c, y),
           entry: e
         });
         b(e, {
@@ -158,33 +158,33 @@ const X = ({ value: f }) => f, ce = N({
           }
         });
       } catch (o) {
-        if (M(t, o)) {
+        if (A(t, o)) {
           O(e);
           return;
         }
-        y(e, o);
+        U(e, o);
       }
     }
     function W(e) {
       if (!C(e) || G(e.file))
         return;
-      const t = x(e);
+      const t = q(e);
       if (t?.type === "error")
         return;
-      const { fetchedMetadata: a = !1 } = B(e), { actionLoad: o, actionAbort: u, fetchMetadata: i, parallel: n } = m, { src: r, name: s, size: d } = e, l = e.state[o], c = e.state[u];
+      const { fetchedMetadata: a = !1 } = x(e), { actionLoad: o, actionAbort: u, fetchMetadata: i, parallel: n } = m, { src: r, name: s, size: d } = e, l = e.state[o], c = e.state[u];
       if (!L(r))
         return;
       if (c)
-        return q(e.id, v);
+        return B(e.id, v);
       if (l === !1)
         return;
-      const E = L(s) && j(d), P = i && !D(r);
-      if (!a && !E && P) {
+      const E = L(s) && j(d), Y = i && !F(r);
+      if (!a && !E && Y) {
         R(e.id, I);
         return;
       }
-      const Y = t?.code === "LOAD_BUSY";
-      if (!(t?.code === "LOAD_QUEUED") && !Y) {
+      const P = t?.code === "LOAD_BUSY";
+      if (!(t?.code === "LOAD_QUEUED") && !P) {
         R(e.id, H);
         return;
       }

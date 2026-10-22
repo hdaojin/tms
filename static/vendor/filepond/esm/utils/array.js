@@ -1,57 +1,59 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-function f(t) {
+const f = Object.freeze([]);
+function o(t) {
   return Array.isArray(t) ? t : [t];
 }
-function o(t, r, e = (n) => n !== r) {
-  return [...t.filter(e), r];
+function s(t, e, r = (n) => n !== e) {
+  return [...t.filter(r), e];
 }
-function s(t, r, e = 0) {
-  const n = e === 0 ? 1 : -1;
-  t.sort((i, u) => i[r] < u[r] ? -1 * n : i[r] > u[r] ? 1 * n : 0);
+function c(t, e, r = 0) {
+  const n = r === 0 ? 1 : -1;
+  t.sort((i, u) => i[e] < u[e] ? -1 * n : i[e] > u[e] ? 1 * n : 0);
 }
-function l(t, r) {
-  return t.filter((e) => !r(e));
+function l(t, e) {
+  return t.filter((r) => !e(r));
 }
-function a(t, r) {
-  let e = [];
-  return t.filter(r).forEach((i) => {
+function a(t, e) {
+  let r = [];
+  return t.filter(e).forEach((i) => {
     const u = t.indexOf(i);
-    e.push(...t.splice(u, 1));
-  }), e;
+    r.push(...t.splice(u, 1));
+  }), r;
 }
-function c(t) {
+function y(t) {
   return t.filter(Boolean);
 }
-function y(t, r, ...e) {
-  return [...t.slice(0, r), ...e, ...t.slice(r)];
+function h(t, e, ...r) {
+  return [...t.slice(0, e), ...r, ...t.slice(e)];
 }
-function h(t, r, e) {
-  const n = t[r];
-  return t.splice(r, 1), t.splice(e, 0, n), t;
+function A(t, e, r) {
+  const n = t[e];
+  return t.splice(e, 1), t.splice(r, 0, n), t;
 }
-function d(t, r) {
-  if (t === r)
+function R(t, e) {
+  if (t === e)
     return !0;
-  if (t.length !== r.length)
+  if (t.length !== e.length)
     return !1;
-  for (let e = 0; e < t.length; e++)
-    if (t[e] !== r[e])
+  for (let r = 0; r < t.length; r++)
+    if (t[r] !== e[r])
       return !1;
   return !0;
 }
 export {
-  o as arrayAddUnique,
-  y as arrayInsertAtIndex,
-  d as arrayItemsEqual,
-  h as arrayMove,
+  f as EMPTY_ARRAY,
+  s as arrayAddUnique,
+  h as arrayInsertAtIndex,
+  R as arrayItemsEqual,
+  A as arrayMove,
   l as arrayRemove,
-  c as arrayRemoveFalsy,
+  y as arrayRemoveFalsy,
   a as arrayRemoveInPlace,
-  s as arraySortByItemProp,
-  f as arrayWrap
+  c as arraySortByItemProp,
+  o as arrayWrap
 };

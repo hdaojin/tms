@@ -1,33 +1,32 @@
 # TMS 竞赛训练管理系统
 
-TMS（Training Management System）是一个面向技能竞赛训练场景的 Django 单体应用，用于统一管理训练过程、竞赛与考核资料、技能标准、评分结果、知识点映射、会议记录、通知公告和用户角色权限。
+TMS（Training Management System）是一个面向技能竞赛训练场景的 Django 单体应用，用于统一管理训练过程、竞赛与考核资料、技能标准、评分结果、考点证据、会议记录、通知公告和用户角色权限。
 
-项目当前围绕“标准—事件—试题/评分—考点—技能—训练分析”组织核心业务，长期目标是把历届竞赛与训练数据沉淀为可复用、可分析的训练知识体系。
+项目当前围绕“技术领域/WSOS—稳定 Skill—竞赛与考核/考点证据/训练任务—评分与执行结果—技能分析—教练人工调整”组织核心业务，长期目标是把历届竞赛与训练数据沉淀为可复用、可分析的训练知识体系。
 
 ## 核心业务链路
 
 ```text
-技能项目 / 标准技能树
+TechnicalDomain / WSOS
         ↓
-赛事或考核事件
-        ↓
-试题 / 评分方案
-        ↓
-考点证据
-        ↓
-技能点映射
-        ↓
-评分结果
-        ↓
-训练分析与反馈
+       Skill
+      ↙    ↘
+ Evidence  TrainingTask
+    ↑          ↓
+Assessment  TaskExecution
+    ↓          ↓
+ Scoring   TrainingLog
+    ↓
+Skill performance → Coach review → 人工调整后续计划
 ```
 
 核心原则：
 
-- 技能项目和标准技能树表达长期能力体系，不随某一届比赛或某个 A/B/C/D 模块变化而重复创建。
-- 赛事、选拔赛、训练考核、模拟赛等统一抽象为“事件”。
-- 原始试题、评分表、结果包、训练资料等统一通过资料资产进行登记和归档。
-- 评分结果通过考点证据和技能映射反推技能表现，为后续训练重点、难点和查漏补缺提供数据基础。
+- `Skill` 是跨技能树版本稳定的能力本体；技能树节点只负责版本内组织，不承载历史评分或训练事实。
+- `TechnicalDomain` 是训练组织和权限范围轴，WSOS 是标准映射轴；评测模块不是技术领域。
+- 正式竞赛、选拔赛、交流赛、模拟赛和训练考核统一使用 `Assessment`，资料由所属业务 APP 管理，不使用全局泛型资料资产模型。
+- 技能表现从真实评分结果经已批准 Evidence 和映射动态反推；训练完成不等于掌握度。
+- 系统提供事实与分析，后续训练计划由教练人工判断和调整，不自动生成或改写。
 
 更完整的领域术语和业务不变量见 [`CONTEXT.md`](CONTEXT.md)。
 
@@ -35,7 +34,7 @@ TMS（Training Management System）是一个面向技能竞赛训练场景的 Dj
 
 ### 后端
 
-- Python 3.13+
+- Python `>=3.13, <3.15`（仓库默认使用 3.14）
 - Django 6
 - django-htmx
 - django-tables2
@@ -53,6 +52,7 @@ TMS（Training Management System）是一个面向技能竞赛训练场景的 Dj
 - HTMX
 - Mermaid
 - Prism
+- FilePond 5 beta
 
 ### 开发工具
 
@@ -128,11 +128,11 @@ event_countdown
 
 ## 环境要求
 
-- Python 3.13+
+- Python `>=3.13, <3.15`（`.python-version` 当前固定为 3.14）
 - uv
-- Node.js 与 npm（仅开发环境或前端资源构建时需要）
+- Node.js `>=22.12.0` 与 npm（仅开发环境或前端资源构建时需要）
 
-生产环境使用 PostgreSQL 17；SQLite 用于本地开发和测试。
+当前生产基线使用 PostgreSQL 17；项目也保留 MySQL 驱动，SQLite 用于本地开发和测试。
 
 ## 目录说明
 
@@ -168,7 +168,7 @@ git switch develop
 
 ```bash
 uv sync
-npm install
+npm ci
 ```
 
 ### 3. 配置环境变量
@@ -196,8 +196,8 @@ uv run manage.py migrate
 ### 5. 初始化默认业务目录
 
 ```bash
-uv run manage.py bootstrap_tms
 uv run manage.py bootstrap_tms --dry-run
+uv run manage.py bootstrap_tms
 ```
 
 该命令先执行只读预检并输出完整预览，确认后才创建新环境缺失的出厂业务目录；默认模式可安全重复执行，并保留管理员已经修改的名称、排序、启用状态或其他受管配置。`--dry-run` 只预览、不询问且不写数据库。正常部署不在应用启动时自动执行该命令。
@@ -217,7 +217,7 @@ uv run manage.py bootstrap_tms --force
 uv run manage.py createsuperuser
 ```
 
-### 7. 构建前端样式
+### 7. 构建前端资源
 
 开发时建议单独启动 Tailwind 监听：
 
@@ -225,7 +225,13 @@ uv run manage.py createsuperuser
 npm run watch:css
 ```
 
-只构建一次：
+完整同步第三方浏览器资源并构建 CSS：
+
+```bash
+npm run build:frontend
+```
+
+只重新构建 CSS：
 
 ```bash
 npm run build:css
@@ -268,9 +274,107 @@ uv run manage.py migrate
 # 前端样式
 npm run watch:css
 npm run build:css
+
+# 完整前端构建、测试和格式检查
+npm run build:frontend
+npm run test:frontend
+npm run format:frontend:check
 ```
 
+`format:frontend` / `format:frontend:check` 只覆盖前端构建配置和脚本，避免一次性改写尚未建立统一格式基线的历史模板。模板格式化应按实际变更范围显式执行，并单独检查模板差异。
+
 涉及模板或前端 class 变化时，应重新执行 `npm run build:css` 并提交 `static/css/output.css` 的实际变化。
+
+## 开发环境更新依赖
+
+依赖升级只在开发环境进行。`pyproject.toml` / `uv.lock` 和 `package.json` / `package-lock.json` 必须成对审查并提交；不要手工编辑锁文件，也不要在生产服务器现场解析新版本。
+
+### 更新 Python 包
+
+先查看当前依赖树中可更新的包：
+
+```bash
+uv tree --outdated
+```
+
+只升级一个包时，优先保持其他包的锁定版本不变：
+
+```bash
+uv lock --upgrade-package <包名>
+uv sync --locked
+```
+
+确认需要整体升级时再重新解析全部 Python 依赖：
+
+```bash
+uv lock --upgrade
+uv sync --locked
+```
+
+新增或删除依赖仍通过 uv 管理：
+
+```bash
+# 运行时依赖
+uv add <包名>
+uv remove <包名>
+
+# 开发依赖
+uv add --dev <包名>
+uv remove --dev <包名>
+```
+
+升级后检查 `pyproject.toml` 与 `uv.lock` 的实际变化，并按影响范围运行验证：
+
+```bash
+git diff -- pyproject.toml uv.lock
+uv lock --check
+uv run manage.py check
+uv run ruff check .
+uv run pytest <受影响的 app 或测试路径>
+```
+
+跨多个核心依赖或升级 Django 时，应运行全量 `uv run pytest` 和 migration drift 检查。生产部署使用 `uv sync --locked --no-dev`，确保声明与锁文件一致且不安装开发依赖。
+
+### 更新前端组件
+
+先查看已安装、版本范围内可更新和上游最新版本：
+
+```bash
+npm outdated
+```
+
+在现有 `package.json` 版本范围内更新 lockfile 可使用：
+
+```bash
+npm update
+```
+
+升级指定组件或跨主版本时，应显式更新开发依赖声明。项目所有 npm 包都是开发或构建依赖：
+
+```bash
+npm install --save-dev <包名>@<版本>
+
+# FilePond 按项目约定继续跟随 v5 beta channel
+npm install --save-dev filepond@beta
+```
+
+依赖更新后必须同步随仓库部署的浏览器资源、重建 CSS 并检查资源一致性：
+
+```bash
+npm run build:frontend
+npm run test:frontend
+npm run format:frontend:check
+npm audit
+npm audit --omit=dev
+```
+
+然后检查依赖声明、锁文件和生成资源的差异：
+
+```bash
+git diff -- package.json package-lock.json static/css/output.css static/js static/vendor/filepond
+```
+
+`npm ci` 只按 `package-lock.json` 做可复现安装，不用于升级依赖。`npm audit` 检查包括构建工具在内的完整依赖树；`npm audit --omit=dev` 单独确认生产交付边界。不要为消除报告而直接执行破坏性的 `npm audit fix --force`，应先确认上游修复和兼容性。Alpine.js CSP、Mermaid、Mermaid 许可证和 FilePond 由 `npm run build:frontend` 自动同步；Prism 当前仍是仓库内维护的 vendored 资源，不在 npm 同步脚本范围内，升级时需要单独核对下载配置、许可证和实际页面效果。
 
 ## 前端静态资源交付
 
@@ -285,13 +389,15 @@ TMS 的生产服务器不要求安装 npm。前端资源应在开发机或 CI �
 - `static/js/mermaid.min.js`、`static/js/notes-mermaid.js`：教学笔记 Mermaid 渲染资源。
 - HTMX 运行时由 `django-htmx` 提供，并在 `collectstatic` 时一并收集。
 
-更新 Tailwind CSS、DaisyUI、Iconify 或模板中的相关 class 后，需要重新构建 CSS。更新 Alpine.js CSP、Mermaid、Prism 等前端依赖时，也应同步更新仓库中的对应静态文件和许可证文件。
+更新 Tailwind CSS、DaisyUI、Iconify 或模板中的相关 class 后，需要重新构建 CSS。更新 Alpine.js CSP、Mermaid 或 FilePond 后，也应通过统一脚本同步仓库中的对应静态文件和许可证文件。
+
+所有 npm 包均为开发或构建依赖，生产服务器不从 `node_modules/` 提供资源。执行 `npm run build:frontend` 会统一同步 Alpine.js CSP、Mermaid、Mermaid 许可证和 FilePond，并生成 `static/css/output.css`；`npm run test:frontend` 会检查仓库静态资源与 lockfile 安装结果是否一致。
 
 ## 文件与权限
 
 项目区分公共和私有上传目录：
 
-- `media/`：适合公开或无需对象级鉴权的资源，可由 Nginx 直接提供。
+- `media/`：适合公开或无需对象级鉴权的资源，可由 Nginx、Caddy 等 Web 服务器直接提供。
 - `media-private/`：用于考核资料、竞赛资料、学习资料等私有内容，只允许通过具有权限检查的 Django view 提供访问。
 
 生产环境不要把 `media-private/` 直接映射为公开静态目录。
@@ -303,7 +409,7 @@ TMS 的生产服务器不要求安装 npm。前端资源应在开发机或 CI �
 ```text
 Client
   ↓
-Nginx
+Nginx / Caddy
   ↓
 Gunicorn
   ↓
@@ -312,7 +418,7 @@ Django
 PostgreSQL / MySQL
 ```
 
-生产服务器通常只需要 Python、uv、Nginx、Gunicorn 和数据库服务；npm 构建应在部署前完成。
+生产服务器通常只需要 Python、uv、反向代理/Web 服务器、Gunicorn 和数据库服务；npm 构建应在部署前完成。
 
 ### 1. 拉取代码并安装依赖
 
@@ -320,7 +426,7 @@ PostgreSQL / MySQL
 git clone git@github.com:hdaojin/tms.git /srv/tms
 cd /srv/tms
 
-uv sync --frozen --no-dev
+uv sync --locked --no-dev
 ```
 
 生产环境应部署经过确认的发布分支或 tag，而不是依赖服务器现场修改代码。
@@ -392,17 +498,14 @@ uv run manage.py bootstrap_tms --force
 
 数据库结构变更应通过 Django migration 管理；部署前应按实际环境做好数据库和上传文件备份。
 
-权限架构硬切换版本首次部署前，必须确认至少一个可用超级管理员，并备份数据库及公开/私有上传目录。本次迁移会清空旧的用户/用户组权限包选择和原生权限分配，但保留用户、用户组、组成员关系和业务数据。迁移后按以下顺序检查并重建授权投影：
+权限包定义发生变化后，先检查原生权限投影差异，确认后再应用：
 
 ```bash
-uv run manage.py check --deploy
 uv run manage.py reconcile_permission_assignments
 uv run manage.py reconcile_permission_assignments --apply
-uv run manage.py migrate_private_media
-uv run manage.py migrate_private_media --apply
 ```
 
-前两条对账命令默认只报告差异；确认输出后才执行 `--apply`。敏感文件迁移同样先 dry-run，完成后再重启应用。权限包定义位于 `core/config/permission_bundles.yml`，修改后必须重新执行检查与授权对账。
+对账命令默认只报告差异；确认输出后才执行 `--apply`。权限包定义位于 `core/config/permission_bundles.yml`。`migrate_private_media` 等历史切换命令不是常规部署步骤，只有发布说明明确要求时才按“先预检、后应用”的方式执行。
 
 ### 5. 收集静态文件
 
@@ -426,9 +529,9 @@ uv run gunicorn tmsproject.wsgi:application \
   --workers 4
 ```
 
-实际生产环境建议通过 systemd 或其他进程管理器托管 Gunicorn，再由 Nginx 进行反向代理。
+实际生产环境建议通过 systemd 或其他进程管理器托管 Gunicorn，再由 Nginx、Caddy 等 Web 服务器进行反向代理。
 
-Nginx 可以直接提供：
+Web 服务器可以直接提供：
 
 - `/static/` → `/srv/tms/staticfiles/`
 - `/media/` → `/srv/tms/media/`
@@ -456,6 +559,13 @@ uv run manage.py makemigrations --check --dry-run
 
 ```bash
 npm run build:css
+```
+
+升级 Alpine.js、Mermaid、FilePond 或其他 npm 前端依赖时执行：
+
+```bash
+npm run build:frontend
+npm run test:frontend
 ```
 
 ## 开发文档约定

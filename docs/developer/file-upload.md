@@ -108,13 +108,13 @@ TMS 接受跟随 beta channel，但仍保留 `package-lock.json`：
 
 TMS 当前没有 Vite/Webpack/Rollup 的必要。FilePond v5 官方 ESM 可以直接部署，因此第一阶段保持现有轻量前端构建方式。
 
-建议增加：
+项目使用统一同步脚本：
 
 ```text
-scripts/sync-filepond.mjs
+scripts/sync-frontend-vendor.mjs
 ```
 
-负责把 npm 包中的 FilePond ESM 发布文件同步到：
+脚本统一同步 Alpine.js CSP、Mermaid、Mermaid 许可证和 FilePond；其中 FilePond ESM 发布文件同步到：
 
 ```text
 static/vendor/filepond/
@@ -122,11 +122,11 @@ static/vendor/filepond/
 
 同步整个所需 ESM 目录，不手工挑选上游内部文件，以免 beta 升级时遗漏依赖。
 
-可增加 npm 命令：
+对外只保留完整构建和检查入口：
 
 ```text
-sync:filepond
-build:frontend = sync:filepond + build:css
+build:frontend = 同步全部第三方浏览器资源 + 构建 CSS
+test:frontend = 检查全部第三方浏览器资源 + 运行 FilePond 聚焦测试
 ```
 
 是否提交 `static/vendor/filepond/` 以当前部署流程为准；原则是生产环境不能直接暴露 `node_modules/`。
@@ -451,9 +451,9 @@ async（按需）
 升级流程保持轻量：
 
 1. 更新 `filepond@beta` 与 `package-lock.json`；
-2. 重新同步 FilePond ESM static 资源；
+2. 执行 `npm run build:frontend`，重新同步 FilePond ESM static 资源并构建 CSS；
 3. 查看 v5 changelog / migration notes，重点关注 extensions、custom element 和 template API；
-4. 运行上传组件相关后端测试；
+4. 运行 `npm run test:frontend` 和上传组件相关后端测试；
 5. 手工完成点击、拖放、Ctrl+V、HTMX swap 和 multipart 提交的最小回归；
 6. 如果上游 beta API 改动，只修改 TMS adapter / component，不把兼容代码扩散到业务 APP。
 

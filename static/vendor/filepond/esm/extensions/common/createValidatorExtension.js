@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -21,8 +21,8 @@ function $(y) {
         pushTask: i,
         abortTask: D,
         setEntryExtensionStatus: s,
-        setEntryExtensionState: r,
-        getEntryExtensionState: l
+        setEntryExtensionState: l,
+        getEntryExtensionState: r
       } = u, {
         // by default can only validate a blob/file
         canValidateEntry: O = (t) => V(t) && b(t.file),
@@ -37,8 +37,8 @@ function $(y) {
           f(t);
       }
       function f(t) {
-        const { canValidate: a } = l(t);
-        a !== null && r(t, {
+        const { canValidate: a } = r(t);
+        a !== null && l(t, {
           // null means it's undetermined if we can validate, need to retest
           canValidate: null,
           // null means it's undetermined if we should validate, need to retest
@@ -53,7 +53,7 @@ function $(y) {
         });
       }
       async function N(t) {
-        s(t, {
+        t = s(t, {
           type: n.System,
           code: "VALIDATION_BUSY",
           progress: 1 / 0
@@ -91,7 +91,7 @@ function $(y) {
         if (!a)
           return;
         const e = await a(t);
-        r(t, {
+        l(t, {
           shouldValidate: e,
           // have determined if we should validate, switch to idle
           status: {
@@ -111,7 +111,7 @@ function $(y) {
             values: { error: e }
           }), e;
         }
-        r(t, {
+        l(t, {
           canValidate: a,
           // have determined if we can validate, switch to idle
           status: {
@@ -121,11 +121,11 @@ function $(y) {
         });
       }
       function _(t) {
-        const { canValidate: a } = l(t);
+        const { canValidate: a } = r(t);
         a !== null && (D(t.id, E), f(t));
       }
       function x(t) {
-        const { canValidate: a, shouldValidate: e, status: o } = l(t), k = o?.code === "VALIDATION_COMPLETE";
+        const { canValidate: a, shouldValidate: e, status: o } = r(t), k = o?.code === "VALIDATION_COMPLETE";
         if (!(o?.type === "error" || k || a === !1 || e === !1)) {
           if (a === null) {
             i(t.id, E);

@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -7,42 +7,43 @@
 import { warn as K } from "../../common/console.js";
 import { copyDescriptors as q, isObjectValuesEqual as w } from "../../utils/object.js";
 import { isString as C, isObject as D } from "../../utils/test.js";
-function T(m) {
-  const { name: n, type: u, props: a, factory: x } = m || {}, c = (f) => {
+import { Status as H } from "../../common/status.js";
+function z(E) {
+  const { name: n, type: i, props: u, factory: d } = E || {}, a = (c) => {
     (!C(n) || !n) && K("Extension name missing or invalid");
-    function p(t) {
+    function f(t) {
       return t.extensionState?.[n] ?? {};
     }
-    function y(t, e) {
-      f.updateEntry(t, {
+    function p(t, e) {
+      return c.updateEntry(t, {
         extensionState: {
           [n]: e
         }
       });
     }
-    function l(t, e) {
-      y(t, { status: e });
+    function y(t, e) {
+      return p(t, { status: e });
     }
-    function o(t) {
-      return p(t).status ?? {};
+    function x(t) {
+      return f(t).status ?? {};
     }
-    function g(t) {
-      const e = o(t), { type: s, code: P } = e ?? o(t);
+    function S(t, e) {
+      const { type: s = H.System, code: P } = e;
       return ({ lengthComputable: v, loaded: h, total: k }) => {
-        l(t, {
+        t = y(t, {
           type: s,
           code: P,
           progress: v ? h / k : 1 / 0
         });
       };
     }
-    let r = Object.entries(a).reduce((t, [e, s]) => (s === void 0 || (t[e] = s), t), {});
-    const S = Object.keys(a);
-    let E = [];
+    let r = Object.entries(u).reduce((t, [e, s]) => (s === void 0 || (t[e] = s), t), {});
+    const g = Object.keys(u);
+    let m = [];
     function b(t) {
-      E.push(t), t(i());
+      m.push(t), t(o());
     }
-    const d = x(
+    const l = d(
       // instance
       {
         // reference to current props so extension always has latest values
@@ -52,44 +53,44 @@ function T(m) {
         // return name of this extension
         extensionName: n,
         // return type of this extension
-        extensionType: u
+        extensionType: i
       },
       {
         // merge extension manager with extension context
-        ...f,
-        getEntryExtensionState: p,
-        setEntryExtensionState: y,
-        setEntryExtensionStatus: l,
-        getEntryExtensionStatus: o,
-        createProgressHandler: g
+        ...c,
+        getEntryExtensionState: f,
+        setEntryExtensionState: p,
+        setEntryExtensionStatus: y,
+        getEntryExtensionStatus: x,
+        createProgressHandler: S
       }
     );
     function j(t) {
-      D(t) && (w(t, r) || (Object.assign(r, t), E.forEach((e) => e(i()))));
+      D(t) && (w(t, r) || (Object.assign(r, t), m.forEach((e) => e(o()))));
     }
-    function i() {
+    function o() {
       return { ...r };
     }
     function O() {
-      return S;
+      return g;
     }
-    return q(d, {
+    return q(l, {
       setProps: j,
-      getProps: i,
+      getProps: o,
       getPropertyKeys: O,
       get name() {
         return n;
       },
       destroy() {
-        d.destroy();
+        l.destroy();
       }
     });
   };
-  return Object.defineProperties(c, {
+  return Object.defineProperties(a, {
     name: { value: n, writable: !1 },
-    type: { value: u, writable: !1 }
-  }), c;
+    type: { value: i, writable: !1 }
+  }), a;
 }
 export {
-  T as createExtension
+  z as createExtension
 };

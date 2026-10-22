@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Klart",
   info: "Info",
   system: "System",
-  // sources
-  device: "Enhet",
-  camera: "Kamera",
-  link: "Länk",
   // capabilities labels
   descriptionBrowse: "[Välj {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Släpp {{maxFilesUnit}} här eller [bläddra]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "Det gick inte att redigera filen. Försök igen."
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "Denna filtyp är inte tillåten. {{details}}.",
+    template: "Denna filtyp är inte tillåten. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Filen måste vara av typen {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, l = {
   validationFileExtensionMismatch: {
-    template: "Denna filändelse är inte tillåten. {{details}}.",
+    template: "Denna filändelse är inte tillåten. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Filen måste ha filändelsen {{accept}}",
@@ -168,17 +164,34 @@ const i = {
   ...d,
   ...s,
   ...p
+}, c = {
+  device: "Enhet"
 }, g = {
+  link: "Länk"
+}, f = {
+  camera: "Kamera",
+  capture: "Fånga",
+  record: "Spela in"
+}, v = {
+  ...c,
+  ...g,
+  ...f
+}, u = {
   ...i,
   ...t,
   ...e,
   ...m,
-  ...a
+  ...a,
+  ...v
 };
 export {
   i as core,
-  g as locale,
+  u as locale,
   e as media,
+  v as source,
+  f as sourceCamera,
+  c as sourceDevice,
+  g as sourceLink,
   t as store,
   a as transform,
   m as validation,

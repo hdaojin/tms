@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const e = {
   success: "Réussi",
   info: "Info",
   system: "Système",
-  // sources
-  device: "Appareil",
-  camera: "Caméra",
-  link: "Lien",
   // capabilities labels
   descriptionBrowse: "[Sélectionner {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Déposez {{maxFilesUnit}} ici ou [parcourir]",
@@ -113,9 +109,9 @@ const e = {
   transformError: "Le fichier n’a pas pu être modifié. Veuillez réessayer."
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "Ce type de fichier n’est pas autorisé. {{details}}.",
+    template: "Ce type de fichier n’est pas autorisé. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Le fichier doit être de type {{accept}}",
@@ -124,11 +120,11 @@ const e = {
       }
     }
   }
-}, s = {
+}, o = {
   validationFileExtensionMismatch: {
-    template: "Cette extension de fichier n’est pas autorisée. {{details}}.",
+    template: "Cette extension de fichier n’est pas autorisée. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Le fichier doit avoir l’extension {{accept}}",
@@ -137,7 +133,7 @@ const e = {
       }
     }
   }
-}, o = {
+}, s = {
   validationFileNameMissing: "Nom de fichier manquant",
   validationFileNameMismatch: "Ce nom de fichier est invalide."
 }, r = {
@@ -157,36 +153,53 @@ const e = {
   validationMediaResolutionRangeMismatch: "La résolution du {{fileMainType}} est invalide. Elle doit être comprise entre {{minResolution}}MP et {{maxResolution}}MP.",
   validationMediaResolutionUnderflow: "La résolution du {{fileMainType}} est invalide. La résolution minimale est {{minResolution}}MP.",
   validationMediaResolutionOverflow: "La résolution du {{fileMainType}} est invalide. La résolution maximale est {{maxResolution}}MP."
-}, m = {
+}, c = {
   validationListEntryCountUnderflow: "Pas assez de fichiers dans la liste. Le minimum est {{minFiles}} {{minFilesUnit}}.",
   validationListEntryCountOverflow: "Trop de fichiers dans la liste. Le maximum est {{maxFiles}} {{maxFilesUnit}}."
 }, u = {
   ...r,
   ...n,
-  ...s,
   ...o,
+  ...s,
   ...d,
   ...l,
-  ...m
-}, c = {
+  ...c
+}, m = {
+  device: "Appareil"
+}, p = {
+  link: "Lien"
+}, v = {
+  camera: "Caméra",
+  capture: "Capturer",
+  record: "Enregistrer"
+}, f = {
+  ...m,
+  ...p,
+  ...v
+}, h = {
   ...e,
   ...t,
   ...i,
   ...u,
-  ...a
+  ...a,
+  ...f
 };
 export {
   e as core,
-  c as locale,
+  h as locale,
   i as media,
+  f as source,
+  v as sourceCamera,
+  m as sourceDevice,
+  p as sourceLink,
   t as store,
   a as transform,
   u as validation,
-  s as validationFileExtension,
+  o as validationFileExtension,
   n as validationFileMimeType,
-  o as validationFileName,
+  s as validationFileName,
   r as validationFileSize,
-  m as validationListCount,
+  c as validationListCount,
   l as validationListSize,
   d as validationMediaResolution
 };

@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const e = {
   success: "Lykkedes",
   info: "Info",
   system: "System",
-  // sources
-  device: "Enhed",
-  camera: "Kamera",
-  link: "Link",
   // capabilities labels
   descriptionBrowse: "[Vælg {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Slip {{maxFilesUnit}} her, eller [gennemse]",
@@ -113,9 +109,9 @@ const e = {
   transformError: "Kunne ikke redigere fildata. Prøv igen."
 }, a = {
   validationFileMimeTypeMismatch: {
-    template: "Denne filtype er ikke tilladt. {{details}}.",
+    template: "Denne filtype er ikke tilladt. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Filen skal være af typen {{accept}}",
@@ -126,9 +122,9 @@ const e = {
   }
 }, t = {
   validationFileExtensionMismatch: {
-    template: "Denne filendelse er ikke tilladt. {{details}}.",
+    template: "Denne filendelse er ikke tilladt. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Filen skal have endelsen {{accept}}",
@@ -160,7 +156,7 @@ const e = {
 }, m = {
   validationListEntryCountUnderflow: "Der er for få filer på listen. Minimum er {{minFiles}} {{minFilesUnit}}.",
   validationListEntryCountOverflow: "Der er for mange filer på listen. Maksimum er {{maxFiles}} {{maxFilesUnit}}."
-}, f = {
+}, p = {
   ...o,
   ...a,
   ...t,
@@ -168,20 +164,37 @@ const e = {
   ...d,
   ...s,
   ...m
-}, p = {
+}, f = {
+  device: "Enhed"
+}, g = {
+  link: "Link"
+}, u = {
+  camera: "Kamera",
+  capture: "Tag billede",
+  record: "Optag"
+}, c = {
+  ...f,
+  ...g,
+  ...u
+}, v = {
   ...e,
   ...l,
   ...i,
-  ...f,
-  ...n
+  ...p,
+  ...n,
+  ...c
 };
 export {
   e as core,
-  p as locale,
+  v as locale,
   i as media,
+  c as source,
+  u as sourceCamera,
+  f as sourceDevice,
+  g as sourceLink,
   l as store,
   n as transform,
-  f as validation,
+  p as validation,
   t as validationFileExtension,
   a as validationFileMimeType,
   r as validationFileName,

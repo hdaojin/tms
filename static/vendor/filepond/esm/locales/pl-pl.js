@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Sukces",
   info: "Informacja",
   system: "System",
-  // sources
-  device: "Urządzenie",
-  camera: "Aparat",
-  link: "Link",
   // capabilities labels
   descriptionBrowse: "[Wybierz {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Upuść tutaj {{maxFilesUnit}} lub [przeglądaj]",
@@ -108,14 +104,14 @@ const i = {
   storeStorageComplete: "Przesyłanie zakończone",
   storeError: "Nie udało się zapisać pliku.",
   storeAwaitingCompletion: "Nie wszystkie pliki zostały zapisane."
-}, t = {
+}, o = {
   transformEditBusy: "Edycja danych pliku",
   transformError: "Nie udało się edytować danych pliku. Spróbuj ponownie."
-}, o = {
+}, t = {
   validationFileMimeTypeMismatch: {
-    template: "Ten typ pliku jest niedozwolony. {{details}}.",
+    template: "Ten typ pliku jest niedozwolony. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Plik musi być typu {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, n = {
   validationFileExtensionMismatch: {
-    template: "To rozszerzenie pliku jest niedozwolone. {{details}}.",
+    template: "To rozszerzenie pliku jest niedozwolone. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Plik musi mieć rozszerzenie {{accept}}",
@@ -162,28 +158,45 @@ const i = {
   validationListEntryCountOverflow: "Na liście jest za dużo plików. Maksimum to {{maxFiles}} {{maxFilesUnit}}."
 }, z = {
   ...l,
-  ...o,
+  ...t,
   ...n,
   ...s,
   ...d,
   ...r,
   ...m
 }, p = {
+  device: "Urządzenie"
+}, c = {
+  link: "Link"
+}, u = {
+  camera: "Aparat",
+  capture: "Przechwyć",
+  record: "Nagraj"
+}, y = {
+  ...p,
+  ...c,
+  ...u
+}, w = {
   ...i,
   ...a,
   ...e,
   ...z,
-  ...t
+  ...o,
+  ...y
 };
 export {
   i as core,
-  p as locale,
+  w as locale,
   e as media,
+  y as source,
+  u as sourceCamera,
+  p as sourceDevice,
+  c as sourceLink,
   a as store,
-  t as transform,
+  o as transform,
   z as validation,
   n as validationFileExtension,
-  o as validationFileMimeType,
+  t as validationFileMimeType,
   s as validationFileName,
   l as validationFileSize,
   m as validationListCount,

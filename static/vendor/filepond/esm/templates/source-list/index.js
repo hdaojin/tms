@@ -1,11 +1,11 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import "../../elements/components/Button/index.js";
-import { supportsDisplayTransition as p } from "../../utils/support.js";
+import { supportsDisplayTransition as s } from "../../utils/support.js";
 import { getAsButtonProps as y } from "../common/index.js";
 import b from "../../elements/components/Button/index-svelte.js";
 function w() {
@@ -24,45 +24,46 @@ function w() {
         },
         children: {
           component: b,
-          props: (s, l) => {
+          props: (l, t) => {
             let {
-              icon: a,
-              label: c,
-              title: m,
+              disabled: a,
+              icon: m,
+              label: u,
+              title: c,
               onclick: e,
-              command: n,
-              commandfor: r,
-              onopen: u,
-              onopened: f,
-              onclose: d,
-              onclosed: i
-            } = s;
-            const { dialog: o, disabled: g } = l;
-            return e || (n = n || "show-modal", r = r || o, e = function(h) {
-              o.ontransitionend = function(t) {
-                if (t.target === o) {
-                  if (p() && !o.open && t.propertyName === "display") {
-                    i?.(o);
+              command: i,
+              commandfor: n,
+              onopen: f,
+              onopened: d,
+              onclose: g,
+              onclosed: p
+            } = l;
+            const { dialog: o } = t;
+            return e || (i = i || "show-modal", n = n || o, e = function(h) {
+              o.ontransitionend = function(r) {
+                if (r.target === o) {
+                  if (s() && !o.open && r.propertyName === "display") {
+                    p?.(t);
                     return;
                   }
-                  if (t.propertyName === "opacity" && t.pseudoElement === "" && o.open) {
-                    f?.(o);
+                  if (r.propertyName === "opacity" && r.pseudoElement === "" && o.open) {
+                    d?.(t);
                     return;
                   }
                 }
               }, o.ontoggle = function() {
-                o.open ? u?.(o) : (d?.(o), p() || i?.(o));
+                o.open ? f?.(t) : (g?.(t), s() || p?.(t));
               };
             }), {
               ...y({
-                icon: a,
-                label: c,
-                title: m
+                icon: m,
+                label: u,
+                title: c
               }),
-              disabled: g,
+              disabled: a,
               part: "source-button",
-              command: n,
-              commandfor: r,
+              command: i,
+              commandfor: n,
               onclick: e
             };
           }

@@ -1,68 +1,72 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { isFunction as s, isObject as f, isBlobOrFile as j, isArray as o, isObjectOrArray as l } from "./test.js";
-function d(e, r) {
-  for (const [n, t] of Object.entries(e)) {
-    if (s(t) && s(r[n])) {
-      if (t.toString() !== r[n].toString())
+import { isFunction as o, isPlainObject as u, isObject as j, isArray as f, isObjectOrArray as O } from "./test.js";
+const b = Object.freeze({});
+function d(r, e) {
+  for (const [t, n] of Object.entries(r)) {
+    if (o(n) && o(e[t])) {
+      if (n.toString() !== e[t].toString())
         return !1;
       continue;
     }
-    if (t !== r[n])
+    if (n !== e[t])
       return !1;
   }
   return !0;
 }
-function b(e, ...r) {
-  return r.forEach((n) => {
-    for (const [t, i] of Object.entries(n))
-      f(i) ? !f(e[t]) || j(i) ? e[t] = i : b(e[t], i) : Object.assign(e, { [t]: i });
+function v(r, e) {
+  const t = { ...r };
+  for (const n of Object.keys(e)) {
+    const i = e[n], s = Object.hasOwn(r, n) ? r[n] : void 0;
+    t[n] = u(i) ? v(u(s) ? s : {}, i) : i;
+  }
+  return t;
+}
+function l(r, e) {
+  for (const [t, n] of Object.entries(r))
+    if (j(n)) {
+      if (!l(n, e[t]))
+        return !1;
+    } else if (f(n)) {
+      if (!y(n, e[t]))
+        return !1;
+    } else if (n !== e[t])
+      return !1;
+  return !0;
+}
+function y(r, e) {
+  if (!f(r) || !f(e))
+    return !1;
+  for (let t = 0; t < r.length; t++) {
+    if (O(r[t]) && O(e[t]))
+      return l(r, e);
+    if (r[t] !== e[t])
+      return !1;
+  }
+  return !0;
+}
+function h(r = {}, e) {
+  return r.hasOwnProperty(e);
+}
+function w(r, e) {
+  const t = Object.getOwnPropertyDescriptors(r), n = Object.getOwnPropertyDescriptors(e);
+  return Object.entries(t).forEach(([i, { get: s, set: c, value: p }]) => {
+    n[i] || (s || c ? Object.defineProperty(e, i, {
+      set: c ? (a) => r[i] = a : void 0,
+      get: s ? () => r[i] : void 0
+    }) : o(p) && (e[i] = r[i]));
   }), e;
 }
-function O(e, r) {
-  for (const [n, t] of Object.entries(e))
-    if (f(t)) {
-      if (!O(t, r[n]))
-        return !1;
-    } else if (o(t)) {
-      if (!v(t, r[n]))
-        return !1;
-    } else if (t !== r[n])
-      return !1;
-  return !0;
-}
-function v(e, r) {
-  if (!o(e) || !o(r))
-    return !1;
-  for (let n = 0; n < e.length; n++) {
-    if (l(e[n]) && l(r[n]))
-      return O(e, r);
-    if (e[n] !== r[n])
-      return !1;
-  }
-  return !0;
-}
-function h(e = {}, r) {
-  return e.hasOwnProperty(r);
-}
-function D(e, r) {
-  const n = Object.getOwnPropertyDescriptors(e), t = Object.getOwnPropertyDescriptors(r);
-  return Object.entries(n).forEach(([i, { get: c, set: u, value: p }]) => {
-    t[i] || (c || u ? Object.defineProperty(r, i, {
-      set: u ? (a) => e[i] = a : void 0,
-      get: c ? () => e[i] : void 0
-    }) : s(p) && (r[i] = e[i]));
-  }), r;
-}
 export {
-  v as arrayItemsOverlap,
-  D as copyDescriptors,
-  b as deepAssign,
-  O as deepOverlap,
+  b as EMPTY_OBJECT,
+  y as arrayItemsOverlap,
+  w as copyDescriptors,
+  v as deepMerge,
+  l as deepOverlap,
   h as hasOwnProp,
   d as isObjectValuesEqual
 };

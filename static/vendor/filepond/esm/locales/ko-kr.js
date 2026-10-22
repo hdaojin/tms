@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "완료",
   info: "정보",
   system: "시스템",
-  // sources
-  device: "기기",
-  camera: "카메라",
-  link: "링크",
   // capabilities labels
   descriptionBrowse: "[{{maxFilesUnit}} 선택]",
   descriptionBrowseDrop: "{{maxFilesUnit}}을(를) 여기에 놓거나 [찾아보기]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "파일을 편집할 수 없습니다. 다시 시도해 주세요."
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "이 파일 형식은 허용되지 않습니다. {{details}}.",
+    template: "이 파일 형식은 허용되지 않습니다. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "파일 형식은 {{accept}}이어야 합니다",
@@ -126,9 +122,9 @@ const i = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "이 파일 확장자는 허용되지 않습니다. {{details}}.",
+    template: "이 파일 확장자는 허용되지 않습니다. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "파일은 {{accept}} 확장자여야 합니다",
@@ -168,17 +164,34 @@ const i = {
   ...d,
   ...r,
   ...m
+}, p = {
+  device: "기기"
 }, v = {
+  link: "링크"
+}, u = {
+  camera: "카메라",
+  capture: "캡처",
+  record: "녹화"
+}, M = {
+  ...p,
+  ...v,
+  ...u
+}, f = {
   ...i,
   ...a,
   ...e,
   ...c,
-  ...t
+  ...t,
+  ...M
 };
 export {
   i as core,
-  v as locale,
+  f as locale,
   e as media,
+  M as source,
+  u as sourceCamera,
+  p as sourceDevice,
+  v as sourceLink,
   a as store,
   t as transform,
   c as validation,

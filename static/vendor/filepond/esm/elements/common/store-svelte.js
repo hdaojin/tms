@@ -1,12 +1,12 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import { get as e } from "../../vendor/svelte/src/internal/client/runtime.js";
 import { user_effect as m } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { set as o, state as i } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
+import { state as i, set as o } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
 import { isFunction as s } from "../../utils/test.js";
 function v(n, f) {
   let r = i(void 0);

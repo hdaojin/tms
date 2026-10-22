@@ -1,102 +1,104 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { onMount as X } from "../../../../vendor/svelte/src/index-client.js";
-import { user_effect as P, template_effect as Y } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { pop as Z, push as $ } from "../../../../vendor/svelte/src/internal/client/context.js";
-import { get as t, untrack as tt } from "../../../../vendor/svelte/src/internal/client/runtime.js";
-import { first_child as rt, sibling as et, child as ot } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
-import { set as c, state as A } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
+import { onMount as Z } from "../../../../vendor/svelte/src/index-client.js";
+import { user_effect as N, template_effect as $ } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { pop as tt, push as rt } from "../../../../vendor/svelte/src/internal/client/context.js";
+import { get as t, untrack as et } from "../../../../vendor/svelte/src/internal/client/runtime.js";
+import { first_child as ot, sibling as nt, child as st } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
+import { set as p, state as L } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
 import { user_derived as i } from "../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { from_html as F, append as E } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
-import { if_block as I } from "../../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
-import { set_attribute as nt } from "../../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
-import { set_style as st } from "../../../../vendor/svelte/src/internal/client/dom/elements/style.js";
-import { prop as d, spread_props as D } from "../../../../vendor/svelte/src/internal/client/reactivity/props.js";
-import { Spring as it } from "../../../../vendor/svelte/src/motion/spring.js";
-import { getExtensionStateByStatusCode as at } from "../../../../common/entry.js";
-import { isObjectValuesEqual as ut } from "../../../../utils/object.js";
-import { getValueByKeyFromData as lt } from "../../../common/string.js";
-import { getAppContext as ct } from "../../contexts/appContext.js";
-import { getEntryContext as pt } from "../../contexts/entryContext.js";
-import { gate as ft } from "../../../common/store-svelte.js";
-import mt from "../../../components/SpringElement/index-svelte.js";
+import { from_html as E, append as C } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
+import { if_block as M } from "../../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
+import { set_attribute as it } from "../../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
+import { set_style as ut } from "../../../../vendor/svelte/src/internal/client/dom/elements/style.js";
+import { prop as d, spread_props as at } from "../../../../vendor/svelte/src/internal/client/reactivity/props.js";
+import { Spring as ct } from "../../../../vendor/svelte/src/motion/spring.js";
+import { getExtensionStateByStatusCode as pt } from "../../../../common/entry.js";
+import { isObjectValuesEqual as lt } from "../../../../utils/object.js";
+import { getValueByKeyFromData as ft } from "../../../common/string.js";
+import { getAppContext as mt } from "../../contexts/appContext.js";
+import { getEntryContext as dt } from "../../contexts/entryContext.js";
+import { gate as gt } from "../../../common/store-svelte.js";
+import bt from "../../../components/SpringElement/index-svelte.js";
 import "../../../components/Button/index.js";
 import "../../../components/ProgressIndicator/index.js";
-import dt from "../../../components/NodeList/index-svelte.js";
-import { addListener as w } from "../../../../utils/dom.js";
-import gt from "../../../components/Button/index-svelte.js";
-import bt from "../../../components/ProgressIndicator/index-svelte.js";
-var yt = F("<div><!></div>"), ht = F("<!><!>", 1);
-function Gt(N, l) {
-  $(l, !0);
-  let O = d(l, "class", 3, void 0), j = d(l, "part", 3, void 0), g = d(l, "buttonPart", 3, void 0), q = d(l, "states", 19, () => []), p;
-  const b = i(ct), L = i(() => t(b).locale), y = i(() => t(b).enableAnimations), R = i(() => t(b).springDefaults), V = pt(), H = i(() => Object.values(V.current.extensionState));
-  function K(r, e) {
+import Pt from "../../../components/NodeList/index-svelte.js";
+import { addListener as O } from "../../../../utils/dom.js";
+import yt from "../../../components/Button/index-svelte.js";
+import vt from "../../../components/ProgressIndicator/index-svelte.js";
+var ht = E("<div><!></div>"), _t = E("<!><!>", 1);
+function Ut(I, s) {
+  rt(s, !0);
+  let R = d(s, "class", 3, void 0), w = d(s, "part", 3, void 0), A = d(s, "buttonPart", 3, void 0), F = d(s, "states", 19, () => []);
+  const j = i(R), q = i(w), g = i(A);
+  let l;
+  const b = i(mt), V = i(() => t(b).locale), P = i(() => t(b).reduceMotion), D = i(() => t(b).springOptions), H = dt(), K = i(() => Object.values(H.current.extensionState));
+  function T(r, e) {
     if (r.length) {
       for (const o of r) {
-        const s = at(e, o.codes);
-        if (!s)
+        const u = pt(e, o.codes);
+        if (!u)
           continue;
-        const _ = o.button, S = o.progress ? { ...o.progress, value: s.progress } : null;
-        return { button: _, progress: S };
+        const h = o.button, _ = o.progress ? { ...o.progress, value: u.progress } : null;
+        return { button: h, progress: _ };
       }
       return null;
     }
   }
-  const B = i(() => K(q(), t(H))), M = i(() => t(B)?.progress), T = i(() => z(t(B)?.button)), a = ft(
+  const S = i(() => T(F(), t(K))), z = i(() => t(S)?.progress), G = i(() => J(t(S)?.button)), a = gt(
     // should update value?
-    (r, e) => r && e ? !ut(r, e) : r !== e,
+    (r, e) => r && e ? !lt(r.props, e.props) : r !== e,
     // $derived
-    () => t(T)
+    () => t(G)
   );
-  function z(r) {
+  function J(r) {
     if (!r)
       return;
-    const e = { part: g(), ...r.props };
-    return { component: gt, ...r, props: e };
+    const e = { part: t(g), ...r.props };
+    return { component: yt, ...r, props: e };
   }
-  function G(r, e) {
+  function Q(r, e) {
     if (!r)
       return;
     const { label: o } = r;
     return {
       ...r,
-      label: lt(o, e, e.busy)
+      label: ft(o, e, e.busy)
     };
   }
-  const h = i(() => G(t(M), t(L))), v = new it(0);
-  P(() => {
-    v.set(t(h) ? 1 : 0, { instant: !t(y) });
+  const y = i(() => Q(t(z), t(V))), v = new ct(0);
+  N(() => {
+    v.set(t(y) ? 1 : 0, { instant: t(P) });
   });
-  let C = A(void 0);
-  P(() => {
-    t(h) && c(C, { ...t(h) });
+  let k = L(void 0);
+  N(() => {
+    t(y) && p(k, { ...t(y) });
   });
-  function J(r) {
+  function U(r) {
     return !t(n).at(-1) ? !1 : t(n).at(-1)?.props.icon !== r.props.icon;
   }
-  function Q(r) {
+  function W(r) {
     if (!t(n).length)
       return !1;
     const { props: e } = t(n).at(-1), { props: o } = r;
     return e.icon === o.icon && e.title === o.title && e.label === o.label && e.onclick.toString() === o.onclick.toString();
   }
-  let n = A([]);
-  P(() => {
+  let n = L([]);
+  N(() => {
     if (!(!a.current && !t(n).length)) {
       if (!a.current) {
-        c(n, []);
+        p(n, []);
         return;
       }
-      tt(() => {
-        if (Q(a.current))
-          return c(n, t(n).map((e) => e.key === a.current.key ? a.current : e));
-        const r = J(a.current);
-        c(n, t(n).map((e) => ({
+      et(() => {
+        if (W(a.current))
+          return p(n, t(n).map((e) => e.key === a.current.key ? a.current : e));
+        const r = U(a.current);
+        p(n, t(n).map((e) => ({
           ...e,
           props: {
             ...e.props,
@@ -104,7 +106,7 @@ function Gt(N, l) {
             autofocus: !1,
             dataset: { state: r ? "outro" : "idle" }
           }
-        })).filter((e, o, s) => o > s.length - 2)), c(n, [
+        })).filter((e, o, u) => o > u.length - 2)), p(n, [
           ...t(n),
           {
             ...a.current,
@@ -116,102 +118,124 @@ function Gt(N, l) {
             }
           }
         ]), r && requestAnimationFrame(() => {
-          c(n, t(n).map((e, o, s) => ({
+          p(n, t(n).map((e, o, u) => ({
             ...e,
             props: {
               ...e.props,
-              inert: o < s.length - 1,
+              inert: o < u.length - 1,
               autofocus: f,
-              dataset: { state: o < s.length - 1 ? "outro" : "idle" }
+              dataset: { state: o < u.length - 1 ? "outro" : "idle" }
             }
           })));
         });
       });
     }
   });
-  const k = i(() => t(n).length ? [
+  const B = i(() => t(n).length ? [
     {
+      key: "entry-activity-indicator-buttons",
       tag: "element-stack",
       attrs: {
         layout: "pile",
         class: "button-pile",
-        part: `${g()}-pile`
+        part: `${t(g)}-pile`
       },
       children: t(n)
     }
   ] : []);
   let f = !1;
-  X(() => {
-    if (!p)
+  Z(() => {
+    if (!l)
       return;
     const r = [
-      w(p, "focusin", () => {
+      O(l, "focusin", () => {
         f = !0;
       }),
-      w(p, "focusout", () => {
+      O(l, "focusout", () => {
         f = !1;
       })
     ];
     return () => {
       r.forEach((e) => e());
     };
-  }), mt(N, {
+  }), bt(I, {
     tag: "entry-activity-indicator",
     get class() {
-      return O();
+      return t(j);
     },
     subtag: "element-stack",
     subattrs: { layout: "pile" },
-    onroot: (r) => p = r,
+    onroot: (r) => l = r,
     get part() {
-      return j();
+      return t(q);
     },
-    get enableAnimations() {
-      return t(y);
+    get reduceMotion() {
+      return t(P);
     },
-    get springDefaults() {
-      return t(R);
+    get springOptions() {
+      return t(D);
     },
     children: (r, e) => {
-      var o = ht(), s = rt(o);
+      var o = _t(), u = ot(o);
       {
-        var _ = (u) => {
-          dt(u, D(
-            {
-              get nodes() {
-                return t(k);
-              }
+        var h = (c) => {
+          Pt(c, {
+            get springOptions() {
+              return s.subNodeListProps.springOptions;
             },
-            () => l.nodeContext
-          ));
-        };
-        I(s, (u) => {
-          t(k).length && u(_);
-        });
-      }
-      var S = et(s);
-      {
-        var U = (u) => {
-          var m = yt();
-          let x;
-          var W = ot(m);
-          bt(W, D(() => t(C), {
-            get enableAnimations() {
-              return t(y);
+            get reduceMotion() {
+              return s.subNodeListProps.reduceMotion;
+            },
+            get routes() {
+              return s.subNodeListProps.routes;
+            },
+            get resources() {
+              return s.subNodeListProps.resources;
+            },
+            get propResourceMap() {
+              return s.subNodeListProps.propResourceMap;
+            },
+            get data() {
+              return s.subNodeListProps.data;
+            },
+            get context() {
+              return s.subNodeListProps.context;
+            },
+            get beforeRenderNode() {
+              return s.subNodeListProps.beforeRenderNode;
+            },
+            get nodes() {
+              return t(B);
             }
-          })), Y(() => {
-            nt(m, "part", `${g()}-pile`), x = st(m, "", x, { opacity: v.current });
-          }), E(u, m);
+          });
         };
-        I(S, (u) => {
-          v.current > 0 && u(U);
+        M(u, (c) => {
+          t(B).length && c(h);
         });
       }
-      E(r, o);
+      var _ = nt(u);
+      {
+        var X = (c) => {
+          var m = ht();
+          let x;
+          var Y = st(m);
+          vt(Y, at(() => t(k), {
+            get reduceMotion() {
+              return t(P);
+            }
+          })), $(() => {
+            it(m, "part", `${t(g)}-pile`), x = ut(m, "", x, { opacity: v.current });
+          }), C(c, m);
+        };
+        M(_, (c) => {
+          v.current > 0 && c(X);
+        });
+      }
+      C(r, o);
     },
     $$slots: { default: !0 }
-  }), Z();
+  }), tt();
 }
 export {
-  Gt as default
+  Ut as default
 };

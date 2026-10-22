@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Επιτυχία",
   info: "Πληροφορία",
   system: "Σύστημα",
-  // sources
-  device: "Συσκευή",
-  camera: "Κάμερα",
-  link: "Σύνδεσμος",
   // capabilities labels
   descriptionBrowse: "[Επιλέξτε {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Αποθέστε {{maxFilesUnit}} εδώ ή [περιηγηθείτε]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "Αποτυχία επεξεργασίας δεδομένων. Προσπαθήστε ξανά."
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "Αυτός ο τύπος αρχείου δεν επιτρέπεται. {{details}}.",
+    template: "Αυτός ο τύπος αρχείου δεν επιτρέπεται. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Το αρχείο πρέπει να είναι τύπου {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "Αυτή η επέκταση αρχείου δεν επιτρέπεται. {{details}}.",
+    template: "Αυτή η επέκταση αρχείου δεν επιτρέπεται. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Το αρχείο πρέπει να έχει επέκταση {{accept}}",
@@ -168,17 +164,34 @@ const i = {
   ...d,
   ...r,
   ...m
+}, p = {
+  device: "Συσκευή"
 }, v = {
+  link: "Σύνδεσμος"
+}, u = {
+  camera: "Κάμερα",
+  capture: "Λήψη",
+  record: "Εγγραφή"
+}, M = {
+  ...p,
+  ...v,
+  ...u
+}, f = {
   ...i,
   ...a,
   ...e,
   ...c,
-  ...t
+  ...t,
+  ...M
 };
 export {
   i as core,
-  v as locale,
+  f as locale,
   e as media,
+  M as source,
+  u as sourceCamera,
+  p as sourceDevice,
+  v as sourceLink,
   a as store,
   t as transform,
   c as validation,

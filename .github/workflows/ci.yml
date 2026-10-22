@@ -94,5 +94,23 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Build Tailwind CSS
-        run: npm run build:css
+      - name: Build frontend assets
+        run: npm run build:frontend
+
+      - name: Run frontend tests
+        run: npm run test:frontend
+
+      - name: Verify generated frontend assets are committed
+        run: |
+          status_file="${RUNNER_TEMP}/frontend-status.txt"
+          git status --porcelain --untracked-files=all -- \
+            static/css/output.css \
+            static/js/alpinejs.min.js \
+            static/js/mermaid.min.js \
+            static/js/mermaid.LICENSE.txt \
+            static/vendor/filepond/esm > "${status_file}"
+          cat "${status_file}"
+          test ! -s "${status_file}"
+
+      - name: Audit production npm dependencies
+        run: npm audit --omit=dev

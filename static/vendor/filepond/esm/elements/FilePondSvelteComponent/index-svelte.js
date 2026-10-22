@@ -1,92 +1,99 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import { get as o } from "../../vendor/svelte/src/internal/client/runtime.js";
-import { proxy as p } from "../../vendor/svelte/src/internal/client/proxy.js";
-import { state as d } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
+import { proxy as a } from "../../vendor/svelte/src/internal/client/proxy.js";
+import { state as p } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
 import { mount as l, unmount as m } from "../../vendor/svelte/src/internal/client/render.js";
 import { HTMLElementSafe as f } from "../../common/ssr.js";
 import { createStyleSheet as b, addListener as h, dispatchCustomEvent as v } from "../../utils/dom.js";
 import { arrayRemoveFalsy as g } from "../../utils/array.js";
-const E = ["animations"], C = ["animations", "springDefaults"];
-class L extends f {
-  #s;
+const E = ["locale", "reducedMotionPreference", "springOptions"], C = ["reduced-motion"];
+class A extends f {
+  #r;
   #t;
   #e;
   #i = [];
   #o;
-  #r = [];
+  #s = [];
   #n;
   /** Protected props */
   get _app() {
     return this.#t;
   }
   get _root() {
-    return this.#s;
+    return this.#r;
   }
   /** Attributes being observed for changes */
   static get observedAttributes() {
-    return E;
+    return C;
   }
-  attributeChangedCallback(t, e, s) {
-    Object.assign(o(this.#e), { [t]: s });
+  attributeChangedCallback(t, r, e) {
+    if (t === "reduced-motion") {
+      o(this.#e).reducedMotionPreference = e;
+      return;
+    }
+    o(this.#e)[t] = e;
   }
-  constructor(t, e) {
+  constructor(t, r) {
     super();
-    const { styles: s = [], properties: a = [], methods: u = [], events: c = [] } = e || {};
-    this.#n = t, this.#s = this.attachShadow({ mode: "open" }), this.#s.adoptedStyleSheets = g(s).map(b), this.#e = d(p({
+    const { styles: e = [], properties: c = [], methods: d = [], events: u = [] } = r || {};
+    this.#n = t, this.#r = this.attachShadow({ mode: "open" }), this.#r.adoptedStyleSheets = g(e).map(b), this.#e = p(a({
+      // this cannot be a $state.raw because then the Svelte component doesn't respond to prop updates
       root: this,
-      springDefaults: void 0,
-      animations: this.getAttribute("animations") || void 0
+      springOptions: void 0,
+      locale: void 0,
+      reducedMotionPreference: this.getAttribute("reduced-motion") || "auto"
     })), [
-      .../* @__PURE__ */ new Set([...C, ...a])
-    ].forEach((i) => {
-      Object.defineProperty(this, i, {
+      .../* @__PURE__ */ new Set([...E, ...c])
+    ].forEach((s) => {
+      Object.defineProperty(this, s, {
         get() {
-          return o(this.#e)[i];
+          return o(this.#e)[s];
         },
-        set(r) {
-          o(this.#e)[i] = r;
+        set(i) {
+          o(this.#e)[s] = i;
         }
       });
-    }), Object.defineProperties(this, u.reduce(
-      (i, r) => (i[r] = {
+    }), Object.defineProperties(this, d.reduce(
+      (s, i) => (s[i] = {
         value: function(...n) {
           if (!this.#t) {
-            this.#i.push([r, n]);
+            this.#i.push([i, n]);
             return;
           }
-          return this.#t[r](...n);
+          return this.#t[i](...n);
         },
         writable: !1,
         configurable: !1
-      }, i),
+      }, s),
       {}
-    )), this.#o = c;
+    )), this.#o = u;
   }
-  addListener(t, e) {
+  addListener(t, r) {
     if (!this._root.children[0])
       return;
-    const s = h(this._root.children[0], t, e);
-    return this.#r.push(s), s;
+    const e = h(this._root.children[0], t, r);
+    return this.#s.push(e), e;
   }
   connectedCallback() {
-    this.#t = l(this.#n, { target: this.#s, props: o(this.#e) }), this.#o.forEach((t) => {
-      const e = h(this._root.children[0], t, (s) => {
-        v(this, t, { bubbles: !0, detail: s.detail });
+    this.#t || (this.#t = l(this.#n, { target: this.#r, props: o(this.#e) }), this.#o.forEach((t) => {
+      const r = h(this._root.children[0], t, (e) => {
+        v(this, t, { bubbles: !0, detail: e.detail });
       });
-      this.#r.push(e);
-    }), this.#i.forEach(([t, e]) => {
-      this.#t[t](...e);
-    }), this.#i.length = 0, this.dispatchEvent(new CustomEvent("connected"));
+      this.#s.push(r);
+    }), this.#i.forEach(([t, r]) => {
+      this.#t[t](...r);
+    }), this.#i.length = 0, this.dispatchEvent(new CustomEvent("connected")));
   }
   disconnectedCallback() {
-    this.#r.forEach((t) => t()), m(this.#t), this.#t = null, this.dispatchEvent(new CustomEvent("disconnected"));
+    this.#s.forEach((t) => t()), this.#s.length = 0, this.#t && (m(this.#t), this.#t = null), this.dispatchEvent(new CustomEvent("disconnected"));
   }
 }
 export {
-  L as FilePondSvelteComponentElement
+  E as COMPONENT_PROPS,
+  A as FilePondSvelteComponentElement
 };

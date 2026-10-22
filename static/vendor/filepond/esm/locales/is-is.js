@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Tókst",
   info: "Upplýsingar",
   system: "Kerfi",
-  // sources
-  device: "Tæki",
-  camera: "Myndavél",
-  link: "Tengill",
   // capabilities labels
   descriptionBrowse: "[Velja {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Dragðu {{maxFilesUnit}} hingað eða [flettu]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "Tókst ekki að breyta gögnum. Reyndu aftur."
 }, r = {
   validationFileMimeTypeMismatch: {
-    template: "Þessi skráategund er ekki leyfð. {{details}}.",
+    template: "Þessi skráategund er ekki leyfð. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Skráin verður að vera af gerðinni {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, n = {
   validationFileExtensionMismatch: {
-    template: "Þessi skráarending er ekki leyfð. {{details}}.",
+    template: "Þessi skráarending er ekki leyfð. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Skráin þarf að hafa endinguna {{accept}}",
@@ -168,17 +164,34 @@ const i = {
   ...d,
   ...o,
   ...m
+}, p = {
+  device: "Tæki"
 }, k = {
+  link: "Tengill"
+}, g = {
+  camera: "Myndavél",
+  capture: "Taka mynd",
+  record: "Taka upp"
+}, v = {
+  ...p,
+  ...k,
+  ...g
+}, c = {
   ...i,
   ...e,
   ...a,
   ...u,
-  ...t
+  ...t,
+  ...v
 };
 export {
   i as core,
-  k as locale,
+  c as locale,
   a as media,
+  v as source,
+  g as sourceCamera,
+  p as sourceDevice,
+  k as sourceLink,
   e as store,
   t as transform,
   u as validation,

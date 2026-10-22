@@ -1,15 +1,15 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { stringReplaceVariables as w } from "../elements/common/string.js";
-import { getAsElement as A } from "../utils/dom.js";
-import { upperCaseFirstLetter as E } from "../utils/string.js";
-import { isString as S } from "../utils/test.js";
-import { createExtension as v } from "./common/createExtension.js";
-const U = v({
+import { stringReplaceVariables as A } from "../elements/common/string.js";
+import { getAsElement as E } from "../utils/dom.js";
+import { upperCaseFirstLetter as S } from "../utils/string.js";
+import { isString as v } from "../utils/test.js";
+import { createExtension as x } from "./common/createExtension.js";
+const h = x({
   name: "SourceDescriptionView",
   type: "view",
   props: {
@@ -22,50 +22,50 @@ const U = v({
     // prevent adding entries
     preventAddEntries: void 0
   },
-  factory: ({ props: s, didSetProps: c }, { on: l }) => {
-    let r, o = [];
-    c(({ element: e }) => {
-      e && (r = A(e), n());
+  factory: ({ props: l, didSetProps: a }, { on: p }) => {
+    let r, n = [], o;
+    a(({ element: e }) => {
+      e && (r = E(e), i());
     });
-    function a(e) {
-      return `description${e.sort().map(E).join("")}`;
+    function u(e) {
+      return `description${e.sort().map(S).join("")}`;
     }
-    function n() {
-      const { locale: e, maxFiles: t, allowedSourceActions: d, preventAddEntries: m } = s;
-      if (!r || !o.length)
+    function i() {
+      const { locale: e, maxFiles: t, allowedSourceActions: f, preventAddEntries: b } = l;
+      if (!r || !n.length)
         return;
-      const i = a(
-        o.filter((y) => d.includes(y))
-      ), f = {
+      const s = u(
+        n.filter((y) => f.includes(y))
+      ), w = {
         maxFilesUnit: "unitFiles",
         maxFiles: t
-      }, b = e ? w(
-        e[i],
-        f,
+      }, c = (e ? A(
+        e[s],
+        w,
         e
-      ) || "" : i;
-      r.innerHTML = b.replaceAll(
+      ) || "" : s).replaceAll(
         "[",
-        `<button type="button" data-browse${m ? " disabled" : ""}>`
+        `<button type="button" data-browse${b ? " disabled" : ""}>`
       ).replaceAll("]", "</button>");
+      o !== c && (o = c, r.innerHTML = o);
     }
-    function p(e) {
-      o = Array.from(
+    function d(e) {
+      n = Array.from(
         new Set(
           Object.values(e).filter(
-            (t) => t?.source && S(t?.source?.type)
+            (t) => t?.source && v(t?.source?.type)
           ).map((t) => t?.source?.type)
         )
-      ), r && n();
+      ), r && i();
     }
-    const u = l("updateExtensionState", p);
+    const m = p("updateExtensionState", d);
     return {
       destroy() {
-        u?.();
+        m?.();
       }
     };
   }
 });
 export {
-  U as SourceDescriptionView
+  h as SourceDescriptionView
 };

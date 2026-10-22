@@ -1,18 +1,18 @@
-import { ERROR_VALUE as o, REACTION_RAN as r, EFFECT as u, DESTROYED as E, BOUNDARY_EFFECT as a } from "./constants.js";
-import { active_reaction as l, active_effect as _ } from "./runtime.js";
-function m(i) {
+import { ERROR_VALUE as E, REACTION_RAN as o, EFFECT as u, DESTROYED as r, BOUNDARY_EFFECT as a, DESTROYING as l } from "./constants.js";
+import { active_reaction as R, active_effect as _ } from "./runtime.js";
+function f(i) {
   var n = _;
   if (n === null)
-    return l.f |= o, i;
-  if ((n.f & r) === 0 && (n.f & u) === 0)
+    return R.f |= E, i;
+  if ((n.f & o) === 0 && (n.f & u) === 0)
     throw i;
-  R(i, n);
+  h(i, n);
 }
-function R(i, n) {
-  if (!(n !== null && (n.f & E) !== 0)) {
+function h(i, n) {
+  if (!(n !== null && (n.f & r) !== 0)) {
     for (; n !== null; ) {
-      if ((n.f & a) !== 0) {
-        if ((n.f & r) === 0)
+      if ((n.f & a) !== 0 && (n.f & (r | l)) === 0) {
+        if ((n.f & o) === 0)
           throw i;
         try {
           n.b.error(i);
@@ -27,6 +27,6 @@ function R(i, n) {
   }
 }
 export {
-  m as handle_error,
-  R as invoke_error_boundary
+  f as handle_error,
+  h as invoke_error_boundary
 };

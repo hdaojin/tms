@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Concluído",
   info: "Info",
   system: "Sistema",
-  // sources
-  device: "Dispositivo",
-  camera: "Câmara",
-  link: "Ligação",
   // capabilities labels
   descriptionBrowse: "[Selecionar {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Largue {{maxFilesUnit}} aqui ou [procure]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "Não foi possível editar o ficheiro. Tente novamente."
 }, t = {
   validationFileMimeTypeMismatch: {
-    template: "Este tipo de ficheiro não é permitido. {{details}}.",
+    template: "Este tipo de ficheiro não é permitido. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "O ficheiro tem de ser do tipo {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, r = {
   validationFileExtensionMismatch: {
-    template: "Esta extensão de ficheiro não é permitida. {{details}}.",
+    template: "Esta extensão de ficheiro não é permitida. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "O ficheiro tem de ter a extensão {{accept}}",
@@ -169,16 +165,33 @@ const i = {
   ...l,
   ...m
 }, p = {
+  device: "Dispositivo"
+}, u = {
+  link: "Ligação"
+}, v = {
+  camera: "Câmara",
+  capture: "Capturar",
+  record: "Gravar"
+}, f = {
+  ...p,
+  ...u,
+  ...v
+}, h = {
   ...i,
   ...a,
   ...e,
   ...c,
-  ...o
+  ...o,
+  ...f
 };
 export {
   i as core,
-  p as locale,
+  h as locale,
   e as media,
+  f as source,
+  v as sourceCamera,
+  p as sourceDevice,
+  u as sourceLink,
   a as store,
   o as transform,
   c as validation,

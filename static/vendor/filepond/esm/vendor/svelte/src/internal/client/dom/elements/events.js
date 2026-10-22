@@ -1,51 +1,51 @@
 import { teardown as y } from "../../reactivity/effects.js";
 import { define_property as k } from "../../../shared/utils.js";
-import { set_active_reaction as v, set_active_effect as m, active_reaction as E, active_effect as L } from "../../runtime.js";
+import { set_active_reaction as g, set_active_effect as m, active_reaction as E, active_effect as L } from "../../runtime.js";
 import { queue_micro_task as T } from "../task.js";
 import { without_reactive_context as M } from "./bindings/shared.js";
 const o = /* @__PURE__ */ Symbol("events"), S = /* @__PURE__ */ new Set(), q = /* @__PURE__ */ new Set();
-function x(e, t, n, i = {}) {
+function x(e, t, i, n = {}) {
   function a(r) {
-    if (i.capture || B.call(t, r), !r.cancelBubble)
-      return M(() => n?.call(this, r));
+    if (n.capture || B.call(t, r), !r.cancelBubble)
+      return M(() => i?.call(this, r));
   }
-  return e.startsWith("pointer") || e.startsWith("touch") || e === "wheel" ? T(() => {
-    t.addEventListener(e, a, i);
-  }) : t.addEventListener(e, a, i), a;
+  return e.startsWith("pointer") || e.startsWith("touch") || e === "wheel" ? (a.__removed = !1, T(() => {
+    a.__removed || t.addEventListener(e, a, n);
+  })) : t.addEventListener(e, a, n), a;
 }
-function j(e, t, n, i, a) {
-  var r = { capture: i, passive: a }, l = x(e, t, n, r);
+function j(e, t, i, n, a) {
+  var r = { capture: n, passive: a }, l = x(e, t, i, r);
   (t === document.body || // @ts-ignore
   t === window || // @ts-ignore
   t === document || // Firefox has quirky behavior, it can happen that we still get "canplay" events when the element is already removed
   t instanceof HTMLMediaElement) && y(() => {
-    t.removeEventListener(e, l, r);
+    l.__removed = !0, t.removeEventListener(e, l, r);
   });
 }
-function z(e, t, n) {
-  (t[o] ??= {})[e] = n;
+function z(e, t, i) {
+  (t[o] ??= {})[e] = i;
 }
 function A(e) {
   for (var t = 0; t < e.length; t++)
     S.add(e[t]);
-  for (var n of q)
-    n(e);
+  for (var i of q)
+    i(e);
 }
-let s = null, d = !1;
+let s = null, _ = !1;
 function B(e) {
-  var t = this, n = (
+  var t = this, i = (
     /** @type {Node} */
     t.ownerDocument
-  ), i = e.type, a = e.composedPath?.() || [], r = (
+  ), n = e.type, a = e.composedPath?.() || [], r = (
     /** @type {null | Element} */
     a[0] || e.target
   );
-  s = e, d || (d = !0, setTimeout(() => {
-    d = !1, s = null;
+  s = e, _ || (_ = !0, setTimeout(() => {
+    _ = !1, s = null;
   }));
-  var l = 0, _ = s === e && e[o];
-  if (_) {
-    var u = a.indexOf(_);
+  var l = 0, d = s === e && e[o];
+  if (d) {
+    var u = a.indexOf(d);
     if (u !== -1 && (t === document || t === /** @type {any} */
     window)) {
       e[o] = t;
@@ -61,21 +61,21 @@ function B(e) {
     k(e, "currentTarget", {
       configurable: !0,
       get() {
-        return r || n;
+        return r || i;
       }
     });
     var b = E, w = L;
-    v(null), m(null);
+    g(null), m(null);
     try {
-      for (var c, h = []; r !== null && r !== t; ) {
+      for (var c, v = []; r !== null && r !== t; ) {
         try {
-          var g = r[o]?.[i];
-          g != null && (!/** @type {any} */
+          var h = r[o]?.[n];
+          h != null && (!/** @type {any} */
           r.disabled || // DOM could've been updated already by the time this is reached, so we check this as well
           // -> the target could not have been disabled because it emits the event in the first place
-          e.target === r) && g.call(r, e);
+          e.target === r) && h.call(r, e);
         } catch (f) {
-          c ? h.push(f) : c = f;
+          c ? v.push(f) : c = f;
         }
         if (e.cancelBubble) break;
         l++, r = l < a.length ? (
@@ -84,14 +84,14 @@ function B(e) {
         ) : null;
       }
       if (c) {
-        for (let f of h)
+        for (let f of v)
           queueMicrotask(() => {
             throw f;
           });
         throw c;
       }
     } finally {
-      e[o] = t, delete e.currentTarget, v(b), m(w);
+      e[o] = t, delete e.currentTarget, g(b), m(w);
     }
   }
 }

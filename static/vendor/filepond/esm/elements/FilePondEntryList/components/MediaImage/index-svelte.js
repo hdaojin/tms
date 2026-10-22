@@ -1,63 +1,63 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import { get as e, untrack as F } from "../../../../vendor/svelte/src/internal/client/runtime.js";
-import { push as se, pop as me } from "../../../../vendor/svelte/src/internal/client/context.js";
-import { first_child as fe, child as ue } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
-import { state as g, set as n } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { user_effect as b, template_effect as P } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { user_derived as u } from "../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { comment as de, append as M, from_html as D } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
-import { if_block as ce } from "../../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
-import { each as pe } from "../../../../vendor/svelte/src/internal/client/dom/blocks/each.js";
+import { push as me, pop as fe } from "../../../../vendor/svelte/src/internal/client/context.js";
+import { first_child as ue, child as de } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
+import { state as d, set as o } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
+import { user_effect as b, template_effect as h } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { user_derived as c } from "../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { comment as ce, append as M, from_html as T } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
+import { if_block as pe } from "../../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
+import { each as ge } from "../../../../vendor/svelte/src/internal/client/dom/blocks/each.js";
 import { set_custom_element_data as R } from "../../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
-import { set_class as Q } from "../../../../vendor/svelte/src/internal/client/dom/elements/class.js";
-import { clsx as B } from "../../../../vendor/svelte/src/internal/shared/attributes.js";
-import { prop as d } from "../../../../vendor/svelte/src/internal/client/reactivity/props.js";
+import { set_class as B } from "../../../../vendor/svelte/src/internal/client/dom/elements/class.js";
+import { clsx as D } from "../../../../vendor/svelte/src/internal/shared/attributes.js";
+import { prop as p } from "../../../../vendor/svelte/src/internal/client/reactivity/props.js";
 import "../MediaPane/index.js";
-import { arrayRemoveFalsy as ge } from "../../../../utils/array.js";
-import { isImageFile as I, isBlobOrFile as Pe, isURL as ve } from "../../../../utils/test.js";
-import { getAppContext as he } from "../../contexts/appContext.js";
-import { getEntryContext as ye } from "../../contexts/entryContext.js";
-import { filesAreProbablyEqual as Ee } from "../../../../utils/file.js";
-import { Status as xe } from "../../../../common/status.js";
-import _e from "./components/BitmapRenderer-svelte.js";
-import Fe from "../MediaPane/index-svelte.js";
-var be = D("<media-image-item><!></media-image-item>", 2), Me = D("<media-image></media-image>", 2);
-function Ne(T, l) {
-  se(l, !0);
-  let w = d(l, "class", 3, void 0), V = d(l, "maximumPixels", 3, void 0), q = d(l, "resizeQuality", 3, void 0), U = d(l, "objectFit", 3, void 0), G = d(l, "overflowAmount", 3, void 0), H = d(l, "enableParallax", 3, void 0);
-  const { setEntryExtensionState: A, getEntryExtensionState: J } = he(), c = ye(), y = u(() => c.current.file), K = u(() => J(c.current)), s = u(() => e(K)?.poster);
-  let m = g(null);
+import { arrayRemoveFalsy as he } from "../../../../utils/array.js";
+import { isImageFile as C, isBlobOrFile as Pe, isURL as ve } from "../../../../utils/test.js";
+import { getAppContext as ye } from "../../contexts/appContext.js";
+import { getEntryContext as Ee } from "../../contexts/entryContext.js";
+import { filesAreProbablyEqual as xe } from "../../../../utils/file.js";
+import { Status as _e } from "../../../../common/status.js";
+import Fe from "./components/BitmapRenderer-svelte.js";
+import be from "../MediaPane/index-svelte.js";
+var Me = T("<media-image-item><!></media-image-item>", 2), Re = T("<media-image></media-image>", 2);
+function We(V, l) {
+  me(l, !0);
+  let I = p(l, "class", 3, void 0), q = p(l, "maximumPixels", 3, void 0), U = p(l, "resizeQuality", 3, void 0), G = p(l, "objectFit", 3, void 0), H = p(l, "overflowAmount", 3, void 0), J = p(l, "enableParallax", 3, void 0);
+  const { setEntryExtensionState: w, getEntryExtensionState: K } = ye(), g = Ee(), y = c(() => g.current.file), N = c(() => K(g.current)), m = c(() => e(N)?.poster);
+  let f = d(null);
   b(() => {
-    I(e(y)) ? Ee(
+    C(e(y)) ? xe(
       // don't want to re-run when currentFile is assigned
-      F(() => e(m)?.file),
+      F(() => e(f)?.file),
       e(
         // newly updated file
         y
       )
     ).then((t) => {
-      t || n(m, {
+      t || o(f, {
         file: e(y),
         isError: !1,
         isComplete: !1,
         isPoster: !1
       });
-    }).catch(E) : e(s) && (Pe(e(s)) && I(e(s)) ? n(m, {
-      file: e(s),
+    }).catch(E) : e(m) && (Pe(e(m)) && C(e(m)) ? o(f, {
+      file: e(m),
       isComplete: !1,
       isPoster: !0,
       isError: !1
-    }) : ve(e(s)) && fetch(e(s)).then((t) => {
+    }) : ve(e(m)) && fetch(e(m)).then((t) => {
       if (!t.ok)
         throw new Error("Failed to load poster");
       return t.blob();
     }).then((t) => {
-      if (!I(t))
+      if (!C(t))
         throw new Error("Poster is not an image");
       return {
         file: t,
@@ -66,122 +66,126 @@ function Ne(T, l) {
         isPoster: !0
       };
     }).then((t) => {
-      n(m, t);
+      o(f, t);
     }).catch(E));
   });
-  let o = g([]);
+  let a = d([]);
   b(() => {
-    e(m) && F(() => {
-      n(o, ge([e(o).at(-1), e(m)]).sort((t, r) => t.isPoster && !r.isPoster ? -1 : r.isPoster && !t.isPoster ? 1 : 0));
+    e(f) && F(() => {
+      o(a, he([e(a).at(-1), e(f)]).sort((t, r) => t.isPoster && !r.isPoster ? -1 : r.isPoster && !t.isPoster ? 1 : 0));
     });
   });
-  function N(t) {
-    n(o, e(o).map((r) => r.file === t ? { ...r, isComplete: !0 } : r));
+  function W(t) {
+    o(a, e(a).map((r) => r.file === t ? { ...r, isComplete: !0 } : r));
   }
-  function W(t, r) {
-    n(o, e(o).map((i) => i.file === t ? { ...i, isError: r } : i)), e(o).every((i) => i.isError) && E(r);
+  function X(t, r) {
+    o(a, e(a).map((i) => i.file === t ? { ...i, isError: r } : i)), e(a).every((i) => i.isError) && E(r);
   }
-  const C = u(() => e(o).map(({ file: t, isPoster: r, isComplete: i, isError: a }, v, x) => ({
+  const A = c(() => e(a).map(({ file: t, isPoster: r, isComplete: i, isError: n }, P, x) => ({
     // use file as draw key
     key: t,
     // file object
     file: t,
     // previous file was a poster, if this is true we instantly replace the previous image
-    replacesPoster: !!e(o)[v - 1]?.isPoster,
+    replacesPoster: !!e(a)[P - 1]?.isPoster,
     // always make last file active
-    active: v === x.length - 1 ? "" : void 0,
+    active: P === x.length - 1 ? "" : void 0,
     // did draw this file to bitmap
     complete: i ? "" : void 0,
     // is this a poster
     poster: r ? "" : void 0,
     // error state
-    error: a || void 0
+    error: n || void 0
   })));
   function E(t) {
-    A(c.current, {
+    w(g.current, {
       status: {
-        type: xe.Error,
+        type: _e.Error,
         code: "MEDIA_LOAD_ERROR",
         values: { error: t, fileMainType: "fileMainTypeImage" }
       }
-    }), n(k, !0);
+    }), o(k, !0);
   }
-  let k = g(!1), S = g(!1), L = g(!1);
+  let k = d(!1), L = d(!1), O = d(!1), S = d(!1);
   b(() => {
-    const t = { isReady: e(S), isVisible: e(L) };
+    const t = {
+      isCached: e(S),
+      isReady: e(L),
+      isVisible: e(O)
+    };
     F(() => {
-      A(c.current, { media: t });
+      w(g.current, { media: t });
     });
   });
-  var O = de(), X = fe(O);
+  var j = ce(), Y = ue(j);
   {
-    var Y = (t) => {
-      var r = Me();
-      pe(r, 21, () => e(C), ({ key: i, file: a, active: v, complete: x, poster: h, replacesPoster: j }) => i, (i, a, v, x) => {
-        let h = () => e(a).file, j = () => e(a).active, Z = () => e(a).complete, $ = () => e(a).poster, z = () => e(a).replacesPoster;
-        var f = be();
-        P(() => R(f, "active", j())), P(() => R(f, "complete", Z())), P(() => R(f, "poster", $()));
-        var ee = ue(f);
+    var Z = (t) => {
+      var r = Re();
+      ge(r, 21, () => e(A), ({ key: i, file: n, active: P, complete: x, poster: v, replacesPoster: z }) => i, (i, n, P, x) => {
+        let v = () => e(n).file, z = () => e(n).active, $ = () => e(n).complete, ee = () => e(n).poster, Q = () => e(n).replacesPoster;
+        var u = Me();
+        h(() => R(u, "active", z())), h(() => R(u, "complete", $())), h(() => R(u, "poster", ee()));
+        var te = de(u);
         {
-          const te = (oe, _) => {
-            let ae = () => (_?.()).onInitMedia, ne = () => (_?.()).onLoadMedia, le = () => (_?.()).onRenderMedia;
-            _e(oe, {
+          const re = (ae, _) => {
+            let ne = () => (_?.()).onInitMedia, le = () => (_?.()).onLoadMedia, se = () => (_?.()).onRenderMedia;
+            Fe(ae, {
               get file() {
-                return h();
+                return v();
               },
               get resizeQuality() {
-                return q();
+                return U();
               },
               get maximumPixels() {
-                return V();
+                return q();
               },
               get taskId() {
-                return c.current.id;
+                return g.current.id;
               },
-              oninit: () => {
-                ae()();
+              oninit: ({ willRestore: s }) => {
+                o(S, s, !0), ne()();
               },
-              onload: (p) => {
-                n(S, !0), N(h()), ne()(p);
+              onload: (s) => {
+                o(L, !0), W(v()), le()(s);
               },
-              onrender: ({ didRestore: p }) => {
-                n(L, !0), le()({ instant: p });
+              onrender: ({ didRestore: s }) => {
+                o(O, !0), se()({ instant: s });
               },
-              onerror: (p) => {
-                W(h(), p);
+              onerror: (s) => {
+                X(v(), s);
               }
             });
           };
-          let re = u(() => z() ? 1 : 0), ie = u(() => z() || e(C).length > 1 ? 1 : 0);
-          Fe(ee, {
+          let ie = c(() => Q() ? 1 : 0), oe = c(() => Q() || e(A).length > 1 ? 1 : 0);
+          be(te, {
             get enableParallax() {
-              return H();
+              return J();
             },
             get overflowAmount() {
-              return G();
+              return H();
             },
             get mediaObjectFit() {
-              return U();
+              return G();
             },
             get mediaInitialOpacity() {
-              return e(re);
-            },
-            get mediaInitialScalar() {
               return e(ie);
             },
-            children: te,
+            get mediaInitialScalar() {
+              return e(oe);
+            },
+            children: re,
             $$slots: { default: !0 }
           });
         }
-        P(() => Q(f, 1, B(w()))), M(i, f);
-      }), P(() => Q(r, 1, B(w()))), M(t, r);
+        h(() => B(u, 1, D(I()))), M(i, u);
+      }), h(() => B(r, 1, D(I()))), M(t, r);
     };
-    ce(X, (t) => {
-      e(k) || t(Y);
+    pe(Y, (t) => {
+      e(k) || t(Z);
     });
   }
-  M(T, O), me();
+  M(V, j), fe();
 }
 export {
-  Ne as default
+  We as default
 };

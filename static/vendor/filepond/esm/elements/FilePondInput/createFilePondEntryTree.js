@@ -1,62 +1,59 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { createEntryTree as E } from "../../core/entryTree.js";
-import { isFileEntry as f, isNumber as b, isString as s, isFile as o, isObject as a, isDataTransfer as l, isDirectoryEntry as S, isBlobOrFile as g, isCanvas as F } from "../../utils/test.js";
-import { copyFilePropsToObject as c } from "../../utils/file.js";
-import { getFilenameFromURL as x } from "../../utils/url.js";
-function j(t) {
-  const { beforeInsertEntries: e } = t || {};
-  return E({
+import { createEntryTree as b } from "../../core/entryTree.js";
+import { isFileEntry as l, isNumber as F, isString as a, isFile as f, isObject as c, isDataTransfer as u, isDirectoryEntry as x, isBlobOrFile as P, isCanvas as S } from "../../utils/test.js";
+import { copyFilePropsToObject as m } from "../../utils/file.js";
+import { getFilenameFromURL as h } from "../../utils/url.js";
+import { stringMatchesAny as O } from "../../utils/string.js";
+import { EMPTY_ARRAY as p } from "../../utils/array.js";
+function U(e) {
+  const { beforeInsertEntries: i, getIgnoredEntryPatterns: t = () => p } = e || {};
+  return b({
     // allows limiting the total entries added
-    beforeInsertEntries: e,
+    beforeInsertEntries: i,
     // formats the entry so all entries in the dataset follow the same data structure
     beforeOnboardEntry(r) {
-      return u(r) ? m(r) : !1;
+      const n = { ignoredEntryPatterns: t() };
+      return E(r, n) ? d(r, n) : !1;
     },
     // makes modifications to the props the entry is updated with
-    beforeUpdateEntryWithProps(r, i, d) {
-      if (f(r) && d && c(i.file, i), i.extensionState) {
-        const p = Object.values(
-          i.extensionState
+    beforeUpdateEntryWithProps(r, n, o) {
+      if (l(r) && o && m(n.file, n), n.extensionState) {
+        const g = Object.values(
+          n.extensionState
         );
-        for (const { status: n } of p)
-          n && (n.values = n.values ?? null, n.progress = b(n.progress) ? n.progress : null);
+        for (const { status: s } of g)
+          s && (s.values = s.values ?? null, s.progress = F(s.progress) ? s.progress : null);
       }
     }
   });
 }
-function h(t) {
-  return s(t) || g(t) || F(t) || l(t);
+function v(e) {
+  return a(e) || P(e) || S(e) || u(e);
 }
-function u(t) {
-  if (s(t) || f(t)) {
-    const e = s(t) ? x(t) ?? "" : t.name ?? (o(t?.src) ? t.src.name : "");
-    return ![
-      /\.git/,
-      /thumbs\.db/,
-      /\.DS_Store/,
-      /desktop\.ini/,
-      /^__MACOSX/,
-      /node_modules/
-    ].find((r) => r.test(e));
+function E(e, i) {
+  const { ignoredEntryPatterns: t = p } = i || {};
+  if (a(e) || l(e)) {
+    const r = a(e) ? h(e) ?? "" : e.name ?? (f(e?.src) ? e.src.name : "");
+    return !O(r, t);
   }
   return !0;
 }
-function m(t) {
-  const e = h(t) ? { src: t } : { ...t };
-  if (e.state = a(e.state) ? e.state : {}, e.extensionState = a(e.extensionState) ? e.extensionState : {}, e.origin = e.origin ?? "api", e.containerId = e.containerId ?? null, l(e.src))
-    return e;
-  if (e.path = e.path ?? e.src?.path ?? null, S(e)) {
-    const { entries: i } = e;
-    return e.entries = i.filter(u).map(m), e;
+function d(e, i) {
+  const t = v(e) ? { src: e } : { ...e };
+  if (t.state = c(t.state) ? t.state : {}, t.extensionState = c(t.extensionState) ? t.extensionState : {}, t.origin = t.origin ?? "api", t.containerId = t.containerId ?? null, u(t.src))
+    return t;
+  if (t.path = t.path ?? t.src?.path ?? null, x(t)) {
+    const { entries: n } = t;
+    return t.entries = n.filter((o) => E(o, i)).map((o) => d(o, i)), t;
   }
-  const r = e;
-  return r.file = r.file ?? void 0, o(r.src) && (r.file = r.src), o(r.file) && c(r.file, r), r;
+  const r = t;
+  return r.file = r.file ?? void 0, f(r.src) && (r.file = r.src), f(r.file) && m(r.file, r), r;
 }
 export {
-  j as createFilePondEntryTree
+  U as createFilePondEntryTree
 };

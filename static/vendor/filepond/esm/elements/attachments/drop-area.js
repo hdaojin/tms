@@ -1,29 +1,29 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { addListener as P, dispatchCustomEvent as x } from "../../utils/dom.js";
-import { debounce as y } from "../../utils/debounce.js";
-import { getUniqueId as X } from "../../utils/string.js";
+import { addListener as y, dispatchCustomEvent as w } from "../../utils/dom.js";
+import { debounce as X } from "../../utils/debounce.js";
+import { getUniqueId as Y } from "../../utils/string.js";
 import { vectorCreate as o } from "../../utils/vector.js";
-import { isObjectValuesEqual as Y } from "../../utils/object.js";
-import { noop as w } from "../../utils/placeholder.js";
-function I(u = {}) {
-  const { disabled: f } = u;
-  return (m) => {
-    let d = 0, p, r, i, n, l, c;
-    const g = () => {
-      d = 0, r = void 0, i = void 0, l = void 0, n = void 0;
-    }, s = (t) => {
+import { isObjectValuesEqual as C } from "../../utils/object.js";
+import { noop as L } from "../../utils/placeholder.js";
+function U(u = {}) {
+  const { disabled: m, willAcceptDrop: g } = u;
+  return (D) => {
+    let s = 0, p, r, i, n, d, c;
+    const E = () => {
+      s = 0, r = void 0, i = void 0, d = void 0, n = void 0;
+    }, l = (t) => {
       if (i = o(t.clientX, t.clientY), !r || !n)
         return;
       const e = o(
         i.x - r.x,
         i.y - r.y
       );
-      l = o(
+      d = o(
         e.x - n.x,
         e.y - n.y
       ), n = e, c = {
@@ -31,29 +31,33 @@ function I(u = {}) {
         clientY: t.clientY,
         type: t.type
       };
-    }, a = (t, e) => {
-      if (f)
-        return;
-      const v = {
+    };
+    function f(t = null) {
+      return {
         id: p,
         element: void 0,
         translation: { ...n },
         offset: o(0, 0),
         startPosition: { ...r },
         viewPosition: { ...i },
-        vector: { ...l },
-        dataTransfer: e
+        vector: { ...d },
+        dataTransfer: t
       };
-      (u[`on${t}`] ?? w)(v), x(m, t, {
+    }
+    const a = (t, e) => {
+      if (m)
+        return;
+      const v = f(e);
+      (u[`on${t}`] ?? L)(v), w(D, t, {
         detail: v
       });
-    }, D = (t) => {
-      t.preventDefault(), !(d++ > 0) && (p = X(), n = o(), r = o(t.pageX, t.pageY), s(t), a("itemdragin"));
     }, h = (t) => {
-      t.preventDefault(), !(--d > 0) && (s(t), a("itemdragout"));
-    }, E = y(
+      t.preventDefault(), !(s++ > 0) && (p = Y(), n = o(), r = o(t.pageX, t.pageY), l(t), a("itemdragin"));
+    }, b = (t) => {
+      t.preventDefault(), !(--s > 0) && (l(t), a("itemdragout"));
+    }, P = X(
       (t) => {
-        c && Y(c, t) || (s(t), a("itemdrag"));
+        c && C(c, t) || (l(t), a("itemdrag"));
       },
       {
         beforeDebounce: (t) => {
@@ -62,25 +66,25 @@ function I(u = {}) {
         // can't push forward events
         runLast: !1
       }
-    ), b = Object.entries({
+    ), x = Object.entries({
       // enter and leave drop area
-      dragenter: D,
-      dragleave: h,
+      dragenter: h,
+      dragleave: b,
       // handle dragover only (drag pageX and pageY is 0 on Firefox)
-      dragover: E,
+      dragover: P,
       // a file was dropped
       drop: (t) => {
         const e = t.defaultPrevented;
-        t.preventDefault(), s(t), e ? a("itemdropcancel") : a("itemdrop", t.dataTransfer), g();
+        l(t), g?.(f(t.dataTransfer)) && t.preventDefault(), e ? a("itemdropcancel") : a("itemdrop", t.dataTransfer), E();
       }
     }).map(
-      ([t, e]) => P(document.documentElement, t, e)
+      ([t, e]) => y(document.documentElement, t, e)
     );
     return () => {
-      b.forEach((t) => t());
+      x.forEach((t) => t());
     };
   };
 }
 export {
-  I as dropArea
+  U as dropArea
 };

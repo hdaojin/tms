@@ -1,5 +1,5 @@
 import { TEMPLATE_FRAGMENT as c, TEMPLATE_USE_IMPORT_NODE as h } from "../../../constants.js";
-import { create_text as d, get_first_child as o, is_firefox as g } from "./operations.js";
+import { get_first_child as o, is_firefox as g, create_text as d } from "./operations.js";
 import { create_fragment_from_html as l } from "./reconciler.js";
 import { active_effect as E } from "../runtime.js";
 function i(r, e) {

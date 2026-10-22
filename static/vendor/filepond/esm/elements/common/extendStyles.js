@@ -1,35 +1,28 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { isBrowser as c } from "../../utils/test.js";
+import { isBrowser as y } from "../../utils/test.js";
 import { createStyleSheet as r } from "../../utils/dom.js";
-const n = [], u = [];
-let s = !1;
+const h = [], n = [];
 function S() {
-  if (s)
-    return;
-  s = !0, queueMicrotask(e);
-  function e() {
-    for (const { shadowRoot: t, styleSheet: o } of u)
-      t.adoptedStyleSheets.push(
-        // my styles
-        o,
-        ...n
-      );
-    s = !1;
-  }
+  for (const { shadowRoot: t, styleSheet: o, key: s } of n)
+    t.adoptedStyleSheets.push(
+      // my styles
+      o,
+      ...h.filter((e) => !e.rootKeys.length || e.rootKeys.includes(s)).map((e) => e.styleSheet)
+    );
 }
-function i(e) {
-  c() && (n.push(r(e)), S());
+function c(t, ...o) {
+  y() && (h.push({ styleSheet: r(t), rootKeys: o }), S());
 }
-function l(e, t) {
-  const o = r(t);
-  u.push({ shadowRoot: e, styleSheet: o }), S();
+function d(t, o, s) {
+  const e = r(s);
+  n.push({ key: o, shadowRoot: t, styleSheet: e }), S();
 }
 export {
-  i as extendShadowRootStyles,
-  l as registerShadowRoot
+  c as extendShadowRootStyles,
+  d as registerShadowRoot
 };

@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "सफल",
   info: "जानकारी",
   system: "सिस्टम",
-  // sources
-  device: "डिवाइस",
-  camera: "कैमरा",
-  link: "लिंक",
   // capabilities labels
   descriptionBrowse: "[{{maxFilesUnit}} चुनें]",
   descriptionBrowseDrop: "{{maxFilesUnit}} यहां छोड़ें, या [ब्राउज़] करें",
@@ -113,9 +109,9 @@ const i = {
   transformError: "फ़ाइल संपादित नहीं हो सकी। कृपया पुनः प्रयास करें।"
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "यह फ़ाइल प्रकार अनुमति नहीं है। {{details}}.",
+    template: "यह फ़ाइल प्रकार अनुमति नहीं है। {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "फ़ाइल का प्रकार {{accept}} होना चाहिए",
@@ -126,9 +122,9 @@ const i = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "यह फ़ाइल एक्सटेंशन अनुमति नहीं है। {{details}}.",
+    template: "यह फ़ाइल एक्सटेंशन अनुमति नहीं है। {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "फ़ाइल में {{accept}} एक्सटेंशन होना चाहिए",
@@ -168,17 +164,34 @@ const i = {
   ...d,
   ...r,
   ...m
+}, p = {
+  device: "डिवाइस"
 }, v = {
+  link: "लिंक"
+}, u = {
+  camera: "कैमरा",
+  capture: "कैप्चर",
+  record: "रिकॉर्ड"
+}, M = {
+  ...p,
+  ...v,
+  ...u
+}, f = {
   ...i,
   ...a,
   ...e,
   ...c,
-  ...t
+  ...t,
+  ...M
 };
 export {
   i as core,
-  v as locale,
+  f as locale,
   e as media,
+  M as source,
+  u as sourceCamera,
+  p as sourceDevice,
+  v as sourceLink,
   a as store,
   t as transform,
   c as validation,

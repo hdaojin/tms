@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Onnistui",
   info: "Info",
   system: "Järjestelmä",
-  // sources
-  device: "Laite",
-  camera: "Kamera",
-  link: "Linkki",
   // capabilities labels
   descriptionBrowse: "[Valitse {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Pudota {{maxFilesUnit}} tähän tai [selaa]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "Tietoja ei voitu muokata. Yritä uudelleen."
 }, o = {
   validationFileMimeTypeMismatch: {
-    template: "Tämä tiedostotyyppi ei ole sallittu. {{details}}.",
+    template: "Tämä tiedostotyyppi ei ole sallittu. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Tiedoston on oltava tyyppiä {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, n = {
   validationFileExtensionMismatch: {
-    template: "Tämä tiedostopääte ei ole sallittu. {{details}}.",
+    template: "Tämä tiedostopääte ei ole sallittu. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Tiedostolla on oltava pääte {{accept}}",
@@ -137,10 +133,10 @@ const i = {
       }
     }
   }
-}, l = {
+}, s = {
   validationFileNameMissing: "Tiedoston nimi puuttuu",
   validationFileNameMismatch: "Virheellinen tiedostonimi."
-}, s = {
+}, l = {
   validationFileSizeUnderflow: "Tämä tiedosto on liian pieni. Vähimmäiskoko on {{minSize}} {{minSizeUnit}}.",
   validationFileSizeOverflow: "Tämä tiedosto on liian suuri. Enimmäiskoko on {{maxSize}} {{maxSizeUnit}}."
 }, r = {
@@ -161,31 +157,48 @@ const i = {
   validationListEntryCountUnderflow: "Luettelossa on liian vähän tiedostoja. Vähimmäismäärä on {{minFiles}} {{minFilesUnit}}.",
   validationListEntryCountOverflow: "Luettelossa on liikaa tiedostoja. Enimmäismäärä on {{maxFiles}} {{maxFilesUnit}}."
 }, m = {
-  ...s,
+  ...l,
   ...o,
   ...n,
-  ...l,
+  ...s,
   ...d,
   ...r,
   ...u
+}, p = {
+  device: "Laite"
 }, v = {
+  link: "Linkki"
+}, c = {
+  camera: "Kamera",
+  capture: "Kaappaa",
+  record: "Nauhoita"
+}, k = {
+  ...p,
+  ...v,
+  ...c
+}, h = {
   ...i,
   ...a,
   ...t,
   ...m,
-  ...e
+  ...e,
+  ...k
 };
 export {
   i as core,
-  v as locale,
+  h as locale,
   t as media,
+  k as source,
+  c as sourceCamera,
+  p as sourceDevice,
+  v as sourceLink,
   a as store,
   e as transform,
   m as validation,
   n as validationFileExtension,
   o as validationFileMimeType,
-  l as validationFileName,
-  s as validationFileSize,
+  s as validationFileName,
+  l as validationFileSize,
   u as validationListCount,
   r as validationListSize,
   d as validationMediaResolution

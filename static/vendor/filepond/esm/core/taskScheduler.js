@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -8,13 +8,14 @@ import { arrayRemoveInPlace as k } from "../utils/array.js";
 import { didAbort as z } from "../utils/abort.js";
 import { pubsub as J } from "../utils/pubsub.js";
 import { isString as K, isFunction as h } from "../utils/test.js";
+import "../common/yield.js";
 const o = {
   QUEUED: 1,
   ACTIVE: 2,
   FAILED: 3,
   HALTED: 4
 };
-function _(v) {
+function $(v) {
   const { log: g = void 0 } = v ?? {}, { on: C, pub: f } = J(), s = [], i = /* @__PURE__ */ new Map();
   function F(t) {
     return t.state === o.QUEUED || t.state === o.ACTIVE;
@@ -72,7 +73,7 @@ function _(v) {
     if (n)
       return n.find((e) => e.fn === r);
   }
-  function I(t, r, n) {
+  function y(t, r, n) {
     const { isSoftFailure: e = !1 } = n || {}, l = i.get(t) ?? [];
     for (const a of l)
       e && a.ignoreSoftFailure || (a.state = r);
@@ -92,10 +93,10 @@ function _(v) {
   function M(t) {
     return P().filter((r) => r.fn === t.fn);
   }
-  function y(t) {
+  function I(t) {
     return t ? t.parallel === 1 / 0 || M(t).length < t.parallel : !1;
   }
-  function p() {
+  async function p() {
     queueMicrotask(D);
   }
   function D() {
@@ -109,14 +110,14 @@ function _(v) {
       if (!A(r, o.QUEUED)) {
         if (A(r, o.HALTED)) {
           const e = b(r);
-          if (!e || e.ignoreSoftFailure === !1 || !y(e))
+          if (!e || e.ignoreSoftFailure === !1 || !I(e))
             continue;
           G(e);
         }
         continue;
       }
       const n = b(r);
-      y(n) && G(n);
+      I(n) && G(n);
     }
   }
   async function G(t) {
@@ -124,11 +125,11 @@ function _(v) {
     t.state = o.ACTIVE;
     try {
       const u = h(e) ? e() : e, T = await n(...u, { signal: a });
-      d(t), T === !1 && I(r, o.HALTED, { isSoftFailure: !0 });
+      d(t), T === !1 && y(r, o.HALTED, { isSoftFailure: !0 });
     } catch (u) {
       if (z(a, u))
         return;
-      f("error", u), I(r, o.HALTED), t.state = o.FAILED;
+      f("error", u), y(r, o.HALTED), t.state = o.FAILED;
     }
     q(r) || f("complete", r), p();
   }
@@ -180,5 +181,5 @@ function _(v) {
   };
 }
 export {
-  _ as createTaskScheduler
+  $ as createTaskScheduler
 };

@@ -1,16 +1,16 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import { createExtension as z } from "./createExtension.js";
-import { isFileEntry as M, isBlobOrFile as G, isFile as y, isNullOrUndefined as x, isFunction as O } from "../../utils/test.js";
+import { isFileEntry as M, isBlobOrFile as G, isFile as O, isNullOrUndefined as P, isFunction as F } from "../../utils/test.js";
 import { cloneFile as J, cloneFileWithOptions as K } from "../../utils/file.js";
 import { Status as i } from "../../common/status.js";
-import { didAbort as L } from "../../utils/abort.js";
-function tt(P) {
-  const { name: d, props: k, factory: b } = P;
+import { didAbort as x } from "../../utils/abort.js";
+function tt(L) {
+  const { name: d, props: k, factory: U } = L;
   return z({
     name: d,
     type: "transform",
@@ -23,26 +23,26 @@ function tt(P) {
       filterEntry: (R) => !0,
       ...k
     },
-    factory: (R, F) => {
+    factory: (R, A) => {
       const { props: f } = R, {
-        on: h,
+        on: y,
         updateEntry: u,
         pushTask: m,
-        abortTask: w,
-        abortTasks: U,
+        abortTask: b,
+        abortTasks: w,
         setEntryExtensionStatus: p,
         getEntryExtensionState: T,
         setEntryExtensionState: C,
-        createProgressHandler: A
-      } = F, {
+        createProgressHandler: h
+      } = A, {
         transformEntry: D = () => null,
         canTransformEntry: I = (t) => M(t) && G(t.file),
         prepareTransformEntry: N = void 0
-      } = b(R, F);
+      } = U(R, A);
       async function v(t, { signal: o }) {
-        const { actionTransform: s, actionLoad: n, shouldTransform: r } = f;
-        if (O(N)) {
-          p(t, {
+        const { actionTransform: n, actionLoad: s, shouldTransform: r } = f;
+        if (F(N)) {
+          t = p(t, {
             type: i.System,
             code: "TRANSFORM_PREPARE",
             progress: 1 / 0
@@ -50,10 +50,10 @@ function tt(P) {
           try {
             await N(t, {
               signal: o,
-              onprogress: A(t)
+              onprogress: h(t, { code: "TRANSFORM_PREPARE" })
             });
           } catch (l) {
-            if (L(o, l))
+            if (x(o, l))
               return;
             p(t, {
               type: i.Error,
@@ -67,7 +67,7 @@ function tt(P) {
             code: "TRANSFORM_PREPARE_COMPLETE"
           });
         }
-        p(t, {
+        t = p(t, {
           type: i.System,
           code: "TRANSFORM_BUSY",
           progress: 1 / 0
@@ -76,21 +76,21 @@ function tt(P) {
         try {
           a = await D(t, {
             signal: o,
-            onprogress: A(t)
+            onprogress: h(t, { code: "TRANSFORM_BUSY" })
           });
         } catch (l) {
-          if (L(o, l))
+          if (x(o, l))
             return;
           if (p(t, {
             type: i.Error,
             code: "TRANSFORM_ERROR",
             values: { error: l }
-          }), O(r))
+          }), F(r))
             throw l;
           return;
         }
         const c = {
-          [s]: O(r) ? !1 : null
+          [n]: F(r) ? !1 : null
         };
         if (!a) {
           u(t, {
@@ -106,7 +106,7 @@ function tt(P) {
           });
           return;
         }
-        let { file: e, history: S } = y(a) ? { file: a } : a;
+        let { file: e, history: S } = O(a) ? { file: a } : a;
         e.lastModified <= t.file.lastModified && (e = K(e, {
           lastModified: e.lastModified + 1
         }));
@@ -123,7 +123,7 @@ function tt(P) {
             // we don't transform again
             state: {
               ...c,
-              [n]: null
+              [s]: null
             },
             // did edit Entry
             extensionState: {
@@ -142,14 +142,14 @@ function tt(P) {
           }
         );
       }
-      async function g(t) {
-        const { actionTransform: o } = f, { input: s } = T(t);
-        U(t.id), u(
+      async function B(t) {
+        const { actionTransform: o } = f, { input: n } = T(t);
+        w(t.id), u(
           // current entry
           t,
           // reset to original file
           {
-            file: J(s)
+            file: J(n)
           },
           // reset all changes
           {
@@ -169,14 +169,14 @@ function tt(P) {
           }
         );
       }
-      async function B(t) {
-        const { actionTransform: o, shouldTransform: s } = f;
-        if (!s)
+      async function g(t) {
+        const { actionTransform: o, shouldTransform: n } = f;
+        if (!n)
           return;
-        const { input: n } = T(t);
-        if (n)
+        const { input: s } = T(t);
+        if (s)
           return;
-        const r = await s(t);
+        const r = await n(t);
         u(t, {
           state: {
             [o]: r
@@ -184,18 +184,18 @@ function tt(P) {
         });
       }
       async function _(t) {
-        const { actionTransform: o, filterEntry: s } = f;
-        let n = await I(t);
-        n && (n = await s(t)), C(t, {
-          canTransform: n,
-          actions: n ? [o] : [],
+        const { actionTransform: o, filterEntry: n } = f;
+        let s = await I(t);
+        s && (s = await n(t)), C(t, {
+          canTransform: s,
+          actions: s ? [o] : [],
           status: {
             type: i.System,
             code: "TRANSFORM_IDLE"
           }
         });
       }
-      async function H(t) {
+      async function Y(t) {
         const { actionLoad: o } = f;
         u(t, {
           state: {
@@ -203,14 +203,14 @@ function tt(P) {
           }
         });
       }
-      async function W(t) {
-        if (!M(t) || !y(t.file))
+      async function H(t) {
+        if (!M(t) || !O(t.file))
           return;
-        const { actionTransform: o, shouldTransform: s } = f, { file: n } = t, r = x(t.state[o]) ? null : t.state[o], { canTransform: a, input: c } = T(t);
-        a !== null && (c && n.lastModified >= c.lastModified || (w(t.id, _), u(t, {
+        const { actionTransform: o, shouldTransform: n } = f, { file: s } = t, r = P(t.state[o]) ? null : t.state[o], { canTransform: a, input: c } = T(t);
+        a !== null && (c && s.lastModified >= c.lastModified || (b(t.id, _), u(t, {
           state: {
             // when `shouldTransform` is set we don't accept `false` for transform action
-            [o]: s && r === !1 ? null : r
+            [o]: n && r === !1 ? null : r
           },
           extensionState: {
             [d]: {
@@ -229,15 +229,15 @@ function tt(P) {
           }
         })));
       }
-      async function Y(t) {
-        const { actionTransform: o, actionLoad: s, parallel: n, shouldTransform: r } = f;
+      async function W(t) {
+        const { actionTransform: o, actionLoad: n, parallel: s, shouldTransform: r } = f;
         if (!M(t))
           return;
-        const { canTransform: a = null, input: c } = T(t), e = t.state[o], S = t.state[s], E = !x(e) && e !== !1;
+        const { canTransform: a = null, input: c } = T(t), e = t.state[o], S = t.state[n], E = !P(e) && e !== !1;
         if (a === !1)
           return;
-        if (E && S === null && !y(t.file)) {
-          m(t.id, H);
+        if (E && S === null && !O(t.file)) {
+          m(t.id, Y);
           return;
         }
         if (a === null) {
@@ -245,19 +245,19 @@ function tt(P) {
           return;
         }
         if (e === null && r) {
-          m(t.id, B);
+          m(t.id, g);
           return;
         }
         if (e === !1 && !!c && !r) {
-          m(t.id, g, { parallel: n });
+          m(t.id, B, { parallel: s });
           return;
         }
         if (E && a) {
-          m(t.id, v, { parallel: n });
+          m(t.id, v, { parallel: s });
           return;
         }
       }
-      const j = h("updateEntryData", W), q = h("updateEntry", Y);
+      const j = y("updateEntryData", H), q = y("updateEntry", W);
       return {
         destroy() {
           q(), j();

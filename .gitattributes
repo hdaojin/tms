@@ -1,0 +1,4 @@
+# Generated third-party assets are copied byte-for-byte from npm packages.
+static/css/output.css -whitespace
+static/js/*.min.js -whitespace
+static/vendor/filepond/** -whitespace

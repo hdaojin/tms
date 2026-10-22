@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const e = {
   success: "Vellykket",
   info: "Info",
   system: "System",
-  // sources
-  device: "Enhet",
-  camera: "Kamera",
-  link: "Lenke",
   // capabilities labels
   descriptionBrowse: "[Velg {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Slipp {{maxFilesUnit}} her, eller [bla gjennom]",
@@ -108,14 +104,14 @@ const e = {
   storeStorageComplete: "Opplasting fullført",
   storeError: "Kunne ikke lagre filen.",
   storeAwaitingCompletion: "Ikke alle filer er lagret."
-}, l = {
+}, n = {
   transformEditBusy: "Redigerer fil",
   transformError: "Kunne ikke redigere filen. Prøv igjen."
-}, n = {
+}, l = {
   validationFileMimeTypeMismatch: {
-    template: "Denne filtypen er ikke tillatt. {{details}}.",
+    template: "Denne filtypen er ikke tillatt. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Filen må være av typen {{accept}}",
@@ -126,9 +122,9 @@ const e = {
   }
 }, a = {
   validationFileExtensionMismatch: {
-    template: "Denne filendelsen er ikke tillatt. {{details}}.",
+    template: "Denne filendelsen er ikke tillatt. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Filen må ha endelsen {{accept}}",
@@ -162,28 +158,45 @@ const e = {
   validationListEntryCountOverflow: "For mange filer i listen. Maksimum er {{maxFiles}} {{maxFilesUnit}}."
 }, p = {
   ...o,
-  ...n,
+  ...l,
   ...a,
   ...r,
   ...d,
   ...s,
   ...m
 }, g = {
+  device: "Enhet"
+}, f = {
+  link: "Lenke"
+}, u = {
+  camera: "Kamera",
+  capture: "Ta bilde",
+  record: "Ta opp"
+}, v = {
+  ...g,
+  ...f,
+  ...u
+}, c = {
   ...e,
   ...t,
   ...i,
   ...p,
-  ...l
+  ...n,
+  ...v
 };
 export {
   e as core,
-  g as locale,
+  c as locale,
   i as media,
+  v as source,
+  u as sourceCamera,
+  g as sourceDevice,
+  f as sourceLink,
   t as store,
-  l as transform,
+  n as transform,
   p as validation,
   a as validationFileExtension,
-  n as validationFileMimeType,
+  l as validationFileMimeType,
   r as validationFileName,
   o as validationFileSize,
   m as validationListCount,

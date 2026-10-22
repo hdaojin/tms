@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -46,10 +46,6 @@ const e = {
   success: "Gelukt",
   info: "Info",
   system: "Systeem",
-  // sources
-  device: "Apparaat",
-  camera: "Camera",
-  link: "Link",
   // capabilities labels
   descriptionBrowse: "[Selecteer {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Sleep {{maxFilesUnit}} hierheen of [blader]",
@@ -122,9 +118,9 @@ const e = {
   transformError: "Bestand kon niet worden bewerkt. Probeer het opnieuw."
 }, a = {
   validationFileMimeTypeMismatch: {
-    template: "Dit bestandstype is niet toegestaan. {{details}}.",
+    template: "Dit bestandstype is niet toegestaan. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Bestand moet van het type {{accept}} zijn",
@@ -135,9 +131,9 @@ const e = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "Deze bestandsextensie is niet toegestaan. {{details}}.",
+    template: "Deze bestandsextensie is niet toegestaan. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Bestand moet de {{accept}} extensie hebben",
@@ -178,16 +174,33 @@ const e = {
   ...r,
   ...m
 }, p = {
+  device: "Apparaat"
+}, c = {
+  link: "Link"
+}, u = {
+  camera: "Camera",
+  capture: "Vastleggen",
+  record: "Opnemen"
+}, v = {
+  ...p,
+  ...c,
+  ...u
+}, M = {
   ...e,
   ...t,
   ...i,
   ...g,
-  ...n
+  ...n,
+  ...v
 };
 export {
   e as core,
-  p as locale,
+  M as locale,
   i as media,
+  v as source,
+  u as sourceCamera,
+  p as sourceDevice,
+  c as sourceLink,
   t as store,
   n as transform,
   g as validation,

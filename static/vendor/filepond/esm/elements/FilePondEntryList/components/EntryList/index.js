@@ -1,9 +1,9 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { extendShadowRootStyles as o } from "../../../common/extendStyles.js";
-import t from "./index.css.js";
-o(t);
+import { extendShadowRootStyles as t } from "../../../common/extendStyles.js";
+import o from "./index.css.js";
+t(o, "entry-list");

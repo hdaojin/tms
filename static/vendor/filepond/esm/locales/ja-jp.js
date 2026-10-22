@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "完了",
   info: "情報",
   system: "システム",
-  // sources
-  device: "デバイス",
-  camera: "カメラ",
-  link: "リンク",
   // capabilities labels
   descriptionBrowse: "[{{maxFilesUnit}}を選択]",
   descriptionBrowseDrop: "ここに{{maxFilesUnit}}をドロップ、または[参照]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "ファイルを編集できませんでした。もう一度お試しください。"
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "このファイル形式は許可されていません。{{details}}。",
+    template: "このファイル形式は許可されていません。{{accepted}}。",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "ファイル形式は {{accept}} である必要があります",
@@ -126,9 +122,9 @@ const i = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "このファイル拡張子は許可されていません。{{details}}。",
+    template: "このファイル拡張子は許可されていません。{{accepted}}。",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "ファイル拡張子は {{accept}} である必要があります",
@@ -168,17 +164,34 @@ const i = {
   ...d,
   ...r,
   ...m
+}, p = {
+  device: "デバイス"
 }, v = {
+  link: "リンク"
+}, u = {
+  camera: "カメラ",
+  capture: "キャプチャ",
+  record: "録画"
+}, M = {
+  ...p,
+  ...v,
+  ...u
+}, f = {
   ...i,
   ...a,
   ...e,
   ...c,
-  ...t
+  ...t,
+  ...M
 };
 export {
   i as core,
-  v as locale,
+  f as locale,
   e as media,
+  M as source,
+  u as sourceCamera,
+  p as sourceDevice,
+  v as sourceLink,
   a as store,
   t as transform,
   c as validation,

@@ -1,14 +1,14 @@
-import { is_function as L, noop as l } from "../../../shared/utils.js";
-import { effect as S } from "../../reactivity/effects.js";
-import { active_effect as x, untrack as B } from "../../runtime.js";
-import { loop as M } from "../../loop.js";
-import { should_intro as j } from "../../render.js";
-import { TRANSITION_GLOBAL as q } from "../../../../constants.js";
-import { EFFECT_TRANSPARENT as G, BLOCK_EFFECT as K, REACTION_RAN as P } from "../../constants.js";
-import { queue_micro_task as U } from "../task.js";
-import { without_reactive_context as I } from "./bindings/shared.js";
-function y(t, r) {
-  I(() => {
+import { is_function as S, noop as h } from "../../../shared/utils.js";
+import { effect as x } from "../../reactivity/effects.js";
+import { active_effect as B, untrack as M } from "../../runtime.js";
+import { loop as j } from "../../loop.js";
+import { should_intro as q } from "../../render.js";
+import { TRANSITION_GLOBAL as G } from "../../../../constants.js";
+import { EFFECT_TRANSPARENT as K, BLOCK_EFFECT as P, REACTION_RAN as U } from "../../constants.js";
+import { queue_micro_task as k } from "../task.js";
+import { without_reactive_context as L } from "./bindings/shared.js";
+function T(t, r) {
+  L(() => {
     t.dispatchEvent(new CustomEvent(r));
   });
 }
@@ -19,155 +19,159 @@ function W(t) {
   const r = t.split("-");
   return r.length === 1 ? r[0] : r[0] + r.slice(1).map(
     /** @param {any} word */
-    (i) => i[0].toUpperCase() + i.slice(1)
+    (o) => o[0].toUpperCase() + o.slice(1)
   ).join("");
 }
-function k(t) {
-  const r = {}, i = t.split(";");
-  for (const a of i) {
+function I(t) {
+  const r = {}, o = t.split(";");
+  for (const a of o) {
     const [e, n] = a.split(":");
     if (!e || n === void 0) break;
-    const v = W(e.trim());
-    r[v] = n.trim();
+    const c = W(e.trim());
+    r[c] = n.trim();
   }
   return r;
 }
 const z = (t) => t;
-function rr(t, r, i, a) {
-  var e = (t & q) !== 0, n = "both", v, c = r.inert, w = r.style.overflow, p, u;
+function rr(t, r, o, a) {
+  var e = (t & G) !== 0, n = "both", c, m = r.inert, d = r.style.overflow, p, u;
   function s() {
-    return I(() => v ??= i()(r, a?.() ?? /** @type {P} */
+    return L(() => c ??= o()(r, a?.() ?? /** @type {P} */
     {}, {
       direction: n
     }));
   }
-  var m = {
+  var _ = {
     is_global: e,
     in() {
-      r.inert = c, p = N(
+      r.inert = m, p = C(
         r,
         s(),
         u,
         1,
         () => {
-          y(r, "introstart");
+          T(r, "introstart");
         },
         () => {
-          y(r, "introend"), p?.abort(), p = v = void 0, r.style.overflow = w;
+          T(r, "introend"), p?.abort(), p = c = void 0, r.style.overflow = d;
         }
       );
     },
-    out(f) {
-      r.inert = !0, u = N(
+    out(l) {
+      r.inert = !0, u = C(
         r,
         s(),
         p,
         0,
         () => {
-          y(r, "outrostart");
+          T(r, "outrostart");
         },
         () => {
-          y(r, "outroend"), f?.();
+          T(r, "outroend"), l?.();
         }
       );
     },
     stop: () => {
       p?.abort(), u?.abort();
     }
-  }, _ = (
+  }, i = (
     /** @type {Effect & { nodes: EffectNodes }} */
-    x
+    B
   );
-  if ((_.nodes.t ??= []).push(m), j) {
-    var d = e;
-    if (!d) {
-      for (var o = (
+  if ((i.nodes.t ??= []).push(_), q) {
+    var v = e;
+    if (!v) {
+      for (var f = (
         /** @type {Effect | null} */
-        _.parent
-      ); o && (o.f & G) !== 0; )
-        for (; (o = o.parent) && (o.f & K) === 0; )
+        i.parent
+      ); f && (f.f & K) !== 0; )
+        for (; (f = f.parent) && (f.f & P) === 0; )
           ;
-      d = !o || (o.f & P) !== 0;
+      v = !f || (f.f & U) !== 0;
     }
-    d && S(() => {
-      B(() => m.in());
+    v && x(() => {
+      M(() => _.in());
     });
   }
 }
-function N(t, r, i, a, e, n) {
-  var v = a === 1;
-  if (L(r)) {
-    var c, w = !1;
-    return U(() => {
-      if (!w) {
-        var h = r({ direction: v ? "in" : "out" });
-        c = N(t, h, i, a, e, n);
+function C(t, r, o, a, e, n) {
+  var c = a === 1, m = !1;
+  if (S(r)) {
+    var d;
+    return k(() => {
+      if (!m) {
+        var f = r({ direction: c ? "in" : "out" });
+        d = C(t, f, o, a, e, n);
       }
     }), {
       abort: () => {
-        w = !0, c?.abort();
+        m = !0, d?.abort();
       },
-      deactivate: () => c.deactivate(),
-      reset: () => c.reset(),
-      t: () => c.t()
+      deactivate: () => d.deactivate(),
+      reset: () => d.reset(),
+      t: () => d.t()
     };
   }
-  if (i?.deactivate(), !r?.duration && !r?.delay)
+  if (o?.deactivate(), !r?.duration && !r?.delay)
     return e(), n(), {
-      abort: l,
-      deactivate: l,
-      reset: l,
+      abort: h,
+      deactivate: h,
+      reset: h,
       t: () => a
     };
-  const { delay: p = 0, css: u, tick: s, easing: m = z } = r;
-  var _ = [];
-  if (v && i === void 0 && (s && s(0, 1), u)) {
-    var d = k(u(0, 1));
-    _.push(d, d);
-  }
-  var o = () => 1 - a, f = t.animate(_, { duration: p, fill: "forwards" });
-  return f.onfinish = () => {
-    f.cancel(), e();
-    var h = i?.t() ?? 1 - a;
-    i?.abort();
-    var A = a - h, E = (
-      /** @type {number} */
-      r.duration * Math.abs(A)
-    ), F = [];
-    if (E > 0) {
-      var O = !1;
-      if (u)
-        for (var R = Math.ceil(E / 16.666666666666668), C = 0; C <= R; C += 1) {
-          var b = h + A * m(C / R), g = k(u(b, 1 - b));
-          F.push(g), O ||= g.overflow === "hidden";
-        }
-      O && (t.style.overflow = "hidden"), o = () => {
-        var T = (
+  const { delay: p = 0, css: u, tick: s, easing: _ = z } = r;
+  var i, v = () => 1 - a;
+  return k(() => {
+    if (!m) {
+      var f = [];
+      if (c && o === void 0 && (s && s(0, 1), u)) {
+        var l = I(u(0, 1));
+        f.push(l, l);
+      }
+      i = t.animate(f, { duration: p, fill: "forwards" }), i.onfinish = () => {
+        i.cancel(), e();
+        var y = o?.t() ?? 1 - a;
+        o?.abort();
+        var b = a - y, w = (
           /** @type {number} */
-          /** @type {globalThis.Animation} */
-          f.currentTime
-        );
-        return h + A * m(T / E);
-      }, s && M(() => {
-        if (f.playState !== "running") return !1;
-        var T = o();
-        return s(T, 1 - T), !0;
-      });
+          r.duration * Math.abs(b)
+        ), N = [];
+        if (w > 0) {
+          var F = !1;
+          if (u)
+            for (var O = Math.ceil(w / 16.666666666666668), A = 0; A <= O; A += 1) {
+              var R = y + b * _(A / O), g = I(u(R, 1 - R));
+              N.push(g), F ||= g.overflow === "hidden";
+            }
+          F && (t.style.overflow = "hidden"), v = () => {
+            var E = (
+              /** @type {number} */
+              /** @type {globalThis.Animation} */
+              i.currentTime
+            );
+            return y + b * _(E / w);
+          }, s && j(() => {
+            if (i.playState !== "running") return !1;
+            var E = v();
+            return s(E, 1 - E), !0;
+          });
+        }
+        i = t.animate(N, { duration: w, fill: "forwards" }), i.onfinish = () => {
+          v = () => a, s?.(a, 1 - a), n();
+        };
+      };
     }
-    f = t.animate(F, { duration: E, fill: "forwards" }), f.onfinish = () => {
-      o = () => a, s?.(a, 1 - a), n();
-    };
-  }, {
+  }), {
     abort: () => {
-      f && (f.cancel(), f.effect = null, f.onfinish = l);
+      m = !0, i && (i.cancel(), i.effect = null, i.onfinish = h);
     },
     deactivate: () => {
-      n = l;
+      n = h;
     },
     reset: () => {
       a === 0 && s?.(1, 0);
     },
-    t: () => o()
+    t: () => v()
   };
 }
 export {

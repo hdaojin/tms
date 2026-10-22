@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Completato",
   info: "Info",
   system: "Sistema",
-  // sources
-  device: "Dispositivo",
-  camera: "Fotocamera",
-  link: "Link",
   // capabilities labels
   descriptionBrowse: "[Seleziona {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Rilascia qui {{maxFilesUnit}} oppure [sfoglia]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "Impossibile modificare il file. Riprova."
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "Questo tipo di file non è consentito. {{details}}.",
+    template: "Questo tipo di file non è consentito. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Il file deve essere di tipo {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, t = {
   validationFileExtensionMismatch: {
-    template: "Questa estensione file non è consentita. {{details}}.",
+    template: "Questa estensione file non è consentita. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Il file deve avere estensione {{accept}}",
@@ -160,7 +156,7 @@ const i = {
 }, m = {
   validationListEntryCountUnderflow: "Troppi pochi file nell'elenco. Il minimo è {{minFiles}} {{minFilesUnit}}.",
   validationListEntryCountOverflow: "Troppi file nell'elenco. Il massimo è {{maxFiles}} {{maxFilesUnit}}."
-}, p = {
+}, c = {
   ...s,
   ...n,
   ...t,
@@ -168,20 +164,37 @@ const i = {
   ...d,
   ...r,
   ...m
-}, c = {
+}, p = {
+  device: "Dispositivo"
+}, u = {
+  link: "Link"
+}, v = {
+  camera: "Fotocamera",
+  capture: "Acquisisci",
+  record: "Registra"
+}, f = {
+  ...p,
+  ...u,
+  ...v
+}, z = {
   ...i,
   ...a,
   ...e,
-  ...p,
-  ...o
+  ...c,
+  ...o,
+  ...f
 };
 export {
   i as core,
-  c as locale,
+  z as locale,
   e as media,
+  f as source,
+  v as sourceCamera,
+  p as sourceDevice,
+  u as sourceLink,
   a as store,
   o as transform,
-  p as validation,
+  c as validation,
   t as validationFileExtension,
   n as validationFileMimeType,
   l as validationFileName,

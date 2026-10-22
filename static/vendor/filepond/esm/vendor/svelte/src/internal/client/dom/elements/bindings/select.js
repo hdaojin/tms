@@ -1,31 +1,61 @@
-import { teardown as f } from "../../../reactivity/effects.js";
-import { is_array as o } from "../../../../shared/utils.js";
-import { select_multiple_invalid_value as _ } from "../../../warnings.js";
-import { is as a } from "../../../proxy.js";
-function l(e, r, u = !1) {
+import { teardown as c } from "../../../reactivity/effects.js";
+import { is_array as s } from "../../../../shared/utils.js";
+import { select_multiple_invalid_value as m } from "../../../warnings.js";
+import { is as v } from "../../../proxy.js";
+function b(e, t) {
+  t ? e.hasAttribute("selected") || e.setAttribute("selected", "") : e.removeAttribute("selected");
+}
+function E(e, t) {
+  var r = !("__defaultValue" in e);
+  !r && e.__defaultValue === t || (e.__defaultValue = t, o(e, !r || "__value" in e));
+}
+function o(e, t) {
+  var r = e.__defaultValue, u = e.multiple, n = u ? r ?? [] : null;
+  if (!(u && !s(n))) {
+    var f = e.selectedIndex, a = t && u ? new Set(e.selectedOptions) : null;
+    for (var i of e.options) {
+      var d = l(i);
+      b(
+        i,
+        u ? (
+          /** @type {any[]} */
+          n.includes(d)
+        ) : v(d, r)
+      );
+    }
+    if (t)
+      if (a !== null)
+        for (i of e.options) {
+          var _ = a.has(i);
+          i.selected !== _ && (i.selected = _);
+        }
+      else e.selectedIndex !== f && (e.selectedIndex = f);
+  }
+}
+function x(e, t, r = !1) {
   if (e.multiple) {
-    if (r == null)
+    if (t == null)
       return;
-    if (!o(r))
-      return _();
-    for (var t of e.options)
-      t.selected = r.includes(i(t));
+    if (!s(t))
+      return m();
+    for (var u of e.options)
+      u.selected = t.includes(l(u));
     return;
   }
-  for (t of e.options) {
-    var n = i(t);
-    if (a(n, r)) {
-      t.selected = !0;
+  for (u of e.options) {
+    var n = l(u);
+    if (v(n, t)) {
+      u.selected = !0;
       return;
     }
   }
-  (!u || r !== void 0) && (e.selectedIndex = -1);
+  (!r || t !== void 0) && (e.selectedIndex = -1);
 }
-function c(e) {
-  var r = new MutationObserver(() => {
-    "__value" in e && l(e, e.__value);
+function I(e) {
+  var t = new MutationObserver((r) => {
+    r.every(h) || ("__defaultValue" in e && o(e, !1), "__value" in e && x(e, e.__value));
   });
-  r.observe(e, {
+  t.observe(e, {
     // Listen to option element changes
     childList: !0,
     subtree: !0,
@@ -35,14 +65,28 @@ function c(e) {
     // because that property is not reflected as an attribute)
     attributes: !0,
     attributeFilter: ["value"]
-  }), f(() => {
-    r.disconnect();
+  }), c(() => {
+    t.disconnect();
   });
 }
-function i(e) {
+function l(e) {
   return "__value" in e ? e.__value : e.value;
 }
+function h(e) {
+  if (
+    /** @type {Element} */
+    e.target.closest("selectedcontent") !== null
+  )
+    return !0;
+  if (e.type === "childList") {
+    var t = [...e.addedNodes, ...e.removedNodes];
+    return t.length > 0 && t.every((r) => r.nodeName === "SELECTEDCONTENT");
+  }
+  return !1;
+}
 export {
-  c as init_select,
-  l as select_option
+  I as init_select,
+  x as select_option,
+  E as set_default_select_value,
+  b as set_selected
 };

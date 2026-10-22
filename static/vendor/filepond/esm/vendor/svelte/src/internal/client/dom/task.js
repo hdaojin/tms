@@ -1,18 +1,24 @@
-import { run_all as i } from "../../shared/utils.js";
-let r = [];
-function o() {
-  var t = r;
-  r = [], i(t);
+import { run_all as n } from "../../shared/utils.js";
+import { is_flushing_sync as o } from "../reactivity/batch.js";
+let s = [];
+function i() {
+  var t = s;
+  s = [], n(t);
 }
-function a(t) {
-  if (r.length === 0) {
-    var u = r;
+function e(t) {
+  if (s.length === 0 && !o) {
+    var r = s;
     queueMicrotask(() => {
-      u === r && o();
+      r === s && i();
     });
   }
-  r.push(t);
+  s.push(t);
+}
+function f() {
+  for (; s.length > 0; )
+    i();
 }
 export {
-  a as queue_micro_task
+  f as flush_tasks,
+  e as queue_micro_task
 };

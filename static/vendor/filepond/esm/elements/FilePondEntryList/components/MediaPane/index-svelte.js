@@ -1,108 +1,108 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { get as e } from "../../../../vendor/svelte/src/internal/client/runtime.js";
-import { push as re, pop as oe } from "../../../../vendor/svelte/src/internal/client/context.js";
-import { child as me } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
-import { set as A, state as C } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { user_effect as P, template_effect as de } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { get as t } from "../../../../vendor/svelte/src/internal/client/runtime.js";
+import { push as rt, pop as ot } from "../../../../vendor/svelte/src/internal/client/context.js";
+import { child as dt } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
+import { set as C, state as P } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
+import { user_effect as R, template_effect as mt } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
 import { user_derived as i } from "../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { from_html as ce, append as le } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
-import { snippet as se } from "../../../../vendor/svelte/src/internal/client/dom/blocks/snippet.js";
-import { attach as ue } from "../../../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
-import { set_style as fe } from "../../../../vendor/svelte/src/internal/client/dom/elements/style.js";
+import { from_html as ct, append as lt } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
+import { snippet as st } from "../../../../vendor/svelte/src/internal/client/dom/blocks/snippet.js";
+import { attach as ut } from "../../../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
+import { set_style as ft } from "../../../../vendor/svelte/src/internal/client/dom/elements/style.js";
 import { bind_window_size as G } from "../../../../vendor/svelte/src/internal/client/dom/elements/bindings/window.js";
 import { prop as r } from "../../../../vendor/svelte/src/internal/client/reactivity/props.js";
-import { rectFromBounds as he, rectScale as ge, rectCreate as pe } from "../../../../utils/rect.js";
-import { Spring as R } from "../../../../vendor/svelte/src/motion/spring.js";
-import { measurable as we } from "../../../attachments/measurable.js";
-import { getAppContext as xe } from "../../contexts/appContext.js";
-import { getSpringElementTreeContext as _e } from "../../contexts/springElementTreeContext.js";
-var be = ce("<media-pane><!></media-pane>", 2);
-function Le(J, a) {
-  re(a, !0);
-  let d = r(a, "mediaWidth", 7, void 0), c = r(a, "mediaHeight", 7, void 0), w = r(a, "mediaVisible", 7, void 0), x = r(a, "mediaLoading", 7, !0), _ = r(a, "mediaObjectFit", 3, "cover"), k = r(a, "mediaInitialScalar", 3, 1), I = r(a, "mediaInitialOpacity", 3, 1), b = r(a, "mediaAnimateIn", 7, !0), v = r(a, "overflowAmount", 3, 10), F = r(a, "enableParallax", 3, !0);
-  const H = { stiffness: 0.1, damping: 0.8, precision: 0.01 }, T = new R(I(), H), W = new R(k(), H), j = i(xe), D = i(() => e(j).springDefaults), K = i(() => e(j).enableAnimations), N = _e(), y = i(() => N.currentScale);
-  let h = C(null);
-  const n = new R(void 0);
-  P(() => {
-    e(D) && Object.assign(n, e(D));
+import { rectFromBounds as ht, rectScale as pt, rectCreate as gt } from "../../../../utils/rect.js";
+import { Spring as k } from "../../../../vendor/svelte/src/motion/spring.js";
+import { measurable as wt } from "../../../attachments/measurable.js";
+import { getAppContext as xt } from "../../contexts/appContext.js";
+import { getSpringElementTreeContext as _t } from "../../contexts/springElementTreeContext.js";
+var Mt = ct("<media-pane><!></media-pane>", 2);
+function Bt(J, a) {
+  rt(a, !0);
+  let m = r(a, "mediaWidth", 7, void 0), c = r(a, "mediaHeight", 7, void 0), w = r(a, "mediaVisible", 7, void 0), x = r(a, "mediaLoading", 7, !0), _ = r(a, "mediaObjectFit", 3, "cover"), I = r(a, "mediaInitialScalar", 3, 1), A = r(a, "mediaInitialOpacity", 3, 1), M = r(a, "mediaAnimateIn", 7, !0), v = r(a, "overflowAmount", 3, 10), F = r(a, "enableParallax", 3, !0);
+  const H = { stiffness: 0.1, damping: 0.8, precision: 0.01 }, T = new k(A(), H), W = new k(I(), H), j = i(xt), L = i(() => t(j).springOptions), K = i(() => t(j).reduceMotion), N = _t(), y = i(() => N.currentScale);
+  let h = P(null);
+  const n = new k(void 0);
+  R(() => {
+    t(L) && Object.assign(n, t(L));
   });
-  const M = i(() => ({ instant: !e(K) }));
-  let L = C(void 0), B = C(void 0);
-  const m = i(() => !x() && !!(d() && c())), O = i(() => e(m) ? d() / c() : null), l = i(() => n.current ? n.current.width : null), s = i(() => n.current ? n.current.height : null), Q = i(() => e(m) ? e(l) * 0.5 - d() * 0.5 : 0), Z = i(() => e(m) ? e(s) * 0.5 - c() * 0.5 : 0);
-  function V(t) {
-    return Math[t === "cover" ? "max" : "min"];
+  const O = i(() => ({ instant: t(K) }));
+  let B = P(void 0), V = P(void 0);
+  const d = i(() => !x() && !!(m() && c())), b = i(() => t(d) ? m() / c() : null), l = i(() => n.current ? n.current.width : null), s = i(() => n.current ? n.current.height : null), Q = i(() => t(d) ? t(l) * 0.5 - m() * 0.5 : 0), Z = i(() => t(d) ? t(s) * 0.5 - c() * 0.5 : 0);
+  function X(e) {
+    return Math[e === "cover" ? "max" : "min"];
   }
-  const X = i(() => e(m) ? V(_())(e(l) / d(), e(s) / c()) : null), $ = i(() => e(m) ? V(_())((e(l) + v() * 2) / d(), (e(s) + v() * 2) / c()) - e(X) : null), Y = i(() => e(m) && F() && n.current ? (n.current.x + n.current.width) / (e(L) + n.current.width) : null), E = i(() => e(m) && F() && n.current ? (n.current.y + n.current.height) / (e(B) + n.current.height) : null);
-  P(() => {
-    T.set(w() ? 1 : I(), {
-      instant: b() ? e(M).instant : !0
+  const Y = i(() => t(d) ? X(_())(t(l) / m(), t(s) / c()) : null), $ = i(() => t(d) ? X(_())((t(l) + v() * 2) / m(), (t(s) + v() * 2) / c()) - t(Y) : null), D = i(() => t(d) && F() && n.current ? (n.current.x + n.current.width) / (t(B) + n.current.width) : null), E = i(() => t(d) && F() && n.current ? (n.current.y + n.current.height) / (t(V) + n.current.height) : null);
+  R(() => {
+    T.set(w() ? 1 : A(), {
+      instant: M() ? t(O).instant : !0
     });
-  }), P(() => {
-    W.set(w() ? 1 : k(), {
-      instant: b() ? e(M).instant : !0
+  }), R(() => {
+    W.set(w() ? 1 : I(), {
+      instant: M() ? t(O).instant : !0
     });
   });
-  function ee(t, o, z) {
-    let S = t, f = t / z;
+  function tt(e, o, z) {
+    let S = e, f = e / z;
     return f > o && (f = o, S = f * z), {
-      x: (t - S) / 2,
+      x: (e - S) / 2,
       y: (o - f) / 2,
       width: S,
       height: f
     };
   }
-  const U = i(() => e(h) && n.current ? {
-    width: e(h)?.width - n.current?.width * e(y),
-    height: e(h)?.height - n.current?.height * e(y)
-  } : { width: 0, height: 0 }), u = i(() => e(m) ? _() === "contain" ? ee(e(l), e(s), e(O)) : pe(0, 0, e(l), e(s)) : null), g = i(() => e(u) ? {
-    t: e(u).y,
-    r: e(u).x + e(U).width,
-    b: e(u).y + e(U).height,
-    l: e(u).x
-  } : null), te = i(() => e(O) ? e(O).toFixed(3) : "auto");
-  function ie(t) {
-    const o = he(t);
-    !o.width || !o.height || ne(o);
+  const U = i(() => t(h) && n.current ? {
+    width: t(h)?.width - n.current?.width * t(y),
+    height: t(h)?.height - n.current?.height * t(y)
+  } : { width: 0, height: 0 }), u = i(() => t(d) ? _() === "contain" ? tt(t(l), t(s), t(b)) : gt(0, 0, t(l), t(s)) : null), p = i(() => t(u) ? {
+    t: t(u).y,
+    r: t(u).x + t(U).width,
+    b: t(u).y + t(U).height,
+    l: t(u).x
+  } : null), et = i(() => t(b) ? t(b).toFixed(3) : "auto");
+  function it(e) {
+    const o = ht(e);
+    !o.width || !o.height || nt(o);
   }
-  function ne(t) {
-    A(h, { ...t }), n.set(ge(t, 1 / e(y)), e(M));
+  function nt(e) {
+    C(h, { ...e }), n.set(pt(e, 1 / t(y)), t(O));
   }
-  var p = be();
+  var g = Mt();
   let q;
-  var ae = me(p);
-  se(ae, () => a.children, () => ({
+  var at = dt(g);
+  st(at, () => a.children, () => ({
     onInitMedia: () => {
       x(!0);
     },
-    onLoadMedia: (t) => {
-      d(t.width), c(t.height), x(!1);
+    onLoadMedia: (e) => {
+      m(e.width), c(e.height), x(!1);
     },
-    onRenderMedia: (t) => {
-      const { instant: o = !1 } = t || {};
-      b(!o), w(!0);
+    onRenderMedia: (e) => {
+      const { instant: o = !1 } = e || {};
+      M(!o), w(!0);
     }
-  })), ue(p, () => we({ onmeasure: ie })), de(() => q = fe(p, "", q, {
-    "--_aspect-ratio": e(te),
-    "--_x": `${e(Q)}px`,
-    "--_y": `${e(Z)}px`,
-    "--_scale": e(X),
+  })), ut(g, () => wt({ onmeasure: it })), mt(() => q = ft(g, "", q, {
+    "--_aspect-ratio": t(et),
+    "--_x": `${t(Q)}px`,
+    "--_y": `${t(Z)}px`,
+    "--_scale": t(Y),
     "--_opacity": T.current,
     "--_scalar": W.current,
-    "--_pan-x": e(Y) === null ? 0 : -1 + e(Y) * 2,
-    "--_pan-y": e(E) === null ? 0 : -1 + e(E) * 2,
+    "--_pan-x": t(D) === null ? 0 : -1 + t(D) * 2,
+    "--_pan-y": t(E) === null ? 0 : -1 + t(E) * 2,
     "--_overflow-amount": `${v()}px`,
-    "--_overflow-scale": e($),
-    "--_mask-top": `${e(g)?.t ?? 0}px`,
-    "--_mask-right": `${e(g)?.r ?? 0}px`,
-    "--_mask-bottom": `${e(g)?.b ?? 0}px`,
-    "--_mask-left": `${e(g)?.l ?? 0}px`
-  })), G("innerWidth", (t) => A(L, t)), G("innerHeight", (t) => A(B, t)), le(J, p), oe();
+    "--_overflow-scale": t($),
+    "--_mask-top": `${t(p)?.t ?? 0}px`,
+    "--_mask-right": `${t(p)?.r ?? 0}px`,
+    "--_mask-bottom": `${t(p)?.b ?? 0}px`,
+    "--_mask-left": `${t(p)?.l ?? 0}px`
+  })), G("innerWidth", (e) => C(B, e)), G("innerHeight", (e) => C(V, e)), lt(J, g), ot();
 }
 export {
-  Le as default
+  Bt as default
 };

@@ -1,26 +1,37 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { h as t } from "../utils/dom.js";
+import "../common/ssr.js";
+import "../elements/FilePondSourceList/index-svelte.js";
 import { createSourceExtension as n } from "./common/createSourceExtension.js";
-const p = n({
+const a = n({
   name: "URLInputSource",
   props: {
     sourceIcon: "link"
   },
   factory: ({ props: r }) => {
-    function e() {
+    function t(e) {
       const { placeholder: o } = r;
-      return t("input", { type: "url", placeholder: o });
+      return [
+        {
+          key: "url-input",
+          tag: "input",
+          attrs: {
+            ...e,
+            type: "url",
+            placeholder: o
+          }
+        }
+      ];
     }
     return {
-      createSourceElement: e
+      createSourceTemplate: t
     };
   }
 });
 export {
-  p as URLInputSource
+  a as URLInputSource
 };

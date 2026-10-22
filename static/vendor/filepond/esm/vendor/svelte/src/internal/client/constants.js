@@ -1,44 +1,45 @@
-const t = 2, o = 4, s = 8, n = 16777216, c = 16, T = 32, C = 64, A = 128, R = 512, e = 1024, S = 2048, F = 4096, _ = 8192, l = 16384, N = 32768, a = 33554432, r = 65536, D = 131072, O = 262144, I = 524288, m = 1048576, y = 33554432, b = 65536, L = 2097152, Y = 4194304, i = 8388608, d = /* @__PURE__ */ Symbol("$state"), B = /* @__PURE__ */ Symbol("legacy props"), H = /* @__PURE__ */ Symbol(""), g = /* @__PURE__ */ Symbol("attributes"), G = /* @__PURE__ */ Symbol("class"), M = /* @__PURE__ */ Symbol("style"), p = /* @__PURE__ */ Symbol("text"), u = new class extends Error {
+const o = 2, t = 4, n = 8, s = 16777216, c = 16, T = 32, C = 64, e = 128, S = 256, A = 512, R = 1024, F = 2048, _ = 4096, l = 8192, N = 16384, O = 32768, a = 33554432, r = 65536, D = 131072, m = 262144, y = 524288, I = 1048576, b = 33554432, L = 2097152, Y = 4194304, i = 8388608, B = /* @__PURE__ */ Symbol("$state"), d = /* @__PURE__ */ Symbol("component"), H = /* @__PURE__ */ Symbol("legacy props"), M = /* @__PURE__ */ Symbol(""), P = /* @__PURE__ */ Symbol("attributes"), g = /* @__PURE__ */ Symbol("class"), p = /* @__PURE__ */ Symbol("style"), G = /* @__PURE__ */ Symbol("text"), U = new class extends Error {
   name = "StaleReactionError";
   message = "The reaction that called `getAbortSignal()` was re-run or destroyed";
-}(), U = (
+}(), h = (
   // We gotta write it like this because after downleveling the pure comment may end up in the wrong location
   !!globalThis.document?.contentType && /* @__PURE__ */ globalThis.document.contentType.includes("xml")
 );
 export {
   Y as ASYNC,
-  g as ATTRIBUTES_CACHE,
+  P as ATTRIBUTES_CACHE,
   c as BLOCK_EFFECT,
-  A as BOUNDARY_EFFECT,
+  e as BOUNDARY_EFFECT,
   T as BRANCH_EFFECT,
-  G as CLASS_CACHE,
-  e as CLEAN,
-  R as CONNECTED,
-  t as DERIVED,
-  l as DESTROYED,
+  g as CLASS_CACHE,
+  R as CLEAN,
+  d as COMPONENT_SYMBOL,
+  A as CONNECTED,
+  o as DERIVED,
+  N as DESTROYED,
   a as DESTROYING,
-  S as DIRTY,
+  F as DIRTY,
   D as EAGER_EFFECT,
-  o as EFFECT,
-  y as EFFECT_OFFSCREEN,
-  I as EFFECT_PRESERVED,
+  t as EFFECT,
+  b as EFFECT_OFFSCREEN,
+  y as EFFECT_PRESERVED,
   r as EFFECT_TRANSPARENT,
   i as ERROR_VALUE,
-  O as HEAD_EFFECT,
-  _ as INERT,
-  U as IS_XHTML,
-  B as LEGACY_PROPS,
-  H as LOADING_ATTR_SYMBOL,
-  n as MANAGED_EFFECT,
-  F as MAYBE_DIRTY,
+  m as HEAD_EFFECT,
+  l as INERT,
+  h as IS_XHTML,
+  H as LEGACY_PROPS,
+  M as LOADING_ATTR_SYMBOL,
+  s as MANAGED_EFFECT,
+  _ as MAYBE_DIRTY,
+  S as PAUSED,
   L as REACTION_IS_UPDATING,
-  N as REACTION_RAN,
-  s as RENDER_EFFECT,
+  O as REACTION_RAN,
+  n as RENDER_EFFECT,
   C as ROOT_EFFECT,
-  u as STALE_REACTION,
-  d as STATE_SYMBOL,
-  M as STYLE_CACHE,
-  p as TEXT_CACHE,
-  m as USER_EFFECT,
-  b as WAS_MARKED
+  U as STALE_REACTION,
+  B as STATE_SYMBOL,
+  p as STYLE_CACHE,
+  G as TEXT_CACHE,
+  I as USER_EFFECT
 };

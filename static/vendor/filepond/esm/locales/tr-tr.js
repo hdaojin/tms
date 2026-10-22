@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Başarılı",
   info: "Bilgi",
   system: "Sistem",
-  // sources
-  device: "Cihaz",
-  camera: "Kamera",
-  link: "Bağlantı",
   // capabilities labels
   descriptionBrowse: "[{{maxFilesUnit}} seç]",
   descriptionBrowseDrop: "{{maxFilesUnit}} buraya bırakın veya [göz atın]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "Dosya verisi düzenlenemedi. Lütfen tekrar deneyin."
 }, t = {
   validationFileMimeTypeMismatch: {
-    template: "Bu dosya türüne izin verilmiyor. {{details}}.",
+    template: "Bu dosya türüne izin verilmiyor. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Dosya türü {{accept}} olmalıdır",
@@ -126,9 +122,9 @@ const i = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "Bu dosya uzantısına izin verilmiyor. {{details}}.",
+    template: "Bu dosya uzantısına izin verilmiyor. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Dosya uzantısı {{accept}} olmalıdır",
@@ -169,16 +165,33 @@ const i = {
   ...r,
   ...m
 }, u = {
+  device: "Cihaz"
+}, k = {
+  link: "Bağlantı"
+}, c = {
+  camera: "Kamera",
+  capture: "Yakala",
+  record: "Kayda al"
+}, v = {
+  ...u,
+  ...k,
+  ...c
+}, p = {
   ...i,
   ...e,
   ...a,
   ...y,
-  ...n
+  ...n,
+  ...v
 };
 export {
   i as core,
-  u as locale,
+  p as locale,
   a as media,
+  v as source,
+  c as sourceCamera,
+  u as sourceDevice,
+  k as sourceLink,
   e as store,
   n as transform,
   y as validation,

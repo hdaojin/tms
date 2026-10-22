@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const e = {
   success: "Úspěch",
   info: "Informace",
   system: "Systém",
-  // sources
-  device: "Zařízení",
-  camera: "Fotoaparát",
-  link: "Odkaz",
   // capabilities labels
   descriptionBrowse: "[Vybrat {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Přetáhněte sem {{maxFilesUnit}} nebo [Procházet]",
@@ -113,9 +109,9 @@ const e = {
   transformError: "Nepodařilo se upravit data souboru. Zkuste to znovu."
 }, t = {
   validationFileMimeTypeMismatch: {
-    template: "Tento typ souboru není povolen. {{details}}.",
+    template: "Tento typ souboru není povolen. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Soubor musí být typu {{accept}}",
@@ -126,9 +122,9 @@ const e = {
   }
 }, n = {
   validationFileExtensionMismatch: {
-    template: "Tato přípona není povolena. {{details}}.",
+    template: "Tato přípona není povolena. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Soubor musí mít příponu {{accept}}",
@@ -140,10 +136,10 @@ const e = {
 }, l = {
   validationFileNameMissing: "Chybí název souboru",
   validationFileNameMismatch: "Neplatný název souboru."
-}, s = {
+}, r = {
   validationFileSizeUnderflow: "Tento soubor je příliš malý. Minimální velikost je {{minSize}} {{minSizeUnit}}.",
   validationFileSizeOverflow: "Tento soubor je příliš velký. Maximální velikost je {{maxSize}} {{maxSizeUnit}}."
-}, r = {
+}, s = {
   validationListSizeUnderflow: "Celková velikost souborů je příliš malá. Minimální celková velikost je {{minSize}} {{minSizeUnit}}.",
   validationListSizeOverflow: "Celková velikost souborů je příliš velká. Maximální celková velikost je {{maxSize}} {{maxSizeUnit}}."
 }, m = {
@@ -161,32 +157,49 @@ const e = {
   validationListEntryCountUnderflow: "V seznamu je příliš málo souborů. Minimální počet je {{minFiles}} {{minFilesUnit}}.",
   validationListEntryCountOverflow: "V seznamu je příliš mnoho souborů. Maximální počet je {{maxFiles}} {{maxFilesUnit}}."
 }, u = {
-  ...s,
+  ...r,
   ...t,
   ...n,
   ...l,
   ...m,
-  ...r,
+  ...s,
   ...d
 }, p = {
+  device: "Zařízení"
+}, v = {
+  link: "Odkaz"
+}, c = {
+  camera: "Fotoaparát",
+  capture: "Zachytit",
+  record: "Nahrát"
+}, b = {
+  ...p,
+  ...v,
+  ...c
+}, z = {
   ...e,
   ...o,
   ...i,
   ...u,
-  ...a
+  ...a,
+  ...b
 };
 export {
   e as core,
-  p as locale,
+  z as locale,
   i as media,
+  b as source,
+  c as sourceCamera,
+  p as sourceDevice,
+  v as sourceLink,
   o as store,
   a as transform,
   u as validation,
   n as validationFileExtension,
   t as validationFileMimeType,
   l as validationFileName,
-  s as validationFileSize,
+  r as validationFileSize,
   d as validationListCount,
-  r as validationListSize,
+  s as validationListSize,
   m as validationMediaResolution
 };

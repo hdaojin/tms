@@ -1,41 +1,38 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { FilePondSvelteComponentElement as t } from "../FilePondSvelteComponent/index-svelte.js";
-import r from "./index-svelte.js";
-import { registerShadowRoot as s } from "../common/extendStyles.js";
+import { FilePondSvelteComponentElement as o } from "../FilePondSvelteComponent/index-svelte.js";
+import t from "./index-svelte.js";
+import { registerShadowRoot as r } from "../common/extendStyles.js";
+import { setBooleanAttribute as s } from "../../utils/dom.js";
 import i from "../styles/defaults.css.js";
-import e from "./index.css.js";
-import { setBooleanAttribute as l } from "../../utils/dom.js";
-const n = [
+import l from "./index.css.js";
+const p = [
   "disabled",
   "assets",
-  "locale",
   "template",
   "propResourceMap",
-  "animations",
-  "springDefaults",
   "beforeRenderNode",
   "sources",
   "propResourceMap"
 ];
-class P extends t {
+class P extends o {
   constructor() {
-    super(r, {
-      styles: [e],
-      properties: n
-    }), s(this._root, i + e);
+    super(t, {
+      styles: [i],
+      properties: p
+    }), r(this._root, "source-list", l);
   }
   connectedCallback() {
-    super.connectedCallback(), this.addListener("sourceschange", (o) => {
-      l(this, "empty", o.detail === 0);
+    super.connectedCallback(), this.addListener("sourceschange", (e) => {
+      s(this, "empty", e.detail === 0);
     });
   }
 }
 export {
-  n as COMPONENT_PROPS,
+  p as COMPONENT_PROPS,
   P as FilePondSourceListElement
 };

@@ -1,31 +1,33 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import "../../elements/FilePondEntryList/components/MediaVideo/index.js";
-import { createEntryMatcher as S, createButton as s, hasExtensionWithStatusCode as u, createDefaultSpringElement as a, createSpringPane as l, whenEntryIs as y, whenEntryHasAction as b, whenEntryNotHasStatus as M, getExtensionByAction as h, hasExtensionWithProp as T } from "../common/index.js";
+import { createEntryMatcher as M, createButton as d, hasExtensionWithStatusCode as m, createDefaultSpringElement as a, createSpringPane as l, whenEntryIs as f, whenEntryHasAction as R, whenEntryNotHasStatus as T, getExtensionByAction as O, hasExtensionWithProp as A } from "../common/index.js";
 import "../../elements/components/RangeInput/index.js";
-import { supportsRequestFullscreen as O } from "../../utils/support.js";
-import { toTime as A } from "../../utils/date.js";
+import { supportsRequestFullscreen as v } from "../../utils/support.js";
+import { toTime as C } from "../../utils/date.js";
 import { withNodeTree as c } from "../../elements/common/nodeTree.js";
-import { boolToAttributeValue as m } from "../../utils/dom.js";
-import "../../elements/FilePondEntryList/components/MediaTimeIndicator/index.js";
+import { boolToAttributeValue as b } from "../../utils/dom.js";
 import "../../elements/FilePondEntryList/components/EntryActivityIndicator/index.js";
 import "../../elements/FilePondEntryList/components/MediaImage/index.js";
 import "../../elements/components/ElementPane/index.js";
-import v from "../../elements/FilePondEntryList/components/EntryActivityIndicator/index-svelte.js";
-import F from "../../elements/FilePondEntryList/components/MediaVideo/index-svelte.js";
-import P from "../../elements/components/ElementPane/index-svelte.js";
-import _ from "../../elements/FilePondEntryList/components/MediaImage/index-svelte.js";
+import "../../elements/components/TimeIndicator/index.js";
+import { passthrough as u } from "../../utils/placeholder.js";
+import { EMPTY_OBJECT as y } from "../../utils/object.js";
+import P from "../../elements/FilePondEntryList/components/EntryActivityIndicator/index-svelte.js";
+import _ from "../../elements/FilePondEntryList/components/MediaVideo/index-svelte.js";
+import F from "../../elements/components/ElementPane/index-svelte.js";
+import B from "../../elements/FilePondEntryList/components/MediaImage/index-svelte.js";
 import I from "../../elements/components/RangeInput/index-svelte.js";
-import B from "../../elements/FilePondEntryList/components/MediaTimeIndicator/index-svelte.js";
-function f(e) {
+import N from "../../elements/components/TimeIndicator/index-svelte.js";
+function k(e) {
   const { action: t = "editMedia" } = e ?? {};
   return {
     key: "button-media-edit",
-    component: v,
+    component: P,
     props: ({ id: n, entry: r }, { updateEntryState: i }) => ({
       buttonPart: "media-button",
       states: [
@@ -38,9 +40,9 @@ function f(e) {
             "TRANSFORM_BUSY",
             "TRANSFORM_ERROR"
           ],
-          button: s("button-transform-activate", {
+          button: d("button-transform-activate", {
             icon: "mediaEdit",
-            disabled: u(r, [
+            disabled: m(r, [
               "STORE_QUEUED",
               "STORE_BUSY",
               "TRANSFORM_BUSY"
@@ -51,9 +53,9 @@ function f(e) {
         {
           codes: ["TRANSFORM_PREPARE"],
           progress: !0,
-          button: s("button-transform-abort", {
+          button: d("button-transform-abort", {
             icon: "abort",
-            disabled: u(r, [
+            disabled: m(r, [
               "STORE_QUEUED",
               "STORE_BUSY",
               "TRANSFORM_BUSY",
@@ -68,17 +70,17 @@ function f(e) {
     })
   };
 }
-function R(e) {
+function E(e) {
   const { action: t = "editMedia" } = e ?? {};
-  return s("button-media-reset", {
+  return d("button-media-reset", {
     props: ({ id: n, entry: r }, { updateEntryState: i }) => ({
       part: "media-button",
-      disabled: u(r, [
+      disabled: m(r, [
         "STORE_QUEUED",
         "STORE_BUSY",
         "TRANSFORM_PREPARE",
         "TRANSFORM_BUSY"
-      ]) || !h(r, t)?.input,
+      ]) || !O(r, t)?.input,
       icon: "mediaReset",
       label: "reset",
       title: "reset",
@@ -86,15 +88,17 @@ function R(e) {
     })
   });
 }
-function k(e) {
+function h(e) {
   return {
     key: e,
-    component: P,
-    spring: ({ visualRect: t }) => ({
+    component: F,
+    data: (t) => t ? { ...t, ...g(t) } : {},
+    spring: ({ visualRect: t, media: n }) => ({
       opacity: {
-        value: t.height > 0 ? 1 : 0,
+        instant: n?.isCached,
+        value: t?.height > 0 ? 1 : 0,
         config: {
-          stiffness: 0.02,
+          stiffness: 0.1,
           damping: 0.85,
           precision: 0.1
         }
@@ -109,24 +113,27 @@ function k(e) {
     })
   };
 }
-function N(e) {
+function U(e) {
   const { objectFit: t = void 0 } = e ?? {};
   return a({
     key: "entry-image-spring",
     props: {
       class: "entry-media",
-      part: "entry-media"
+      part: "entry-media",
+      // propagate visualRect
+      beforeRenderChildren: u
     },
     children: [
       {
         key: "entry-image",
-        component: _,
+        component: B,
+        data: !1,
         props: e
       },
       {
         if: {
           test: () => t === "contain",
-          then: k("entry-image-pane")
+          then: h("entry-image-pane")
         }
       },
       l({
@@ -144,24 +151,25 @@ function g({ entry: e }) {
     video: n
   };
 }
-function U(e) {
+function w(e) {
   const { objectFit: t = void 0 } = e ?? {};
   return a({
     key: "entry-video-spring",
     props: {
       class: "entry-media",
-      part: "entry-media"
+      part: "entry-media",
+      beforeRenderChildren: u
     },
     children: [
       {
         key: "entry-video",
-        component: F,
+        component: _,
         props: e
       },
       {
         if: {
           test: () => t === "contain",
-          then: k("entry-video-pane")
+          then: h("entry-video-pane")
         }
       },
       l({
@@ -172,14 +180,16 @@ function U(e) {
     ]
   });
 }
-function C(e) {
+function V(e) {
   const { key: t, justifyContent: n } = e || {}, r = "media-control-group" + (n ? ` justify-content-${n}` : "");
   return c(
     a({
       key: t,
       props: {
         subtag: "element-stack",
-        class: r
+        class: r,
+        // pass visualRect to children
+        beforeRenderChildren: u
       },
       children: [
         l({
@@ -197,7 +207,9 @@ function p(e) {
       key: t,
       props: {
         subtag: "element-stack",
-        class: "media-control"
+        class: "media-control",
+        // pass visualRect to children
+        beforeRenderChildren: u
       },
       children: [
         l({
@@ -208,7 +220,7 @@ function p(e) {
     })
   );
 }
-function E(e) {
+function S(e) {
   const { key: t = "media-controls", justifyContent: n } = e || {}, r = "entry-media-controls" + (n ? ` justify-content-${n}` : "");
   return c({
     if: {
@@ -219,53 +231,56 @@ function E(e) {
       then: {
         key: t,
         tag: "element-stack",
-        context: g,
-        attrs: ({ media: i, video: o }) => ({
-          class: r,
-          part: "media-controls",
-          "data-media-is-visible": m(i?.isVisible),
-          "data-media-is-playing": m(o?.isPlaying)
-        })
+        data: (i = y) => ({ ...i, ...g(i) }),
+        attrs: (i) => {
+          const { media: o, video: s } = i;
+          return {
+            class: r,
+            part: "media-controls",
+            "data-media-is-visible": b(o?.isVisible),
+            "data-media-is-playing": b(s?.isPlaying)
+          };
+        }
       }
     }
   });
 }
-function w() {
+function L() {
   return a({
     key: "toggle-playback-spring",
     props: {
       class: "toggle-playback"
     },
-    children: s("toggle-playback", ({ video: e }) => ({
+    children: d("toggle-playback", ({ video: e }) => ({
       part: "media-button",
       icon: e?.isPaused ? "mediaPlay" : "mediaPause"
     }))
   });
 }
-function V() {
+function Y() {
   return a({
     key: "toggle-audio-spring",
     props: {
       class: "toggle-audio"
     },
-    children: s("toggle-audio", ({ video: e }) => ({
+    children: d("toggle-audio", ({ video: e }) => ({
       part: "media-button",
       icon: e?.isMute ? "mediaSilent" : e?.isMuted ? "mediaUnmute" : "mediaMute",
       disabled: e?.isMute
     }))
   });
 }
-function ie() {
+function de() {
   return {
     // only added when fullscreen is supported
     if: {
-      test: O,
+      test: v,
       then: a({
         key: "toggle-fullscreen-spring",
         props: {
           class: "toggle-fullscreen"
         },
-        children: s("toggle-fullscreen", {
+        children: d("toggle-fullscreen", {
           part: "media-button",
           icon: "mediaFullscreen"
         })
@@ -273,7 +288,7 @@ function ie() {
     }
   };
 }
-function x() {
+function j() {
   return a({
     key: "media-scrubber-spring",
     props: {
@@ -283,6 +298,7 @@ function x() {
       {
         key: "media-scrubber",
         component: I,
+        data: ({ video: e } = y) => ({ video: e }),
         props: ({ video: e }) => ({
           part: "media-scrubber",
           step: e?.framesPerSecond,
@@ -294,12 +310,12 @@ function x() {
     ]
   });
 }
-function ae() {
+function ce() {
   return {
     key: "media-scrubber-title",
     tag: "time",
-    context: ({ hoverValue: e }) => ({
-      time: A(e)
+    data: ({ hoverValue: e }) => ({
+      time: C(e)
     }),
     attrs: ({ time: e }) => ({
       datetime: e
@@ -307,7 +323,7 @@ function ae() {
     children: "{{time}}"
   };
 }
-function L() {
+function x() {
   return a({
     key: "media-time-indicator-spring",
     props: {
@@ -315,7 +331,8 @@ function L() {
     },
     children: {
       key: "media-time-indicator",
-      component: B,
+      component: N,
+      data: ({ video: e } = y) => ({ video: e }),
       props: ({ video: e }) => ({
         timeISO: e?.timeISO,
         timeLabel: e?.timeLabel,
@@ -325,44 +342,44 @@ function L() {
     }
   });
 }
-const j = S("image");
-function oe(e, t) {
+const Q = M("image");
+function pe(e, t) {
   const { enableEdit: n = !0, enableReset: r = !0, ...i } = t ?? {}, o = n || r;
   return c(e).find("entry").append(
-    y((d) => j(d) || T(d, "poster")).append(
-      N(i),
-      o && b("editMedia").append(
-        E({ justifyContent: "end" }).append(
-          r && p().append(R()),
-          n && p().append(f())
+    f((s) => Q(s) || A(s, "poster")).append(
+      U(i),
+      o && R("editMedia").append(
+        S({ justifyContent: "end" }).append(
+          r && p().append(E()),
+          n && p().append(k())
         )
       )
     )
   ), e;
 }
-function se(e, t) {
+function le(e, t) {
   const { enableEdit: n = !0, enableReset: r = !0, ...i } = t ?? {}, o = n || r;
-  return c(e).update("entry", (d) => {
-    d.routes = {
+  return c(e).update("entry", (s) => {
+    s.routes = {
       "toggle-playback:click": "entry-video.togglePlayback",
       "toggle-audio:click": "entry-video.toggleAudio",
       "toggle-fullscreen:click": "entry-video.toggleFullscreen",
       "media-scrubber:input": "entry-video.setCurrentTime"
     };
   }).append(
-    y("video").append(
-      U(i),
-      M("error").append(
-        E().append(
-          C({ key: "video-controls" }).append(
-            w(),
-            x(),
+    f("video").append(
+      w(i),
+      T("error").append(
+        S().append(
+          V({ key: "video-controls" }).append(
             L(),
-            V()
+            j(),
+            x(),
+            Y()
           ),
-          o && b("editMedia").append(
-            r && p().append(R()),
-            n && p().append(f())
+          o && R("editMedia").append(
+            r && p().append(E()),
+            n && p().append(k())
           )
         )
       )
@@ -370,19 +387,19 @@ function se(e, t) {
   ), e;
 }
 export {
-  oe as appendEntryImageView,
-  se as appendEntryVideoView,
-  f as createEditMediaButton,
-  N as createImageView,
+  pe as appendEntryImageView,
+  le as appendEntryVideoView,
+  k as createEditMediaButton,
+  U as createImageView,
   p as createMediaControl,
-  C as createMediaControlGroup,
-  E as createMediaControls,
-  x as createMediaScrubber,
-  ae as createMediaScrubberTitle,
-  L as createMediaTimeIndicator,
-  R as createResetMediaButton,
-  V as createToggleAudioButton,
-  ie as createToggleFullscreenButton,
-  w as createTogglePlaybackButton,
-  U as createVideoView
+  V as createMediaControlGroup,
+  S as createMediaControls,
+  j as createMediaScrubber,
+  ce as createMediaScrubberTitle,
+  x as createMediaTimeIndicator,
+  E as createResetMediaButton,
+  Y as createToggleAudioButton,
+  de as createToggleFullscreenButton,
+  L as createTogglePlaybackButton,
+  w as createVideoView
 };

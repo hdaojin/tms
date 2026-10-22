@@ -1,10 +1,10 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-const e = ".entry-list-item{isolation:isolate;--entry-border-top: var(--entry-border);--entry-border-right: var(--entry-border);--entry-border-bottom: var(--entry-border);--entry-border-left: var(--entry-border)}.entry-list-item[data-detached]{position:fixed;width:var(--_detached-entry-width);height:var(--_detached-entry-height)}.entry-list-item[data-render-above]{z-index:1}.entry-list-item[data-render-below]{z-index:-1}.entry-list-item[data-dragging] *{pointer-events:none!important}.entry-list-item[data-dragging]>div{z-index:2147483647}.entry-list-item:empty{min-height:var(--entry-min-height)}";
+const t = ".entry-list-item{isolation:isolate;--entry-border-top: var(--entry-border);--entry-border-right: var(--entry-border);--entry-border-bottom: var(--entry-border);--entry-border-left: var(--entry-border)}.entry-list-item[data-detached]{position:fixed;width:var(--_detached-entry-width);height:var(--_detached-entry-height)}.entry-list-item[data-render-above]{z-index:1}.entry-list-item[data-render-below]{z-index:-1}.entry-list-item[data-dragging] *{pointer-events:none!important}.entry-list-item[data-dragging]>div{z-index:2147483647}.entry-list-item:empty{min-height:var(--entry-min-height);opacity:1;transition:opacity 50ms steps(1,jump-end)}@starting-style{.entry-list-item:empty{opacity:0}}";
 export {
-  e as default
+  t as default
 };

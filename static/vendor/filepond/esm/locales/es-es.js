@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const e = {
   success: "Correcto",
   info: "Info",
   system: "Sistema",
-  // sources
-  device: "Dispositivo",
-  camera: "Cámara",
-  link: "Enlace",
   // capabilities labels
   descriptionBrowse: "[Seleccionar {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Suelta {{maxFilesUnit}} aquí o [explora]",
@@ -90,7 +86,7 @@ const e = {
   ariaDragStateDrop: "Se soltó {{name}} en la posición {{position}}",
   ariaDragStateGrab: "Se recogió {{name}} en la posición {{position}}",
   ariaDragStateSort: "Se movió {{name}} a la posición {{position}} de {{total}}"
-}, i = {
+}, a = {
   mediaEdit: "Editar",
   mediaPlay: "Reproducir",
   mediaPause: "Pausar",
@@ -100,7 +96,7 @@ const e = {
   mediaFullscreen: "Pantalla completa",
   mediaLoadError: "No se pudo cargar la {{fileMainType}}.",
   mediaPlayError: "No se pudo reproducir el video."
-}, a = {
+}, i = {
   storeRestoreError: "No se pudo cargar el archivo.",
   storeRestoreProgress: "Cargando {{progress}}%",
   storeStorageQueued: "En espera de subir",
@@ -113,9 +109,9 @@ const e = {
   transformError: "No se pudo editar el archivo. Inténtalo de nuevo."
 }, t = {
   validationFileMimeTypeMismatch: {
-    template: "Este tipo de archivo no está permitido. {{details}}.",
+    template: "Este tipo de archivo no está permitido. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "El archivo debe ser del tipo {{accept}}",
@@ -126,9 +122,9 @@ const e = {
   }
 }, n = {
   validationFileExtensionMismatch: {
-    template: "Esta extensión de archivo no está permitida. {{details}}.",
+    template: "Esta extensión de archivo no está permitida. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "El archivo debe tener la extensión {{accept}}",
@@ -140,10 +136,10 @@ const e = {
 }, s = {
   validationFileNameMissing: "Falta el nombre del archivo",
   validationFileNameMismatch: "Este nombre de archivo no es válido."
-}, l = {
+}, r = {
   validationFileSizeUnderflow: "Este archivo es demasiado pequeño. El tamaño mínimo es {{minSize}} {{minSizeUnit}}.",
   validationFileSizeOverflow: "Este archivo es demasiado grande. El tamaño máximo es {{maxSize}} {{maxSizeUnit}}."
-}, r = {
+}, l = {
   validationListSizeUnderflow: "El tamaño total de los archivos es demasiado pequeño. El tamaño total mínimo es {{minSize}} {{minSizeUnit}}.",
   validationListSizeOverflow: "El tamaño total de los archivos es demasiado grande. El tamaño total máximo es {{maxSize}} {{maxSizeUnit}}."
 }, d = {
@@ -161,32 +157,49 @@ const e = {
   validationListEntryCountUnderflow: "Muy pocos archivos en la lista. El mínimo es {{minFiles}} {{minFilesUnit}}.",
   validationListEntryCountOverflow: "Demasiados archivos en la lista. El máximo es {{maxFiles}} {{maxFilesUnit}}."
 }, m = {
-  ...l,
+  ...r,
   ...t,
   ...n,
   ...s,
   ...d,
-  ...r,
+  ...l,
   ...c
 }, v = {
+  device: "Dispositivo"
+}, p = {
+  link: "Enlace"
+}, u = {
+  camera: "Cámara",
+  capture: "Capturar",
+  record: "Grabar"
+}, h = {
+  ...v,
+  ...p,
+  ...u
+}, g = {
   ...e,
-  ...a,
   ...i,
+  ...a,
   ...m,
-  ...o
+  ...o,
+  ...h
 };
 export {
   e as core,
-  v as locale,
-  i as media,
-  a as store,
+  g as locale,
+  a as media,
+  h as source,
+  u as sourceCamera,
+  v as sourceDevice,
+  p as sourceLink,
+  i as store,
   o as transform,
   m as validation,
   n as validationFileExtension,
   t as validationFileMimeType,
   s as validationFileName,
-  l as validationFileSize,
+  r as validationFileSize,
   c as validationListCount,
-  r as validationListSize,
+  l as validationListSize,
   d as validationMediaResolution
 };

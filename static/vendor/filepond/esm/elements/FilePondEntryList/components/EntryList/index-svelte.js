@@ -1,208 +1,143 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import { get as t } from "../../../../vendor/svelte/src/internal/client/runtime.js";
-import { pop as gt, push as ft } from "../../../../vendor/svelte/src/internal/client/context.js";
-import { first_child as L, sibling as ut, child as ht } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
-import { set as P, state as O } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { user_effect as N, template_effect as yt } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { user_derived as s } from "../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { set_text as Dt } from "../../../../vendor/svelte/src/internal/client/render.js";
-import { snippet as vt } from "../../../../vendor/svelte/src/internal/client/dom/blocks/snippet.js";
-import { comment as U, append as R, from_html as xt } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
-import { if_block as St } from "../../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
-import { each as It } from "../../../../vendor/svelte/src/internal/client/dom/blocks/each.js";
-import { set_attribute as F } from "../../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
-import { set_style as _t } from "../../../../vendor/svelte/src/internal/client/dom/elements/style.js";
-import { proxy as Et } from "../../../../vendor/svelte/src/internal/client/proxy.js";
-import { bind_this as bt } from "../../../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
-import { sizeFromRect as At } from "../../../../utils/size.js";
-import { SvelteMap as Ct } from "../../../../vendor/svelte/src/reactivity/map.js";
-import { vectorAdd as Pt, vectorCreate as V } from "../../../../utils/vector.js";
-import { getAppContext as zt } from "../../contexts/appContext.js";
-import { getDragContext as wt } from "../../contexts/dragContext.js";
-import { getDropContext as Lt } from "../../contexts/dropContext.js";
-import { isNumber as W } from "../../../../utils/test.js";
-import { noop as T } from "../../../../utils/placeholder.js";
-import { getUniqueId as Ot } from "../../../../utils/string.js";
-var Rt = xt('<ul role="list" class="entry-list"></ul> <div class="implicit"> </div>', 1);
-function re(B, D) {
-  ft(D, !0);
-  const v = zt(), J = s(() => v.animatedEntries), K = s(() => v.locale), Q = s(() => v.enableDrag), X = s(() => v.updateEntryPlaceholderRect), Y = s(() => v.entryAnimationProps), Z = wt(), d = s(() => Z.current), $ = Lt(), j = s(() => $.current);
-  let k = O(void 0);
-  N(() => {
-    if (!t(d))
+import { pop as pt, push as yt } from "../../../../vendor/svelte/src/internal/client/context.js";
+import { first_child as T, sibling as Dt, only_child as vt } from "../../../../vendor/svelte/src/internal/client/dom/operations.js";
+import { set as _, state as L } from "../../../../vendor/svelte/src/internal/client/reactivity/sources.js";
+import { user_effect as B, template_effect as It } from "../../../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { user_derived as r } from "../../../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { set_text as St } from "../../../../vendor/svelte/src/internal/client/render.js";
+import { snippet as xt } from "../../../../vendor/svelte/src/internal/client/dom/blocks/snippet.js";
+import { comment as J, append as M, from_html as _t } from "../../../../vendor/svelte/src/internal/client/dom/template.js";
+import { if_block as Et } from "../../../../vendor/svelte/src/internal/client/dom/blocks/if.js";
+import { each as Ct } from "../../../../vendor/svelte/src/internal/client/dom/blocks/each.js";
+import { set_attribute as k } from "../../../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
+import { set_style as bt } from "../../../../vendor/svelte/src/internal/client/dom/elements/style.js";
+import { proxy as zt } from "../../../../vendor/svelte/src/internal/client/proxy.js";
+import { bind_this as wt } from "../../../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
+import { sizeFromRect as Rt } from "../../../../utils/size.js";
+import { SvelteMap as Pt } from "../../../../vendor/svelte/src/reactivity/map.js";
+import { vectorAdd as Tt, vectorCreate as K } from "../../../../utils/vector.js";
+import { getAppContext as Lt } from "../../contexts/appContext.js";
+import { getDragContext as Mt } from "../../contexts/dragContext.js";
+import { getDropContext as kt } from "../../contexts/dropContext.js";
+import { getUniqueId as At } from "../../../../utils/string.js";
+var Ft = _t('<ul role="list" class="entry-list"></ul> <div class="implicit"> </div>', 1);
+function oe(N, g) {
+  yt(g, !0);
+  const Q = r(() => g.part), D = Lt(), X = r(() => D.locale), Y = r(() => D.enableDrag), A = r(() => D.updateEntryPlaceholderRect), Z = Mt(), s = r(() => Z.current), u = r(() => t(s) ? t(s).index : -1), E = r(() => t(s) ? t(s).id : null), F = r(() => t(s) ? t(s).outside : !1), W = r(() => !!t(s)), $ = kt(), v = r(() => $.current), C = r(() => t(v) ? t(v).id : null), b = r(() => t(v) ? t(v).remove : null);
+  let q = L(void 0);
+  B(() => {
+    if (!t(W))
       return;
-    const e = D.entries[t(d).index];
-    e && P(k, e.id);
+    const e = g.entries[t(u)];
+    e && _(q, e.id);
   });
-  function tt(e) {
-    return v.retainedEntries.find(({ entry: n }) => n.id === e);
+  function z(e) {
+    return D.retainedEntries.find(({ entry: i }) => i.id === e);
   }
-  const z = Et(new Ct());
-  function et(e, n, i) {
-    z.set(e, { index: n, rect: i });
+  const I = zt(new Pt());
+  function tt(e, i, n) {
+    I.set(e, { index: i, rect: n });
   }
-  let x = O(void 0);
-  N(() => {
-    if (!t(d)) {
-      P(x, void 0);
+  let h = L(void 0);
+  B(() => {
+    if (!t(W)) {
+      _(h, void 0);
       return;
     }
-    if (t(x))
+    if (t(h))
       return;
-    const e = D.entries[t(d).index];
+    const e = g.entries[t(u)];
     if (!e)
       return;
-    const { rect: n } = z.get(e.id) ?? {};
-    n && P(x, { ...n });
+    const { rect: i } = I.get(e.id) ?? {};
+    i && _(h, { ...i });
   });
-  function nt(e, n, i, c) {
-    const a = V(
-      e.width > 0 ? i.x / e.width * (t(x).width - n.width) : 0,
-      e.height > 0 ? i.y / e.height * (e.height - n.height) : 0
+  function et(e, i, n, c) {
+    const a = K(
+      e.width > 0 ? n.x / e.width * (t(h).width - i.width) : 0,
+      e.height > 0 ? n.y / e.height * (e.height - i.height) : 0
     );
-    return V(c.x + (e.x - n.x) + a.x, c.y + (e.y - n.y) + a.y);
+    return K(c.x + (e.x - i.x) + a.x, c.y + (e.y - i.y) + a.y);
   }
-  function it(e, n) {
-    const { animation: i, delayed: c, oncancel: a, oncomplete: p } = t(J)[e.id] ?? {};
-    if (!n[i])
-      return { onspringcancel: T, onspringcomplete: T };
-    const {
-      scale: l,
-      opacity: o,
-      translation: h,
-      opacityFrom: S,
-      scaleFrom: g,
-      translationFrom: f,
-      translationSpringOptions: u,
-      scaleSpringOptions: I,
-      opacitySpringOptions: _
-    } = n[i], r = {
-      scale: void 0,
-      opacity: void 0,
-      translation: void 0,
-      translationSpringOptions: u,
-      scaleSpringOptions: I,
-      opacitySpringOptions: _,
-      onspringcancel() {
-        a();
-      },
-      onspringcomplete({ opacity: b, scale: C }) {
-        const E = W(r.opacity) ? r.opacity === b : !0;
-        if (E && r.opacity === 0) {
-          p();
-          return;
-        }
-        const y = W(r.scale) ? r.scale === C : !0;
-        E && y && p();
-      }
-    };
-    return c ? Object.assign(r, {
-      opacityFrom: S,
-      scaleFrom: g,
-      translationFrom: f,
-      onspringcomplete: T
-    }) : Object.assign(r, {
-      opacityFrom: S,
-      scaleFrom: g,
-      translationFrom: f,
-      scale: l,
-      opacity: o,
-      translation: h
-    });
-  }
-  let w = null;
-  const m = s(() => {
+  let S = null;
+  const rt = r(() => {
+    const e = g.entries.find((y, R) => t(u) === R);
+    if (!e)
+      return;
+    const i = e.id, n = !!z(i), c = t(s)?.translation, a = i === t(E), p = n && t(b) && i === t(C);
+    let { rect: l } = I.get(i) ?? {};
+    const m = l !== void 0, f = t(h) !== void 0;
+    let o;
+    return c && !a && m && f ? (o = et(t(h), l, t(s).offset, t(s).translation), o = Tt(o, t(s).parentTranslation), S = { ...o }) : p && S && (o = { ...S }), o;
+  }), w = /* @__PURE__ */ new WeakMap(), d = r(() => {
     let e = null;
-    return { entries: D.entries.map((i, c) => {
-      const a = i.id, p = c === t(d)?.index, l = t(d)?.translation, o = !!tt(a), h = t(d)?.id === a, S = t(k) === a, g = o && t(j)?.remove && a === t(j)?.id, f = p && t(d)?.outside || g;
-      let { rect: u } = z.get(a) ?? {};
-      const I = u !== void 0, _ = t(x) !== void 0;
-      let r;
-      p && l && !h && I && _ ? (r = nt(t(x), u, t(d).offset, t(d).translation), r = Pt(r, t(d).parentTranslation), w = { ...r }) : g && w && (r = { ...w }), f && (e = At(u));
-      const {
-        translation: b = r,
-        // filter out
-        onspringcancel: C,
-        // capture rest of props
-        ...E
-      } = it(i, t(Y)) ?? {};
-      return {
-        id: a,
-        entry: i,
-        isPlaceholder: h,
-        isRemoving: o,
-        isDetached: f,
-        isDragging: p,
-        isLastDraggedItem: S,
-        springAnimation: E,
-        translation: b,
-        onmeasureitem(y) {
-          h ? t(X)(y) : y && et(a, c, y);
-        }
-      };
+    return { entries: g.entries.map((n, c) => {
+      const a = n.id, p = c === t(u), m = !!z(a) && t(b) && a === t(C), f = p && t(F) || m;
+      let { rect: o } = I.get(a) ?? {};
+      if (o && f && (e = Rt(o)), w.has(n))
+        return w.get(n);
+      const y = { id: a, ariaId: `entry-${a}`, entry: n };
+      return w.set(n, y), y;
     }), detachedItemSize: e };
   });
-  let A = O(void 0);
-  const rt = s(() => t(d)?.index), q = s(() => t(A) && t(rt) ? getComputedStyle(t(A)) : void 0), ot = s(() => !!t(q)), at = s(() => t(ot) ? parseFloat(t(q).getPropertyValue("gap")) : 0), G = `aria-drag-description-${Ot()}`, st = s(() => t(m).detachedItemSize ? `${t(m).detachedItemSize?.height + t(at)}px` : null), dt = s(() => t(m).detachedItemSize ? `${t(m).detachedItemSize?.width}px` : null), ct = s(() => t(m).detachedItemSize ? `${t(m).detachedItemSize?.height}px` : null);
-  var H = U(), lt = L(H);
+  let x = L(void 0);
+  const nt = r(() => t(u) > -1), G = r(() => t(x) && t(nt) ? getComputedStyle(t(x)) : void 0), it = r(() => !!t(G)), ot = r(() => t(it) ? parseFloat(t(G).getPropertyValue("gap")) : 0), H = `aria-drag-description-${At()}`, at = r(() => t(d).detachedItemSize ? `${t(d).detachedItemSize?.height + (t(d).entries.length > 1 ? t(ot) : 0)}px` : null), st = r(() => t(d).detachedItemSize ? `${t(d).detachedItemSize?.width}px` : null), dt = r(() => t(d).detachedItemSize ? `${t(d).detachedItemSize?.height}px` : null);
+  function ct(e, i, n) {
+    if (e === t(E)) {
+      t(A)(n);
+      return;
+    }
+    if (n) {
+      tt(e, i, n);
+      return;
+    }
+    t(A)();
+  }
+  var O = J(), lt = T(O);
   {
     var mt = (e) => {
-      var n = Rt(), i = L(n);
+      var i = Ft(), n = T(i);
       let c;
-      It(
-        i,
-        21,
-        () => t(m).entries,
-        ({
-          id: l,
-          isPlaceholder: o,
-          isDetached: h,
-          isRemoving: S,
-          isDragging: g,
-          isLastDraggedItem: f,
-          springAnimation: u,
-          translation: I,
-          onmeasureitem: _,
-          entry: r
-        }) => l,
-        (l, o, h, S) => {
-          let g = () => t(o).id, f = () => t(o).isPlaceholder, u = () => t(o).isDetached, I = () => t(o).isRemoving, _ = () => t(o).isDragging, r = () => t(o).isLastDraggedItem, b = () => t(o).springAnimation, C = () => t(o).translation, E = () => t(o).onmeasureitem, y = () => t(o).entry;
-          var M = U(), pt = L(M);
-          vt(pt, () => D.children, () => ({
-            isDraggable: t(Q),
-            isPlaceholder: f(),
-            isDetached: u(),
-            isRemoving: I(),
-            isDragging: _(),
-            isLastDraggedItem: r(),
-            springAnimation: b(),
-            translation: C(),
-            onmeasureitem: E(),
-            entry: y(),
-            ariaId: `entry-${g()}`
-          })), R(l, M);
-        }
-      ), bt(i, (l) => P(A, l), () => t(A));
-      var a = ut(i, 2), p = ht(a);
-      yt(() => {
-        F(i, "aria-describedby", G), F(i, "part", D.part), c = _t(i, "", c, {
-          "--_detached-entry-spacing": t(st),
-          "--_detached-entry-width": t(dt),
-          "--_detached-entry-height": t(ct)
-        }), F(a, "id", G), Dt(p, t(K).ariaDragDescription);
-      }), R(e, n);
+      Ct(n, 23, () => t(d).entries, ({ id: l, ariaId: m, entry: f }) => l, (l, m, f) => {
+        let o = () => t(m).id, y = () => t(m).ariaId, R = () => t(m).entry;
+        const P = r(() => t(f) === t(u)), U = r(() => !!z(o())), V = r(() => !!(t(U) && t(b) && o() === t(C))), gt = r(() => t(P) && t(F) || t(V)), ft = r(() => t(q) === o()), ut = r(() => o() === t(E));
+        var j = J(), ht = T(j);
+        xt(ht, () => g.children, () => ({
+          id: o(),
+          index: t(f),
+          isPlaceholder: t(ut),
+          entry: R(),
+          ariaId: y(),
+          isDraggable: t(Y),
+          isDetached: t(gt),
+          isRemoving: t(U),
+          isDragging: t(P),
+          isLastDraggedItem: t(ft),
+          translation: t(P) ? t(rt) : t(V) ? S : void 0,
+          onmeasureitem: ct
+        })), M(l, j);
+      }), wt(n, (l) => _(x, l), () => t(x));
+      var a = Dt(n, 2), p = vt(a, !0);
+      It(() => {
+        k(n, "aria-describedby", H), k(n, "part", t(Q)), c = bt(n, "", c, {
+          "--_detached-entry-spacing": t(at),
+          "--_detached-entry-width": t(st),
+          "--_detached-entry-height": t(dt)
+        }), k(a, "id", H), St(p, t(X).ariaDragDescription);
+      }), M(e, i);
     };
-    St(lt, (e) => {
-      t(m).entries.length && e(mt);
+    Et(lt, (e) => {
+      t(d).entries.length && e(mt);
     });
   }
-  R(B, H), gt();
+  M(N, O), pt();
 }
 export {
-  re as default
+  oe as default
 };

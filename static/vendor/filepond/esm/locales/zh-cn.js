@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "完成",
   info: "信息",
   system: "系统",
-  // sources
-  device: "设备",
-  camera: "相机",
-  link: "链接",
   // capabilities labels
   descriptionBrowse: "[选择{{maxFilesUnit}}]",
   descriptionBrowseDrop: "将{{maxFilesUnit}}拖放到此处，或[浏览]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "无法编辑文件，请重试。"
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "不允许此文件类型。{{details}}。",
+    template: "不允许此文件类型。{{accepted}}。",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "文件类型必须为 {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "不允许此文件扩展名。{{details}}。",
+    template: "不允许此文件扩展名。{{accepted}}。",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "文件扩展名必须为 {{accept}}",
@@ -168,17 +164,34 @@ const i = {
   ...d,
   ...r,
   ...m
+}, p = {
+  device: "设备"
 }, v = {
+  link: "链接"
+}, u = {
+  camera: "相机",
+  capture: "捕获",
+  record: "录制"
+}, M = {
+  ...p,
+  ...v,
+  ...u
+}, f = {
   ...i,
   ...a,
   ...e,
   ...c,
-  ...t
+  ...t,
+  ...M
 };
 export {
   i as core,
-  v as locale,
+  f as locale,
   e as media,
+  M as source,
+  u as sourceCamera,
+  p as sourceDevice,
+  v as sourceLink,
   a as store,
   t as transform,
   c as validation,

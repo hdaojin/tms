@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Thành công",
   info: "Thông tin",
   system: "Hệ thống",
-  // sources
-  device: "Thiết bị",
-  camera: "Máy ảnh",
-  link: "Liên kết",
   // capabilities labels
   descriptionBrowse: "[Chọn {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Thả {{maxFilesUnit}} vào đây hoặc [duyệt]",
@@ -108,14 +104,14 @@ const i = {
   storeStorageComplete: "Tải lên hoàn tất",
   storeError: "Không thể lưu tệp.",
   storeAwaitingCompletion: "Chưa lưu xong tất cả tệp."
-}, a = {
+}, e = {
   transformEditBusy: "Đang chỉnh sửa dữ liệu tệp",
   transformError: "Không thể chỉnh sửa dữ liệu tệp. Vui lòng thử lại."
-}, e = {
+}, a = {
   validationFileMimeTypeMismatch: {
-    template: "Loại tệp không được phép. {{details}}.",
+    template: "Loại tệp không được phép. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Tệp phải thuộc loại {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "Phần mở rộng không được phép. {{details}}.",
+    template: "Phần mở rộng không được phép. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Tệp phải có phần mở rộng {{accept}}",
@@ -143,10 +139,10 @@ const i = {
 }, l = {
   validationFileSizeUnderflow: "Tệp này quá nhỏ. Kích thước tối thiểu là {{minSize}} {{minSizeUnit}}.",
   validationFileSizeOverflow: "Tệp này quá lớn. Kích thước tối đa là {{maxSize}} {{maxSizeUnit}}."
-}, s = {
+}, r = {
   validationListSizeUnderflow: "Tổng kích thước tệp quá nhỏ. Tổng kích thước tối thiểu là {{minSize}} {{minSizeUnit}}.",
   validationListSizeOverflow: "Tổng kích thước tệp quá lớn. Tổng kích thước tối đa là {{maxSize}} {{maxSizeUnit}}."
-}, r = {
+}, s = {
   validationMediaSizeUnavailable: "Không đọc được kích thước phương tiện.",
   validationMediaWidthRangeMismatch: "Chiều rộng của {{fileMainType}} không hợp lệ. Chiều rộng phải nằm trong khoảng từ {{minWidth}} đến {{maxWidth}} {{maxWidthUnit}}.",
   validationMediaWidthUnderflow: "{{fileMainType}} quá nhỏ. Chiều rộng tối thiểu là {{minWidth}} {{minWidthUnit}}.",
@@ -162,31 +158,48 @@ const i = {
   validationListEntryCountOverflow: "Có quá nhiều tệp trong danh sách. Tối đa là {{maxFiles}} {{maxFilesUnit}}."
 }, p = {
   ...l,
-  ...e,
+  ...a,
   ...o,
   ...h,
-  ...r,
   ...s,
+  ...r,
   ...c
 }, d = {
+  device: "Thiết bị"
+}, m = {
+  link: "Liên kết"
+}, u = {
+  camera: "Máy ảnh",
+  capture: "Chụp",
+  record: "Ghi"
+}, g = {
+  ...d,
+  ...m,
+  ...u
+}, v = {
   ...i,
   ...n,
   ...t,
   ...p,
-  ...a
+  ...e,
+  ...g
 };
 export {
   i as core,
-  d as locale,
+  v as locale,
   t as media,
+  g as source,
+  u as sourceCamera,
+  d as sourceDevice,
+  m as sourceLink,
   n as store,
-  a as transform,
+  e as transform,
   p as validation,
   o as validationFileExtension,
-  e as validationFileMimeType,
+  a as validationFileMimeType,
   h as validationFileName,
   l as validationFileSize,
   c as validationListCount,
-  s as validationListSize,
-  r as validationMediaResolution
+  r as validationListSize,
+  s as validationMediaResolution
 };

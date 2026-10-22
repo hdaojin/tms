@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -22,26 +22,26 @@ const U = v({
     getExtension: S,
     getFilename: L
   },
-  factory: ({ props: o }, l) => {
+  factory: ({ props: e }, l) => {
     const { on: c, updateEntry: p, pushTask: m, setEntryExtensionStatus: a, getEntryExtensionStatus: d } = l;
     async function u(t) {
-      a(t, {
+      t = a(t, {
         type: s.System,
         code: "LOAD_BUSY",
         progress: 1 / 0
       });
       try {
-        const { type: e, quality: n, getFilename: r } = o, i = await h(t.src, {
-          type: e,
-          quality: n
-        }), f = C(i, r(t, i, o));
-        p(t, { file: f });
-      } catch (e) {
+        const { type: o, quality: i, getFilename: n } = e, r = await h(t.src, {
+          type: o,
+          quality: i
+        }), y = C(r, n(t, r, e));
+        t = p(t, { file: y });
+      } catch (o) {
         throw a(t, {
           type: s.Error,
           code: "LOAD_ERROR",
-          values: { error: e }
-        }), e;
+          values: { error: o }
+        }), o;
       }
       a(t, {
         type: s.Success,
@@ -49,13 +49,13 @@ const U = v({
       });
     }
     function E(t) {
-      const { parallel: e } = o;
-      d(t)?.type === "error" || !F(t) || b(t.file) || !g(t.src) || m(t.id, u, { parallel: e });
+      const { parallel: o } = e;
+      d(t)?.type === "error" || !F(t) || b(t.file) || !g(t.src) || m(t.id, u, { parallel: o });
     }
-    const y = c("updateEntry", E);
+    const f = c("updateEntry", E);
     return {
       destroy: () => {
-        y();
+        f();
       }
     };
   }

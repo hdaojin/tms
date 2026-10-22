@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "نجاح",
   info: "معلومات",
   system: "النظام",
-  // sources
-  device: "الجهاز",
-  camera: "الكاميرا",
-  link: "الرابط",
   // capabilities labels
   descriptionBrowse: "[اختر {{maxFilesUnit}}]",
   descriptionBrowseDrop: "أسقط {{maxFilesUnit}} هنا، أو [تصفح]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "تعذر تحرير بيانات الملف. حاول مرة أخرى."
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "نوع الملف غير مسموح. {{details}}.",
+    template: "نوع الملف غير مسموح. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "يجب أن يكون الملف من النوع {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "امتداد الملف غير مسموح. {{details}}.",
+    template: "امتداد الملف غير مسموح. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "يجب أن يكون للملف الامتداد {{accept}}",
@@ -168,17 +164,34 @@ const i = {
   ...d,
   ...r,
   ...m
+}, p = {
+  device: "الجهاز"
 }, v = {
+  link: "الرابط"
+}, u = {
+  camera: "الكاميرا",
+  capture: "التقاط",
+  record: "تسجيل"
+}, M = {
+  ...p,
+  ...v,
+  ...u
+}, f = {
   ...i,
   ...a,
   ...e,
   ...c,
-  ...t
+  ...t,
+  ...M
 };
 export {
   i as core,
-  v as locale,
+  f as locale,
   e as media,
+  M as source,
+  u as sourceCamera,
+  p as sourceDevice,
+  v as sourceLink,
   a as store,
   t as transform,
   c as validation,

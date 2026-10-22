@@ -1,22 +1,22 @@
-import { increment_write_version as O, active_effect as s, is_dirty as g, update_effect as q, push_reaction_value as B, active_reaction as o, untracking as S, current_sources as h, is_destroying_effect as Y, untracked_writes as C, set_untracked_writes as b } from "../runtime.js";
-import { equals as x, safe_equals as M } from "./equality.js";
-import { DERIVED as E, DIRTY as m, EAGER_EFFECT as v, WAS_MARKED as T, CONNECTED as G, REACTION_IS_UPDATING as K, MAYBE_DIRTY as A, CLEAN as w, BLOCK_EFFECT as F, ASYNC as L, BRANCH_EFFECT as z, ROOT_EFFECT as H } from "../constants.js";
-import { state_unsafe_mutation as P } from "../errors.js";
-import { proxy as U } from "../proxy.js";
-import { Batch as V, batch_values as R, schedule_effect as W, legacy_updates as j, eager_block_effects as k } from "./batch.js";
-import { is_runes as J } from "../context.js";
-import { execute_derived as Q } from "./deriveds.js";
-import { update_derived_status as X, set_signal_status as D } from "./status.js";
-let l = /* @__PURE__ */ new Set();
-const c = /* @__PURE__ */ new Map();
-let N = !1;
-function I(e, t) {
+import { increment_write_version as Y, is_dirty as b, update_effect as x, push_reaction_value as I, active_reaction as o, untracking as N, current_sources as w, is_destroying_effect as O, active_effect as c, untracked_writes as C, set_untracked_writes as S } from "../runtime.js";
+import { equals as L, safe_equals as M } from "./equality.js";
+import { DERIVED as E, DIRTY as v, EAGER_EFFECT as p, MAYBE_DIRTY as T, CLEAN as R, BLOCK_EFFECT as y, ASYNC as z, BRANCH_EFFECT as G, ROOT_EFFECT as H } from "../constants.js";
+import { state_unsafe_mutation as K } from "../errors.js";
+import { proxy as V } from "../proxy.js";
+import { Batch as j, batch_values as A, schedule_effect as J, legacy_updates as P, eager_block_effects as F } from "./batch.js";
+import { is_runes as Q } from "../context.js";
+import { execute_derived as U } from "./deriveds.js";
+import { update_derived_status as W, set_signal_status as g } from "./status.js";
+let a = /* @__PURE__ */ new Set();
+const m = /* @__PURE__ */ new Map();
+let q = !1;
+function B(e, t) {
   var f = {
     f: 0,
     // TODO ideally we could skip this altogether, but it causes type errors
     v: e,
     reactions: null,
-    equals: x,
+    equals: L,
     rv: 0,
     wv: 0
   };
@@ -24,86 +24,93 @@ function I(e, t) {
 }
 // @__NO_SIDE_EFFECTS__
 function ue(e, t) {
-  const f = I(e);
-  return B(f), f;
+  const f = B(e);
+  return I(f), f;
 }
 // @__NO_SIDE_EFFECTS__
-function oe(e, t = !1, f = !0) {
-  const r = I(e);
-  return t || (r.equals = M), r;
+function _e(e, t = !1, f = !0) {
+  const n = B(e);
+  return t || (n.equals = M), n;
 }
-function Z(e, t, f = !1) {
+function X(e, t, f = !1) {
   o !== null && // since we are untracking the function inside `$inspect.with` we need to add this check
   // to ensure we error if state is set inside an inspect effect
-  (!S || (o.f & v) !== 0) && J() && (o.f & (E | F | L | v)) !== 0 && (h === null || !h.has(e)) && P();
-  let r = f ? U(t) : t;
-  return $(e, r, j);
+  (!N || (o.f & p) !== 0) && Q() && (o.f & (E | y | z | p)) !== 0 && (w === null || !w.has(e)) && K();
+  let n = f ? V(t) : t;
+  return Z(e, n, P);
 }
-function $(e, t, f = null) {
+var r = null, d = 0;
+function Z(e, t, f = null) {
   if (!e.equals(t)) {
-    Y ? c.set(e, t) : c.has(e) || c.set(e, e.v);
-    var r = V.ensure();
-    if (r.capture(e, t), (e.f & E) !== 0) {
-      const a = (
+    O ? m.set(e, t) : m.has(e) || m.set(e, e.v);
+    var n = j.ensure();
+    if (n.capture(e, t), (e.f & E) !== 0) {
+      const i = (
         /** @type {Derived} */
         e
       );
-      (e.f & m) !== 0 && Q(a), R === null && X(a);
+      (e.f & v) !== 0 && U(i), A === null && W(i);
     }
-    e.wv = O(), y(e, m, f), s !== null && (s.f & w) !== 0 && (s.f & (z | H)) === 0 && (C === null ? b([e]) : C.push(e)), !r.is_fork && l.size > 0 && !N && ee();
+    e.wv = Y(), r = null, d = 0, D(e, v, f), r = null, c !== null && (c.f & R) !== 0 && (c.f & (G | H)) === 0 && (C === null ? S([e]) : C.push(e)), !n.is_fork && a.size > 0 && !q && $();
   }
   return t;
 }
-function ee() {
-  N = !1;
-  for (const e of l) {
-    (e.f & w) !== 0 && D(e, A);
+function $() {
+  q = !1;
+  for (const e of a) {
+    (e.f & R) !== 0 && g(e, T);
     let t;
     try {
-      t = g(e);
+      t = b(e);
     } catch {
       t = !0;
     }
-    t && q(e);
+    t && x(e);
   }
-  l.clear();
+  a.clear();
 }
-function ce(e) {
-  Z(e, e.v + 1);
+function oe(e) {
+  X(e, e.v + 1);
 }
-function y(e, t, f) {
-  var r = e.reactions;
-  if (r !== null)
-    for (var a = r.length, _ = 0; _ < a; _++) {
-      var n = r[_], i = n.f, p = (i & m) === 0;
-      if (p && D(n, t), (i & v) !== 0)
-        l.add(
+function D(e, t, f) {
+  var n = e.reactions;
+  if (n !== null) {
+    var i = n.length;
+    if (d += i, d > 1e5 && r === null && (r = /* @__PURE__ */ new Set()), r !== null) {
+      if (r.has(e)) return;
+      r.add(e);
+    }
+    for (var u = 0; u < i; u++) {
+      var l = n[u], s = l.f, h = (s & v) === 0;
+      if (h && g(l, t), (s & p) !== 0)
+        a.add(
           /** @type {Effect} */
-          n
+          l
         );
-      else if ((i & E) !== 0) {
-        var d = (
+      else if ((s & E) !== 0) {
+        var k = (
           /** @type {Derived} */
-          n
+          l
         );
-        R?.delete(d), (i & T) === 0 && (i & G && (s === null || (s.f & K) === 0) && (n.f |= T), y(d, A, f));
-      } else if (p) {
-        var u = (
+        A?.delete(k), D(k, T, f);
+      } else if (h) {
+        var _ = (
           /** @type {Effect} */
-          n
+          l
         );
-        (i & F) !== 0 && k !== null && k.add(u), f !== null ? f.push(u) : W(u);
+        (s & y) !== 0 && F !== null && F.add(_), f !== null ? f.push(_) : J(_);
       }
     }
+  }
 }
 export {
-  l as eager_effects,
-  ee as flush_eager_effects,
-  ce as increment,
-  $ as internal_set,
-  oe as mutable_source,
-  c as old_values,
-  Z as set,
-  I as source,
+  a as eager_effects,
+  $ as flush_eager_effects,
+  oe as increment,
+  Z as internal_set,
+  _e as mutable_source,
+  m as old_values,
+  X as set,
+  B as source,
   ue as state
 };

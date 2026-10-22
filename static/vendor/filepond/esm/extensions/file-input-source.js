@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -19,33 +19,36 @@ const L = I({
     preventAddEntries: void 0,
     // source label and icon to use
     sourceIcon: "device",
-    sourceLabel: void 0
+    sourceLabel: void 0,
+    // is disabled
+    disabled: void 0
   },
-  factory: ({ didSetProps: d, props: c }, { insertEntries: u, removeEntries: f, setExtensionState: m }) => {
+  factory: ({ didSetProps: u, props: d }, { insertEntries: f, removeEntries: m, setExtensionState: p }) => {
     let i, e, s, r;
     function a() {
-      const { insertIndex: t, resetFilesOnAdd: o } = c;
-      s && f(s);
-      const n = g(Array.from(e.files ?? []), (p) => ({
-        src: p,
+      const { insertIndex: t, resetFilesOnAdd: o } = d;
+      s && m(s);
+      const n = g(Array.from(e.files ?? []), (c) => ({
+        src: c,
         origin: "input"
       }));
-      s = n, u(n, t > -1 ? t : void 0), o && (e.files = new DataTransfer().files);
+      s = n, f(n, t > -1 ? t : void 0), o && (e.files = new DataTransfer().files);
     }
     function l() {
-      const { sourceLabel: t, sourceIcon: o } = c, n = !e.hasAttribute("data-readonly");
-      m({
-        source: n ? {
+      const { sourceLabel: t, sourceIcon: o, disabled: n } = d, c = !e.hasAttribute("data-readonly");
+      p({
+        source: c ? {
           type: "browse",
           label: t,
           icon: o,
+          disabled: n,
           onclick: () => {
             e.click();
           }
         } : void 0
       });
     }
-    return d(({ element: t, preventAddEntries: o }) => {
+    return u(({ element: t, preventAddEntries: o }) => {
       if (!t)
         return;
       const n = v(t);

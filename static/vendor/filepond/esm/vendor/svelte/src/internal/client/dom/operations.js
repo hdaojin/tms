@@ -1,55 +1,58 @@
-import { CLASS_CACHE as c, ATTRIBUTES_CACHE as a, STYLE_CACHE as m, TEXT_CACHE as p } from "../constants.js";
-import { NAMESPACE_HTML as x } from "../../../constants.js";
-import { get_descriptor as i, is_extensible as o } from "../../shared/utils.js";
-var u, s, l, _;
+import { CLASS_CACHE as d, ATTRIBUTES_CACHE as a, STYLE_CACHE as x, TEXT_CACHE as m } from "../constants.js";
+import { NAMESPACE_HTML as p } from "../../../constants.js";
+import { get_descriptor as o, is_extensible as u } from "../../shared/utils.js";
+var l, s, _, f;
 function v() {
-  if (u === void 0) {
-    u = window, s = /Firefox/.test(navigator.userAgent);
+  if (l === void 0) {
+    l = window, s = /Firefox/.test(navigator.userAgent);
     var e = Element.prototype, n = Node.prototype, t = Text.prototype;
-    l = i(n, "firstChild").get, _ = i(n, "nextSibling").get, o(e) && (e[c] = void 0, e[a] = null, e[m] = void 0, e.__e = void 0), o(t) && (t[p] = void 0);
+    _ = o(n, "firstChild").get, f = o(n, "nextSibling").get, u(e) && (e[d] = void 0, e[a] = null, e[x] = void 0, e.__e = void 0), u(t) && (t[m] = void 0);
   }
 }
 function A(e = "") {
   return document.createTextNode(e);
 }
 // @__NO_SIDE_EFFECTS__
-function f(e) {
-  return (
-    /** @type {TemplateNode | null} */
-    l.call(e)
-  );
-}
-// @__NO_SIDE_EFFECTS__
-function d(e) {
+function i(e) {
   return (
     /** @type {TemplateNode | null} */
     _.call(e)
   );
 }
-function T(e, n) {
-  return /* @__PURE__ */ f(e);
+// @__NO_SIDE_EFFECTS__
+function c(e) {
+  return (
+    /** @type {TemplateNode | null} */
+    f.call(e)
+  );
 }
-function S(e, n = !1) {
+function T(e, n) {
+  return /* @__PURE__ */ i(e);
+}
+function h(e, n = !1) {
   {
-    var t = /* @__PURE__ */ f(e);
-    return t instanceof Comment && t.data === "" ? /* @__PURE__ */ d(t) : t;
+    var t = /* @__PURE__ */ i(e);
+    return t instanceof Comment && t.data === "" ? /* @__PURE__ */ c(t) : t;
   }
 }
-function h(e, n = 1, t = !1) {
+function S(e, n = !1) {
+  return /* @__PURE__ */ i(e);
+}
+function y(e, n = 1, t = !1) {
   let r = e;
   for (; n--; )
     r = /** @type {TemplateNode} */
-    /* @__PURE__ */ d(r);
+    /* @__PURE__ */ c(r);
   return r;
 }
 function b(e) {
   e.textContent = "";
 }
-function y() {
+function w() {
   return !1;
 }
-function w(e, n, t) {
-  return n == null || n === x ? (
+function H(e, n, t) {
+  return n == null || n === p ? (
     /** @type {T extends keyof HTMLElementTagNameMap ? HTMLElementTagNameMap[T] : Element} */
     t ? document.createElement(e, { is: t }) : document.createElement(e)
   ) : (
@@ -58,16 +61,17 @@ function w(e, n, t) {
   );
 }
 export {
-  u as $window,
+  l as $window,
   T as child,
   b as clear_text_content,
-  w as create_element,
+  H as create_element,
   A as create_text,
-  S as first_child,
-  f as get_first_child,
-  d as get_next_sibling,
+  h as first_child,
+  i as get_first_child,
+  c as get_next_sibling,
   v as init_operations,
   s as is_firefox,
-  y as should_defer_append,
-  h as sibling
+  S as only_child,
+  w as should_defer_append,
+  y as sibling
 };

@@ -1,11 +1,11 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { sortTree as tt, eachTree as w, filterTree as et, mapTree as M, findTree as nt } from "../utils/tree.js";
-import { deepAssign as rt, deepOverlap as it } from "../utils/object.js";
+import { sortTree as tt, eachTree as q, filterTree as et, mapTree as w, findTree as nt } from "../utils/tree.js";
+import { deepMerge as rt, deepOverlap as it } from "../utils/object.js";
 import { pubsub as st } from "../utils/pubsub.js";
 import { arrayRemoveFalsy as m, arrayWrap as ot } from "../utils/array.js";
 import { isArray as U, isDirectoryEntry as h, isUndefined as I, isNumber as b, isString as P, isNullOrUndefined as at, isObject as ft, isFileEntry as D, isBlobOrFile as ct, isFile as ut } from "../utils/test.js";
@@ -87,14 +87,14 @@ function xt(O) {
       }
     }
   }
-  function j(t, ...n) {
+  function M(t, ...n) {
     let e = !1;
     for (const r of n) {
       let i = !1;
       // we're comparing files
       D(t) && D(r) && // new entry carries a file object
       ut(r.file) && // these files are different so we're gonna update data
-      t.file !== r.file && (i = !0), R && R(t, r, i), i && (e = !0), rt(t, r);
+      t.file !== r.file && (i = !0), R && R(t, r, i), i && (e = !0), t = rt(t, r);
     }
     return [t, e];
   }
@@ -108,13 +108,13 @@ function xt(O) {
     const i = m(n), o = e.at(-1);
     if (I(o))
       return;
-    const [f, s] = j(
+    const [f, s] = M(
       r.entries[o],
       ...i
     );
     r.entries = r.entries.toSpliced(o, 1, f);
     let c = !1;
-    s && (c = F(f)), c || z(f), u || d();
+    return s && (c = F(f)), c || z(f), u || d(), f;
   }
   function H(t, n) {
     let e = ot(t), r = a, i = -1;
@@ -222,18 +222,18 @@ function xt(O) {
   }
   function X(t) {
     u = !0;
-    const n = [], e = [], r = [], i = new Set(p.keys()), o = /* @__PURE__ */ new Set(), f = M(t, (s) => {
+    const n = [], e = [], r = [], i = new Set(p.keys()), o = /* @__PURE__ */ new Set(), f = w(t, (s) => {
       const c = P(s.id) && g(s.id);
       if (c) {
         o.add(s.id);
         const l = s, B = y(c);
         if (l === B)
           return B;
-        const [q, $] = j(
+        const [j, $] = M(
           B,
           l
         );
-        return r.push([q, $]), q;
+        return r.push([j, $]), j;
       } else {
         const l = S(s);
         return l ? (e.push(l), l) : void 0;
@@ -248,11 +248,11 @@ function xt(O) {
   }
   function Y(t) {
     u = !0;
-    const n = et(M(t, S), Boolean);
-    a.entries = n, E(), w(a.entries, T), d(), u = !1;
+    const n = et(w(t, S), Boolean);
+    a.entries = n, E(), q(a.entries, T), d(), u = !1;
   }
   function Z() {
-    a.entries.length && (u = !0, w(a.entries, (t, n) => C({ entry: t, index: [-1] })), a.entries = [], _(), d(), u = !1);
+    a.entries.length && (u = !0, q(a.entries, (t, n) => C({ entry: t, index: [-1] })), a.entries = [], _(), d(), u = !1);
   }
   return {
     on: W,

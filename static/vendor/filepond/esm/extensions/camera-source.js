@@ -1,21 +1,21 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { defineCustomElement as d, h } from "../utils/dom.js";
-import { CameraInputElement as I } from "../elements/FilePondCameraInput/index.js";
-import { createSourceExtension as g } from "./common/createSourceExtension.js";
-const e = "2-digit", y = new Intl.DateTimeFormat("sv-SE", {
+import { createSourceExtension as f } from "./common/createSourceExtension.js";
+import "../elements/components/CameraInput/index.js";
+import p from "../elements/components/CameraInput/index-svelte.js";
+const o = "2-digit", C = new Intl.DateTimeFormat("sv-SE", {
   year: "numeric",
-  month: e,
-  day: e,
-  hour: e,
-  minute: e,
-  second: e,
+  month: o,
+  day: o,
+  hour: o,
+  minute: o,
+  second: o,
   hour12: !1
-}), O = g({
+}), I = f({
   name: "CameraSource",
   props: {
     // icons and labels
@@ -24,35 +24,51 @@ const e = "2-digit", y = new Intl.DateTimeFormat("sv-SE", {
     sourceIconError: "cameraOff",
     sourceType: "select",
     // use date time by default
-    filename: () => y.format(/* @__PURE__ */ new Date()).replace(" ", "_").replaceAll(":", "-")
+    filename: () => C.format(/* @__PURE__ */ new Date()).replace(" ", "_").replaceAll(":", "-")
   },
-  factory: ({ props: o }, { on: n, setExtensionSourceState: a }) => {
-    function t() {
-      return d("camera-input", I), h("camera-input");
+  factory: ({ props: a }, { setExtensionSourceState: t }) => {
+    function n(e) {
+      const { mediaConstraints: r } = a;
+      e.requestCameraAccess(r).then(m).catch(c);
     }
-    function c(i) {
-      const { sourceIcon: u, sourceIconError: s, mediaConstraints: l, filename: p } = o, r = i.querySelector("camera-input");
-      r && (r.filename = p, r.requestCameraAccess(l).then(() => {
-        a({
-          icon: u,
-          title: void 0
-        });
-      }).catch((f) => {
-        a({
-          icon: s,
-          title: f.message
-        });
-      }));
+    function m() {
+      const { sourceIcon: e } = a;
+      t({
+        icon: e,
+        title: void 0
+      });
     }
-    const m = n("dialogOpened", c);
+    function c(e) {
+      const { sourceIconError: r } = a;
+      t({
+        icon: r,
+        title: e.message
+      });
+    }
+    function s(e) {
+      return [
+        {
+          key: "camera-input",
+          component: p,
+          props: ({ filename: r }, u) => {
+            const { capture: i, reset: l } = u.resources?.locale || {};
+            return {
+              ...e,
+              filename: r,
+              labelReset: l,
+              labelCapture: i,
+              onmount: n,
+              onerror: c
+            };
+          }
+        }
+      ];
+    }
     return {
-      createSourceElement: t,
-      destroy() {
-        m();
-      }
+      createSourceTemplate: s
     };
   }
 });
 export {
-  O as CameraSource
+  I as CameraSource
 };

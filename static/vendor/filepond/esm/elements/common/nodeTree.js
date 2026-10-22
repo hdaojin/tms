@@ -1,11 +1,11 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { arrayRemoveFalsy as m, arrayInsertAtIndex as p, arrayWrap as a } from "../../utils/array.js";
-import { isArray as c, isFunction as g } from "../../utils/test.js";
+import { arrayRemoveFalsy as w, arrayInsertAtIndex as a, arrayWrap as m } from "../../utils/array.js";
+import { isArray as c, isFunction as y } from "../../utils/test.js";
 import { hasOwnProp as d } from "../../utils/object.js";
 function t(n) {
   function u(r) {
@@ -30,9 +30,9 @@ function t(n) {
       if (!n)
         return t(void 0);
       const f = i.map(e);
-      return h(n, r, (o, l) => {
-        const N = l.indexOf(o);
-        return l.splice(N, 1, ...f), o;
+      return h(n, r, (o, p) => {
+        const g = p.indexOf(o);
+        return p.splice(g, 1, ...f), o;
       }), t(n);
     },
     update(r, i) {
@@ -43,8 +43,8 @@ function t(n) {
     },
     append(...r) {
       if (n) {
-        let i = y(n);
-        s(n, i, m(r));
+        let i = x(n);
+        s(n, i, w(r));
       }
       return t(n);
     },
@@ -57,9 +57,9 @@ function t(n) {
   };
 }
 function e(n) {
-  return g(n.unwrap) ? n.unwrap() : n;
+  return y(n.unwrap) ? n.unwrap() : n;
 }
-function y(n) {
+function x(n) {
   if (c(n))
     return n.length;
   if (c(n.children))
@@ -74,12 +74,12 @@ function y(n) {
 }
 function s(n, u, r) {
   const i = r.map(e);
-  return c(n) ? n.splice(u, 0, ...i) : w(n) ? Object.keys(n.if.then).length ? n.if.then.children ? c(n.if.then.children) && (n.if.then.children = p(
+  return c(n) ? n.splice(u, 0, ...i) : l(n) ? Object.keys(n.if.then).length ? n.if.then.children ? c(n.if.then.children) && (n.if.then.children = a(
     // @ts-ignore
     n.if.then.children,
     u,
     ...i
-  )) : n.if.then.children = i : n.if.then = i : n.children ? c(n.children) && (n.children = p(n.children, u, ...i)) : n.children = i, i;
+  )) : n.if.then.children = i : n.if.then = i : n.children ? c(n.children) && (n.children = a(n.children, u, ...i)) : n.children = i, i;
 }
 function h(n, u, r) {
   if (!c(n))
@@ -88,7 +88,7 @@ function h(n, u, r) {
   for (const f of n) {
     if (f.key === u)
       return r(f, n);
-    const o = v(f);
+    const o = T(f);
     o.length && i.push(o);
   }
   for (const f of i) {
@@ -97,25 +97,29 @@ function h(n, u, r) {
       return o;
   }
 }
-function v(n) {
-  return w(n) ? m([n.if.then, n.elseif?.then, n.else]) : x(n) && n.item ? a(n.item) : n.children ? a(n.children) : [];
+function T(n) {
+  return l(n) ? w([n.if.then, n.elseif?.then, n.else]) : N(n) && n.item ? m(n.item) : n.children ? m(n.children) : [];
 }
-function w(n) {
+function l(n) {
   return !!(n && d(n, "if"));
 }
-function A(n) {
+function I(n) {
   return !!n;
 }
-function x(n) {
+function N(n) {
   return !!(n && d(n, "component"));
 }
-function I(n) {
-  return !!(n && !d(n, "component"));
+function b(n) {
+  return !!(n && d(n, "tag"));
+}
+function F(n) {
+  return !b(n) && !N(n) && !l(n);
 }
 export {
-  x as isComponentNode,
-  I as isElementNode,
-  w as isSwitchNode,
-  A as isTemplateNode,
+  N as isComponentNode,
+  b as isElementNode,
+  l as isSwitchNode,
+  I as isTemplateNode,
+  F as isTextNode,
   t as withNodeTree
 };

@@ -1,23 +1,23 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { createExtensionManager as k } from "../../core/extensionManager.js";
-import { isString as g, isBoolean as V, isNumber as I, isFile as w, isObject as z } from "../../utils/test.js";
-import { arrayRemoveFalsy as E } from "../../utils/array.js";
-import { toCamelCase as C } from "../../utils/string.js";
-import { setBooleanAttribute as a, setStringAttribute as o, getAttribute as h, getFileSizeAttributeValue as u, createStyleSheet as P, h as d, getAttributeFromElements as b, addListener as L, dispatchCustomEvent as c } from "../../utils/dom.js";
-import { stringReplaceVariables as m, statusToLabel as O, statusCodeToLocaleKey as q } from "../common/string.js";
+import { createExtensionManager as I } from "../../core/extensionManager.js";
+import { isString as g, isArray as V, isRegExp as w, isBoolean as P, isNumber as z, isFile as C, isObject as L } from "../../utils/test.js";
+import { EMPTY_ARRAY as E, arrayRemoveFalsy as b } from "../../utils/array.js";
+import { toCamelCase as O } from "../../utils/string.js";
+import { setBooleanAttribute as a, setStringAttribute as o, getAttribute as h, getFileSizeAttributeValue as u, createStyleSheet as q, h as d, getAttributeFromElements as x, addListener as R, dispatchCustomEvent as c } from "../../utils/dom.js";
+import { stringReplaceVariables as m, statusToLabel as T, statusCodeToLocaleKey as B } from "../common/string.js";
 import { debounce as p } from "../../utils/debounce.js";
-import { Status as T } from "../../common/status.js";
-import { HTMLElementSafe as B } from "../../common/ssr.js";
-import D from "./index.css.js";
-import { createFilePondEntryTree as R } from "./createFilePondEntryTree.js";
-import { FileInputSource as M } from "../../extensions/file-input-source.js";
-import { ValueCallbackStore as j } from "../../extensions/value-callback-store.js";
-const x = [
+import { Status as D } from "../../common/status.js";
+import { HTMLElementSafe as M } from "../../common/ssr.js";
+import { createFilePondEntryTree as _ } from "./createFilePondEntryTree.js";
+import { FileInputSource as j } from "../../extensions/file-input-source.js";
+import { ValueCallbackStore as N } from "../../extensions/value-callback-store.js";
+import U from "./index.css.js";
+const S = [
   // customError
   "customError",
   // if accept is mismatched
@@ -29,29 +29,29 @@ const x = [
   // if is required and value is missing
   "valueMissing"
 ];
-function _(n) {
+function $(n) {
   const { nodeType: t, nodeValue: e, nodeName: i } = n;
   return t === 3 ? (e || "").trim().length > 0 : t === 1 && i === "INPUT" ? !/hidden|file/.test(n.type) : !0;
 }
-function N(n) {
-  return n.some((t) => Object.values(t.extensionState ?? {}).some(({ status: e }) => e ? I(e.progress) : !1));
+function G(n) {
+  return n.some((t) => Object.values(t.extensionState ?? {}).some(({ status: e }) => e ? z(e.progress) : !1));
 }
-function U(n) {
+function K(n) {
   return n.some((t) => Object.values(t.extensionState ?? {}).some(({ status: e }) => e ? e.type === "error" : !1));
 }
-function $(n, t) {
+function Y(n, t) {
   const e = Array.isArray(t) ? t : [t], i = new FormData();
   for (const s of e) {
-    if (w(s)) {
+    if (C(s)) {
       i.append(n, s, s.name);
       continue;
     }
-    i.append(n, z(s) ? JSON.stringify(s) : `${s}`);
+    i.append(n, L(s) ? JSON.stringify(s) : `${s}`);
   }
   return i;
 }
-const G = ["required", "name", "id"], S = ["disabled", "accept", "capture", "webkitdirectory"], F = ["disabled", "required", "webkitdirectory"];
-class nt extends B {
+const H = ["required", "name", "id"], A = ["disabled", "accept", "capture", "webkitdirectory"], F = ["disabled", "required", "webkitdirectory"];
+class ht extends M {
   /** FilePond element shadowRoot */
   #l;
   /** Div element that wraps styleable children */
@@ -74,13 +74,15 @@ class nt extends B {
   #t;
   /** Locale object reference */
   #r = void 0;
+  /** File patterns to ignore */
+  #p = E;
   /** Holds Names of extensions we've currently set up proxies for */
-  #p = [];
+  #f = [];
   /**
    * Holds default entries as set by developer to .entries, we use this so we can reset to initial
    * state when reset is clicked
    */
-  #f = null;
+  #y = null;
   /** Holds references to event subscriptions so we can more easily unsub */
   #h = [];
   //#region getters and setters for <file-pond> custom element attributes
@@ -125,10 +127,10 @@ class nt extends B {
       this.value = `${i}`;
       return;
     }
-    this.#E(t, i), this.#b(t, i), this.#x(t, i);
+    this.#b(t, i), this.#x(t, i), this.#S(t, i);
   }
   /** Syncs attribute to internal element state */
-  #E(t, e) {
+  #b(t, e) {
     if (t === "nobrowse") {
       a(this.#s, "data-readonly", g(e));
       return;
@@ -140,8 +142,8 @@ class nt extends B {
     }
   }
   /** Syncs file-pond interaction attributes (attributes that impact file system file selection UX) to source input attributes */
-  #b(t, e) {
-    if (S.includes(t)) {
+  #x(t, e) {
+    if (A.includes(t)) {
       if (F.includes(t)) {
         a(this.#s, t, e === !0 || e === "");
         return;
@@ -150,8 +152,8 @@ class nt extends B {
     }
   }
   /** Looks up the extension(s) linked to this attribute and assigns the matched props */
-  #x(t, e) {
-    const i = C(t);
+  #S(t, e) {
+    const i = O(t);
     e = F.includes(t) && e === "" ? !0 : e, this.#e.propagateExtensionProperty(i, e);
   }
   /** Disable the field and sets the disabled attribute */
@@ -206,15 +208,19 @@ class nt extends B {
   get accept() {
     return h(this, "accept");
   }
+  /** Ignored files */
+  set ignoredEntryPatterns(t) {
+    this.#p = V(t) ? t.filter(w) : E, this.#e.propagateExtensionProperty("ignoredEntryPatterns", t);
+  }
   /** Toggle browse button */
   set noBrowse(t) {
-    V(t) && (this.#c = !!t, this.#y());
+    P(t) && (this.#c = !!t, this.#g());
   }
   /** Returns the current browse button state */
   get noBrowse() {
     return this.#c;
   }
-  #y() {
+  #g() {
     this.isConnected && a(this, "nobrowse", this.#c);
   }
   /** Min file size setter, accepts a number of bytes or a natural filesize string like 1MB */
@@ -341,11 +347,11 @@ class nt extends B {
   constructor(t) {
     super();
     const { styles: e = [] } = t || {};
-    this.#l = this.attachShadow({ mode: "open", delegatesFocus: !0 }), this.#l.adoptedStyleSheets = [D, ...e].map(P), this.#n = d("div"), this.#n.tabIndex = -1, this.#l.append(this.#n), this.#o = d("slot"), this.#o.addEventListener("slotchange", () => {
-      this.#g(), a(
+    this.#l = this.attachShadow({ mode: "open", delegatesFocus: !0 }), this.#l.adoptedStyleSheets = [U, ...e].map(q), this.#n = d("div"), this.#n.tabIndex = -1, this.#l.append(this.#n), this.#o = d("slot"), this.#o.addEventListener("slotchange", () => {
+      this.#E(), a(
         this.#o,
         "data-has-children",
-        !!this.#o.assignedNodes().filter(_).length
+        !!this.#o.assignedNodes().filter($).length
       );
     }), this.#n.append(this.#o), this.#s = d("input", {
       type: "file",
@@ -353,11 +359,13 @@ class nt extends B {
       hidden: !0,
       multiple: !0,
       tabIndex: -1
-    }), this.#n.prepend(this.#s), this.#i = this.attachInternals(), this.#t = R({
+    }), this.#n.prepend(this.#s), this.#i = this.attachInternals(), this.#t = _({
+      // files to ignore
+      getIgnoredEntryPatterns: () => this.#p,
       // handles one or multiple files state
       beforeInsertEntries: (i, s) => this.maxFiles < 1 / 0 && s.length + i.length > this.maxFiles ? i.toSpliced(this.maxFiles - s.length) : i
-    }), this.#e = k({ entryTree: this.#t }), this.#e.on("setExtensions", ({ extensionNames: i }) => {
-      this.#p.filter((s) => !i.includes(s)).forEach((s) => {
+    }), this.#e = I({ entryTree: this.#t }), this.#e.on("setExtensions", ({ extensionNames: i }) => {
+      this.#f.filter((s) => !i.includes(s)).forEach((s) => {
         delete this[s];
       }), i.forEach((s) => {
         Object.defineProperty(this, s, {
@@ -371,7 +379,7 @@ class nt extends B {
           // so we can delete this proxy later
           configurable: !0
         });
-      }), this.#p = i, this.checkValidity();
+      }), this.#f = i, this.checkValidity();
     }), this.#e.on("updateExtensionState", () => {
       this.checkValidity();
     }), this.#t.on(
@@ -379,7 +387,7 @@ class nt extends B {
       p(() => {
         this.locale && this.#a();
       })
-    ), this.#e.extensions = [M, j];
+    ), this.#e.extensions = [j, N];
   }
   // This updates the aria-description attribute.
   // It describes the element similar to how other input elements are described(label_name: field type, role, validation state)
@@ -403,22 +411,22 @@ class nt extends B {
       // is required?
       this.required ? this.#r.ariaRequired : !1
     ];
-    this.setAttribute("aria-description", E(s).join(", "));
+    this.setAttribute("aria-description", b(s).join(", "));
   }
-  #g() {
-    const t = this.#o.assignedElements({ flatten: !0 }).filter((i) => i.matches('input[type="file"]')), e = [...G, ...S];
+  #E() {
+    const t = this.#o.assignedElements({ flatten: !0 }).filter((i) => i.matches('input[type="file"]')), e = [...H, ...A];
     for (const i of e) {
-      const s = b(i, ...t, this);
+      const s = x(i, ...t, this);
       s !== void 0 && (this[i] = s);
     }
-    t.length && (this.multiple = !!b("multiple", ...t)), t.forEach((i) => i.remove());
+    t.length && (this.multiple = !!x("multiple", ...t)), t.forEach((i) => i.remove());
   }
   /** Called each time the element is added to the document */
   connectedCallback() {
-    this.#g(), this.#y(), this.#a(), this.#d && (this.#e.extensions = this.#d);
+    this.#E(), this.#g(), this.#a(), this.#d && (this.#e.extensions = this.#d);
     const t = (e) => {
       this.#i.setFormValue(
-        e.length > 0 ? $(this.name ?? "filepond", e) : null
+        e.length > 0 ? Y(this.name ?? "filepond", e) : null
       ), this.checkValidity(), c(this, "change");
     };
     this.#e.setExtensionProperties("FileInputSource", {
@@ -427,8 +435,8 @@ class nt extends B {
     }), this.#e.setExtensionProperties("ValueCallbackStore", {
       required: this.required,
       onChange: t
-    }), this.#S(), this.#h.push(
-      L(this, "click", (e) => {
+    }), this.#A(), this.#h.push(
+      R(this, "click", (e) => {
         e.composedPath()[0].closest(this.#u) && (e.stopPropagation(), e.preventDefault(), this.browse());
       }),
       // fire update events
@@ -468,14 +476,14 @@ class nt extends B {
     let e = [];
     g(t) && (e = t.split(",").map((i) => i.trim()).map((i) => ({
       src: i
-    }))), this.#f = e, this.entries = e;
+    }))), this.#y = e, this.entries = e;
   }
   /** Proxy for `entries` getter */
   get value() {
     return this.currentEntries;
   }
   /** Sets up the field for validation */
-  #S() {
+  #A() {
     this.#h.push(
       this.#t.on(
         "updateEntries",
@@ -490,7 +498,7 @@ class nt extends B {
   /** Validates the current state of the field */
   checkValidity() {
     const { validationInvalidBusy: t = "", validationInvalidState: e = "" } = this.#r || {};
-    if (N(this.currentEntries)) {
+    if (G(this.currentEntries)) {
       if (this.#i.validity.customError === !0)
         return;
       this.#m({ customError: !0 }, m(t));
@@ -498,7 +506,7 @@ class nt extends B {
     }
     const i = {
       // add generic item state, for when an extension doesn't set a generic state on the extension manager (this allows for more extension specific error messages like "not all items have been stored")
-      ...U(this.currentEntries) ? {
+      ...K(this.currentEntries) ? {
         FilePondItemValidator: {
           status: {
             type: "error",
@@ -512,9 +520,9 @@ class nt extends B {
       ...this.#e.getState()
     }, s = {};
     for (const { status: r } of Object.values(i)) {
-      if (!r || r.type !== T.Error)
+      if (!r || r.type !== D.Error)
         continue;
-      const { flag: l = "customError" } = r?.meta ?? {}, y = this.#r ? O(
+      const { flag: l = "customError" } = r?.meta ?? {}, y = this.#r ? T(
         {
           ...r,
           values: {
@@ -525,18 +533,18 @@ class nt extends B {
           }
         },
         this.#r
-      ) : q(r.code);
+      ) : B(r.code);
       s[l] = y || m(e) || "";
     }
     if (Object.keys(s).length === 0)
       return this.#m();
-    const v = E(x.map((r) => s[r])).at(
+    const k = b(S.map((r) => s[r])).at(
       0
-    ), A = x.reduce(
+    ), v = S.reduce(
       (r, l) => (r[l] = !!s[l], r),
       {}
     );
-    return this.#m(A, v);
+    return this.#m(v, k);
   }
   /** Sets the validity state on the element internals. Returns `true` if valid, `false` if invalid */
   #m(t, e) {
@@ -569,7 +577,7 @@ class nt extends B {
    * https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/reset
    */
   formResetCallback() {
-    this.entries = this.#f ?? [];
+    this.entries = this.#y ?? [];
   }
   /** Called when user returns to form with back button */
   formStateRestoreCallback(t, e) {
@@ -577,5 +585,5 @@ class nt extends B {
   //#endregion
 }
 export {
-  nt as FilePondInputElement
+  ht as FilePondInputElement
 };

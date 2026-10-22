@@ -1,21 +1,21 @@
-import { DIRTY as v, MAYBE_DIRTY as F, CLEAN as m, INERT as k, EFFECT as j, BLOCK_EFFECT as w, ERROR_VALUE as P, ASYNC as C, DESTROYED as A, EAGER_EFFECT as Q, RENDER_EFFECT as W, MANAGED_EFFECT as X, REACTION_RAN as $, ROOT_EFFECT as B, BRANCH_EFFECT as I, DERIVED as y } from "../constants.js";
+import { DIRTY as _, MAYBE_DIRTY as w, DESTROYED as k, ROOT_EFFECT as B, BRANCH_EFFECT as M, CLEAN as v, INERT as b, EFFECT as V, BLOCK_EFFECT as y, ERROR_VALUE as P, ASYNC as F, EAGER_EFFECT as Q, RENDER_EFFECT as W, MANAGED_EFFECT as X, REACTION_RAN as $, DERIVED as S } from "../constants.js";
 import { deferred as ee, includes as te } from "../../shared/utils.js";
-import { is_dirty as H, update_effect as M, active_effect as re, active_reaction as V } from "../runtime.js";
-import { effect_update_depth_exceeded as ie } from "../errors.js";
-import { queue_micro_task as q } from "../dom/task.js";
-import se from "../../../../../esm-env/false.js";
+import { is_dirty as H, update_effect as O } from "../runtime.js";
+import { effect_update_depth_exceeded as se } from "../errors.js";
+import { queue_micro_task as q, flush_tasks as ie } from "../dom/task.js";
+import re from "../../../../../esm-env/false.js";
 import { invoke_error_boundary as ne } from "../error-handling.js";
-import { old_values as O } from "./sources.js";
+import { old_values as x } from "./sources.js";
 import { unlink_effect as le } from "./effects.js";
 import { defer_effect as fe } from "./utils.js";
 import { UNINITIALIZED as oe } from "../../../constants.js";
 import { set_signal_status as p } from "./status.js";
-import { OBSOLETE as ue } from "./deriveds.js";
-let S = null, E = null, a = null, G = null, R = null, x = null, D = !1, T = null, N = null;
+import { OBSOLETE as he } from "./deriveds.js";
+let A = null, g = null, u = null, G = null, T = null, L = null, C = !1, D = !1, N = null, I = null;
 var U = 0;
-let he = 1;
-class L {
-  id = he++;
+let ue = 1;
+class Y {
+  id = ue++;
   /** True as soon as `#process` was called */
   #a = !1;
   linked = !0;
@@ -65,7 +65,14 @@ class L {
    */
   #p = null;
   /**
-   * The root effects that need to be flushed
+   * Effects that were scheduled in this batch but not yet 'resolved' into the
+   * root effects that need to be flushed. Resolving — the upwards traversal that
+   * marks the path to each effect on the shared effect tree (see #resolve) — is
+   * deferred until the batch is processed, so that the markers are created and
+   * consumed within a single traversal. Scheduling into other batches (which can
+   * happen concurrently, e.g. while a batch is committed) can therefore never
+   * observe (and be confused by) this batch's markers.
+   * May contain duplicates — deduplication happens during resolving
    * @type {Effect[]}
    */
   #e = [];
@@ -78,7 +85,7 @@ class L {
    * Deferred effects (which run after async work has completed) that are DIRTY
    * @type {Set<Effect>}
    */
-  #s = /* @__PURE__ */ new Set();
+  #r = /* @__PURE__ */ new Set();
   /**
    * Deferred effects that are MAYBE_DIRTY
    * @type {Set<Effect>}
@@ -91,7 +98,7 @@ class L {
    * so they can be rescheduled if the branch survives.
    * @type {Map<Effect, { d: Effect[], m: Effect[] }>}
    */
-  #r = /* @__PURE__ */ new Map();
+  #s = /* @__PURE__ */ new Map();
   /**
    * Inverse of #skipped_branches which we need to tell prior batches to unskip them when committing
    * @type {Set<Effect>}
@@ -100,13 +107,13 @@ class L {
   is_fork = !1;
   #o = !1;
   constructor() {
-    E === null ? S = E = this : (E.#f = this, this.#n = E), E = this;
+    g === null ? A = g = this : (g.#f = this, this.#n = g), g = this;
   }
   #g() {
     if (this.is_fork) return !0;
-    for (const r of this.#i.keys()) {
-      for (var e = r, t = !1; e.parent !== null; ) {
-        if (this.#r.has(e)) {
+    for (const s of this.#i.keys()) {
+      for (var e = s, t = !1; e.parent !== null; ) {
+        if (this.#s.has(e)) {
           t = !0;
           break;
         }
@@ -122,7 +129,7 @@ class L {
    * @param {Effect} effect
    */
   skip_effect(e) {
-    this.#r.has(e) || this.#r.set(e, { d: [], m: [] }), this.#v.delete(e);
+    this.#s.has(e) || this.#s.set(e, { d: [], m: [] }), this.#v.delete(e);
   }
   /**
    * Remove an effect from the #skipped_branches map and reschedule
@@ -130,65 +137,95 @@ class L {
    * @param {Effect} effect
    * @param {(e: Effect) => void} callback
    */
-  unskip_effect(e, t = (r) => this.schedule(r)) {
-    var r = this.#r.get(e);
-    if (r) {
-      this.#r.delete(e);
-      for (var i of r.d)
-        p(i, v), t(i);
-      for (i of r.m)
-        p(i, F), t(i);
+  unskip_effect(e, t = (s) => this.schedule(s)) {
+    var s = this.#s.get(e);
+    if (s) {
+      this.#s.delete(e);
+      for (var i of s.d)
+        p(i, _), t(i);
+      for (i of s.m)
+        p(i, w), t(i);
     }
     this.#v.add(e);
   }
-  #u() {
-    this.#a = !0, U++ > 1e3 && (this.#h(), ae());
-    for (const f of this.#s)
-      this.#t.delete(f), p(f, v), this.schedule(f);
-    for (const f of this.#t)
-      p(f, F), this.schedule(f);
-    const e = this.#e;
-    this.#e = [], this.apply();
-    var t = T = [], r = [], i = N = [];
-    for (const f of e)
-      try {
-        this.#E(f, t, r);
-      } catch (c) {
-        throw J(f), this.#g() || this.discard(), c;
+  /**
+   * Convert the effects that were scheduled in this batch into the root effects
+   * that need to be traversed, marking the path to each effect (by clearing the
+   * `CLEAN` flag on ancestor branches) so that the traversal can find them.
+   * This happens right before traversal rather than at scheduling time, so that
+   * the markers left on the (shared) effect tree are created and consumed within
+   * a single traversal — scheduling into other batches can never observe them
+   * @returns {Effect[]}
+   */
+  #E() {
+    var e = [];
+    for (const l of this.#e)
+      if (!((l.f & k) !== 0 || (l.f & (_ | w)) === 0)) {
+        for (var t = l, s = !1; t.parent !== null; ) {
+          t = t.parent;
+          var i = t.f;
+          if ((i & (B | M)) !== 0) {
+            if ((i & v) === 0) {
+              s = !0;
+              break;
+            }
+            t.f ^= v;
+          }
+        }
+        s || e.push(t);
       }
-    if (a = null, i.length > 0) {
-      var l = L.ensure();
-      for (const f of i)
-        l.schedule(f);
+    return this.#e = [], e;
+  }
+  #h() {
+    this.#a = !0;
+    for (const r of this.#r)
+      this.#t.delete(r), p(r, _), this.schedule(r);
+    for (const r of this.#t)
+      p(r, w), this.schedule(r);
+    this.apply();
+    for (var e = N = [], t = [], s = I = []; this.#e.length > 0; ) {
+      U++ > 1e3 && (this.#u(), ae());
+      for (const r of this.#E())
+        try {
+          this.#w(r, e, t);
+        } catch (c) {
+          throw J(r), this.#g() || this.discard(), c;
+        }
     }
-    if (T = null, N = null, this.#g()) {
-      this.#l(r), this.#l(t);
-      for (const [f, c] of this.#r)
-        Z(f, c);
-      i.length > 0 && /** @type {unknown} */
-      a.#u();
+    if (u = null, s.length > 0) {
+      var i = Y.ensure();
+      for (const r of s)
+        i.schedule(r);
+    }
+    if (N = null, I = null, this.#g()) {
+      this.#l(t), this.#l(e);
+      for (const [r, c] of this.#s)
+        Z(r, c);
+      s.length > 0 && /** @type {unknown} */
+      u.#h();
       return;
     }
-    const h = this.#w();
-    if (h) {
-      this.#l(r), this.#l(t), h.#k(this);
+    const l = this.#y();
+    if (l) {
+      this.#l(t), this.#l(e), l.#k(this);
       return;
     }
-    this.#s.clear(), this.#t.clear();
-    for (const f of this.#c) f(this);
-    this.#c.clear(), G = this, z(r), z(t), G = null, this.#p?.resolve();
-    var u = (
+    this.#r.clear(), this.#t.clear();
+    for (const r of this.#c) r(this);
+    this.#c.clear(), G = this, z(t), z(e), G = null, this.#p?.resolve();
+    var o = (
       /** @type {Batch | null} */
       /** @type {unknown} */
-      a
+      u
     );
-    if (this.#_ === 0 && (this.#e.length === 0 || u !== null) && this.#h(), this.#e.length > 0)
-      if (u !== null) {
-        const f = u;
-        f.#e.push(...this.#e.filter((c) => !f.#e.includes(c)));
+    if (this.#_ === 0 && (this.#e.length === 0 || o !== null) && this.#u(), this.#e.length > 0)
+      if (o !== null) {
+        for (const r of this.#e)
+          o.#e.push(r);
+        this.#e = [];
       } else
-        u = this;
-    u !== null && (O.clear(), u.#u());
+        o = this;
+    o !== null && (x.clear(), o.#h());
   }
   /**
    * Traverse the effect tree, executing effects or stashing
@@ -197,33 +234,33 @@ class L {
    * @param {Effect[]} effects
    * @param {Effect[]} render_effects
    */
-  #E(e, t, r) {
-    e.f ^= m;
+  #w(e, t, s) {
+    e.f ^= v;
     for (var i = e.first; i !== null; ) {
-      var l = i.f, h = (l & (I | B)) !== 0, u = h && (l & m) !== 0, f = u || (l & k) !== 0 || this.#r.has(i);
-      if (!f && i.fn !== null) {
-        h ? i.f ^= m : (l & j) !== 0 ? t.push(i) : H(i) && ((l & w) !== 0 && this.#t.add(i), M(i));
-        var c = i.first;
-        if (c !== null) {
-          i = c;
+      var l = i.f, o = (l & (M | B)) !== 0, r = o && (l & v) !== 0, c = r || (l & b) !== 0 || this.#s.has(i);
+      if (!c && i.fn !== null) {
+        o ? i.f ^= v : (l & V) !== 0 ? t.push(i) : H(i) && ((l & y) !== 0 && this.#t.add(i), O(i));
+        var E = i.first;
+        if (E !== null) {
+          i = E;
           continue;
         }
       }
       for (; i !== null; ) {
-        var b = i.next;
-        if (b !== null) {
-          i = b;
+        var R = i.next;
+        if (R !== null) {
+          i = R;
           break;
         }
         i = i.parent;
       }
     }
   }
-  #w() {
+  #y() {
     for (var e = this.#n; e !== null; ) {
       if (!e.is_fork) {
-        for (const [t, [, r]] of this.current)
-          if (e.current.has(t) && !r)
+        for (const [t, [, s]] of this.current)
+          if (e.current.has(t) && !s)
             return e;
       }
       e = e.#n;
@@ -234,42 +271,42 @@ class L {
    * @param {Batch} batch
    */
   #k(e) {
-    for (const [r, i] of e.current)
-      !this.previous.has(r) && e.previous.has(r) && this.previous.set(r, e.previous.get(r)), this.current.set(r, i);
-    for (const [r, i] of e.async_deriveds) {
-      const l = this.async_deriveds.get(r);
+    for (const [s, i] of e.current)
+      !this.previous.has(s) && e.previous.has(s) && this.previous.set(s, e.previous.get(s)), this.current.set(s, i);
+    for (const [s, i] of e.async_deriveds) {
+      const l = this.async_deriveds.get(s);
       l && i.promise.then(l.resolve).catch(l.reject);
     }
-    e.async_deriveds.clear(), this.transfer_effects(e.#s, e.#t);
-    const t = (r) => {
-      var i = r.reactions;
-      if (i !== null && !((r.f & y) !== 0 && (r.f & (v | F)) === 0))
-        for (const u of i) {
-          var l = u.f;
-          if ((l & y) !== 0)
+    e.async_deriveds.clear(), this.transfer_effects(e.#r, e.#t);
+    const t = (s) => {
+      var i = s.reactions;
+      if (i !== null && !((s.f & S) !== 0 && (s.f & (_ | w)) === 0))
+        for (const r of i) {
+          var l = r.f;
+          if ((l & S) !== 0)
             t(
               /** @type {Derived} */
-              u
+              r
             );
           else {
-            var h = (
+            var o = (
               /** @type {Effect} */
-              u
+              r
             );
-            l & (C | w) && !this.async_deriveds.has(h) && (this.#t.delete(h), p(h, v), this.schedule(h));
+            l & (F | y) && !this.async_deriveds.has(o) && (this.#t.delete(o), p(o, _), this.schedule(o));
           }
         }
     };
-    for (const r of this.current.keys())
-      t(r);
-    this.oncommit(() => e.discard()), e.#h(), a = this, this.#u();
+    for (const s of this.current.keys())
+      t(s);
+    this.oncommit(() => e.discard()), e.#u(), u = this, this.#h();
   }
   /**
    * @param {Effect[]} effects
    */
   #l(e) {
     for (var t = 0; t < e.length; t += 1)
-      fe(e[t], this.#s, this.#t);
+      fe(e[t], this.#r, this.#t);
   }
   /**
    * Associate a change to a given source with the current
@@ -278,28 +315,28 @@ class L {
    * @param {any} value
    * @param {boolean} [is_derived]
    */
-  capture(e, t, r = !1) {
-    e.v !== oe && !this.previous.has(e) && this.previous.set(e, e.v), (e.f & P) === 0 && (this.current.set(e, [t, r]), R?.set(e, t)), this.is_fork || (e.v = t);
+  capture(e, t, s = !1) {
+    e.v !== oe && !this.previous.has(e) && this.previous.set(e, e.v), (e.f & P) === 0 && (this.current.set(e, [t, s]), T?.set(e, t)), this.is_fork || (e.v = t);
   }
   activate() {
-    a = this;
+    u = this;
   }
   deactivate() {
-    a = null, R = null;
+    u = null, T = null;
   }
   flush() {
     try {
-      D = !0, a = this, this.#u();
+      D = !0, u = this, this.#h();
     } finally {
-      U = 0, x = null, T = null, N = null, D = !1, a = null, R = null, O.clear();
+      U = 0, L = null, N = null, I = null, D = !1, u = null, T = null, x.clear();
     }
   }
   discard() {
     for (const e of this.#d) e(this);
     this.#d.clear();
     for (const e of this.async_deriveds.values())
-      e.reject(ue);
-    this.#h(), this.#p?.resolve();
+      e.reject(he);
+    this.#u(), this.#p?.resolve();
   }
   /**
    * @param {Effect} effect
@@ -307,60 +344,59 @@ class L {
   register_created_effect(e) {
     this.#m.push(e);
   }
-  #y() {
-    for (let n = S; n !== null; n = n.#f) {
-      var e = n.id < this.id, t = [];
-      for (const [o, [d, _]] of this.current) {
-        if (n.current.has(o)) {
-          var r = (
+  #b() {
+    for (let f = A; f !== null; f = f.#f) {
+      var e = f.id < this.id, t = [];
+      for (const [h, [a, d]] of this.current) {
+        if (f.current.has(h)) {
+          var s = (
             /** @type {[any, boolean]} */
-            n.current.get(o)[0]
+            f.current.get(h)[0]
           );
-          if (e && d !== r)
-            n.current.set(o, [d, _]);
+          if (e && a !== s)
+            f.current.set(h, [a, d]);
           else
             continue;
         }
-        t.push(o);
+        t.push(h);
       }
       if (e)
-        for (const [o, d] of this.async_deriveds) {
-          const _ = n.async_deriveds.get(o);
-          _ && d.promise.then(_.resolve).catch(_.reject);
+        for (const [h, a] of this.async_deriveds) {
+          const d = f.async_deriveds.get(h);
+          d && a.promise.then(d.resolve).catch(d.reject);
         }
-      var i = [...n.current.keys()].filter(
-        (o) => !/** @type {[any, boolean]} */
-        n.current.get(o)[1]
+      var i = [...f.current.keys()].filter(
+        (h) => !/** @type {[any, boolean]} */
+        f.current.get(h)[1]
       );
-      if (!(!n.#a || i.length === 0)) {
-        var l = i.filter((o) => !this.current.has(o));
+      if (!(!f.#a || i.length === 0)) {
+        var l = i.filter((h) => !this.current.has(h));
         if (l.length === 0)
-          e && n.discard();
+          e && f.discard();
         else if (t.length > 0) {
           if (e)
-            for (const o of this.#v)
-              n.unskip_effect(o, (d) => {
-                (d.f & (w | C)) !== 0 ? n.schedule(d) : n.#l([d]);
+            for (const h of this.#v)
+              f.unskip_effect(h, (a) => {
+                (a.f & (y | F)) !== 0 ? f.schedule(a) : f.#l([a]);
               });
-          n.activate();
-          var h = /* @__PURE__ */ new Set(), u = /* @__PURE__ */ new Map();
-          for (var f of t)
-            K(f, l, h, u);
-          u = /* @__PURE__ */ new Map();
-          var c = [...n.current].filter(([o, d]) => {
-            const _ = this.current.get(o);
-            return _ ? _[0] !== d[0] || _[1] !== d[1] : !0;
-          }).map(([o]) => o);
-          if (c.length > 0)
-            for (const o of this.#m)
-              (o.f & (A | k | Q)) === 0 && Y(o, c, u) && ((o.f & (C | w)) !== 0 ? (p(o, v), n.schedule(o)) : n.#s.add(o));
-          if (n.#e.length > 0 && !n.#o) {
-            n.apply();
-            for (var b of n.#e)
-              n.#E(b, [], []);
-            n.#e = [];
+          f.activate();
+          var o = /* @__PURE__ */ new Set(), r = /* @__PURE__ */ new Map();
+          for (var c of t)
+            K(c, l, o, r);
+          r = /* @__PURE__ */ new Map();
+          var E = [...f.current].filter(([h, a]) => {
+            const d = this.current.get(h);
+            return d ? d[0] !== a[0] || d[1] !== a[1] : !0;
+          }).map(([h]) => h);
+          if (E.length > 0)
+            for (const h of this.#m)
+              (h.f & (k | b | Q)) === 0 && j(h, E, r) && ((h.f & (F | y)) !== 0 ? (p(h, _), f.schedule(h)) : f.#r.add(h));
+          if (f.#e.length > 0 && !f.#o) {
+            f.apply();
+            for (var R of f.#E())
+              f.#w(R, [], []);
           }
-          n.deactivate();
+          f.deactivate();
         }
       }
     }
@@ -371,8 +407,8 @@ class L {
    */
   increment(e, t) {
     if (this.#_ += 1, e) {
-      let r = this.#i.get(t) ?? 0;
-      this.#i.set(t, r + 1);
+      let s = this.#i.get(t) ?? 0;
+      this.#i.set(t, s + 1);
     }
   }
   /**
@@ -381,8 +417,8 @@ class L {
    */
   decrement(e, t) {
     if (this.#_ -= 1, e) {
-      let r = this.#i.get(t) ?? 0;
-      r === 1 ? this.#i.delete(t) : this.#i.set(t, r - 1);
+      let s = this.#i.get(t) ?? 0;
+      s === 1 ? this.#i.delete(t) : this.#i.set(t, s - 1);
     }
     this.#o || (this.#o = !0, q(() => {
       this.#o = !1, this.linked && this.flush();
@@ -393,10 +429,10 @@ class L {
    * @param {Set<Effect>} maybe_dirty_effects
    */
   transfer_effects(e, t) {
-    for (const r of e)
-      this.#s.add(r);
-    for (const r of t)
-      this.#t.add(r);
+    for (const s of e)
+      this.#r.add(s);
+    for (const s of t)
+      this.#t.add(s);
     e.clear(), t.clear();
   }
   /** @param {(batch: Batch) => void} fn */
@@ -411,17 +447,17 @@ class L {
     return (this.#p ??= ee()).promise;
   }
   static ensure() {
-    if (a === null) {
-      const e = a = new L();
-      D || q(() => {
+    if (u === null) {
+      const e = u = new Y();
+      !D && !C && q(() => {
         e.#a || e.flush();
       });
     }
-    return a;
+    return u;
   }
   apply() {
     {
-      R = null;
+      T = null;
       return;
     }
   }
@@ -430,86 +466,91 @@ class L {
    * @param {Effect} effect
    */
   schedule(e) {
-    if (x = e, e.b?.is_pending && (e.f & (j | W | X)) !== 0 && (e.f & $) === 0) {
+    if (L = e, e.b?.is_pending && (e.f & (V | W | X)) !== 0 && (e.f & $) === 0) {
       e.b.defer_effect(e);
       return;
     }
-    for (var t = e; t.parent !== null; ) {
-      t = t.parent;
-      var r = t.f;
-      if (T !== null && t === re && (V === null || (V.f & y) === 0))
-        return;
-      if ((r & (B | I)) !== 0) {
-        if ((r & m) === 0)
-          return;
-        t.f ^= m;
-      }
-    }
-    this.#e.push(t);
+    this.#e.push(e);
   }
-  #h() {
+  #u() {
     if (this.linked) {
       var e = this.#n, t = this.#f;
-      e === null ? S = t : e.#f = t, t === null ? E = e : t.#n = e, this.linked = !1;
+      e === null ? A = t : e.#f = t, t === null ? g = e : t.#n = e, this.linked = !1;
     }
+  }
+}
+function Fe(n) {
+  var e = C;
+  C = !0;
+  try {
+    for (var t; ; ) {
+      if (ie(), u === null)
+        return (
+          /** @type {T} */
+          t
+        );
+      u.flush();
+    }
+  } finally {
+    C = e;
   }
 }
 function ae() {
   try {
-    ie();
-  } catch (s) {
-    ne(s, x);
+    se();
+  } catch (n) {
+    ne(n, L);
   }
 }
-let g = null;
-function z(s) {
-  var e = s.length;
+let m = null;
+function z(n) {
+  var e = n.length;
   if (e !== 0) {
     for (var t = 0; t < e; ) {
-      var r = s[t++];
-      if ((r.f & (A | k)) === 0 && H(r) && (g = /* @__PURE__ */ new Set(), M(r), r.deps === null && r.first === null && r.nodes === null && r.teardown === null && r.ac === null && le(r), g?.size > 0)) {
-        O.clear();
-        for (const i of g) {
-          if ((i.f & (A | k)) !== 0) continue;
+      var s = n[t++];
+      if ((s.f & (k | b)) === 0 && H(s) && (m = /* @__PURE__ */ new Set(), O(s), s.deps === null && s.first === null && s.nodes === null && s.teardown === null && s.ac === null && le(s), m?.size > 0)) {
+        x.clear();
+        for (const i of m) {
+          if ((i.f & (k | b)) !== 0) continue;
           const l = [i];
-          let h = i.parent;
-          for (; h !== null; )
-            g.has(h) && (g.delete(h), l.push(h)), h = h.parent;
-          for (let u = l.length - 1; u >= 0; u--) {
-            const f = l[u];
-            (f.f & (A | k)) === 0 && M(f);
+          let o = i.parent;
+          for (; o !== null; )
+            m.has(o) && (m.delete(o), l.push(o)), o = o.parent;
+          for (let r = l.length - 1; r >= 0; r--) {
+            const c = l[r];
+            (c.f & (k | b)) === 0 && O(c);
           }
         }
-        g.clear();
+        m.clear();
       }
     }
-    g = null;
+    m = null;
   }
 }
-function K(s, e, t, r) {
-  if (!t.has(s) && (t.add(s), s.reactions !== null))
-    for (const i of s.reactions) {
+function K(n, e, t, s) {
+  if (!t.has(n) && (t.add(n), n.reactions !== null))
+    for (const i of n.reactions) {
       const l = i.f;
-      (l & y) !== 0 ? K(
+      (l & S) !== 0 ? K(
         /** @type {Derived} */
         i,
         e,
         t,
-        r
-      ) : (l & (C | w)) !== 0 && (l & v) === 0 && Y(i, e, r) && (p(i, v), ce(
+        s
+      ) : (l & (F | y)) !== 0 && (l & _) === 0 && j(i, e, s) && (p(i, _), ce(
         /** @type {Effect} */
         i
       ));
     }
 }
-function Y(s, e, t) {
-  const r = t.get(s);
-  if (r !== void 0) return r;
-  if (s.deps !== null)
-    for (const i of s.deps) {
+function j(n, e, t) {
+  const s = t.get(n);
+  if (s !== void 0) return s;
+  if (n.deps !== null)
+    for (const i of n.deps) {
       if (te.call(e, i))
         return !0;
-      if ((i.f & y) !== 0 && Y(
+      if ((i.f & S) !== 0 && j(
         /** @type {Derived} */
         i,
         e,
@@ -521,30 +562,32 @@ function Y(s, e, t) {
           !0
         ), !0;
     }
-  return t.set(s, !1), !1;
+  return t.set(n, !1), !1;
 }
-function ce(s) {
-  a.schedule(s);
+function ce(n) {
+  u.schedule(n);
 }
-function Z(s, e) {
-  if (!((s.f & I) !== 0 && (s.f & m) !== 0)) {
-    (s.f & v) !== 0 ? e.d.push(s) : (s.f & F) !== 0 && e.m.push(s), p(s, m);
-    for (var t = s.first; t !== null; )
+function Z(n, e) {
+  if (!((n.f & M) !== 0 && (n.f & v) !== 0)) {
+    (n.f & _) !== 0 ? e.d.push(n) : (n.f & w) !== 0 && e.m.push(n), p(n, v);
+    for (var t = n.first; t !== null; )
       Z(t, e), t = t.next;
   }
 }
-function J(s) {
-  p(s, m);
-  for (var e = s.first; e !== null; )
+function J(n) {
+  p(n, v);
+  for (var e = n.first; e !== null; )
     J(e), e = e.next;
 }
 export {
-  L as Batch,
-  R as batch_values,
-  T as collected_effects,
-  a as current_batch,
-  g as eager_block_effects,
-  N as legacy_updates,
+  Y as Batch,
+  T as batch_values,
+  N as collected_effects,
+  u as current_batch,
+  m as eager_block_effects,
+  Fe as flushSync,
+  C as is_flushing_sync,
+  I as legacy_updates,
   G as previous_batch,
   ce as schedule_effect
 };

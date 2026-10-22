@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -20,7 +20,7 @@ const D = u({
   },
   factory: ({ props: s }, { on: a, updateEntry: c, pushTask: l, setEntryExtensionStatus: t, getEntryExtensionStatus: m }) => {
     function p(o) {
-      t(o, {
+      o = t(o, {
         type: i.System,
         code: "LOAD_BUSY",
         progress: 1 / 0
@@ -41,13 +41,13 @@ const D = u({
         code: "LOAD_COMPLETE"
       });
     }
-    function n(o) {
+    function d(o) {
       m(o)?.type === "error" || !b(o) || !F(o.src) || g(o.file) || l(o.id, p);
     }
-    const d = a("updateEntry", n);
+    const n = a("updateEntry", d);
     return {
       destroy: () => {
-        d();
+        n();
       }
     };
   }

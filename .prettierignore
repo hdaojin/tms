@@ -1,0 +1,10 @@
+node_modules/
+staticfiles/
+static/vendor/
+static/css/output.css
+static/js/*.min.js
+static/js/prism.js
+media/
+media-private/
+archives/
+backups/

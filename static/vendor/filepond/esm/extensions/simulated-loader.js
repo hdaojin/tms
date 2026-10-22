@@ -1,11 +1,11 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import { createProgressEvent as T } from "../utils/xhr.js";
-import { isFileEntry as H, isBlobOrFile as G, isString as x, isNumber as J } from "../utils/test.js";
+import { isFileEntry as H, isBlobOrFile as G, isString as _, isNumber as J } from "../utils/test.js";
 import { createExtension as K } from "./common/createExtension.js";
 import { Status as n } from "../common/status.js";
 import { sleep as f } from "../utils/sleep.js";
@@ -24,29 +24,29 @@ const et = K({
     log: !0,
     fetchFile: void 0
   },
-  factory: ({ extensionName: O, props: S, didSetProps: R }, _) => {
+  factory: ({ extensionName: F, props: h, didSetProps: x }, R) => {
     const {
       setEntryExtensionStatus: d,
       getEntryExtensionStatus: P,
-      createProgressHandler: z,
+      createProgressHandler: B,
       removeEntries: k,
       updateEntry: L,
       pushTask: v,
-      abortTasks: B,
+      abortTasks: z,
       on: M
-    } = _;
-    let A;
-    R(({ bitrate: t = 1024e3, tickrate: e = 250 }) => {
-      A = t / 8 * (e / 1e3);
+    } = R;
+    let U;
+    x(({ bitrate: t = 1024e3, tickrate: e = 250 }) => {
+      U = t / 8 * (e / 1e3);
     });
-    async function g(t) {
+    async function Y(t) {
       d(t, {
         type: n.System,
         code: "LOAD_QUEUED"
       });
     }
-    async function Q(t) {
-      const { src: e, size: l = 1024 * 1024 } = t, { log: o, connectionDelay: r, errorDelay: a } = S;
+    async function g(t) {
+      const { src: e, size: l = 1024 * 1024 } = t, { log: o, connectionDelay: r, errorDelay: a } = h;
       if (d(t, {
         type: n.System,
         code: "LOAD_BUSY",
@@ -66,81 +66,81 @@ const et = K({
         size: l
       });
     }
-    async function Y(t, { signal: e }) {
+    async function Q(t, { signal: e }) {
       const { src: l, size: o = 1024 * 1024 } = t, {
         log: r,
         actionLoad: a,
         actionAbort: i,
         tickrate: w,
-        connectionDelay: y,
+        connectionDelay: D,
         fetchFile: p,
         errorDelay: m
-      } = S;
-      d(t, {
+      } = h;
+      t = d(t, {
         type: n.System,
         code: "LOAD_BUSY",
         progress: 1 / 0
       });
-      const u = z(t);
-      let b, D, I = !1;
+      const u = B(t, { code: "LOAD_BUSY" });
+      let b, O, y = !1;
       const s = () => {
-        I || (I = !0, clearInterval(b), r && c(["did abort load data", t.id]), L(t, {
+        y || (y = !0, clearInterval(b), r && c(["did abort load data", t.id]), t = L(t, {
           state: {
             [a]: !1,
             [i]: !1
           }
         }), queueMicrotask(() => {
           k(t);
-        }), D?.(e.reason));
+        }), O?.(e.reason));
       };
-      if (e.addEventListener("abort", s, { once: !0 }), await f(y), e.aborted)
+      if (e.addEventListener("abort", s, { once: !0 }), await f(D), e.aborted)
         throw e.reason;
       if (m) {
         if (await f(m), e.aborted)
           throw e.reason;
         const E = "Simulated error";
-        throw d(t, {
+        throw t = d(t, {
           type: n.Error,
           code: "LOAD_ERROR",
           values: { error: E }
         }), r && c(["did throw load data error", t.id]), e.removeEventListener("abort", s), E;
       }
-      return await new Promise((E, U) => {
-        let h = 0;
-        D = U, b = setInterval(async () => {
+      return await new Promise((E, I) => {
+        let S = 0;
+        O = I, b = setInterval(async () => {
           if (e.aborted) {
             s();
             return;
           }
-          if (h = Math.min(o, h + A), u(T(!0, h, o)), h < o)
+          if (S = Math.min(o, S + U), u(T(!0, S, o)), S < o)
             return;
           u(T(!0, o, o)), clearInterval(b);
-          let F;
+          let A;
           try {
             if (p)
-              F = await p(t, { onprogress: u, signal: e });
+              A = await p(t, { onprogress: u, signal: e });
             else {
               if (await f(0), e.aborted)
                 throw e.reason;
-              F = new File(["#".repeat(o)], l.split("/").pop(), {
+              A = new File(["#".repeat(o)], l.split("/").pop(), {
                 type: "plain/text"
               });
             }
           } catch (C) {
-            e.removeEventListener("abort", s), U(C);
+            e.removeEventListener("abort", s), I(C);
             return;
           }
           if (e.aborted) {
             s();
             return;
           }
-          e.removeEventListener("abort", s), L(t, {
-            file: F,
+          e.removeEventListener("abort", s), t = L(t, {
+            file: A,
             state: {
               load: !1
             },
             extensionState: {
-              [O]: {
+              [F]: {
                 status: {
                   type: n.Success,
                   code: "LOAD_COMPLETE"
@@ -155,27 +155,27 @@ const et = K({
       const e = P(t), l = Object.keys(e).length > 0;
       if (e?.type === "error" || !H(t) || G(t.file))
         return;
-      const { src: r, name: a, size: i } = t, { actionLoad: w, actionAbort: y, parallel: p } = S, m = t.state[w], u = t.state[y];
-      if (!x(r))
+      const { src: r, name: a, size: i } = t, { actionLoad: w, actionAbort: D, parallel: p } = h, m = t.state[w], u = t.state[D];
+      if (!_(r))
         return;
       if (u) {
-        B(t.id), k(t);
+        z(t.id), k(t);
         return;
       }
       if (m === !1)
         return;
-      if (!(x(a) && J(i))) {
-        v(t.id, Q);
-        return;
-      }
-      if (!l) {
+      if (!(_(a) && J(i))) {
         v(t.id, g);
         return;
       }
-      v(t.id, Y, { parallel: p });
+      if (!l) {
+        v(t.id, Y);
+        return;
+      }
+      v(t.id, Q, { parallel: p });
     }
     function c(t) {
-      N("⧗", O, "(", ...t, ")");
+      N("⧗", F, "(", ...t, ")");
     }
     const q = M("updateEntry", j);
     return {

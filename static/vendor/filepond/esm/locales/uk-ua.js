@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.66
+* FilePond v5.0.0-beta.74
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -44,10 +44,6 @@ const i = {
   success: "Успіх",
   info: "Інформація",
   system: "Система",
-  // sources
-  device: "Пристрій",
-  camera: "Камера",
-  link: "Посилання",
   // capabilities labels
   descriptionBrowse: "[Вибрати {{maxFilesUnit}}]",
   descriptionBrowseDrop: "Перетягніть сюди {{maxFilesUnit}} або [Огляд]",
@@ -113,9 +109,9 @@ const i = {
   transformError: "Не вдалося відредагувати дані файлу. Спробуйте ще раз."
 }, n = {
   validationFileMimeTypeMismatch: {
-    template: "Цей тип файлу не дозволено. {{details}}.",
+    template: "Цей тип файлу не дозволено. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Файл повинен бути типу {{accept}}",
@@ -126,9 +122,9 @@ const i = {
   }
 }, o = {
   validationFileExtensionMismatch: {
-    template: "Це розширення файлу не дозволено. {{details}}.",
+    template: "Це розширення файлу не дозволено. {{accepted}}.",
     variables: {
-      details: {
+      accepted: {
         context: "count",
         map: {
           1: "Файл повинен мати розширення {{accept}}",
@@ -168,17 +164,34 @@ const i = {
   ...d,
   ...r,
   ...m
+}, p = {
+  device: "Пристрій"
 }, v = {
+  link: "Посилання"
+}, u = {
+  camera: "Камера",
+  capture: "Захопити",
+  record: "Записати"
+}, M = {
+  ...p,
+  ...v,
+  ...u
+}, f = {
   ...i,
   ...a,
   ...e,
   ...c,
-  ...t
+  ...t,
+  ...M
 };
 export {
   i as core,
-  v as locale,
+  f as locale,
   e as media,
+  M as source,
+  u as sourceCamera,
+  p as sourceDevice,
+  v as sourceLink,
   a as store,
   t as transform,
   c as validation,
