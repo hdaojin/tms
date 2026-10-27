@@ -1,0 +1,36 @@
+[Unit]
+Description=TMS Gunicorn application
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=@@APP_USER@@
+Group=@@APP_GROUP@@
+WorkingDirectory=/srv/tms/current
+EnvironmentFile=/etc/tms/tms.env
+ExecStart=/srv/tms/current/.venv/bin/gunicorn tmsproject.wsgi:application --bind @@BIND@@ --workers @@WORKERS@@ --access-logfile - --error-logfile -
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+KillSignal=SIGTERM
+UMask=0027
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadOnlyPaths=/srv/tms/current
+ReadWritePaths=/srv/tms/shared/media /srv/tms/shared/media-private
+
+[Install]
+WantedBy=multi-user.target
+

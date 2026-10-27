@@ -196,7 +196,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Media files (user uploaded files)
 # 注意：公共文件上传目录是通过Web服务器静态文件功能直接提供服务的，无法控制用户权限。
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = env.path('MEDIA_ROOT', default=BASE_DIR / 'media')  # type: ignore
 PRIVATE_MEDIA_ROOT = env.path('PRIVATE_MEDIA_ROOT', default=BASE_DIR / 'media-private')  # type: ignore
 NOTES_ROOT = env.path('NOTES_ROOT', default=Path(PRIVATE_MEDIA_ROOT) / 'notes')  # type: ignore
 
@@ -229,6 +229,21 @@ SECURE_CSP = {
     'form-action': [CSP.SELF],
     'frame-ancestors': [CSP.SELF],
 }
+
+# HTTPS reverse-proxy settings are opt-in so local development remains unchanged.
+# Only enable TRUST_X_FORWARDED_PROTO when a trusted reverse proxy strips the
+# incoming header and sets X-Forwarded-Proto itself.
+TRUST_X_FORWARDED_PROTO = env.bool('TRUST_X_FORWARDED_PROTO', default=False)  # type: ignore
+if TRUST_X_FORWARDED_PROTO:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)  # type: ignore
+SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=False)  # type: ignore
+CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=False)  # type: ignore
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)  # type: ignore
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False)  # type: ignore
+SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', default=False)  # type: ignore
+
 SAMBA_INTEGRATION_ENABLED = env.bool('SAMBA_INTEGRATION_ENABLED', default=False)  # type: ignore
 SAMBA_ASYNC_OPERATIONS_ENABLED = env.bool('SAMBA_ASYNC_OPERATIONS_ENABLED', default=False)  # type: ignore
 SAMBA_COMMAND_TIMEOUT_SECONDS = env.int('SAMBA_COMMAND_TIMEOUT_SECONDS', default=15)  # type: ignore

@@ -409,134 +409,77 @@ TMS 的生产服务器不要求安装 npm。前端资源应在开发机或 CI �
 ```text
 Client
   ↓
-Nginx / Caddy
+Caddy（外层 Basic Auth）
   ↓
-Gunicorn
+Gunicorn（127.0.0.1:8010）
   ↓
 Django
   ↓
-PostgreSQL / MySQL
+PostgreSQL
 ```
 
-生产服务器通常只需要 Python、uv、反向代理/Web 服务器、Gunicorn 和数据库服务；npm 构建应在部署前完成。
+生产服务器只需要 Python 3.13、uv、Caddy 和 PostgreSQL；不安装 Node/npm，前端构建产物必须已经提交。
+正式拓扑采用 `/srv/tms/releases/<release-id>` 不可变 release、root 管理的 `/srv/tms/current` 原子链接，以及代码目录之外的共享上传目录。
 
-### 1. 拉取代码并安装依赖
+### 自动化入口
 
 ```bash
-git clone git@github.com:hdaojin/tms.git /srv/tms
-cd /srv/tms
-
-uv sync --locked --no-dev
+sudo tms-deploy inspect
+sudo tms-deploy plan --revision develop --first-install  # 仅首次部署
+sudo tms-deploy plan --revision develop                  # 日常升级
+sudo tms-deploy apply <plan-id> --confirm-sha <完整SHA>
+sudo tms-deploy verify
 ```
 
-生产环境应部署经过确认的发布分支或 tag，而不是依赖服务器现场修改代码。
+支持 `TMS_TLS_MODE=automatic`（公网 Caddy 自动证书）和 `TMS_TLS_MODE=acme-sh`
+（内网 DNS-01 证书，由 acme.sh 续期并通知 Caddy）。acme.sh 初始化、权限和续期 hook 见部署手册第 12 节。
+日常代码更新可使用独立 `tms-update plan/apply/verify/status`；开发端依赖更新可运行
+`uv run --locked --no-sync scripts/update_dependencies.py all --dry-run`，详见手册第 13 节。
+可配置 `TMS_BASIC_AUTH_TRUSTED_CIDRS="10.21.57.0/24"` 让可信来源网段跳过 Caddy Basic Auth，其他客户端仍需认证；
+默认值为空，要求全站认证。此设置不跳过 Django 登录和权限，适用的源地址判断与代理限制见手册第 7 节。
 
-### 2. 配置环境变量
+`plan` 可解析分支，但生成计划后固定完整 SHA；`apply` 不接受浮动分支。审查后的
+[`scripts/deploy_tms.sh`](scripts/deploy_tms.sh) 应安装为 root 所有的 `/usr/local/sbin/tms-deploy`，
+日常部署不得直接 `sudo` 执行浮动分支里的脚本。
 
-```bash
-cp .env.example .env
-```
+### 生产环境变量
 
-生产环境至少需要确认：
+运行配置位于 `/etc/tms/tms.env`，公共与私有上传均位于代码目录之外：
 
 ```env
-SECRET_KEY=replace-with-a-strong-secret-key
+SECRET_KEY=<由首次部署生成的强随机值>
 DEBUG=False
-ALLOWED_HOSTS=tms.example.com,127.0.0.1
-CSRF_TRUSTED_ORIGINS=https://tms.example.com
-DATABASE_URL=postgres://tms:password@127.0.0.1:5432/tms
+ALLOWED_HOSTS=test.itnsa.cn,127.0.0.1
+CSRF_TRUSTED_ORIGINS=https://test.itnsa.cn
+DATABASE_URL=postgres://tms_app:<运行期密码>@127.0.0.1:5432/tms
 CACHE_TIMEOUT=300
 UPLOAD_MAX_SIZE_MB=100
-PRIVATE_MEDIA_ROOT=/srv/tms/media-private
+MEDIA_ROOT=/srv/tms/shared/media
+PRIVATE_MEDIA_ROOT=/srv/tms/shared/media-private
+NOTES_ROOT=/srv/tms/shared/media-private/notes
+TRUST_X_FORWARDED_PROTO=True
+SECURE_SSL_REDIRECT=True
+SESSION_COOKIE_SECURE=True
+CSRF_COOKIE_SECURE=True
+SECURE_HSTS_SECONDS=3600
+SECURE_HSTS_INCLUDE_SUBDOMAINS=False
+SECURE_HSTS_PRELOAD=False
 SAMBA_INTEGRATION_ENABLED=False
 SAMBA_ASYNC_OPERATIONS_ENABLED=False
 ```
 
-注意：
+生产首次只使用 `tms_migrator` 执行迁移，运行期 `tms_app` 只有 schema usage、表 DML 与序列权限。
+`bootstrap_tms` 在首次部署时显式 dry-run 后执行；Django Group、权限包和领域范围仍由管理员按业务配置。
 
-- `DEBUG=False` 时必须使用真实、强随机的 `SECRET_KEY`。
-- `ALLOWED_HOSTS` 和 `CSRF_TRUSTED_ORIGINS` 应按实际域名配置。
-- 推荐生产环境使用 PostgreSQL 或 MySQL。
-- Samba 系统级集成默认关闭，只有在服务器已完成相应安全配置后才应启用。
+Caddy 只直接提供：
 
-### 3. 准备目录
+- `/static/` → 当前 release 的 `staticfiles/`
+- `/media/` → `/srv/tms/shared/media/`
 
-```bash
-mkdir -p /srv/tms/staticfiles
-mkdir -p /srv/tms/media
-mkdir -p /srv/tms/media-private
-```
+不要直接提供 `/srv/tms/shared/media-private/`。
 
-确保运行 Gunicorn 的用户拥有所需目录权限。
-
-### 4. 初始化或升级数据库
-
-首次部署：
-
-```bash
-uv run manage.py migrate
-uv run manage.py bootstrap_tms
-uv run manage.py createsuperuser
-```
-
-后续版本部署通常执行：
-
-```bash
-uv run manage.py migrate
-```
-
-`bootstrap_tms` 主要用于新环境初始化。命令会先预览并确认；默认模式不覆盖已有目录项的管理员配置，也不删除额外数据。后续版本只有在发布说明明确要求补充出厂目录时才需要再次显式执行。
-
-如需恢复 Bootstrap 声明的受管出厂值，先备份数据库并执行：
-
-```bash
-uv run manage.py bootstrap_tms --force --dry-run
-uv run manage.py bootstrap_tms --force
-```
-
-自动化部署可使用 `--yes`，但该选项只跳过人工确认，不跳过完整预览和预检。
-
-数据库结构变更应通过 Django migration 管理；部署前应按实际环境做好数据库和上传文件备份。
-
-权限包定义发生变化后，先检查原生权限投影差异，确认后再应用：
-
-```bash
-uv run manage.py reconcile_permission_assignments
-uv run manage.py reconcile_permission_assignments --apply
-```
-
-对账命令默认只报告差异；确认输出后才执行 `--apply`。权限包定义位于 `core/config/permission_bundles.yml`。`migrate_private_media` 等历史切换命令不是常规部署步骤，只有发布说明明确要求时才按“先预检、后应用”的方式执行。
-
-### 5. 收集静态文件
-
-确认部署包已经包含最新前端构建产物后执行：
-
-```bash
-uv run manage.py collectstatic --noinput
-```
-
-### 6. 执行部署检查
-
-```bash
-uv run manage.py check --deploy
-```
-
-### 7. 启动 Gunicorn
-
-```bash
-uv run gunicorn tmsproject.wsgi:application \
-  --bind 127.0.0.1:8000 \
-  --workers 4
-```
-
-实际生产环境建议通过 systemd 或其他进程管理器托管 Gunicorn，再由 Nginx、Caddy 等 Web 服务器进行反向代理。
-
-Web 服务器可以直接提供：
-
-- `/static/` → `/srv/tms/staticfiles/`
-- `/media/` → `/srv/tms/media/`
-
-不要直接提供 `/srv/tms/media-private/`。
+安装稳定入口、首次部署、日常升级、权限模型、Basic Auth、备份恢复、回滚和 AI 确认边界见
+[`docs/developer/deploy-tms-production.md`](docs/developer/deploy-tms-production.md)。
 
 ## 发布与验证建议
 

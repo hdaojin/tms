@@ -1,0 +1,177 @@
+import importlib.util
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
+
+REPOSITORY = Path(__file__).resolve().parent.parent
+SPEC = importlib.util.spec_from_file_location("tms_dependency_update", REPOSITORY / "scripts/update_dependencies.py")
+updater = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(updater)
+
+
+def bash_run(script, *, check=True):
+    bash = os.environ.get("TMS_TEST_BASH") or (shutil.which("bash") if os.name != "nt" else None)
+    if not bash:
+        pytest.skip("需要 Bash；Windows 可用 TMS_TEST_BASH 指定 Git Bash")
+    environment = os.environ.copy()
+    environment["TMS_TEST_PYTHON"] = Path(sys.executable).as_posix()
+    if os.name == "nt":
+        environment["MSYS2_ARG_CONV_EXCL"] = "/CN="
+    result = subprocess.run(
+        [bash, "-c", script, "bash", (REPOSITORY / "scripts/deploy_tms.sh").as_posix()],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=environment,
+    )
+    if check:
+        assert result.returncode == 0, result.stdout + result.stderr
+    return result
+
+
+def test_tls_modes_render_public_and_external_certificate_configs():
+    result = bash_run('''
+set -Eeuo pipefail
+source "$1"
+TEMPLATE_DIR_FROM_SCRIPT="$(dirname "$1")/../deploy/production"
+TMS_TLS_MODE=automatic
+validate_tls_config
+render_caddy_site "${TEMPLATE_DIR_FROM_SCRIPT}/tms.caddy"
+printf '\\nEXTERNAL_MODE\\n'
+TMS_TLS_MODE=acme-sh
+validate_tls_config
+render_caddy_site "${TEMPLATE_DIR_FROM_SCRIPT}/tms.caddy"
+''')
+    public, external = result.stdout.split("EXTERNAL_MODE")
+    assert "tls /etc/caddy/certs" not in public
+    assert "tls /etc/caddy/certs/tms/current/fullchain.pem /etc/caddy/certs/tms/current/privkey.pem" in external
+    assert "@@" not in result.stdout
+    assert "media-private" not in result.stdout
+
+
+def test_invalid_tls_mode_is_rejected():
+    result = bash_run('source "$1"; TMS_TLS_MODE=internal; validate_tls_config', check=False)
+    assert result.returncode != 0
+    assert "automatic" in result.stderr
+
+
+def test_basic_auth_defaults_to_all_clients_and_only_explicit_networks_bypass():
+    result = bash_run('''
+set -Eeuo pipefail
+source "$1"
+policy_python() { "$TMS_TEST_PYTHON" "$@"; }
+template="$(dirname "$1")/../deploy/production/tms.caddy"
+[[ "$(basic_auth_policy 10.21.57.1)" == 1 ]]
+render_caddy_site "$template"
+printf '\\nTRUSTED_NETWORKS\\n'
+TMS_BASIC_AUTH_TRUSTED_CIDRS="10.21.57.0/24 fd12:3456:789a::/64"
+[[ "$(basic_auth_policy 10.21.57.1)" == 0 ]]
+[[ "$(basic_auth_policy 10.21.58.1)" == 1 ]]
+[[ "$(basic_auth_policy 192.168.1.1)" == 1 ]]
+[[ "$(basic_auth_policy 127.0.0.1)" == 1 ]]
+[[ "$(basic_auth_policy fd12:3456:789a::2)" == 0 ]]
+[[ "$(basic_auth_policy fd12:3456:789b::2)" == 1 ]]
+render_caddy_site "$template"
+TMS_BASIC_AUTH_TRUSTED_CIDRS="127.0.0.1/32"
+[[ "$(basic_auth_policy 127.0.0.1)" == 0 ]]
+https_status_matches_policy 401 1
+if https_status_matches_policy 200 1; then exit 10; fi
+if https_status_matches_policy 401 0; then exit 11; fi
+''')
+    default, conditional = result.stdout.split("TRUSTED_NETWORKS")
+    assert "@tms_basic_auth path *" in default
+    assert "@tms_basic_auth not remote_ip 10.21.57.0/24 fd12:3456:789a::/64" in conditional
+    assert "client_ip" not in conditional
+    assert "X-Forwarded-For" not in conditional
+    assert "@@" not in result.stdout
+
+
+@pytest.mark.parametrize("cidrs", ["10.21.57.72/24", "10.21.57.0/33", "10.21.57.1", "10.21.57.0/24;abort", "not-a-network"])
+def test_invalid_basic_auth_network_is_rejected(cidrs):
+    with patch.dict(os.environ, {"TMS_TEST_CIDRS": cidrs}):
+        result = bash_run('''
+source "$1"
+policy_python() { "$TMS_TEST_PYTHON" "$@"; }
+TMS_BASIC_AUTH_TRUSTED_CIDRS="$TMS_TEST_CIDRS"
+basic_auth_policy
+''', check=False)
+    assert result.returncode != 0
+    assert "可信认证网段无效" in result.stderr
+
+
+def test_update_entrypoint_rejects_first_install_and_unknown_commands():
+    bash_run('''
+set -Eeuo pipefail
+entry="$(dirname "$1")/update_tms.sh"
+if bash "$entry" plan --first-install; then exit 10; fi
+if bash "$entry" prune; then exit 11; fi
+bash "$entry" --help
+''')
+
+
+def test_certificate_validator_rejects_untrusted_wrong_host_key_and_expiry():
+    bash_run('''
+set -Eeuo pipefail
+source "$1"
+work="$(mktemp -d)"
+trap 'rm -f "$work/cert.pem" "$work/key.pem" "$work/other.key" "$work/short.pem"; rmdir "$work"' EXIT
+openssl req -x509 -newkey rsa:2048 -nodes -days 3 \\
+    -subj /CN=test.itnsa.cn -addext subjectAltName=DNS:test.itnsa.cn \\
+    -keyout "$work/key.pem" -out "$work/cert.pem" >/dev/null 2>&1
+if validate_certificate_pair "$work/cert.pem" "$work/key.pem"; then exit 10; fi
+export SSL_CERT_FILE="$work/cert.pem"
+if command -v cygpath >/dev/null; then export SSL_CERT_FILE="$(cygpath -m "$SSL_CERT_FILE")"; fi
+validate_certificate_pair "$work/cert.pem" "$work/key.pem"
+TMS_DOMAIN=wrong.itnsa.cn
+if validate_certificate_pair "$work/cert.pem" "$work/key.pem"; then exit 11; fi
+TMS_DOMAIN=test.itnsa.cn
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out "$work/other.key" >/dev/null 2>&1
+if validate_certificate_pair "$work/cert.pem" "$work/other.key"; then exit 12; fi
+openssl req -x509 -key "$work/key.pem" -days 1 -subj /CN=test.itnsa.cn \\
+    -addext subjectAltName=DNS:test.itnsa.cn -out "$work/short.pem" >/dev/null 2>&1
+if validate_certificate_pair "$work/short.pem" "$work/key.pem"; then exit 13; fi
+''')
+
+
+@pytest.mark.parametrize("target", ["python", "npm", "all"])
+def test_dependency_dry_run_never_checks_out_or_executes_updates(target, capsys):
+    with patch.object(updater, "run_command") as run, patch.object(updater, "require_development_checkout") as check:
+        assert updater.main([target, "--dry-run"]) == 0
+    run.assert_not_called()
+    check.assert_not_called()
+    output = capsys.readouterr().out
+    assert "git diff --check" in output
+    if target in {"python", "all"}:
+        assert "uv lock --upgrade" in output
+        assert "uv sync --locked" in output
+    if target in {"npm", "all"}:
+        assert "npm ci --include=dev" in output
+        assert "npm run build:frontend" in output
+        assert "npm run test:frontend" in output
+
+
+def test_dependency_update_refuses_dirty_checkout_before_mutation(capsys):
+    with patch.object(updater, "require_development_checkout", side_effect=RuntimeError("dirty")), \
+            patch.object(updater, "run_command") as run:
+        assert updater.main(["all"]) == 1
+    run.assert_not_called()
+    assert "dirty" in capsys.readouterr().err
+
+
+def test_dependency_failure_stops_later_commands_and_keeps_changes():
+    with patch.object(updater, "require_development_checkout"), \
+            patch.object(updater.shutil, "which", return_value=sys.executable), \
+            patch.object(updater, "run_command", side_effect=subprocess.CalledProcessError(1, "uv")) as run:
+        assert updater.main(["python"]) == 1
+    assert run.call_count == 1
+
+
+def test_production_release_cannot_upgrade_dependencies():
+    with patch.object(Path, "exists", return_value=True), pytest.raises(RuntimeError, match="开发 Git 工作区"):
+        updater.require_development_checkout()

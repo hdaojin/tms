@@ -1,0 +1,34 @@
+@@DOMAIN@@ {
+	@@TLS_DIRECTIVE@@
+	@@AUTH_MATCHER@@
+	import /etc/caddy/tms-basic-auth.caddy
+
+	@maintenance file {
+		root /var/lib/tms
+		try_files /maintenance.flag
+	}
+	respond @maintenance "TMS 正在维护，请稍后重试。\n" 503
+
+	handle_path /static/* {
+		root * /srv/tms/current/staticfiles
+		file_server
+	}
+
+	handle_path /media/* {
+		root * /srv/tms/shared/media
+		file_server
+	}
+
+	handle {
+		reverse_proxy @@BIND@@
+	}
+
+	log {
+		output file /var/log/caddy/tms-access.log {
+			roll_size 10MiB
+			roll_keep 10
+			roll_keep_for 720h
+		}
+		format json
+	}
+}

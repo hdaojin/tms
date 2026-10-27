@@ -1,0 +1,36 @@
+# TMS deployment configuration installed as /etc/tms/deploy.conf.
+# This file contains topology and identifiers only. Secrets belong in
+# /etc/tms/tms.env and /etc/tms/migrate.env, which tms-deploy creates.
+
+TMS_DOMAIN=test.itnsa.cn
+TMS_GIT_URL=git@github.com:hdaojin/tms.git
+TMS_GIT_REVISION=develop
+
+TMS_DEPLOY_USER=ecs-user
+TMS_APP_USER=tms
+TMS_APP_GROUP=tms
+TMS_CADDY_USER=caddy
+TMS_CADDY_GROUP=caddy
+
+TMS_DB_NAME=tms
+TMS_DB_MIGRATOR=tms_migrator
+TMS_DB_APP=tms_app
+
+TMS_BIND=127.0.0.1:8010
+TMS_WORKERS=2
+TMS_SWAP_SIZE=2G
+
+# Empty: require Basic Auth from every client. Space-separated explicit CIDRs
+# bypass ONLY Caddy Basic Auth, not Django login or business permissions.
+# Example for a confirmed /24 LAN: "10.21.57.0/24"
+TMS_BASIC_AUTH_TRUSTED_CIDRS=""
+
+# automatic: Caddy obtains/renews public certificates (public DNS + inbound ACME).
+# acme-sh: an existing acme.sh account issues/renews via DNS; see the manual.
+TMS_TLS_MODE=automatic
+# Only used in acme-sh mode. The certificate may contain additional SAN names.
+TMS_ACME_USER=demo
+TMS_ACME_HOME=/home/demo/.acme.sh
+TMS_ACME_DOMAIN=tms.itnsa.cn
+TMS_ACME_ECC=1
+
