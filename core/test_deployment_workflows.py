@@ -115,6 +115,55 @@ bash "$entry" --help
 ''')
 
 
+def test_auth_hash_passes_newline_to_caddy_and_accepts_eight_characters():
+    result = bash_run('''
+set -Eeuo pipefail
+source "$1"
+expected='ab$cd\\ef'
+caddy() {
+    [[ "$#" == 3 && "$1" == hash-password && "$2" == --algorithm && "$3" == argon2id ]] || return 2
+    local received
+    IFS= read -r received || { printf 'ERROR EOF\\n' >&2; return 1; }
+    [[ "$received" == "$expected" ]] || return 3
+    printf 'test-argon2id-hash\\n'
+}
+hash_basic_auth_password "$expected"
+''')
+    assert result.stdout.strip() == "test-argon2id-hash"
+    assert "EOF" not in result.stderr
+
+
+def test_auth_hash_rejects_short_password_before_calling_caddy():
+    result = bash_run('''
+source "$1"
+caddy() { printf 'CADDY_WAS_CALLED\\n'; return 0; }
+hash_basic_auth_password abcdefg
+''', check=False)
+    assert result.returncode != 0
+    assert "至少需要 8 个字符" in result.stderr
+    assert "CADDY_WAS_CALLED" not in result.stdout
+    assert "abcdefg" not in result.stderr
+
+
+@pytest.mark.parametrize("empty_output", [False, True])
+def test_auth_hash_failure_never_returns_a_usable_password_hash(empty_output):
+    with patch.dict(os.environ, {"TMS_TEST_HASH_EMPTY": str(int(empty_output))}):
+        result = bash_run('''
+source "$1"
+caddy() {
+    local password
+    IFS= read -r password || return 2
+    [[ "$TMS_TEST_HASH_EMPTY" == 1 ]] && return 0
+    return 1
+}
+hash_basic_auth_password abcdefgh
+''', check=False)
+    assert result.returncode != 0
+    assert result.stdout == ""
+    assert "未保存该用户" in result.stderr
+    assert "abcdefgh" not in result.stderr
+
+
 def test_certificate_validator_rejects_untrusted_wrong_host_key_and_expiry():
     bash_run('''
 set -Eeuo pipefail

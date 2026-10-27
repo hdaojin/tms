@@ -1,5 +1,8 @@
 # TMS 生产自动化部署手册
 
+已通过 `ecs-user` 登录公网服务器、需要逐步照着操作时，参见
+[TMS 公网服务器首次部署操作指南](deploy-tms-public-first-install.md)。
+
 本文描述公网和内网全新服务器上的人工审核式自动化部署。它不是“复制命令即无条件执行”的安装器：
 只读检查、候选计划和实际变更是三个独立阶段，每个远程写操作仍须由运维人员单独确认。
 
@@ -133,7 +136,7 @@ tms-deploy tls configure-acme|install|check
    sudo tms-deploy auth list
    ```
 
-   密码隐藏读取，至少 12 个字符；脚本调用 `caddy hash-password --algorithm argon2id`，只保存用户名和哈希。
+   密码隐藏读取，至少 8 个字符；脚本调用 `caddy hash-password --algorithm argon2id`，只保存用户名和哈希。
 
 4. 再次确认实际变更后应用计划：
 
@@ -284,6 +287,10 @@ sudo tms-deploy prune --keep 5
 该命令不删除备份。
 
 ## 10. 故障处理
+
+- **auth add 报 `ERROR EOF`**：旧入口向 `caddy hash-password` 传密码时缺少行末换行。
+  更新已审阅的部署脚本并重新安装 `/usr/local/sbin/tms-deploy`，再执行 `auth add`；无需删除账户文件或重装 Caddy。
+  如果已经生成 plan，更新入口后必须重新生成 plan，因为原计划绑定了旧脚本的哈希。
 
 - **plan 报 SSH 或 host key 错误**：以 `ecs-user` 使用 BatchMode、StrictHostKeyChecking 和 10 秒超时单独验证 GitHub；
   不要临时关闭 host key 检查。

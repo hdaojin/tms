@@ -1004,6 +1004,18 @@ auth_validate_username() {
     [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || die "Basic Auth 用户名格式无效。"
 }
 
+hash_basic_auth_password() {
+    local password="$1" password_hash
+    [[ ${#password} -ge 8 ]] || die "密码至少需要 8 个字符。"
+    # Caddy reads a complete line from piped stdin. Missing LF produces EOF.
+    # Keep the plaintext out of Caddy's command-line arguments.
+    if ! password_hash="$(printf '%s\n' "${password}" | caddy hash-password --algorithm argon2id)"; then
+        die "Basic Auth 密码哈希生成失败，未保存该用户。"
+    fi
+    [[ -n "${password_hash}" ]] || die "Caddy 未输出密码哈希，未保存该用户。"
+    printf '%s\n' "${password_hash}"
+}
+
 cmd_auth() {
     require_root
     require_root_owned_file "$0"
@@ -1020,8 +1032,10 @@ cmd_auth() {
             [[ -t 0 ]] || die "auth add 必须在 TTY 中隐藏读取密码。"
             auth_validate_username "${username}"
             read -r -s -p "Basic Auth password: " password; printf '\n'
-            [[ ${#password} -ge 12 ]] || die "密码至少需要 12 个字符。"
-            password_hash="$(printf '%s' "${password}" | caddy hash-password --algorithm argon2id)"
+            if ! password_hash="$(hash_basic_auth_password "${password}")"; then
+                unset password
+                return 1
+            fi
             unset password
             tmp="$(mktemp "${ENV_DIR}/basic-auth.users.XXXXXX")"
             awk -F: -v user="${username}" '$1 != user' "${AUTH_USERS_FILE}" >"${tmp}"
