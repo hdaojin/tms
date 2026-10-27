@@ -40,7 +40,7 @@ Skill performance → Coach review → 人工调整后续计划
 - django-tables2
 - django-filter
 - django-environ
-- PostgreSQL / MySQL / SQLite
+- PostgreSQL / SQLite
 - Gunicorn
 
 ### 前端
@@ -132,7 +132,7 @@ event_countdown
 - uv
 - Node.js `>=22.12.0` 与 npm（仅开发环境或前端资源构建时需要）
 
-当前生产基线使用 PostgreSQL 17；项目也保留 MySQL 驱动，SQLite 用于本地开发和测试。
+当前生产基线使用 PostgreSQL 17，SQLite 用于本地开发和测试；不再支持 MySQL。
 
 ## 目录说明
 

@@ -179,16 +179,11 @@ postgresql
 postgresql-contrib
 python3.13
 python3.13-venv
-python3.13-dev
-build-essential
-pkg-config
-default-libmysqlclient-dev
-libpq-dev
+libpq5
 ```
 
-项目依赖中同时包含 `psycopg` 与 `mysqlclient`。即使本次使用
-PostgreSQL，安装依赖时仍应准备 `mysqlclient` 的编译依赖。按项目现有
-`.python-version` 使用 Python 3.13。
+项目使用 `psycopg` 连接 PostgreSQL，需要 `libpq5` 运行库，无需安装
+MySQL 驱动及其编译依赖。本方案使用系统 Python 3.13。
 
 安装并使用 uv。优先确保 uv 使用可被服务账户读取的系统 Python 3.13
 创建虚拟环境，避免虚拟环境链接到 `/root` 私有目录下的 Python。可使用：

@@ -52,16 +52,14 @@ swapon --show
 - 域名的公网 A 记录指向服务器公网 IP；若存在 AAAA 记录，IPv6 也必须正确。
 - `/srv` 有足够空间。脚本会在 plan/apply 以及备份前继续检查空间。
 
-项目包含可能需要编译的 `mysqlclient` 依赖，即使生产数据库使用 PostgreSQL，也可能需要以下构建依赖。
-如果尚未安装，在 Debian 上执行：
+项目使用 `psycopg` 连接 PostgreSQL，需要 `libpq5` 运行库。如果尚未安装以下软件包，在 Debian 上执行：
 
 ```bash
 sudo apt-get update
 
 sudo apt-get install --no-install-recommends \
   git curl ca-certificates openssl \
-  build-essential pkg-config python3.13-dev \
-  default-libmysqlclient-dev libpq5
+  libpq5
 ```
 
 服务器不需要安装 Node/npm。前端构建产物应在开发端生成并提交到仓库。
@@ -264,7 +262,7 @@ curl -I https://test.itnsa.cn
 sudo /usr/local/sbin/tms-deploy status
 sudo journalctl -u tms.service -n 100 --no-pager
 sudo journalctl -u caddy -n 100 --no-pager
-sudo caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+sudo -u caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 ```
 
 保留失败命令、退出状态和相关错误输出。不要发送 `/etc/tms/*.env` 内容、数据库密码或私钥。

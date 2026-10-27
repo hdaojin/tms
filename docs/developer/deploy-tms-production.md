@@ -288,6 +288,12 @@ sudo tms-deploy prune --keep 5
 
 ## 10. 故障处理
 
+- **启动时偶发 curl connection refused，随后部署成功**：systemd 启动返回时 Gunicorn 可能尚未监听。
+  脚本会有限重试并隐藏中间探测错误；最终失败才输出最后一次诊断，成功重试不再显示误导性报错。
+- **Gunicorn control server 报 `/var/lib/tms/.gunicorn` 只读**：支持控制 socket 的新版 Gunicorn 默认尝试创建该目录。
+  新版部署脚本会检查候选 release 的 `--help`，支持时在 unit 中加入 `--no-control-socket`；旧版不传入不支持的参数。
+  应用继续由 systemd 管理，不放宽 `/var/lib/tms` 的写权限。更新本地入口和 `tms.service` 模板后，重新 plan/apply 才会使 unit 生效。
+
 - **auth add 报 `ERROR EOF`**：旧入口向 `caddy hash-password` 传密码时缺少行末换行。
   更新已审阅的部署脚本并重新安装 `/usr/local/sbin/tms-deploy`，再执行 `auth add`；无需删除账户文件或重装 Caddy。
   如果已经生成 plan，更新入口后必须重新生成 plan，因为原计划绑定了旧脚本的哈希。
@@ -296,6 +302,10 @@ sudo tms-deploy prune --keep 5
   不要临时关闭 host key 检查。
 - **计划漂移**：脚本、配置、模板或候选 SHA 任一哈希变化都重新 `plan`，不要编辑 manifest 绕过。
 - **Caddy validate 失败**：保留现有 `share.itnsa.cn`，检查独立站点和 Basic Auth 片段；验证成功前不 reload。
+- **validate 成功但 reload 报日志 permission denied**：旧脚本以 root 校验时可能创建 `root:root 0600` 的
+  `/var/log/caddy/tms-access.log`。新版部署前会准备该文件为 Caddy 用户/组、`0640`，保留已有内容，
+  并使用实际 Caddy 服务用户校验配置。已有日志目录必须可供 Caddy 写入和遍历，以支持轮转；
+  脚本不会递归修改日志目录或其他站点的日志。手工校验也应使用 `sudo -u caddy caddy validate`，避免再次由 root 创建日志。
 - **迁移后健康检查失败**：维护标志会保留。查看 `journalctl -u tms.service` 和迁移记录，优先前滚修复；需要恢复时走完整恢复演练。
 - **无迁移但切换失败**：脚本会尝试恢复旧链接；仍须检查旧服务健康与外部 HTTPS。
 - **空间不足**：清理应由独立人工决策完成。部署脚本不会删除备份；release 只通过 `prune` 删除。

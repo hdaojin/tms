@@ -63,6 +63,36 @@ die() { printf '[ERROR] %s\n' "$*" >&2; exit 1; }
 require_cmd() { command -v "$1" >/dev/null 2>&1 || die "缺少命令：$1"; }
 require_root() { [[ "${EUID}" -eq 0 ]] || die "该命令必须由 root 执行。"; }
 
+prepare_caddy_logging() {
+    local log_dir="${1:-/var/log/caddy}" log_file
+    log_file="${log_dir}/tms-access.log"
+    [[ ! -L "${log_dir}" && ( ! -e "${log_dir}" || -d "${log_dir}" ) ]] || \
+        die "Caddy 日志目录不是普通目录：${log_dir}"
+    if [[ ! -d "${log_dir}" ]]; then
+        install -d -m 0750 -o "${TMS_CADDY_USER}" -g "${TMS_CADDY_GROUP}" "${log_dir}"
+    fi
+    # Preserve an existing shared directory's ownership/mode and other logs.
+    # Directory write + search permissions are needed for log rotation too.
+    runuser -u "${TMS_CADDY_USER}" -- test -w "${log_dir}" && \
+        runuser -u "${TMS_CADDY_USER}" -- test -x "${log_dir}" || \
+        die "Caddy 用户无法写入/遍历日志目录，请先检查目录权限：${log_dir}"
+    [[ ! -L "${log_file}" && ( ! -e "${log_file}" || -f "${log_file}" ) ]] || \
+        die "TMS 日志文件路径冲突：${log_file}"
+    if [[ ! -e "${log_file}" ]]; then
+        (set -o noclobber; : >"${log_file}") || die "无法创建 TMS 日志文件：${log_file}"
+    fi
+    # Do not use install /dev/null here: it would truncate existing access logs.
+    chown "${TMS_CADDY_USER}:${TMS_CADDY_GROUP}" "${log_file}"
+    chmod 0640 "${log_file}"
+    runuser -u "${TMS_CADDY_USER}" -- test -w "${log_file}" || die "Caddy 用户无法写入 TMS 日志文件。"
+}
+
+validate_caddy_config() {
+    # Provisioning opens log files; validate with the actual service identity.
+    runuser -u "${TMS_CADDY_USER}" -- caddy validate \
+        --config /etc/caddy/Caddyfile --adapter caddyfile
+}
+
 require_root_owned_file() {
     local path="$1" owner mode
     [[ -f "${path}" ]] || die "缺少文件：${path}"
@@ -217,7 +247,7 @@ install_acme_certificate() {
     ln -sfn "${stage}" "${CERT_DIR}/current.new"
     mv -Tf "${CERT_DIR}/current.new" "${CERT_DIR}/current"
     if [[ -f "${CADDY_SITE}" ]]; then
-        caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile || failed=1
+        validate_caddy_config || failed=1
         if (( failed == 0 )); then
             runuser -u "${TMS_CADDY_USER}" -- test -r "${CERT_DIR}/current/privkey.pem" || failed=1
         fi
@@ -676,10 +706,27 @@ render_auth_snippet() {
     chown root:"${TMS_CADDY_GROUP}" "${AUTH_SNIPPET}"; chmod 0640 "${AUTH_SNIPPET}"
 }
 
+render_systemd_unit() {
+    local release_dir="$1" template="${2:-${TEMPLATE_DIR}/tms.service}" help_output control_option=''
+    help_output="$(runuser -u "${TMS_APP_USER}" -- "${release_dir}/.venv/bin/gunicorn" --help)" || return 1
+    # Gunicorn >=25.1 enables this socket by default. Older versions have no
+    # socket and do not accept the flag, so detect support in the actual release.
+    if [[ "${help_output}" == *'--no-control-socket'* ]]; then
+        control_option=--no-control-socket
+    fi
+    sed -e "s/@@APP_USER@@/${TMS_APP_USER}/g" \
+        -e "s/@@APP_GROUP@@/${TMS_APP_GROUP}/g" \
+        -e "s/@@BIND@@/${TMS_BIND}/g" \
+        -e "s/@@WORKERS@@/${TMS_WORKERS}/g" \
+        -e "s/@@CONTROL_OPTION@@/${control_option}/g" "${template}"
+}
+
 install_service_and_caddy() {
     [[ -s "${AUTH_USERS_FILE}" ]] || die "尚未配置 Basic Auth；先执行 tms-deploy auth add USERNAME。"
     [[ -f /etc/caddy/Caddyfile ]] || die "缺少 /etc/caddy/Caddyfile"
-    local verify_unit unit_backup site_backup main_backup
+    prepare_caddy_logging
+    local verify_unit unit_backup site_backup main_backup rendered_unit
+    rendered_unit="$(render_systemd_unit "${RELEASE_DIR}")" || die "无法检查候选 Gunicorn 参数或渲染服务配置。"
     local unit_existed=0 site_existed=0 validation_failed=0
     unit_backup="$(mktemp)"
     site_backup="$(mktemp)"
@@ -694,11 +741,7 @@ install_service_and_caddy() {
     fi
     cp --preserve=all /etc/caddy/Caddyfile "${main_backup}"
 
-    sed -e "s/@@APP_USER@@/${TMS_APP_USER}/g" \
-        -e "s/@@APP_GROUP@@/${TMS_APP_GROUP}/g" \
-        -e "s/@@BIND@@/${TMS_BIND}/g" \
-        -e "s/@@WORKERS@@/${TMS_WORKERS}/g" \
-        "${TEMPLATE_DIR}/tms.service" >"${SYSTEMD_UNIT}"
+    printf '%s\n' "${rendered_unit}" >"${SYSTEMD_UNIT}"
     chown root:root "${SYSTEMD_UNIT}"; chmod 0644 "${SYSTEMD_UNIT}"
     install -d -m 0755 -o root -g root /etc/caddy/sites-enabled
     render_caddy_site >"${CADDY_SITE}"
@@ -713,7 +756,7 @@ install_service_and_caddy() {
     systemd-analyze verify "${verify_unit}" || validation_failed=1
     rm -f "${verify_unit}"
     if (( validation_failed == 0 )); then
-        caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile || validation_failed=1
+        validate_caddy_config || validation_failed=1
     fi
     if (( validation_failed != 0 )); then
         if (( unit_existed )); then cp --preserve=all "${unit_backup}" "${SYSTEMD_UNIT}"; else rm -f "${SYSTEMD_UNIT}"; fi
@@ -772,32 +815,38 @@ atomic_switch() {
 }
 
 local_healthcheck() {
-    local attempt
+    local attempt diagnostic=''
     for attempt in {1..20}; do
-        if curl --silent --show-error --fail --max-time 3 \
+        if diagnostic="$(curl --silent --show-error --fail --max-time 3 --output /dev/null \
             --header "Host: ${TMS_DOMAIN}" --header 'X-Forwarded-Proto: https' \
-            "http://${TMS_BIND}/" >/dev/null; then
+            "http://${TMS_BIND}/" 2>&1)"; then
             return 0
         fi
-        sleep 1
+        if (( attempt < 20 )); then sleep 1; fi
     done
+    warn "Gunicorn 健康检查重试 20 次仍失败，最后一次诊断：${diagnostic}"
     return 1
 }
 
 https_healthcheck() {
     # Loopback may itself be explicitly trusted. Do not misreport it as failure.
-    local attempt code requires_auth=1
+    local attempt code response diagnostic='' requires_auth=1
     if [[ -n "${TMS_BASIC_AUTH_TRUSTED_CIDRS}" ]]; then
         requires_auth="$(basic_auth_policy 127.0.0.1)" || return 1
     fi
     for attempt in {1..15}; do
-        if code="$(curl --noproxy '*' --silent --show-error --max-time 4 \
+        if response="$(curl --noproxy '*' --silent --show-error --max-time 4 \
             --resolve "${TMS_DOMAIN}:443:127.0.0.1" --output /dev/null --write-out '%{http_code}' \
-            "https://${TMS_DOMAIN}/")" && https_status_matches_policy "${code}" "${requires_auth}"; then
-            return 0
+            "https://${TMS_DOMAIN}/" 2>&1)"; then
+            code="${response}"
+            if https_status_matches_policy "${code}" "${requires_auth}"; then return 0; fi
+            diagnostic="HTTP=${code} 不符合来源网段认证策略（requires_auth=${requires_auth}）"
+        else
+            diagnostic="${response}"
         fi
-        sleep 2
+        if (( attempt < 15 )); then sleep 2; fi
     done
+    warn "HTTPS 健康检查重试 15 次仍失败，最后一次诊断：${diagnostic}"
     return 1
 }
 
@@ -932,7 +981,7 @@ cmd_verify() {
     [[ -L "${CURRENT_LINK}" ]] || die "current 不存在。"
     systemctl is-active --quiet tms.service || die "tms.service 未运行。"
     systemctl is-active --quiet caddy || die "caddy 未运行。"
-    caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+    validate_caddy_config
     ss -ltn | grep -Eq '127\.0\.0\.1:8010|\[::1\]:8010' || die "Gunicorn 未仅在回环地址监听 8010。"
     if ss -ltn | awk '$4 ~ /:5432$/ {print $4}' | grep -Evq '^(127\.0\.0\.1|\[::1\]):5432$'; then
         die "PostgreSQL 发现非回环监听地址。"
@@ -1052,7 +1101,7 @@ cmd_auth() {
     esac
     render_auth_snippet
     if [[ -f "${CADDY_SITE}" ]]; then
-        caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+        validate_caddy_config
         systemctl reload caddy
     fi
     info "Basic Auth 配置已更新；未保存明文密码。"

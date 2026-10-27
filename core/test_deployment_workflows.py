@@ -61,6 +61,87 @@ def test_invalid_tls_mode_is_rejected():
     assert "automatic" in result.stderr
 
 
+@pytest.mark.parametrize("supports_control_socket", [True, False])
+def test_systemd_disables_control_socket_only_when_release_supports_flag(supports_control_socket):
+    with patch.dict(os.environ, {"TMS_TEST_CONTROL_HELP": "--no-control-socket" if supports_control_socket else "--workers"}):
+        result = bash_run('''
+set -Eeuo pipefail
+source "$1"
+runuser() {
+    [[ "$#" == 5 && "$1" == -u && "$2" == tms && "$3" == -- && "$4" == /candidate/.venv/bin/gunicorn && "$5" == --help ]] || return 99
+    printf '%s\\n' "$TMS_TEST_CONTROL_HELP"
+}
+render_systemd_unit /candidate "$(dirname "$1")/../deploy/production/tms.service"
+''')
+    assert ("--no-control-socket" in result.stdout) is supports_control_socket
+    assert "@@" not in result.stdout
+    assert "ProtectSystem=strict" in result.stdout
+    assert "ReadWritePaths=/srv/tms/shared/media /srv/tms/shared/media-private" in result.stdout
+
+
+def test_gunicorn_help_failure_stops_service_rendering():
+    result = bash_run('''
+source "$1"
+runuser() { return 42; }
+render_systemd_unit /candidate "$(dirname "$1")/../deploy/production/tms.service"
+''', check=False)
+    assert result.returncode != 0
+    assert result.stdout == ""
+
+
+@pytest.mark.parametrize(("target", "mode"), [
+    ("local", "ready_after_retry"),
+    ("local", "unreachable"),
+    ("https", "ready_after_retry"),
+    ("https", "unreachable"),
+    ("https", "wrong_http_status"),
+])
+def test_healthcheck_retries_quietly_and_reports_only_final_diagnostic(target, mode):
+    with patch.dict(os.environ, {"TMS_TEST_HEALTH_TARGET": target, "TMS_TEST_HEALTH_MODE": mode}):
+        result = bash_run('''
+set -Eeuo pipefail
+source "$1"
+work="$(mktemp -d)"
+trap 'rm -f "$work/attempts"; rmdir "$work"' EXIT
+printf '0' >"$work/attempts"
+sleep() { :; }
+curl() {
+    local count
+    count=$(( $(cat "$work/attempts") + 1 ))
+    printf '%s' "$count" >"$work/attempts"
+    if [[ "$TMS_TEST_HEALTH_MODE" == unreachable || ( "$TMS_TEST_HEALTH_MODE" == ready_after_retry && "$count" == 1 ) ]]; then
+        printf 'curl: (7) simulated connection refused\\n' >&2
+        return 7
+    fi
+    if [[ "$TMS_TEST_HEALTH_TARGET" == https ]]; then
+        if [[ "$TMS_TEST_HEALTH_MODE" == wrong_http_status ]]; then printf 200; else printf 401; fi
+    fi
+    return 0
+}
+result=0
+if [[ "$TMS_TEST_HEALTH_TARGET" == local ]]; then
+    local_healthcheck || result=$?
+else
+    https_healthcheck || result=$?
+fi
+if [[ "$TMS_TEST_HEALTH_MODE" == ready_after_retry ]]; then
+    [[ "$(cat "$work/attempts")" == 2 && "$result" == 0 ]]
+else
+    if [[ "$TMS_TEST_HEALTH_TARGET" == local ]]; then expected=20; else expected=15; fi
+    [[ "$(cat "$work/attempts")" == "$expected" && "$result" != 0 ]]
+fi
+''')
+    assert result.stdout == ""
+    if mode == "ready_after_retry":
+        assert result.stderr == ""
+    else:
+        assert result.stderr.count("[WARN]") == 1
+        if mode == "unreachable":
+            assert result.stderr.count("simulated connection refused") == 1
+        else:
+            assert "HTTP=200" in result.stderr
+
+
 def test_basic_auth_defaults_to_all_clients_and_only_explicit_networks_bypass():
     result = bash_run('''
 set -Eeuo pipefail
@@ -113,6 +194,90 @@ if bash "$entry" plan --first-install; then exit 10; fi
 if bash "$entry" prune; then exit 11; fi
 bash "$entry" --help
 ''')
+
+
+def test_caddy_log_initialization_preserves_existing_content_and_other_logs():
+    bash_run('''
+set -Eeuo pipefail
+source "$1"
+work="$(mktemp -d)"
+trap 'rm -f "$work/logs/tms-access.log" "$work/logs/other.log"; rmdir "$work/logs" "$work"' EXIT
+ownership_calls=0
+mode_calls=0
+runuser() {
+    [[ "$1" == -u && "$2" == caddy && "$3" == -- ]] || return 10
+    shift 3
+    "$@"
+}
+install() {
+    [[ "$1" == -d && "$2" == -m && "$3" == 0750 && "$4" == -o && "$5" == caddy && "$6" == -g && "$7" == caddy ]] || return 11
+    command mkdir -p "$8"
+}
+chown() {
+    [[ "$1" == caddy:caddy && "$2" == "$work/logs/tms-access.log" ]] || return 12
+    ownership_calls=$((ownership_calls + 1))
+}
+chmod() {
+    [[ "$1" == 0640 && "$2" == "$work/logs/tms-access.log" ]] || return 13
+    mode_calls=$((mode_calls + 1))
+}
+prepare_caddy_logging "$work/logs"
+[[ -f "$work/logs/tms-access.log" ]]
+printf 'existing TMS access log\\n' >"$work/logs/tms-access.log"
+printf 'other site log\\n' >"$work/logs/other.log"
+install() { printf 'existing directory must not be reinstalled\\n' >&2; return 14; }
+prepare_caddy_logging "$work/logs"
+[[ "$(cat "$work/logs/tms-access.log")" == 'existing TMS access log' ]]
+[[ "$(cat "$work/logs/other.log")" == 'other site log' ]]
+[[ "$ownership_calls" == 2 && "$mode_calls" == 2 ]]
+''')
+
+
+def test_caddy_log_symlink_is_rejected_without_touching_target():
+    result = bash_run('''
+set -Eeuo pipefail
+source "$1"
+work="$(mktemp -d)"
+trap 'rm -f "$work/tms-access.log" "$work/target"; rmdir "$work"' EXIT
+printf 'keep original\\n' >"$work/target"
+ln -s "$work/target" "$work/tms-access.log"
+[[ -L "$work/tms-access.log" ]] || exit 77
+runuser() { shift 3; "$@"; }
+chown() { printf 'unexpected chown\\n' >&2; exit 20; }
+if (prepare_caddy_logging "$work"); then exit 21; fi
+[[ "$(cat "$work/target")" == 'keep original' ]]
+''', check=False)
+    if result.returncode == 77:
+        pytest.skip("当前文件系统不支持原生软链接")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_caddy_unwritable_log_directory_fails_before_creating_file():
+    bash_run('''
+set -Eeuo pipefail
+source "$1"
+work="$(mktemp -d)"
+trap 'rmdir "$work"' EXIT
+runuser() { return 1; }
+if (prepare_caddy_logging "$work"); then exit 22; fi
+[[ ! -e "$work/tms-access.log" ]]
+''')
+
+
+@pytest.mark.parametrize("exit_code", [0, 42])
+def test_caddy_validation_uses_service_user_and_propagates_failure(exit_code):
+    with patch.dict(os.environ, {"TMS_TEST_VALIDATE_EXIT": str(exit_code)}):
+        result = bash_run('''
+source "$1"
+runuser() {
+    [[ "$#" == 9 && "$1" == -u && "$2" == caddy && "$3" == -- && "$4" == caddy && "$5" == validate && "$6" == --config && "$7" == /etc/caddy/Caddyfile && "$8" == --adapter && "$9" == caddyfile ]] || return 99
+    return "$TMS_TEST_VALIDATE_EXIT"
+}
+caddy() { printf 'unexpected root validation\\n' >&2; return 98; }
+validate_caddy_config
+''', check=False)
+    assert result.returncode == exit_code
+    assert "unexpected root validation" not in result.stderr
 
 
 def test_auth_hash_passes_newline_to_caddy_and_accepts_eight_characters():

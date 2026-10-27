@@ -34,10 +34,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install system build dependencies
+      - name: Install PostgreSQL client library
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends pkg-config default-libmysqlclient-dev libpq-dev
+          sudo apt-get install -y --no-install-recommends libpq5
 
       - name: Set up Python
         uses: actions/setup-python@v5
