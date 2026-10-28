@@ -225,11 +225,52 @@ class TrainingCycleMember(models.Model):
         related_name="training_cycle_memberships",
     )
     role = models.CharField("角色", max_length=20, choices=Role.choices)
+    is_current = models.BooleanField("当前周期", default=False)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
     class Meta:
         verbose_name = verbose_name_plural = "训练周期成员"
-        constraints = [models.UniqueConstraint(fields=["training_cycle", "user"], name="uniq_trainingcycle_member")]
+        constraints = [
+            models.UniqueConstraint(fields=["training_cycle", "user"], name="uniq_trainingcycle_member"),
+            models.UniqueConstraint(fields=["user"], condition=Q(is_current=True), name="uniq_current_cycle_per_user"),
+        ]
+
+    def has_task_links(self):
+        return (
+            TaskExecution.objects.filter(
+                user_id=self.user_id, training_task__training_plan__training_cycle_id=self.training_cycle_id
+            ).exists()
+            or TrainingTaskCoach.objects.filter(
+                user_id=self.user_id, training_task__training_plan__training_cycle_id=self.training_cycle_id
+            ).exists()
+        )
+
+    def removal_error(self):
+        if self.has_task_links():
+            return "该成员已有任务关联，不能移除。"
+        if TrainingLog.objects.filter(author_id=self.user_id, training_cycle_id=self.training_cycle_id).exists():
+            return "该成员已有训练日志，不能移除。"
+        return ""
+
+    def clean(self):
+        super().clean()
+        previous = type(self).objects.filter(pk=self.pk).first() if self.pk else None
+        if previous and (previous.user_id != self.user_id or previous.training_cycle_id != self.training_cycle_id):
+            raise ValidationError("成员的用户与训练周期不可修改，请移除后重新添加。")
+        if previous and previous.role != self.role and previous.has_task_links():
+            raise ValidationError({"role": "该成员已有任务关联，不能改变身份。"})
+        if self.is_current and (not previous or not previous.is_current):
+            if self.training_cycle.status != TrainingCycle.Status.ACTIVE:
+                raise ValidationError({"is_current": "只有进行中的训练周期可以设为当前周期。"})
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if error := self.removal_error():
+            raise ValidationError(error)
+        return super().delete(*args, **kwargs)
 
 
 class TrainingPlan(models.Model):

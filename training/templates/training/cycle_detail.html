@@ -8,6 +8,9 @@
         <h2 class="card-title">训练周期信息</h2>
         <p class="text-sm text-base-content/70">{{ cycle.code }} / {{ cycle.skill_project }}</p>
       </div>
+      {% if perms.training.view_trainingcyclemember %}
+        <a href="{% url 'training:cycle_members' cycle.pk %}" class="btn btn-outline btn-sm">成员管理</a>
+      {% endif %}
       {% if perms.training.change_trainingcycle %}
         <a href="{% url 'training:cycle_edit' cycle.pk %}" class="btn btn-outline btn-sm">编辑</a>
       {% endif %}

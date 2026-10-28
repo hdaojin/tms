@@ -5,22 +5,63 @@ from io import BytesIO
 from pathlib import PurePosixPath
 
 from django.core.exceptions import ValidationError
+from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from .models import TaskExecution, TrainingCycleMember, TrainingLog, TrainingTask
+from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingTask
 from .log_files import DUPLICATE_LOG_MESSAGE, build_log_filename
 
 
-def save_training_log(log, executions):
+@transaction.atomic
+def save_cycle_member(member):
+    """以用户行锁串行化当前周期切换，失败时恢复原设置。"""
+    get_user_model().objects.select_for_update().get(pk=member.user_id)
+    member.training_cycle = TrainingCycle.objects.get(pk=member.training_cycle_id)
+    member.clean()
+    if member.is_current:
+        TrainingCycleMember.objects.filter(user_id=member.user_id, is_current=True).exclude(pk=member.pk).update(
+            is_current=False
+        )
+    member.full_clean()
+    member.save()
+    return member
+
+
+@transaction.atomic
+def remove_cycle_member(member):
+    get_user_model().objects.select_for_update().get(pk=member.user_id)
+    member.delete()
+
+
+def validate_new_log(log, *, backfill=False):
+    cycle = TrainingCycle.objects.get(pk=log.training_cycle_id)
+    member = cycle.members.filter(user_id=log.author_id).first()
+    if not member:
+        raise ValidationError("请先加入所选训练周期，再提交日志。")
+    if backfill:
+        if cycle.status not in {cycle.Status.ACTIVE, cycle.Status.COMPLETED}:
+            raise ValidationError("历史补交仅支持进行中或已完成的训练周期。")
+    elif not member.is_current or cycle.status != cycle.Status.ACTIVE:
+        raise ValidationError("未设置有效的当前周期，请联系管理员。")
+    if log.training_date < cycle.start_date or (cycle.end_date and log.training_date > cycle.end_date):
+        raise ValidationError("训练日期必须位于训练周期日期范围内。")
+
+
+def save_training_log(log, executions, *, backfill=False):
     """先预留数据库唯一键，再保存文件；失败时清理本次新增文件。"""
     upload = log.document if log.document and not log.document._committed else None
     saved_name = None
     storage = log.document.storage
     try:
         with transaction.atomic():
+            if not log.pk:
+                get_user_model().objects.select_for_update().get(pk=log.author_id)
+                validate_new_log(log, backfill=backfill)
             if log.pk:
                 previous = TrainingLog.objects.select_for_update().get(pk=log.pk)
+                if previous.training_cycle_id != log.training_cycle_id:
+                    raise ValidationError("已有日志不可修改训练周期。")
                 if previous.document and (
                     upload or previous.document.name != log.document.name
                     or previous.training_cycle_id != log.training_cycle_id

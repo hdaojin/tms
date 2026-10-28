@@ -1,0 +1,11 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="card bg-base-100 shadow-sm"><div class="card-body">
+  <p>确认从“{{ member.training_cycle.name }}”移除 {{ member.user.display_name }}（{{ member.user.username }}）？</p>
+  {% if removal_error %}<p>{{ removal_error }}</p>{% else %}
+    <p>若这是该用户的当前周期，移除后需要重新设置。</p>
+    <form method="post">{% csrf_token %}<button class="btn btn-error" type="submit">确认移除</button></form>
+  {% endif %}
+  <a class="btn btn-outline" href="{% url 'training:cycle_members' member.training_cycle_id %}">返回成员管理</a>
+</div></div>
+{% endblock %}

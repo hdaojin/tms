@@ -111,7 +111,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.coach = User.objects.create_user("coach", last_name="肖", first_name="威")
         self.period = self.active_cycle(end_date=None)
         for user, role in [(self.user, "competitor"), (self.coach, "coach")]:
-            TrainingCycleMember.objects.create(training_cycle=self.period, user=user, role=role)
+            TrainingCycleMember.objects.create(training_cycle=self.period, user=user, role=role, is_current=True)
         self.grant(self.user, "view_traininglog", "add_traininglog", "change_traininglog")
         self.client.force_login(self.user)
 
@@ -134,18 +134,21 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         return SimpleUploadedFile(filename, b"%PDF-1.4\n%%EOF", content_type="application/pdf")
 
     def create_log(self, user=None, **kwargs):
-        form = TrainingLogForm(self.data(**kwargs), {"document": self.upload()}, author=user or self.user)
+        backfill = kwargs.pop("backfill", False)
+        form = TrainingLogForm(self.data(**kwargs), {"document": self.upload()}, author=user or self.user,
+                               backfill=backfill)
         self.assertTrue(form.is_valid(), form.errors)
         return form.save()
 
-    def test_defaults_pick_latest_active_membership_and_iso_today(self):
+    def test_defaults_use_explicit_current_membership_and_iso_today(self):
         today = timezone.localdate()
         recent = self.active_cycle("RECENT", start_date=today - timedelta(days=1), end_date=None)
         TrainingCycleMember.objects.create(training_cycle=recent, user=self.user, role="competitor")
         self.active_cycle("UNJOINED", start_date=today, end_date=None)
         response = self.client.get(reverse("training:log_create"))
         form = response.context["form"]
-        self.assertEqual(form["training_cycle"].value(), recent.pk)
+        self.assertEqual(form["training_cycle"].value(), self.period.pk)
+        self.assertNotContains(response, '<select name="training_cycle"')
         self.assertContains(response, f'value="{today:%Y-%m-%d}"')
         recent.status = "completed"
         recent.save()
@@ -169,23 +172,24 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn(DUPLICATE_LOG_MESSAGE, str(form.errors))
         other = User.objects.create_user("same_name", last_name="夏", first_name="国金")
-        TrainingCycleMember.objects.create(training_cycle=self.period, user=other, role="competitor")
+        TrainingCycleMember.objects.create(training_cycle=self.period, user=other, role="competitor", is_current=True)
         form = TrainingLogForm(self.data(), {"document": self.upload()}, author=other)
         self.assertFalse(form.is_valid())
         self.assertIn(DUPLICATE_LOG_MESSAGE, str(form.errors))
 
     def test_same_name_allowed_in_different_cycle(self):
         self.create_log()
-        other = self.cycle("OTHER")
+        other = self.active_cycle("OTHER", end_date=None)
         TrainingCycleMember.objects.create(training_cycle=other, user=self.user, role="competitor")
-        log = self.create_log(training_cycle=other.pk)
+        log = self.create_log(training_cycle=other.pk, backfill=True)
         self.assertIn("logs/OTHER/2026/03/", log.document.name)
 
-    def test_member_and_real_name_required_only_for_file(self):
+    def test_membership_always_required_and_real_name_required_only_for_file(self):
         outsider = User.objects.create_user("outsider", last_name="张", first_name="三")
         form = TrainingLogForm(self.data(), {"document": self.upload()}, author=outsider)
         self.assertFalse(form.is_valid())
-        self.assertIn("加入所选训练周期", str(form.errors))
+        self.assertIn("当前周期", str(form.errors))
+        self.assertFalse(TrainingLogForm(self.data(), author=outsider).is_valid())
         self.user.first_name = self.user.last_name = ""
         self.user.save()
         form = TrainingLogForm(self.data(), {"document": self.upload()}, author=self.user)

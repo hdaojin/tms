@@ -43,6 +43,10 @@ bundles:
     name: 训练管理 | 维护训练计划
     description: 查看训练周期并新增、修改训练计划。
     permissions: [training.view_trainingcycle, training.view_trainingcyclemember, training.view_trainingplan, training.add_trainingplan, training.change_trainingplan]
+  - code: training.manage_cycle_members
+    name: 训练管理 | 管理周期成员
+    description: 维护周期选手和教练成员，并设置用户当前周期。
+    permissions: [training.view_trainingcycle, training.view_trainingcyclemember, training.add_trainingcyclemember, training.change_trainingcyclemember, training.delete_trainingcyclemember]
   - code: training.maintain_tasks
     name: 训练管理 | 维护训练任务
     description: 按技术领域或显式教练分配维护训练任务、附件和教练反馈。

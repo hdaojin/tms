@@ -1,0 +1,21 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="card bg-base-100 shadow-sm"><div class="card-body">
+  <h2 class="card-title">{{ cycle.name }} · 周期成员</h2>
+  <div class="overflow-x-auto"><table class="table">
+    <thead><tr><th>用户</th><th>周期身份</th><th>当前周期</th><th>操作</th></tr></thead>
+    <tbody>{% for member in members %}<tr>
+      <td>{{ member.user.display_name }}（{{ member.user.username }}）</td>
+      <td>{{ member.get_role_display }}</td><td>{{ member.is_current|yesno:"是,否" }}</td>
+      <td>
+        {% if perms.training.change_trainingcyclemember %}<a class="btn btn-outline btn-sm" href="{% url 'training:member_edit' cycle.pk member.pk %}">维护</a>{% endif %}
+        {% if perms.training.delete_trainingcyclemember %}<a class="btn btn-outline btn-sm" href="{% url 'training:member_delete' cycle.pk member.pk %}">移除</a>{% endif %}
+      </td>
+    </tr>{% empty %}<tr><td colspan="4">暂无周期成员。</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% if perms.training.add_trainingcyclemember %}
+    <h3 class="font-semibold">批量添加成员</h3>
+    {% include "components/form.html" with form=form action=request.path submit_label="添加成员" %}
+  {% endif %}
+</div></div>
+{% endblock %}

@@ -23,11 +23,24 @@ from .models import (
     TrainingTaskDomain,
     TrainingTaskSkill,
 )
-from .services import publish_training_task, save_training_log
+from .services import publish_training_task, save_training_log, validate_new_log
 from .log_files import DUPLICATE_LOG_MESSAGE, build_log_filename
 
 
 User = get_user_model()
+
+
+class CycleMemberAddForm(StyledFormMixin, forms.Form):
+    users = forms.ModelMultipleChoiceField(label="用户", queryset=User.objects.filter(is_active=True))
+    role = forms.ChoiceField(label="周期身份", choices=TrainingCycleMember.Role.choices)
+    is_current = forms.BooleanField(label="设为当前周期", required=False,
+                                   help_text="将替换所选用户原来的当前周期。")
+
+
+class CycleMemberEditForm(StyledFormMixin, forms.Form):
+    role = forms.ChoiceField(label="周期身份", choices=TrainingCycleMember.Role.choices)
+    is_current = forms.BooleanField(label="设为当前周期", required=False,
+                                   help_text="勾选将替换该用户原来的当前周期；取消则清除本周期的当前标记。")
 
 
 class TrainingCycleForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.ModelForm):
@@ -452,20 +465,36 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.author = kwargs.pop("author", None)
+        self.backfill = kwargs.pop("backfill", False)
         super().__init__(*args, **kwargs)
         if self.instance.pk:
             self.author = self.instance.author
         elif self.author:
             self.instance.author = self.author
-            today = timezone.localdate()
             default_cycle = (
-                TrainingCycle.objects.filter(members__user=self.author, status=TrainingCycle.Status.ACTIVE,
-                                             start_date__lte=today)
-                .filter(models.Q(end_date__isnull=True) | models.Q(end_date__gte=today))
-                .order_by("-start_date", "name", "pk").first()
+                TrainingCycle.objects.filter(members__user=self.author, members__is_current=True,
+                                             status=TrainingCycle.Status.ACTIVE).first()
             )
-            if default_cycle:
-                self.initial.setdefault("training_cycle", default_cycle.pk)
+            if not self.backfill:
+                self.current_cycle = default_cycle
+                self.initial["training_cycle"] = default_cycle.pk if default_cycle else None
+                self.fields["training_cycle"].disabled = True
+                self.fields["training_cycle"].widget = forms.HiddenInput()
+                self.fields["training_cycle"].label = "当前周期"
+                self.fields["training_cycle"].queryset = TrainingCycle.objects.filter(
+                    pk=default_cycle.pk if default_cycle else None
+                )
+                self.fields["training_cycle"].empty_label = "未设置有效的当前周期，请联系管理员"
+                self.fields["training_cycle"].help_text = "当前周期由管理员设置；其他周期的日志请使用历史补交入口。"
+            else:
+                self.fields["training_cycle"].queryset = TrainingCycle.objects.filter(
+                    members__user=self.author,
+                    status__in=[TrainingCycle.Status.ACTIVE, TrainingCycle.Status.COMPLETED],
+                )
+        if self.instance.pk:
+            self.fields["training_cycle"].disabled = True
+            self.fields["training_cycle"].widget = forms.HiddenInput()
+            self.current_cycle = self.instance.training_cycle
         self.fields["document"].widget.attrs.update(TRAINING_LOG_UPLOAD_SPEC.widget_attrs())
         if self.instance.pk and self.instance.document:
             # 不把已有文件再次交给 FileField 校验，避免读取旧文件或触发替换。
@@ -484,7 +513,15 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
         cleaned = super().clean()
         cycle = cleaned.get("training_cycle")
         training_date = cleaned.get("training_date")
+        if not self.instance.pk and not self.backfill and not cycle:
+            self.add_error(None, "未设置有效的当前周期，请联系管理员。")
         if cycle and training_date and self.author:
+            if not self.instance.pk:
+                try:
+                    validate_new_log(TrainingLog(training_cycle=cycle, author=self.author, training_date=training_date),
+                                     backfill=self.backfill)
+                except forms.ValidationError as exc:
+                    self.add_error(None, exc)
             others = TrainingLog.objects.filter(training_cycle=cycle).exclude(pk=self.instance.pk)
             if others.filter(author=self.author, training_date=training_date).exists():
                 self.add_error(None, DUPLICATE_LOG_MESSAGE)
@@ -522,5 +559,5 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
         if self.author and not log.author_id:
             log.author = self.author
         if commit:
-            save_training_log(log, self.cleaned_data.get("executions"))
+            save_training_log(log, self.cleaned_data.get("executions"), backfill=self.backfill)
         return log

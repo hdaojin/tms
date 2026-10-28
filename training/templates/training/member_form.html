@@ -1,0 +1,6 @@
+{% extends "common/form.html" %}
+{% block content %}
+<p>{{ member.training_cycle.name }} · {{ member.user.display_name }}（{{ member.user.username }}）</p>
+{% if removal_error %}<p>{{ removal_error }}</p>{% endif %}
+{{ block.super }}
+{% endblock %}

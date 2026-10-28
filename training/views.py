@@ -1,11 +1,12 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from django.db.models import Count
 from pathlib import Path
 
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, UpdateView
@@ -20,13 +21,15 @@ from core.file_preview import (
 
 from .forms import (
     CoachFeedbackForm,
+    CycleMemberAddForm,
+    CycleMemberEditForm,
     TaskExecutionForm,
     TrainingCycleForm,
     TrainingLogForm,
     TrainingPlanForm,
     TrainingTaskForm,
 )
-from .models import TaskExecution, TrainingCycle, TrainingLog, TrainingPlan, TrainingTask
+from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
 from .selectors import (
     manageable_training_tasks_for,
     training_logs_changeable_by,
@@ -35,7 +38,9 @@ from .selectors import (
     visible_task_executions_for,
     visible_training_tasks_for,
 )
-from .services import build_training_log_archive, record_coach_feedback, update_execution_facts
+from .services import (
+    build_training_log_archive, record_coach_feedback, update_execution_facts, save_cycle_member, remove_cycle_member,
+)
 from .tables import TaskExecutionTable, TrainingCycleTable, TrainingLogTable, TrainingPlanTable, TrainingTaskTable
 
 
@@ -76,6 +81,111 @@ class TrainingCycleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
             "skill_tree_version_links__technical_domain",
             "skill_tree_version_links__skill_tree_version",
         )
+
+
+class TrainingCycleMembersView(TitleMixin, PermissionRequiredMixin, FormView):
+    template_name = "training/cycle_members.html"
+    form_class = CycleMemberAddForm
+    title = "周期成员管理"
+    permission_required = "training.view_trainingcyclemember"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.cycle = get_object_or_404(TrainingCycle, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_breadcrumb_parents(self):
+        if self.request.user.has_perm("training.view_trainingcycle"):
+            return [breadcrumb_link("训练周期", "training:cycle_list"),
+                    breadcrumb_link(self.cycle.name, "training:cycle_detail", args=[self.cycle.pk])]
+        return []
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.fields["users"].queryset = form.fields["users"].queryset.exclude(
+            training_cycle_memberships__training_cycle=self.cycle
+        )
+        if not self.request.user.has_perm("training.change_trainingcyclemember"):
+            form.fields.pop("is_current")
+        return form
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.has_perm("training.add_trainingcyclemember"):
+            raise PermissionDenied
+        return super().post(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["cycle"] = self.cycle
+        context["members"] = self.cycle.members.select_related("user").order_by("user__username")
+        return context
+
+    def form_valid(self, form):
+        if not self.request.user.has_perm("training.add_trainingcyclemember"):
+            raise PermissionDenied
+        try:
+            with transaction.atomic():
+                for user in sorted(form.cleaned_data["users"], key=lambda item: item.pk):
+                    save_cycle_member(TrainingCycleMember(
+                        training_cycle=self.cycle, user=user, role=form.cleaned_data["role"],
+                        is_current=form.cleaned_data.get("is_current", False),
+                    ))
+        except ValidationError as exc:
+            form.add_error(None, "；".join(exc.messages))
+            return self.form_invalid(form)
+        messages.success(self.request, "已添加周期成员。")
+        return redirect("training:cycle_members", pk=self.cycle.pk)
+
+
+class TrainingCycleMemberEditView(TitleMixin, PermissionRequiredMixin, FormView):
+    template_name = "training/member_form.html"
+    form_class = CycleMemberEditForm
+    title = "维护周期成员"
+    permission_required = ("training.view_trainingcyclemember", "training.change_trainingcyclemember")
+
+    def dispatch(self, request, *args, **kwargs):
+        self.member = get_object_or_404(
+            TrainingCycleMember.objects.select_related("user", "training_cycle"),
+            pk=kwargs["member_pk"], training_cycle_id=kwargs["pk"],
+        )
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_breadcrumb_parents(self):
+        return [breadcrumb_link("周期成员管理", "training:cycle_members", args=[self.member.training_cycle_id])]
+
+    def get_initial(self):
+        return {"role": self.member.role, "is_current": self.member.is_current}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["member"] = self.member
+        context["removal_error"] = self.member.removal_error()
+        return context
+
+    def form_valid(self, form):
+        self.member.role = form.cleaned_data["role"]
+        self.member.is_current = form.cleaned_data["is_current"]
+        try:
+            save_cycle_member(self.member)
+        except ValidationError as exc:
+            form.add_error(None, "；".join(exc.messages))
+            return self.form_invalid(form)
+        messages.success(self.request, "已保存周期成员。")
+        return redirect("training:cycle_members", pk=self.member.training_cycle_id)
+
+
+class TrainingCycleMemberDeleteView(TrainingCycleMemberEditView):
+    template_name = "training/member_confirm_delete.html"
+    title = "移除周期成员"
+    permission_required = ("training.view_trainingcyclemember", "training.delete_trainingcyclemember")
+
+    def post(self, request, *args, **kwargs):
+        try:
+            remove_cycle_member(self.member)
+        except ValidationError as exc:
+            messages.error(request, "；".join(exc.messages))
+        else:
+            messages.success(request, "已移除周期成员。")
+        return redirect("training:cycle_members", pk=self.member.training_cycle_id)
 
 
 class TrainingCycleCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
@@ -395,9 +505,10 @@ class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
 class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingLog
     form_class = TrainingLogForm
-    template_name = "common/form.html"
+    template_name = "training/log_form.html"
     title = "新增训练日志"
     permission_required = "training.add_traininglog"
+    backfill = False
 
     def get_breadcrumb_parents(self):
         if not self.request.user.has_perm("training.view_traininglog"):
@@ -407,6 +518,7 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["author"] = self.request.user
+        kwargs["backfill"] = self.backfill
         return kwargs
 
     def get_success_url(self):
@@ -418,6 +530,11 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
         except ValidationError as exc:
             form.add_error(None, exc)
             return self.form_invalid(form)
+
+
+class TrainingLogBackfillView(TrainingLogCreateView):
+    title = "补交历史训练日志"
+    backfill = True
 
 
 class TrainingLogUpdateView(TrainingLogCreateView, UpdateView):

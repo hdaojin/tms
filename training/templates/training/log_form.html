@@ -1,0 +1,9 @@
+{% extends "common/form.html" %}
+{% block content %}
+{% if form.current_cycle %}
+  <p>{% if object %}训练周期{% else %}当前周期{% endif %}：{{ form.current_cycle.name }}（{{ form.current_cycle.code }}）</p>
+{% elif not view.backfill and not object %}
+  <p>未设置有效的当前周期，请联系管理员。</p>
+{% endif %}
+{{ block.super }}
+{% endblock %}
