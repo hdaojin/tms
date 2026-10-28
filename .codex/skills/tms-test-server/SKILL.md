@@ -1,9 +1,9 @@
 ---
-name: remote-server-config
+name: tms-test-server
 description: 通过现有 SSH 配置安全地检查或配置指定的远程服务器；适用于用户明确要求连接 test.itnsa.cn 并执行服务器配置时。
 ---
 
-# 远程服务器配置
+# TMS Test Server
 
 目标服务器固定为 `ecs-user@8.134.199.121:2222`（`test.itnsa.cn`）。使用当前 Windows `demo` 用户环境中已有的 OpenSSH 配置、ssh-agent 或默认身份文件认证；绝不读取、打印、复制、保存或提交私钥、口令、令牌和 `.env` 内容。
 

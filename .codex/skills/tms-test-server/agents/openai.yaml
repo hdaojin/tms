@@ -1,0 +1,3 @@
+interface:
+  display_name: "TMS Test Server"
+  short_description: "通过 SSH 检查或配置 test.itnsa.cn 测试服务器"
