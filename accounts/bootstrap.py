@@ -42,9 +42,9 @@ DEFAULT_ROLES = [
         ],
     },
     {
-        "codename": "class_affairs",
+        "codename": "assistant",
         "name": "班务",
-        "description": "全站日常事务：录入和查看全体奖惩、发布通知、上传会议。不包含账号管理、完整用户资料或奖惩审核。",
+        "description": "协助管理班级日常事务，可录入和查看全体奖惩、发布通知、上传会议；不包含账号管理、完整用户资料或奖惩审核。",
         "bundles": [
             *COMMON_BUNDLES,
             "behaviors.record_conduct",

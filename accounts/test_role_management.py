@@ -41,7 +41,7 @@ class DefaultRoleTests(TestCase):
         self.assertEqual(len(plan.roles), 3)
         self.assertFalse(Group.objects.exists())
         apply_bootstrap_plan(plan)
-        for code in ("competitor", "coach", "class_affairs"):
+        for code in ("competitor", "coach", "assistant"):
             group = GroupProfile.objects.get(codename=code).group
             self.assertFalse(group.user_set.exists())
             self.assertFalse(group.technical_domain_scopes.exists())
@@ -81,7 +81,7 @@ class DefaultRoleTests(TestCase):
                     "scoring.change_scoringresult",
                     "evidence.change_knowledgeevidence",
                 ],
-                "class_affairs": [
+                "assistant": [
                     "behaviors.add_conduct_record",
                     "behaviors.view_all_conduct_records",
                     "notices.add_notice",
@@ -97,6 +97,28 @@ class DefaultRoleTests(TestCase):
         self.assertEqual(self.client.get(create_url).status_code, 403)
         self.assertIsNone(SiteConfig.get_solo().default_registration_group)
         self.assertFalse(build_bootstrap_plan().has_changes)
+
+    def test_existing_assistant_is_updated_in_place_with_members_preserved(self):
+        group = Group.objects.create(name="班务")
+        profile = ensure_group_profile(group)
+        profile.codename = "assistant"
+        profile.description = "班主任助理"
+        profile.save()
+        member = User.objects.create_user("existing-assistant")
+        member.groups.add(group)
+
+        plan = build_bootstrap_plan(force=True)
+        self.assertFalse(plan.has_errors)
+        apply_bootstrap_plan(plan)
+
+        profile.refresh_from_db()
+        self.assertEqual(profile.group_id, group.pk)
+        self.assertEqual(profile.codename, "assistant")
+        self.assertIn("协助管理班级日常事务", profile.description)
+        self.assertEqual(list(member.groups.values_list("pk", flat=True)), [group.pk])
+        self.assertEqual(Group.objects.filter(name="班务").get().pk, group.pk)
+        self.assertFalse(GroupProfile.objects.filter(codename="class_affairs").exists())
+        self.assertFalse(build_bootstrap_plan(force=True).has_changes)
 
     def test_regular_preserves_customizations_force_preserves_members_domains_extras(self):
         bootstrap_defaults()
