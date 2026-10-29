@@ -8,7 +8,7 @@ from accounts.services.users import get_user_display_name
 from core.uploads import PrivateMediaStorage
 
 
-DUPLICATE_LOG_MESSAGE = "日志文件或当天日志已存在，请先删除已有的训练日志及文件。"
+DUPLICATE_LOG_MESSAGE = "日志文件或当天日志已存在，请先联系管理员删除已有的训练日志及文件。"
 
 
 class TrainingLogStorage(PrivateMediaStorage):

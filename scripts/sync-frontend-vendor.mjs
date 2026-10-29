@@ -13,6 +13,22 @@ const args = process.argv.slice(2);
 const checkOnly = args.includes("--check");
 
 const resources = [
+  ...["pdf.mjs", "pdf.worker.mjs"].map((filename) => ({
+    name: `pdfjs-${filename}`,
+    source: resolve(`node_modules/pdfjs-dist/legacy/build/${filename}`),
+    target: resolve(`static/vendor/pdfjs/${filename}`),
+  })),
+  ...["cmaps", "standard_fonts", "wasm"].map((directory) => ({
+    name: `pdfjs-${directory}`,
+    source: resolve(`node_modules/pdfjs-dist/${directory}`),
+    target: resolve(`static/vendor/pdfjs/${directory}`),
+    directory: true,
+  })),
+  {
+    name: "pdfjs-license",
+    source: resolve("node_modules/pdfjs-dist/LICENSE"),
+    target: resolve("static/vendor/pdfjs/LICENSE"),
+  },
   {
     name: "alpine",
     source: resolve("node_modules/@alpinejs/csp/dist/cdn.min.js"),

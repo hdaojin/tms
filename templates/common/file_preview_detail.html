@@ -1,4 +1,12 @@
 {% extends "layouts/app.html" %}
+{% load static %}
+
+{% block extra_js %}
+  {{ block.super }}
+  {% if file_preview.preview_kind.value == "pdf" %}
+    <script type="module" src="{% static 'js/pdf-preview.mjs' %}"></script>
+  {% endif %}
+{% endblock %}
 
 {% block content %}
   <div class="space-y-5">
@@ -39,9 +47,7 @@
         </div>
 
         {% if file_preview.preview_kind.value == "pdf" %}
-          <iframe class="h-[75vh] min-h-96 w-full bg-white"
-                  src="{{ file_preview.preview_url }}"
-                  title="{{ file_preview.filename }} PDF 预览"></iframe>
+          {% include "components/pdf_preview.html" %}
         {% elif file_preview.preview_kind.value == "image" %}
           <div class="flex min-h-80 items-center justify-center overflow-auto bg-base-200/40 p-4">
             <img class="max-h-[75vh] max-w-full object-contain"

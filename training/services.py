@@ -50,11 +50,14 @@ def validate_new_log(log, *, backfill=False):
 
 def save_training_log(log, executions, *, backfill=False):
     """先预留数据库唯一键，再保存文件；失败时清理本次新增文件。"""
+    if not log.pk and not log.document:
+        raise ValidationError({"document": "请上传日志文件。"})
     upload = log.document if log.document and not log.document._committed else None
     saved_name = None
     storage = log.document.storage
     try:
         with transaction.atomic():
+            log.clean()
             if not log.pk:
                 get_user_model().objects.select_for_update().get(pk=log.author_id)
                 validate_new_log(log, backfill=backfill)

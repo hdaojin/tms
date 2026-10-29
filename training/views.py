@@ -8,8 +8,9 @@ from pathlib import Path
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_GET
-from django.views.generic import CreateView, DeleteView, DetailView, FormView, UpdateView
+from django.views.generic import CreateView, DeleteView, DetailView, FormView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
 
 from core.utils.breadcrumbs import breadcrumb_link
@@ -26,6 +27,7 @@ from .forms import (
     TaskExecutionForm,
     TrainingCycleForm,
     TrainingLogForm,
+    TrainingLogStatisticsForm,
     TrainingPlanForm,
     TrainingTaskForm,
 )
@@ -35,6 +37,7 @@ from .selectors import (
     training_logs_changeable_by,
     training_logs_deletable_by,
     training_logs_visible_to,
+    training_log_submission_statistics,
     visible_task_executions_for,
     visible_training_tasks_for,
 )
@@ -456,6 +459,27 @@ class CoachFeedbackView(TitleMixin, PermissionRequiredMixin, FormView):
 
     def get_success_url(self):
         return reverse("training:execution_detail", args=[self.kwargs["pk"]])
+
+
+class TrainingLogMonthlyStatView(TitleMixin, PermissionRequiredMixin, TemplateView):
+    template_name = "training/monthly_stats.html"
+    title = "训练日志提交统计"
+    title_icon = "icon-[tabler--chart-bar]"
+    permission_required = "training.view_traininglog_statistics"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = timezone.localdate()
+        data = self.request.GET.copy()
+        data.setdefault("year", str(today.year))
+        data.setdefault("month", str(today.month))
+        form = TrainingLogStatisticsForm(data if self.request.GET else None, user=self.request.user,
+                                         initial={"year": today.year, "month": today.month})
+        context.update(form=form, can_view_log=self.request.user.has_perm("training.view_traininglog"))
+        if form.is_bound and form.is_valid():
+            context.update(training_log_submission_statistics(self.request.user, **form.cleaned_data))
+            context["selected_cycle"] = form.cleaned_data["cycle"]
+        return context
 
 
 class TrainingLogListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):

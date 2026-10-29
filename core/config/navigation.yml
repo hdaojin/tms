@@ -167,6 +167,11 @@ sections:
             icon_class: icon-[tabler--upload] size-5 text-success
             permissions:
               - training.add_traininglog
+          - key: training_log_statistics
+            label: 训练日志提交统计
+            url_name: training:monthly_stats
+            icon_class: icon-[tabler--chart-bar] size-5 text-success
+            permissions: [training.view_traininglog_statistics]
           - key: training_log_backfill
             label: 补交历史训练日志
             url_name: training:log_backfill

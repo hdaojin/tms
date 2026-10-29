@@ -130,7 +130,7 @@ event_countdown
 
 - Python `>=3.13, <3.14`（`.python-version` 当前固定为 3.13）
 - uv
-- Node.js `>=22.12.0` 与 npm（仅开发环境或前端资源构建时需要）
+- Node.js `>=22.13.0` 与 npm（仅开发环境或前端资源构建时需要）
 
 当前生产基线使用 PostgreSQL 17，SQLite 用于本地开发和测试；不再支持 MySQL。
 

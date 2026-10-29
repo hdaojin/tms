@@ -56,6 +56,14 @@ ZIP_BYTES = b"PK\x03\x04" + b"\x00" * 16
 
 
 class FilePreviewTests(TestCase):
+    def test_pdf_uses_self_hosted_viewer_and_keeps_download(self):
+        descriptor = self.build_descriptor(SimpleUploadedFile("report.pdf", PDF_BYTES), "report.pdf")
+        html = render_to_string("common/file_preview_detail.html", {"file_preview": descriptor})
+        for text in ('data-pdf-url="/preview/"', 'js/pdf-preview.mjs', 'vendor/pdfjs/pdf.worker.mjs',
+                     'data-pdf-canvas', 'href="/download/"'):
+            self.assertIn(text, html)
+        self.assertNotIn("<iframe", html)
+
     def build_descriptor(self, file, filename):
         from core.file_preview import build_file_preview_descriptor
 

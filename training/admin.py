@@ -74,6 +74,7 @@ class TrainingLogAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["document"].required = not self.instance.pk
         if self.instance.pk:
             self.fields["training_cycle"].disabled = True
 

@@ -342,12 +342,14 @@ hx-encoding="multipart/form-data"
 
 当前在线预览白名单为：
 
-- PDF：同源 `iframe`；
+- PDF：自托管 PDF.js，通过同源受控预览 URL 读取文件，在 canvas 中逐页渲染；
 - JPEG、PNG、GIF、WebP：`img`；
 - `txt`、`md`、`csv`、`json`、`yaml`、`yml`、`log`：服务端按 UTF-8 / UTF-8 BOM 解码并自动转义，最多读取前 1 MiB；
 - Office、压缩包、HTML、SVG 和类型校验失败的文件：只展示元数据和下载入口。
 
-PDF 和图片必须同时通过扩展名白名单与服务端文件头校验，不能信任浏览器上传时提交的 MIME。受控文件响应统一设置 `X-Content-Type-Options: nosniff` 和 `Cache-Control: private, no-store`；下载使用 `attachment`，PDF 内联响应使用 `inline` 和 `X-Frame-Options: SAMEORIGIN`。CSP 保持 `object-src 'none'`，PDF 只允许通过同源 `frame-src` 嵌入。
+PDF 和图片必须同时通过扩展名白名单与服务端文件头校验，不能信任浏览器上传时提交的 MIME。受控文件响应统一设置 `X-Content-Type-Options: nosniff` 和 `Cache-Control: private, no-store`；下载使用 `attachment`，PDF 内联响应保留 `inline` 和 `X-Frame-Options: SAMEORIGIN`。PDF.js 不依赖原生 iframe 阅读器，不改变文件权限，不调用外部预览服务；加载失败、加密 PDF 或未启用 JavaScript 时提示下载。
+
+`components/pdf_preview.html` 和 `static/js/pdf-preview.mjs` 提供公共预览组件；每次只渲染一页，并限制 canvas 像素数，控制手机内存使用。PDF.js 使用 legacy 构建，禁用 eval、Wasm 与动态字体加载以兼容现有 CSP（不放宽 script/font 策略）；库、worker、CMaps、标准字体、图像解码器（使用 JS 回退）和许可证由 `scripts/sync-frontend-vendor.mjs` 同步，版本由 npm lockfile 固定。升级后须运行前端构建及测试，并验证含中文字体的实际 PDF。
 
 数据库记录存在但物理文件丢失时，详情页仍展示业务元数据和“文件不可用”，内联预览及下载入口返回 404。
 

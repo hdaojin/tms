@@ -27,6 +27,7 @@ urlpatterns = [
     path("executions/<int:pk>/edit/", views.TaskExecutionUpdateView.as_view(), name="execution_edit"),
     path("executions/<int:pk>/feedback/", views.CoachFeedbackView.as_view(), name="execution_feedback"),
     path("logs/", views.TrainingLogListView.as_view(), name="log_list"),
+    path("logs/monthly-stats/", views.TrainingLogMonthlyStatView.as_view(), name="monthly_stats"),
     path("logs/create/", views.TrainingLogCreateView.as_view(), name="log_create"),
     path("logs/backfill/", views.TrainingLogBackfillView.as_view(), name="log_backfill"),
     path("logs/<int:pk>/", views.TrainingLogDetailView.as_view(), name="log_detail"),

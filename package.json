@@ -1,7 +1,7 @@
 {
   "private": true,
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.13.0"
   },
   "devDependencies": {
     "@alpinejs/csp": "^3.17.5",
@@ -12,6 +12,7 @@
     "daisyui": "^5.7.50",
     "filepond": "beta",
     "mermaid": "^12.2.0",
+    "pdfjs-dist": "6.4.299",
     "prettier": "^3.9.10",
     "prettier-plugin-jinja-template": "^2.2.0",
     "prettier-plugin-tailwindcss": "^0.8.1",
@@ -21,7 +22,7 @@
     "build:css": "tailwindcss --input static/css/main.css --output static/css/output.css --minify",
     "build:frontend": "node scripts/sync-frontend-vendor.mjs && npm run build:css",
     "watch:css": "tailwindcss --input static/css/main.css --output static/css/output.css --watch",
-    "test:frontend": "node scripts/sync-frontend-vendor.mjs --check && node --test scripts/test-filepond.mjs scripts/test-list-bulk-actions.mjs",
+    "test:frontend": "node scripts/sync-frontend-vendor.mjs --check && node --test scripts/test-filepond.mjs scripts/test-list-bulk-actions.mjs scripts/test-pdf-preview.mjs",
     "format:frontend": "prettier --write package.json \"scripts/**/*.mjs\" \"static/css/main.css\"",
     "format:frontend:check": "prettier --check package.json \"scripts/**/*.mjs\" \"static/css/main.css\""
   },

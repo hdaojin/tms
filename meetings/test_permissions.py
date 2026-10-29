@@ -69,7 +69,7 @@ class MeetingViewPermissionTests(TestCase):
         self.assertContains(detail_response, "会议日期")
         self.assertContains(
             detail_response,
-            f'src="{reverse("meetings:meeting_pdf_inline", args=[self.meeting.pk])}"',
+            f'data-pdf-url="{reverse("meetings:meeting_pdf_inline", args=[self.meeting.pk])}"',
         )
         self.assertEqual(pdf_response.status_code, 200)
         self.assertEqual(pdf_response["Content-Type"], "application/pdf")

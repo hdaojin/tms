@@ -1,10 +1,12 @@
 from datetime import date
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from .admin import CycleMemberAdminForm
@@ -17,7 +19,10 @@ from .tests import TrainingFixtureMixin, User
 class CycleMemberTests(TrainingFixtureMixin, TestCase):
     def setUp(self):
         super().setUp()
-        self.user = User.objects.create_user("member")
+        media = TemporaryDirectory()
+        self.addCleanup(media.cleanup)
+        self.enterContext(override_settings(PRIVATE_MEDIA_ROOT=media.name))
+        self.user = User.objects.create_user("member", last_name="测", first_name="试")
         self.manager = User.objects.create_user("manager")
         self.cycle1 = self.active_cycle("C1")
         self.cycle2 = self.active_cycle("C2")
@@ -154,7 +159,8 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
         self.assertFalse(TrainingCycleMember.objects.get(user=new_user).is_current)
 
     def test_service_rechecks_status_after_form_validation(self):
-        form = TrainingLogForm(self.data(), author=self.user)
+        form = TrainingLogForm(self.data(), {"document": SimpleUploadedFile("log.txt", b"training")},
+                               author=self.user)
         self.assertTrue(form.is_valid(), form.errors)
         self.cycle1.status = TrainingCycle.Status.COMPLETED
         self.cycle1.save()
@@ -168,19 +174,23 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
         self.assertFalse(TrainingCycleMember.objects.filter(user=self.user, is_current=True).exists())
 
     def test_daily_ignores_forged_cycle_and_service_rechecks(self):
-        form = TrainingLogForm(self.data(training_cycle=self.cycle2.pk), author=self.user)
+        form = TrainingLogForm(self.data(training_cycle=self.cycle2.pk),
+                               {"document": SimpleUploadedFile("log.txt", b"training")}, author=self.user)
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.save().training_cycle_id, self.cycle1.pk)
         self.other.is_current = True
         save_cycle_member(self.other)
         log = TrainingLog(training_cycle=self.cycle1, author=self.user, training_date=date(2026, 1, 3), topic="伪造")
+        log.document = SimpleUploadedFile("log.txt", b"training")
         with self.assertRaisesMessage(ValidationError, "当前周期"):
             save_training_log(log, [])
 
     def test_backfill_membership_status_dates_and_permission(self):
         self.cycle2.status = TrainingCycle.Status.COMPLETED
         self.cycle2.save()
-        form = TrainingLogForm(self.data(training_cycle=self.cycle2.pk), author=self.user, backfill=True)
+        form = TrainingLogForm(self.data(training_cycle=self.cycle2.pk),
+                               {"document": SimpleUploadedFile("log.txt", b"training")},
+                               author=self.user, backfill=True)
         self.assertTrue(form.is_valid(), form.errors)
         form.save()
         self.member.refresh_from_db()

@@ -659,7 +659,7 @@ class TrainingLog(TimestampedModel):
     topic = models.CharField("训练主题", max_length=150)
     summary = models.TextField("训练摘要", blank=True)
     document = models.FileField(
-        "正式训练日志",
+        "日志文件",
         storage=TrainingLogStorage("training"),
         max_length=500,
         upload_to=training_upload_path,
@@ -690,6 +690,11 @@ class TrainingLog(TimestampedModel):
 
     def __str__(self):
         return f"{self.training_date:%Y-%m-%d} / {self.author} / {self.topic}"
+
+    def clean(self):
+        super().clean()
+        if self.training_date and self.training_date > timezone.localdate():
+            raise ValidationError({"training_date": "训练日期不能晚于今天。"})
 
 
 class TrainingLogExecution(models.Model):

@@ -30,6 +30,20 @@ from .log_files import DUPLICATE_LOG_MESSAGE, build_log_filename
 User = get_user_model()
 
 
+class TrainingLogStatisticsForm(StyledFormMixin, forms.Form):
+    cycle = forms.ModelChoiceField(label="训练周期", queryset=TrainingCycle.objects.none())
+    year = forms.IntegerField(label="年份", min_value=1, max_value=9999)
+    month = forms.TypedChoiceField(label="月份", coerce=int, choices=[(i, f"{i}月") for i in range(1, 13)])
+    role = forms.ChoiceField(label="成员身份", required=False,
+                             choices=[("", "全部"), *TrainingCycleMember.Role.choices])
+
+    def __init__(self, *args, user, **kwargs):
+        from .selectors import training_log_statistics_cycles_for
+
+        super().__init__(*args, **kwargs)
+        self.fields["cycle"].queryset = training_log_statistics_cycles_for(user)
+
+
 class CycleMemberAddForm(StyledFormMixin, forms.Form):
     users = forms.ModelMultipleChoiceField(label="用户", queryset=User.objects.filter(is_active=True))
     role = forms.ChoiceField(label="周期身份", choices=TrainingCycleMember.Role.choices)
@@ -496,6 +510,9 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
             self.fields["training_cycle"].widget = forms.HiddenInput()
             self.current_cycle = self.instance.training_cycle
         self.fields["document"].widget.attrs.update(TRAINING_LOG_UPLOAD_SPEC.widget_attrs())
+        self.fields["training_date"].widget.attrs["max"] = timezone.localdate().isoformat()
+        self.fields["document"].help_text = TRAINING_LOG_UPLOAD_SPEC.help_text("上传日志文件")
+        self.fields["document"].required = not self.instance.pk
         if self.instance.pk and self.instance.document:
             # 不把已有文件再次交给 FileField 校验，避免读取旧文件或触发替换。
             self.fields.pop("document")

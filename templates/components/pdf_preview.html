@@ -1,0 +1,17 @@
+{% load static %}
+<div data-pdf-preview
+     data-pdf-url="{{ file_preview.preview_url }}"
+     data-pdf-library="{% static 'vendor/pdfjs/pdf.mjs' %}"
+     data-pdf-worker="{% static 'vendor/pdfjs/pdf.worker.mjs' %}"
+     data-pdf-assets="{% static 'vendor/pdfjs/' %}">
+  <div class="flex flex-wrap items-center justify-center gap-3 border-b border-base-300 p-3">
+    <button type="button" class="btn btn-sm" data-pdf-previous disabled>上一页</button>
+    <span class="text-sm" data-pdf-page aria-live="polite">尚未加载</span>
+    <button type="button" class="btn btn-sm" data-pdf-next disabled>下一页</button>
+  </div>
+  <p class="p-3 text-center text-sm" data-pdf-status role="status">正在加载 PDF；若无法显示，可下载文件查看。</p>
+  <div class="max-h-[75vh] min-h-80 overflow-auto bg-base-200/40 p-3" data-pdf-viewport>
+    <canvas class="mx-auto h-auto max-w-full bg-white" data-pdf-canvas role="img" aria-label="PDF 预览" hidden></canvas>
+  </div>
+  <noscript><p class="p-4">PDF 在线预览需要启用 JavaScript，也可下载文件查看。</p></noscript>
+</div>

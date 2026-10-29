@@ -103,7 +103,7 @@ jobs:
       - name: Verify generated frontend assets are committed
         run: |
           status_file="${RUNNER_TEMP}/frontend-status.txt"
-          git status --porcelain --untracked-files=all -- \
+          git status --porcelain --untracked-files=all --ignored=matching -- \
             static/css/output.css \
             static/js/alpinejs.min.js \
             static/js/mermaid.min.js \
