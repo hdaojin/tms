@@ -108,7 +108,7 @@ usage() {
 用法：
   tms-deploy inspect [--json]
   tms-deploy plan [--revision REVISION] [--first-install] [--json]
-  tms-deploy apply PLAN_ID --confirm-sha FULL_SHA
+  tms-deploy apply PLAN_ID --confirm-sha FULL_SHA [--skip-backup]
   tms-deploy verify [--json]
   tms-deploy status [--json]
   tms-deploy rollback --to RELEASE_ID
@@ -119,6 +119,7 @@ usage() {
 
 inspect 严格只读。plan 只写入候选 release 和带哈希的计划记录。
 apply 与所有管理子命令都要求 root 权限。
+apply 默认完整备份；--skip-backup 仅跳过本次升级备份，不影响迁移和验收。
 EOF
 }
 
@@ -885,12 +886,13 @@ record_deploy_state() {
 
 cmd_apply() {
     require_root
-    [[ $# -ge 3 ]] || die "用法：tms-deploy apply PLAN_ID --confirm-sha FULL_SHA"
-    local plan_id="$1" confirm_sha=""
+    [[ $# -ge 3 ]] || die "用法：tms-deploy apply PLAN_ID --confirm-sha FULL_SHA [--skip-backup]"
+    local plan_id="$1" confirm_sha="" skip_backup=0
     shift
     while (($#)); do
         case "$1" in
             --confirm-sha) [[ $# -ge 2 ]] || die "--confirm-sha 缺少值"; confirm_sha="$2"; shift 2 ;;
+            --skip-backup) skip_backup=1; shift ;;
             *) die "未知参数：$1" ;;
         esac
     done
@@ -920,7 +922,11 @@ cmd_apply() {
     else
         [[ -n "${previous}" ]] || die "当前不存在 release；请重新 plan --first-install。"
         [[ -f "${RUNTIME_ENV}" && -f "${MIGRATE_ENV}" ]] || die "生产环境文件不完整。"
-        backup_current
+        if (( skip_backup )); then
+            warn "已显式指定 --skip-backup：本次升级不创建备份。"
+        else
+            backup_current
+        fi
         install_service_and_caddy
     fi
 

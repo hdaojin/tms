@@ -8,11 +8,12 @@ case "${1:-}" in
         cat <<'EOF'
 用法：
   tms-update plan [--revision develop] [--json]
-  tms-update apply PLAN_ID --confirm-sha FULL_SHA
+  tms-update apply PLAN_ID --confirm-sha FULL_SHA [--skip-backup]
   tms-update verify [--json]
   tms-update status [--json]
 
 plan 固定完整 SHA；apply 执行备份、迁移、切换和验收。
+apply 可显式使用 --skip-backup 跳过本次备份；默认仍完整备份。
 Python 依赖按新 release 的 uv.lock 同步；npm 产物随代码发布。
 首次安装请使用 tms-deploy plan --first-install。
 EOF

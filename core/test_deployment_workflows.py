@@ -211,6 +211,38 @@ bash "$entry" --help
 ''')
 
 
+@pytest.mark.parametrize("skip_backup", [False, True])
+def test_apply_backup_is_default_and_can_be_explicitly_skipped(skip_backup):
+    with patch.dict(os.environ, {"TMS_TEST_SKIP_BACKUP": str(int(skip_backup))}):
+        result = bash_run('''
+set -Eeuo pipefail
+work="$(mktemp -d)"
+trap 'rm -f "$work/tms.env" "$work/migrate.env"; rmdir "$work/current" "$work"' EXIT
+source <(sed -e "s|^readonly ROOT_DIR=.*|readonly ROOT_DIR=\\"$work\\"|" \\
+    -e "s|^readonly ENV_DIR=.*|readonly ENV_DIR=\\"$work\\"|" \\
+    -e 's/\\[\\[ -L /[[ -d /g' "$1")
+# Use a directory fixture: Git Bash cannot reliably create native symlinks.
+mkdir "$work/current"
+touch "$work/tms.env" "$work/migrate.env"
+require_root() { :; }
+safe_source_config() { :; }
+require_installed_layout() { :; }
+require_cmd() { :; }
+load_plan() { FIRST_INSTALL=0; SHA=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; }
+check_external_certificate() { :; }
+df() { printf 'Filesystem Available\\nmock 2097152\\n'; }
+awk() { command awk 'NR==2 {print $2}'; }
+backup_current() { printf 'BACKUP_CALLED\\n'; }
+install_service_and_caddy() { printf 'CONTINUED\\n'; exit 0; }
+args=()
+[[ "$TMS_TEST_SKIP_BACKUP" == 0 ]] || args+=(--skip-backup)
+cmd_apply plan-test --confirm-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "${args[@]}"
+''')
+    assert ("BACKUP_CALLED" in result.stdout) is not skip_backup
+    assert "CONTINUED" in result.stdout
+    assert ("本次升级不创建备份" in result.stderr) is skip_backup
+
+
 def test_caddy_log_initialization_preserves_existing_content_and_other_logs():
     bash_run('''
 set -Eeuo pipefail

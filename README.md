@@ -451,6 +451,7 @@ sudo tms-deploy verify
 （内网 DNS-01 证书，由 acme.sh 续期并通知 Caddy）。acme.sh 初始化、权限和续期 hook 见部署手册第 12 节。
 日常代码更新可使用独立 `tms-update plan/apply/verify/status`；开发端依赖更新可运行
 `uv run --locked --no-sync scripts/update_dependencies.py all --dry-run`，详见手册第 13 节。
+升级默认完整备份；本次无需备份时，可在 `tms-deploy apply` 或 `tms-update apply` 后显式添加 `--skip-backup`，其余校验、迁移和验收照常执行。
 可配置 `TMS_BASIC_AUTH_TRUSTED_CIDRS="10.21.57.0/24"` 让可信来源网段跳过 Caddy Basic Auth，其他客户端仍需认证；
 默认值为空，要求全站认证。此设置不跳过 Django 登录和权限，适用的源地址判断与代理限制见手册第 7 节。
 

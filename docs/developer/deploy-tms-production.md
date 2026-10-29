@@ -85,7 +85,7 @@ sudo chown root:root /etc/tms/deploy.conf
 ```text
 tms-deploy inspect [--json]
 tms-deploy plan [--revision develop] [--first-install] [--json]
-tms-deploy apply <plan-id> --confirm-sha <完整SHA>
+tms-deploy apply <plan-id> --confirm-sha <完整SHA> [--skip-backup]
 tms-deploy verify [--json]
 tms-deploy status [--json]
 tms-deploy rollback --to <release-id>
@@ -173,7 +173,7 @@ sudo tms-deploy verify
 sudo tms-deploy status
 ```
 
-非首次 `apply` 在任何活动变更前调用当前 release 的 `scripts/backup_tms.sh`，传入：
+非首次 `apply` 默认在任何活动变更前调用当前 release 的 `scripts/backup_tms.sh`，传入：
 
 ```text
 PROJECT_DIR=/srv/tms/current
@@ -185,6 +185,19 @@ INCLUDE_GIT_BUNDLE=0
 
 脚本要求新备份出现、`SHA256SUMS` 全部通过，并用 `pg_restore --list` 读取 PostgreSQL custom dump。
 空间不足或验证失败时停止，不进入维护、不停止 Gunicorn。备份不会被自动删除。
+
+频繁更新且本次无需备份时，可显式跳过：
+
+```bash
+sudo tms-deploy apply <plan-id> --confirm-sha <完整SHA> --skip-backup
+# 独立更新入口同样支持
+sudo tms-update apply <plan-id> --confirm-sha <完整SHA> --skip-backup
+```
+
+`--skip-backup` 仅对本次 apply 生效，跳过完整备份及其空间/完整性检查，并输出警告。
+SHA、计划哈希、最低可用空间、维护、迁移、切换和健康检查仍照常执行；失败处理不变。
+首次安装原本不执行升级备份，此参数对首次安装无额外作用。跳过后不会生成本次更新前的恢复副本。
+已有服务器需先按第 3 节重新安装审阅后的两个脚本，再重新生成计划（更新入口会使旧计划的脚本哈希失效）。
 
 随后创建维护标志、停止 Gunicorn、用 `tms_migrator` 迁移、重新投影现有表/序列权限、原子切换、启动和检查。
 若没有待执行迁移且健康检查失败，自动恢复上一 `current` 链接；若检测到并执行了迁移，则保持维护状态，
@@ -519,4 +532,4 @@ sudo tms-update status
 
 它只开放更新相关命令，不接受 `--first-install`。仍须人工审阅 SHA 和迁移计划；不会直接 `git pull` 当前代码。
 新 release 自动按其 `uv.lock` 安装运行依赖，前端使用随代码提交的构建产物。
-备份、维护、迁移、原子切换和失败处理全部复用 `tms-deploy`，两种 TLS 模式一致。
+备份（可在 apply 时显式指定 `--skip-backup` 跳过）、维护、迁移、原子切换和失败处理全部复用 `tms-deploy`，两种 TLS 模式一致。
