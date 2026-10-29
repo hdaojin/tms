@@ -17,13 +17,18 @@
 
       <label class="input">
         <span class="label">姓名</span>
-        <input type="text" value="{{ target_user.first_name|default:'未设置' }}" disabled />
+        <input type="text" value="{{ target_user.display_name }}" disabled />
       </label>
 
       <label class="input">
         <span class="label">邮箱</span>
-        <input type="email" value="{{ target_user.email|default:'未设置' }}" disabled />
+        {% if email_field %}
+          {{ email_field }}
+        {% else %}
+          <input type="email" value="{{ target_user.email|default:'未设置' }}" disabled />
+        {% endif %}
       </label>
+      {% if email_field.errors %}{{ email_field.errors }}{% endif %}
 
       <div class="label">
         <span class="label-text">角色</span>

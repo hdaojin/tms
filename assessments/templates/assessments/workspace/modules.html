@@ -1,9 +1,9 @@
 <section class="space-y-4">
   <div class="flex flex-wrap justify-end gap-2">
-    {% if perms.assessments.add_assessmentdocument %}
+    {% if can_upload_general_document %}
       <a class="btn btn-outline btn-sm" href="{% url 'assessments:document_upload' %}?assessment={{ assessment.pk }}">上传公共资料</a>
     {% endif %}
-    {% if perms.assessments.add_assessmentmodule %}
+    {% if can_add_module %}
       <a class="btn btn-primary btn-sm" href="{% url 'assessments:module_create' %}?assessment={{ assessment.pk }}">新增模块</a>
     {% endif %}
   </div>

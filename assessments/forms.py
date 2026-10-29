@@ -118,11 +118,17 @@ class CompetitionPersonForm(StyledFormMixin, forms.ModelForm):
 class CompetitionRoleForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = CompetitionRole
-        fields = ["code", "name", "category", "description", "order", "is_active"]
+        fields = ["code", "name", "english_name", "category", "description", "order", "is_active"]
         widgets = {"description": forms.Textarea(attrs={"rows": 3})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        categories = CompetitionRole.Category
+        current_categories = {categories.OFFICIAL, categories.EXPERT, categories.COMPETITOR, categories.OTHER}
+        self.fields["category"].choices = [
+            (value, label) for value, label in self.fields["category"].choices
+            if not value or value in current_categories or value == self.instance.category
+        ]
         if self.instance.pk:
             self.fields["code"].disabled = True
 

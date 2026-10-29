@@ -101,6 +101,7 @@ class BootstrapPlan:
     force: bool
     records: list[BootstrapRecordPlan] = field(default_factory=list)
     issues: list[BootstrapIssue] = field(default_factory=list)
+    roles: list = field(default_factory=list)
 
     @property
     def has_errors(self) -> bool:
@@ -108,11 +109,11 @@ class BootstrapPlan:
 
     @property
     def has_changes(self) -> bool:
-        return any(record.action in {CREATE, UPDATE} for record in self.records)
+        return any(record.action in {CREATE, UPDATE} for record in [*self.records, *self.roles])
 
     def counts(self) -> dict[str, int]:
         counts = {CREATE: 0, UPDATE: 0, SKIP: 0, UNCHANGED: 0, ERROR: len(self.issues)}
-        for record in self.records:
+        for record in [*self.records, *self.roles]:
             counts[record.action] += 1
         return counts
 
@@ -543,7 +544,12 @@ def _build_bootstrap_plan(*, force: bool = False) -> BootstrapPlan:
 
 def build_bootstrap_plan(*, force: bool = False) -> BootstrapPlan:
     try:
-        return _build_bootstrap_plan(force=force)
+        from core.role_bootstrap import build_role_plans
+
+        plan = _build_bootstrap_plan(force=force)
+        if not plan.has_errors:
+            plan.roles = build_role_plans(force=force)
+        return plan
     except (
         BootstrapConfigurationError,
         FieldError,
@@ -672,10 +678,16 @@ def _prepare_default_switches(plan: BootstrapPlan) -> None:
 
 
 def apply_bootstrap_plan(plan: BootstrapPlan) -> dict[str, int]:
+    from core.role_bootstrap import apply_role_plans, assert_role_plans_fresh
+
     if plan.has_errors:
         raise BootstrapPlanError("Bootstrap 预检存在错误，不能执行。")
     with transaction.atomic():
         _assert_plan_is_fresh(plan)
+        try:
+            assert_role_plans_fresh(plan.roles)
+        except ValueError as exc:
+            raise BootstrapPlanError(str(exc)) from exc
         _prepare_default_switches(plan)
         for record in plan.records:
             if record.action == CREATE:
@@ -696,6 +708,7 @@ def apply_bootstrap_plan(plan: BootstrapPlan) -> dict[str, int]:
                 instance.save(update_fields=[*record.desired_values, "updated_at"] if hasattr(instance, "updated_at") else list(record.desired_values))
                 if record.dataset.flatpage_current_site and not record.expected_site_bound:
                     instance.sites.add(Site.objects.get(pk=settings.SITE_ID))
+        apply_role_plans(plan.roles)
     return plan.counts()
 
 
@@ -721,6 +734,8 @@ def _display_value(value: Any) -> str:
 
 
 def render_bootstrap_plan(plan: BootstrapPlan) -> str:
+    from core.role_bootstrap import render_role_plans
+
     lines = [
         "TMS 默认业务数据预览",
         f"模式：{'强制覆盖' if plan.force else '普通'}",
@@ -744,6 +759,8 @@ def render_bootstrap_plan(plan: BootstrapPlan) -> str:
             )
         lines.append("")
 
+    if plan.roles:
+        lines.extend(render_role_plans(plan.roles))
     for issue in plan.issues:
         lines.extend(
             [f"[{issue.model_label}] {issue.label}", "", f"! ERROR     {issue.message}", ""]

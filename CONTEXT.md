@@ -62,7 +62,7 @@ Skill 不设置面向用户的业务编号。正式名称和别名在技能项�
 
 ### CompetitionPerson / CompetitionRole（长期赛事人员/赛事角色）
 
-CompetitionPerson 是不可登录、可跨届复用的轻量赛事人员目录；CompetitionRole 是使用稳定代码和类别表达机器语义的可配置赛事角色。两者都不替代 Django User 或 Django Permission。
+CompetitionPerson 是不可登录、可跨届复用的轻量赛事人员目录；CompetitionRole 是使用稳定代码和类别表达机器语义的可配置赛事角色。两者都不替代 Django User 或 Django Permission。赛事角色可有独立、可选的英文名称；当前类别为项目管理人员、专家或裁判、选手、其他，翻译归入其他，教练归入专家或裁判。备选选手属于选手类别，同样可以录入评分和最终成绩。
 
 ### AssessmentParticipant（评测参与人员）
 

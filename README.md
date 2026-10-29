@@ -211,6 +211,22 @@ uv run manage.py bootstrap_tms --force
 
 `--force` 仍会先输出预览并要求确认，只按稳定业务键更新声明字段，不删除数据库中的额外业务目录，也不改变记录主键或稳定代码。生产环境执行前应先备份数据库。自动化场景可附加 `--yes` 跳过确认，但不会跳过预览或预检。
 
+#### 开发环境完全重建默认数据
+
+需要清空测试业务并验证最新初始化声明时，使用独立的开发命令：
+
+```powershell
+uv run manage.py rebuild_dev_database --dry-run
+uv run manage.py rebuild_dev_database
+uv run manage.py createsuperuser
+```
+
+`rebuild_dev_database` 仅允许在 `DEBUG=True` 的单数据库、无数据库路由配置下执行，支持 SQLite 和 PostgreSQL。先停止开发服务及其他数据库写入进程，再查看预览中的目标数据库、逐表记录数量及将重建的默认目录；输入完整的 `yes` 后执行。自动化测试可用 `--yes` 跳过询问，但仍显示预览；`--dry-run` 始终只读。
+
+该命令清空全部应用表中的业务数据、账号（包括超级管理员）、会话及配置，保留表结构和迁移记录。随后恢复 Django 内容类型、权限、站点及当前 Bootstrap 声明的默认数据，不重放历史数据迁移，因此不会重新引入旧角色清单。清空和初始化在同一数据库事务内执行，初始化失败时整体回滚。存在未应用迁移或当前应用之外的表时拒绝执行；应先正常执行 `migrate` 并核实数据库范围。
+
+上传文件保留，但对应附件记录会清空，文件不会自动重新关联。命令不创建任何账号或默认密码，完成后通过 `createsuperuser` 创建新管理员。它与保留既有业务数据的 `bootstrap_tms --force` 用途不同，不用于生产部署。
+
 ### 6. 创建超级管理员
 
 ```bash
@@ -469,7 +485,7 @@ SAMBA_ASYNC_OPERATIONS_ENABLED=False
 ```
 
 生产首次只使用 `tms_migrator` 执行迁移，运行期 `tms_app` 只有 schema usage、表 DML 与序列权限。
-`bootstrap_tms` 在首次部署时显式 dry-run 后执行；Django Group、权限包和领域范围仍由管理员按业务配置。
+`bootstrap_tms` 在首次部署时显式 dry-run 后执行，提供选手、教练、班务默认 Group 及权限组合；成员、教练技术领域和注册默认组仍由管理员显式配置。升级不会自动替换现有角色授权，详见用户与权限手册。
 
 Caddy 只直接提供：
 

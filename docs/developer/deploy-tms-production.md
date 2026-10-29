@@ -102,9 +102,11 @@ tms-deploy tls configure-acme|install|check
 - `--json` 将最终机器可读结果写到标准输出，阶段日志写到标准错误，便于 AI 分离读取。
 
 `plan` 执行：严格 SSH host key 检查并获取远端引用、固定 SHA、`git archive`、
-`uv sync --locked --no-dev --python /usr/bin/python3.13`、前端产物存在性检查、Django check、
+`uv sync --locked --no-dev --link-mode copy --python /usr/bin/python3.13`、前端产物存在性检查、Django check、
 `check --deploy`、迁移漂移检查、迁移计划和 `collectstatic`。服务器不需要 Node/npm，`static/css/output.css`
 与 `static/vendor/` 必须已经提交。
+
+`--link-mode copy` 避免随后对不可变 release 执行 chown/chmod 时，通过硬链接修改部署用户的 uv 缓存权限。
 
 ## 5. 首次部署
 
@@ -202,6 +204,7 @@ sudo tms-deploy auth remove alice
 ### 按客户端来源网段决定是否需要 Basic Auth
 
 默认 `TMS_BASIC_AUTH_TRUSTED_CIDRS=""`，所有客户端都需要 Basic Auth。
+迁移已有站点且明确要求仅保留 Django 登录时，可设置 `TMS_BASIC_AUTH_ENABLED=0`；此时不生成外层认证路由，部署验收也按无 Basic Auth 检查。默认仍为 `1`。
 如服务器是 `10.21.57.72`，且经确认其可信局域网为 `/24`，可在 `/etc/tms/deploy.conf` 配置：
 
 ```bash

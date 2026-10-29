@@ -13,6 +13,16 @@ from .models import EvidenceSkillMap, KnowledgeEvidence
 APPROVED = KnowledgeEvidence.ReviewStatus.APPROVED
 
 
+def manageable_evidences_for(user, permission="evidence.change_knowledgeevidence"):
+    queryset = KnowledgeEvidence.objects.all()
+    if not user.is_authenticated or not user.has_perm(permission):
+        return queryset.none()
+    if user.is_superuser or user.has_perm("assessments.change_all_assessment"):
+        return queryset
+    modules = assessment_modules_in_scope_for(user, permission)
+    return queryset.filter(Q(assessment_module__in=modules) | Q(assessment_module__isnull=True, created_by=user)).distinct()
+
+
 def visible_evidences_for(user, queryset=None):
     queryset = queryset if queryset is not None else KnowledgeEvidence.objects.all()
     if not user.is_authenticated or not user.has_perm("evidence.view_knowledgeevidence"):

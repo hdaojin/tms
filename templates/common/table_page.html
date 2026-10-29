@@ -1,5 +1,13 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-  {% include "components/table_wrapper.html" with table=table %}
+  {% block list_filters %}
+    {% if list_filter_controls %}{% include "components/list_filter_toolbar.html" %}{% endif %}
+  {% endblock %}
+  <div id="{{ list_filter_target_id|default:'list-results' }}" class="mt-4">
+    {% block list_results %}
+      {% block list_bulk_actions %}{% endblock %}
+      {% block list_table %}{% include "components/table_wrapper.html" with table=table %}{% endblock %}
+    {% endblock %}
+  </div>
 {% endblock %}

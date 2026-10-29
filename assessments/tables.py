@@ -6,7 +6,7 @@ class AssessmentTable(BaseTable):
     start_date = BaseDateColumn()
     end_date = BaseDateColumn()
     actions = ActionsColumn(
-        "assessments:assessment_detail", "assessments:assessment_edit", edit_perm="assessments.change_assessment"
+        "assessments:assessment_detail", "assessments:assessment_edit", edit_perm="assessments.change_assessment", edit_allowed_attr="can_edit"
     )
 
     class Meta(BaseTable.Meta):
@@ -16,7 +16,7 @@ class AssessmentTable(BaseTable):
 
 class AssessmentModuleTable(BaseTable):
     actions = ActionsColumn(
-        "assessments:module_detail", "assessments:module_edit", edit_perm="assessments.change_assessmentmodule"
+        "assessments:module_detail", "assessments:module_edit", edit_perm="assessments.change_assessmentmodule", edit_allowed_attr="can_edit"
     )
 
     class Meta(BaseTable.Meta):
@@ -51,4 +51,4 @@ class CompetitionRoleTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = CompetitionRole
-        fields = ["code", "name", "category", "order", "is_active", "actions"]
+        fields = ["code", "name", "english_name", "category", "order", "is_active", "actions"]

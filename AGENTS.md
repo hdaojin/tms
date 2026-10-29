@@ -94,6 +94,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - `bootstrap_tms` 是生产/新环境默认业务数据的统一显式初始化入口。Bootstrap 必须幂等、可测试，并采用“只读预检与预览 -> 确认 -> 单一事务执行”的流程。默认模式只创建缺失项并保留管理员修改；显式 `--force` 可在完整预览和确认后恢复声明的受管字段，但不得改变稳定 key/code、删除额外数据或破坏既有引用。`--force` 不等于自动确认。不要在 request、selector、普通读取 service、`AppConfig.ready()` 或 signal 中隐式补种子。
 - 各业务 APP 的默认目录声明优先使用字段名完整可见的普通 `list[dict]`，以人类阅读和人工自定义为第一目标；通用 ORM Plan/Diff/Apply 逻辑集中在 `core`，不得散落回各 APP 的声明文件。
 - Bootstrap 只创建已经有明确业务依据的出厂数据；“模型可配置”不等于“必须预置默认行”。仓库没有权威默认值时保持空目录，由管理员按业务建立，不得由 Agent 自行发明。
+- 开发环境完全重建使用独立命令 `rebuild_dev_database`，仅允许 `DEBUG=True`；预览确认后清空应用数据并按当前 Bootstrap 重建，保留表结构、迁移记录和上传文件，不创建账号、不重放历史数据迁移，不改变 `bootstrap_tms --force` 的非删除语义。不得在正常部署中调用。
 - 正常部署不得自动反复执行 Bootstrap。README 的新环境初始化流程可以显式执行一次；后续如确需新增强制基础数据，应通过明确的数据迁移或发布说明处理，不能依靠每次启动时偷偷同步。
 - 历史 `RunPython` 数据迁移继续作为迁移历史快照保留。数据迁移使用 `apps.get_model()` 的历史模型，不直接导入当前 bootstrap 定义；旧迁移里曾经写过的 seed 不代表今后继续以 migration 维护业务目录默认值。
 - Fixture 可以用于测试、演示或显式数据交换，但不再作为生产默认业务数据的权威初始化机制。生产 README 不应要求通过多个 `loaddata .../default` 拼装系统初始状态。
@@ -126,14 +127,21 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - View 负责 HTTP、权限、service/selector 调用和响应选择；尽量保持薄，不复制核心业务逻辑。
 - 类视图复用 `TitleMixin`，设置 `title` 和 `title_icon`。
 - 列表页优先复用 `BaseTable`、`BaseDateColumn`、`BaseDateTimeColumn`、`ActionsColumn` 和 django-tables2 `SingleTableView`/现有封装。
+- 列表采用“搜索筛选区 → 批量操作区 → 结果列表区”的统一顺序，优先扩展 `common/table_page.html`；筛选区与批量 POST 表单分离，复用现有筛选组件。无筛选、无批量业务或当前用户无相应授权时省略对应区块，不放空占位；无可用批量动作时不显示勾选列。卡片、树、统计矩阵和详情内小列表按适用部分遵循，不强制转表格或新增批量能力。
+- 批量操作栏复用 `components/list_bulk_actions.html` 与 `static/js/list-bulk-actions.js`，采用操作下拉框、执行按钮、已选计数和表头当前页全选；额外参数进入固定名单中间页，跨页全匹配仅在业务后端明确支持时开放。筛选、翻页、排序后清空旧选择，完成或取消恢复原列表条件和有效页码。
+- 所有批量写操作须预览明确目标、变更内容和人数后确认；导出等只读批量操作可直接执行。权限与对象范围、严格目标/筛选校验、预览后状态变化检查及事务原子性由业务 service 负责，公共模板和脚本不得成为授权或写入入口。详细接入协议见 `docs/developer/ui.md`。既有列表在触及时逐步迁移，不因本规范批量改造。
 - 通用 CRUD 页面优先复用 `templates/common/` 与 `templates/components/` 现有组件，而不是复制整页模板。
+- 前台按钮及操作链接须与目标端点复用同一基础权限和对象范围判断；无授权则隐藏，业务状态前提不足则保留提示或禁用。列表对象授权优先批量注解，避免逐行查询；隐藏入口不能替代后端校验。
 
 ## 用户、角色与权限
 
 - 保持 Django 默认 `auth.User`；不要引入自定义 User 模型。
 - 全局登录由 `LoginRequiredMiddleware` 强制；公开 view 必须显式使用 `login_not_required`。
 - Django Permission 是运行时唯一授权事实来源；业务权限包只用于部署期授权配置与原生权限投影。
-- Group 名称和 `GroupProfile.codename` 不用于业务授权；codename 只保留给 Samba 等技术集成。
+- Group 名称和 `GroupProfile.codename` 不用于业务授权；codename 只用于默认角色初始化稳定定位或 Samba 等技术集成。
+- 登录不自动授予业务权限。功能面板、本人资料查看与维护等账户基础能力和明确公开页面是例外，资料锁定后只读。角色前端写入和他人有效权限诊断仅限 superuser，复用授权投影 service；默认角色通过 Bootstrap 显式初始化，不自动分配成员或领域，见 ADR 0009。
+- 前端账号启停、批量角色增减和管理员离开日期维护仅限有效 superuser，采用固定名单预览与事务确认；不允许停用超级管理员或批量增减其角色。激活状态与离开日期独立；管理员可维护锁定资料的离开日期，其他锁定字段不因此开放。
+- 有效 superuser 可在用户详情维护未锁定的完整个人资料和邮箱、保存并锁定或单独解锁；完整资料编辑必须先解锁，普通查看权限不提供写权限。解锁只切换锁定状态，不保存其他字段；锁定确认须提交完整主表单。本人资料与管理员资料写入复用同一事务服务。
 - TechnicalDomain 是 Group 级对象范围；领域权限必须由同一个 Group 同时提供对应 Django Permission 与 `TechnicalDomainGroupScope`，不得把不同 Group 的权限和范围串联。
 - superuser 是唯一可绕过 TechnicalDomain Group Scope 的全局管理员；普通用户的直接权限不能绕过 Group Scope。
 - 对象范围统一由 selector/policy 收窄；基础 Permission 表示默认或本人范围，`*_all` 只扩大范围。

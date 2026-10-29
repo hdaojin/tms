@@ -15,7 +15,7 @@ class FeedbackViewTests(FeedbackTestCase):
         self.assertNotContains(response, "无需点击")
         self.assertNotContains(response, 'x-on:paste="handlePaste"', html=False)
 
-    def test_list_create_and_detail_are_available_to_logged_in_users(self):
+    def test_list_create_and_detail_are_available_to_explicitly_authorized_users(self):
         self.client.force_login(self.author)
         self.assertEqual(self.client.get(reverse("feedback:list")).status_code, 200)
         create_response = self.client.post(

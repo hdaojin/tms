@@ -231,7 +231,7 @@ class ForumTopicDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
                 "new_posts": new_posts,
                 "show_unread_divider": bool(state and new_posts),
                 "can_edit_topic": can_edit_topic(self.request.user, self.object),
-                "can_delete_empty_topic": not posts and (self.object.created_by_id == self.request.user.pk or self.request.user.has_perm("worldskills_forum.delete_forumtopic") or self.request.user.is_superuser),
+                "can_delete_empty_topic": not posts and self.request.user.has_perm("worldskills_forum.delete_forumtopic") and (self.object.created_by_id == self.request.user.pk or self.request.user.has_perm("worldskills_forum.change_all_forum_content")),
                 "can_add_post": self.request.user.has_perms(["worldskills_forum.add_forumpost", "worldskills_forum.add_forumtranslation"]),
             }
         )
@@ -458,4 +458,6 @@ class ForumTranslationWorkbenchView(TitleMixin, LoginRequiredMixin, UserPassesTe
         active_topics = get_topic_list_queryset().filter(post_count__gt=0)[:10]
         empty_topics = ForumTopic.objects.filter(created_by=self.request.user, posts__isnull=True).select_related("category", "module")
         recent = ForumPost.objects.filter(translation__translated_by=self.request.user).select_related("topic", "translation").order_by("-translation__updated_at")[:10]
+        for post in recent:
+            post.can_edit = can_edit_post(self.request.user, post)
         return super().get_context_data(active_topics=active_topics, empty_topics=empty_topics, recent_posts=recent, can_create_topic=self.request.user.has_perm("worldskills_forum.add_forumtopic"), can_publish=self.request.user.has_perms(["worldskills_forum.add_forumpost", "worldskills_forum.add_forumtranslation"]), **kwargs)

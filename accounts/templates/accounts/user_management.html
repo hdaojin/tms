@@ -1,0 +1,62 @@
+{% extends "layouts/app.html" %}
+{% block right_sidebar %}{% endblock %}
+{% block content %}
+<div class="card bg-base-100 shadow-sm">
+  <div class="card-body">
+    {% if errors %}
+      <div class="alert alert-error" role="alert"><ul>{% for error in errors %}<li>{{ error }}</li>{% endfor %}</ul></div>
+      <p>操作未保存。请返回重新选择并预览。</p>
+    {% elif preview %}
+      <h2 class="card-title">确认{{ preview.operation }}</h2>
+      <p>目标 {{ preview.count }} 人，无需变更 {{ preview.unchanged }} 人。仅处理以下固定名单；确认前相关状态变化会要求重新预览。</p>
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead><tr><th>姓名</th><th>账号</th><th>原值</th><th>新值</th><th>结果</th>{% if preview.role_operation %}<th>新增有效权限</th><th>移除有效权限</th>{% endif %}</tr></thead>
+          <tbody>{% for row in preview.rows %}
+            <tr><td>{{ row.name }}</td><td>{{ row.username }}</td><td>{{ row.before }}</td><td>{{ row.after }}</td><td>{% if row.changed %}将修改{% else %}无需变更{% endif %}</td>{% if preview.role_operation %}<td>{{ row.granted|join:'、'|default:'无' }}</td><td>{{ row.revoked|join:'、'|default:'无' }}</td>{% endif %}</tr>
+          {% endfor %}</tbody>
+        </table>
+      </div>
+      {% if preview.role_operation %}<p>个人直接授权和其他角色保持不变；技术领域访问仍受各角色的领域范围约束。</p>{% endif %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="preview_token" value="{{ preview.token }}">
+        {% if not view.kwargs.pk %}<input type="hidden" name="return_query" value="{{ return_query }}">{% endif %}
+        <button type="submit" name="action" value="save" class="btn btn-primary">确认保存</button>
+      </form>
+    {% elif parameter_selection %}
+      <h2 class="card-title">{{ operation_label }}：填写参数</h2>
+      <p>已固定选择 {{ parameter_selection.users|length }} 位用户。填写参数后预览变更，尚未保存。</p>
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead><tr><th>姓名</th><th>账号</th></tr></thead>
+          <tbody>{% for target in parameter_selection.users %}<tr><td>{{ target.display_name }}</td><td>{{ target.username }}</td></tr>{% endfor %}</tbody>
+        </table>
+      </div>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="parameter_token" value="{{ parameter_selection.token }}">
+        <input type="hidden" name="return_query" value="{{ return_query }}">
+        {% for field in form %}
+          {% if field.is_hidden %}{{ field }}{% else %}{% include "components/field.html" with field=field %}{% endif %}
+        {% endfor %}
+        <button type="submit" class="btn btn-primary">预览变更</button>
+      </form>
+    {% elif target_user %}
+      <h2 class="card-title">管理 {{ target_user.display_name }}（{{ target_user.username }}）</h2>
+      <p>当前账号状态：{% if target_user.is_active %}已激活{% else %}未激活{% endif %}。</p>
+      <p>账号激活与离开日期独立管理。离开日期可修改已锁定资料，其他资料保持锁定。</p>
+      <form method="post">
+        {% csrf_token %}
+        {% for field in form %}{% include "components/field.html" with field=field %}{% endfor %}
+        <button type="submit" class="btn btn-primary">预览操作</button>
+      </form>
+    {% endif %}
+    {% if view.kwargs.pk %}
+      <a class="btn btn-ghost" href="{% url 'accounts:user_detail' view.kwargs.pk %}">返回用户详情</a>
+    {% else %}
+      <a class="btn btn-ghost" href="{{ return_url }}">取消并返回用户列表</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

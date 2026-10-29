@@ -48,10 +48,12 @@ class ListPageMixin:
     template_name = "training/object_list.html"
     create_url_name = None
     create_label = "新增"
+    create_permission = None
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(create_url_name=self.create_url_name, create_label=self.create_label)
+        permission = self.create_permission or (f"{self.model._meta.app_label}.add_{self.model._meta.model_name}" if self.model else None)
+        context.update(create_url_name=self.create_url_name if permission and self.request.user.has_perm(permission) else None, create_label=self.create_label)
         return context
 
 
@@ -308,7 +310,10 @@ class TrainingTaskListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, S
     create_label = "新增训练任务"
 
     def get_queryset(self):
-        return visible_training_tasks_for(self.request.user).select_related(
+        from django.db.models import Exists, OuterRef
+        return visible_training_tasks_for(self.request.user).annotate(
+            can_edit=Exists(manageable_training_tasks_for(self.request.user).filter(pk=OuterRef("pk")))
+        ).select_related(
             "training_plan", "training_plan__training_cycle"
         )
 
@@ -319,7 +324,7 @@ class MyTrainingView(TrainingTaskListView):
 
     def get_queryset(self):
         return (
-            TrainingTask.objects.filter(executions__user=self.request.user).select_related("training_plan").distinct()
+            super().get_queryset().filter(executions__user=self.request.user).distinct()
         )
 
 
@@ -329,6 +334,9 @@ class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     context_object_name = "task"
     title = "{title}"
     permission_required = "training.view_trainingtask"
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(can_edit=manageable_training_tasks_for(self.request.user).filter(pk=self.object.pk).exists(), **kwargs)
 
     def get_breadcrumb_parents(self):
         if not self.request.user.has_perm("training.view_trainingtask"):
@@ -401,7 +409,8 @@ class TaskExecutionListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, 
     create_url_name = None
 
     def get_queryset(self):
-        return visible_task_executions_for(self.request.user).select_related("training_task", "user")
+        from django.db.models import Q
+        return visible_task_executions_for(self.request.user).annotate(can_edit=Q(user=self.request.user)).select_related("training_task", "user")
 
 
 class TaskExecutionDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -458,10 +467,11 @@ class TrainingLogListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, Si
     create_label = "新增训练日志"
 
     def get_queryset(self):
+        from django.db.models import Exists, OuterRef
         return (
             training_logs_visible_to(self.request.user)
             .select_related("training_cycle", "author")
-            .annotate(execution_count=Count("executions"))
+            .annotate(execution_count=Count("executions"), can_edit=Exists(training_logs_changeable_by(self.request.user).filter(pk=OuterRef("pk"))))
         )
 
 

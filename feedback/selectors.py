@@ -4,12 +4,12 @@ from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
 
 from .models import Feedback, FeedbackAttachment, FeedbackReply
-from .permissions import can_view_private_feedback
+from .permissions import can_access_feedback, can_view_private_feedback
 
 
 def visible_feedbacks_for(user):
     """返回当前用户可见的反馈范围，所有列表筛选都必须从这里开始。"""
-    if not getattr(user, "is_authenticated", False):
+    if not can_access_feedback(user):
         return Feedback.objects.none()
 
     queryset = (

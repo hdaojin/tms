@@ -1,6 +1,24 @@
-{% extends "layouts/app.html" %}
+{% extends "common/table_page.html" %}
+{% load static %}
 {% block right_sidebar %}{% endblock %}
 
-{% block content %}
+{% block list_results %}
+  {% partialdef results inline %}
+  {% if user.is_superuser %}
+  <form action="{% url 'accounts:user_manage' %}" method="post" data-bulk-list data-matching-count="{{ paginator.count }}" data-selection-label="位用户" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="q" value="{{ list_filters.q }}">
+    <input type="hidden" name="active" value="{{ list_filters.active }}">
+    <input type="hidden" name="role" value="{{ list_filters.role }}">
+    <input type="hidden" name="return_query" value="{{ request.GET.urlencode }}">
+    {% include "components/list_bulk_actions.html" with operation_field=management_form.operation matching_count=paginator.count allow_select_all=True selection_label="位用户" %}
+  {% endif %}
   {% include "components/table_wrapper.html" with table=table %}
+  {% if user.is_superuser %}</form>{% endif %}
+  {% endpartialdef %}
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script src="{% static 'js/list-bulk-actions.js' %}" defer></script>
 {% endblock %}

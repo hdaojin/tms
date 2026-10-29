@@ -42,6 +42,12 @@ class NoteRepoMigrationTests(TransactionTestCase):
         repo = self.apps.get_model("notes", "NoteRepo").objects.get(slug="legacy-notes")
         self.assertEqual(repo.relative_path, "legacy-notes")
 
+    def tearDown(self):
+        # 归还最新迁移状态，避免后续历史迁移测试混合前进和回退计划。
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
 
 class NoteRepoPathTests(TestCase):
     def test_model_normalizes_windows_separator(self):
@@ -147,6 +153,22 @@ class NotePathBoundaryTests(TestCase):
 
 
 class NoteViewTests(TestCase):
+    def test_login_and_audience_membership_do_not_replace_view_permission(self):
+        unassigned = User.objects.create_user(username="notes-unassigned")
+        unassigned.groups.add(self.allowed_group)
+        self.client.force_login(unassigned)
+        for url in (
+            reverse("notes:repo_list"),
+            reverse("notes:note_repo_index", kwargs={"repo": "course"}),
+            reverse("notes:note_detail", kwargs={"repo": "course", "slug": "one"}),
+            reverse("notes:note_print", kwargs={"repo": "course", "slug": "one"}),
+            reverse("note_asset", kwargs={"repo": "course", "asset_path": "assets/diagram.png"}),
+        ):
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 403)
+        self.note_repo.allowed_groups.clear()
+        self.assertEqual(self.client.get(reverse("notes:repo_list")).status_code, 403)
+
     def setUp(self):
         self.allowed_group = Group.objects.create(name="资料访问组")
         self.allowed_user = User.objects.create_user(username="asset-allowed", password="testpass123")
@@ -218,6 +240,7 @@ class NoteViewTests(TestCase):
         )
         self.assertEqual(note_response.status_code, 403)
         self.assertEqual(asset_response.status_code, 403)
+        self.assertEqual(self.client.get(reverse("notes:note_print", kwargs={"repo": "course", "slug": "one"})).status_code, 403)
 
     def test_asset_view_serves_file_inside_nested_repo(self):
         self.client.force_login(self.allowed_user)

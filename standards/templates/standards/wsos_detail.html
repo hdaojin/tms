@@ -51,7 +51,7 @@
                 {% for mapping in section.skill_mappings.all %}
                   <div class="flex flex-wrap items-start justify-between gap-3 rounded-box border border-base-300 px-3 py-2">
                     <div>
-                      <a class="link link-primary font-medium" href="{% url 'standards:skill_detail' mapping.skill_id %}">{{ mapping.skill.name }}</a>
+                      {% if perms.standards.view_skill %}<a class="link link-primary font-medium" href="{% url 'standards:skill_detail' mapping.skill_id %}">{{ mapping.skill.name }}</a>{% else %}{{ mapping.skill.name }}{% endif %}
                       {% if not mapping.skill.is_active %}<span class="badge badge-warning badge-sm">已停用</span>{% endif %}
                       {% if mapping.note %}<p class="mt-1 text-sm text-base-content/60">{{ mapping.note }}</p>{% endif %}
                     </div>

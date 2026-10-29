@@ -19,7 +19,7 @@
       <h2 class="card-title text-base">提案信息</h2>
       <p>词库：{{ proposal.glossary }}</p><p>提交人：{{ proposal.submitted_by }}</p><p>提交时间：{{ proposal.created_at }}</p>
       <div class="card-actions mt-3">
-        {% if proposal.status != 'approved' and proposal.submitted_by == request.user %}<a class="btn btn-outline btn-sm" href="{% url 'glossary:proposal_edit' proposal.pk %}">修改并重提</a>{% endif %}
+        {% if proposal.status != 'approved' and proposal.submitted_by == request.user and perms.glossary.change_glossaryentryproposal %}<a class="btn btn-outline btn-sm" href="{% url 'glossary:proposal_edit' proposal.pk %}">修改并重提</a>{% endif %}
         {% if perms.glossary.change_professionalglossary and proposal.status == 'pending' %}
           <form method="post" action="{% url 'glossary:proposal_approve' proposal.pk %}">{% csrf_token %}<button class="btn btn-success btn-sm" type="submit">通过</button></form>
           <a class="btn btn-error btn-sm" href="{% url 'glossary:proposal_reject' proposal.pk %}">驳回</a>

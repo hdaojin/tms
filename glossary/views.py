@@ -155,7 +155,7 @@ class ProfessionalGlossaryListView(TitleMixin, PermissionRequiredMixin, SingleTa
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["create_url"] = reverse("glossary:glossary_create")
+        context["create_url"] = reverse("glossary:glossary_create") if self.request.user.has_perm("glossary.add_professionalglossary") else None
         context["create_label"] = "新增专业词库"
         return context
 
@@ -206,7 +206,7 @@ class GlossaryEntryListView(TitleMixin, PermissionRequiredMixin, SingleTableView
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["subtitle"] = str(self.glossary)
-        context["create_url"] = f"{reverse('glossary:entry_create')}?glossary={self.glossary.pk}"
+        context["create_url"] = f"{reverse('glossary:entry_create')}?glossary={self.glossary.pk}" if self.request.user.has_perm("glossary.add_glossaryentry") else None
         context["create_label"] = "新增正式词条"
         return context
 
@@ -396,7 +396,7 @@ class GlossaryImportListView(TitleMixin, PermissionRequiredMixin, SingleTableVie
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["create_url"] = reverse("glossary:import_create")
+        context["create_url"] = reverse("glossary:import_create") if self.request.user.has_perm("glossary.add_glossaryimport") else None
         context["create_label"] = "导入 Smartcat XLSX"
         return context
 

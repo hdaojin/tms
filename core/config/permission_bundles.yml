@@ -2,7 +2,7 @@ version: 1
 bundles:
   - code: accounts.manage_own_profile
     name: 用户管理 | 管理本人资料
-    description: 查看并维护本人的用户资料。
+    description: 本人资料现为登录账号的基础能力，无需分配此包；保留原生权限映射以兼容已有授权配置。
     permissions: [accounts.change_userprofile]
   - code: accounts.view_all_profiles
     name: 用户管理 | 查看全部用户资料
@@ -37,20 +37,28 @@ bundles:
     permissions: [training.view_trainingcycle, training.view_trainingplan, training.view_trainingtask, training.view_taskexecution, training.change_taskexecution, training.view_traininglog, training.add_traininglog, training.change_traininglog]
   - code: training.view_training
     name: 训练管理 | 查看训练
-    description: 按业务范围查看训练周期、计划、任务、执行和训练日志。
+    description: 全系统周期和计划可读；任务按领域、本人执行或显式教练分配可见，执行按本人或任务教练可见，日志默认仅本人。
     permissions: [training.view_trainingcycle, training.view_trainingcyclemember, training.view_trainingplan, training.view_trainingtask, training.view_trainingtaskdomain, training.view_trainingtaskskill, training.view_trainingtaskcoach, training.view_trainingtaskattachment, training.view_taskexecution, training.view_taskexecutionattachment, training.view_traininglog]
   - code: training.maintain_plans
     name: 训练管理 | 维护训练计划
-    description: 查看训练周期并新增、修改训练计划。
+    description: 查看训练周期并新增、修改全系统训练计划，不按技术领域或创建人限制。
     permissions: [training.view_trainingcycle, training.view_trainingcyclemember, training.view_trainingplan, training.add_trainingplan, training.change_trainingplan]
   - code: training.manage_cycle_members
     name: 训练管理 | 管理周期成员
-    description: 维护周期选手和教练成员，并设置用户当前周期。
+    description: 维护全系统周期选手和教练成员，并设置用户当前周期，不按技术领域限制。
     permissions: [training.view_trainingcycle, training.view_trainingcyclemember, training.add_trainingcyclemember, training.change_trainingcyclemember, training.delete_trainingcyclemember]
   - code: training.maintain_tasks
     name: 训练管理 | 维护训练任务
     description: 按技术领域或显式教练分配维护训练任务、附件和教练反馈。
     permissions: [training.view_trainingcycle, training.view_trainingplan, training.view_trainingtask, training.add_trainingtask, training.change_trainingtask, training.view_trainingtaskdomain, training.view_trainingtaskskill, training.view_trainingtaskcoach, training.view_trainingtaskattachment, training.add_trainingtaskattachment, training.view_taskexecution, training.change_taskexecution, training.view_taskexecutionattachment]
+  - code: training.maintain_own_logs
+    name: 训练管理 | 维护本人训练日志
+    description: 查看、新增和修改本人训练日志；新增仍需周期成员身份及当前周期，不包含删除。
+    permissions: [training.view_traininglog, training.add_traininglog, training.change_traininglog]
+  - code: training.maintain_cycles
+    name: 训练管理 | 维护全系统训练周期
+    description: 创建和修改全系统训练周期、推进状态及配置技能树快照，不按技术领域限制。
+    permissions: [training.view_trainingcycle, training.add_trainingcycle, training.change_trainingcycle]
   - code: training.view_all_logs
     name: 训练管理 | 查看全部训练日志
     description: 将训练日志查看范围扩大到全部人员。
@@ -76,6 +84,10 @@ bundles:
     description: 导出有权查看的训练日志归档。
     permissions: [training.view_traininglog, training.export_traininglog_archive]
 
+  - code: behaviors.view_own_conduct
+    name: 学生奖惩管理 | 查看本人奖惩
+    description: 查看本人奖惩记录、汇总及附件，不授予录入或查看其他人员的权限。
+    permissions: [behaviors.view_conductrecord, behaviors.view_conductsummary]
   - code: behaviors.conduct_subject
     name: 学生奖惩管理 | 奖惩对象
     description: 可被选为奖惩记录对象；不授予页面访问权。
@@ -86,7 +98,7 @@ bundles:
     permissions: [behaviors.add_conduct_record, behaviors.view_conductrecord, behaviors.view_conductsummary]
   - code: behaviors.review_conduct
     name: 学生奖惩管理 | 审核奖惩记录
-    description: 审核奖惩记录并查看汇总。
+    description: 在后台审核奖惩记录，并可查看全体记录与汇总；现有审核操作还需后台访问资格。
     permissions: [behaviors.review_conduct_record, behaviors.view_conductrecord, behaviors.view_conductsummary]
   - code: behaviors.view_all_conduct_records
     name: 学生奖惩管理 | 查看全部奖惩记录
@@ -103,18 +115,30 @@ bundles:
     permissions: [standards.view_skill, standards.add_skill, standards.change_skill]
   - code: standards.maintain_current_tree
     name: 标准体系 | 维护当前技能树
-    description: 在用户组的技术领域范围内维护当前技能树节点，不包含版本治理。
+    description: 在用户组的技术领域范围内维护当前技能树节点，包含移除节点，不包含版本治理。
     permissions: [standards.view_skilltreeversion, standards.view_skilltreenode, standards.add_skilltreenode, standards.change_skilltreenode, standards.delete_skilltreenode]
+  - code: standards.edit_current_tree
+    name: 标准体系 | 维护当前技能树（新增与修改）
+    description: 在同组技术领域范围内新增、修改和调整当前技能树节点；不包含移除节点或版本治理。
+    permissions: [standards.view_skilltreeversion, standards.view_skilltreenode, standards.add_skilltreenode, standards.change_skilltreenode]
+  - code: standards.remove_tree_nodes
+    name: 标准体系 | 移除当前树节点
+    description: 在同组技术领域范围内移除当前树节点或子树，不删除长期 Skill；属于另行授予的删除能力。
+    permissions: [standards.view_skilltreeversion, standards.view_skilltreenode, standards.delete_skilltreenode]
 
   - code: assessments.view_assessments
     name: 竞赛与考核 | 查看
     description: 按业务范围查看竞赛、考核、模块、人员和资料。
     permissions: [assessments.view_assessmentseries, assessments.view_assessmentlevel, assessments.view_competitionperson, assessments.view_competitionrole, assessments.view_assessment, assessments.view_assessmentmodule, assessments.view_assessmentmoduledomain, assessments.view_assessmentmodulecoach, assessments.view_assessmentparticipant, assessments.view_assessmentfinalresult, assessments.view_assessmentfinalscore, assessments.view_assessmentaward, assessments.view_assessmentresultaward, assessments.view_assessmentdocument]
   - code: assessments.maintain_assessments
-    name: 竞赛与考核 | 维护
-    description: 按业务范围维护竞赛、模块、人员、资料和最终结果。
+    name: 竞赛与考核 | 全系统维护（原组合）
+    description: 管理全系统竞赛及人员目录，并扩大关联评分和考点证据范围；此包保留既有全局授权，不适合作为普通领域教练默认能力。
     permissions: [assessments.view_competitionperson, assessments.add_competitionperson, assessments.change_competitionperson, assessments.view_competitionrole, assessments.add_competitionrole, assessments.change_competitionrole, assessments.view_assessment, assessments.view_all_assessment, assessments.add_assessment, assessments.change_assessment, assessments.change_all_assessment, assessments.view_assessmentmodule, assessments.add_assessmentmodule, assessments.change_assessmentmodule, assessments.view_assessmentparticipant, assessments.add_assessmentparticipant, assessments.change_assessmentparticipant, assessments.view_assessmentdocument, assessments.add_assessmentdocument, assessments.change_assessmentdocument, assessments.view_assessmentfinalresult, assessments.add_assessmentfinalresult, assessments.change_assessmentfinalresult, assessments.view_assessmentfinalscore, assessments.add_assessmentfinalscore, assessments.change_assessmentfinalscore, assessments.view_assessmentaward, assessments.add_assessmentaward, assessments.change_assessmentaward, assessments.view_assessmentresultaward, assessments.add_assessmentresultaward, assessments.change_assessmentresultaward]
 
+  - code: assessments.maintain_scoped_assessments
+    name: 竞赛与考核 | 日常维护（按对象范围）
+    description: 不包含新增竞赛与考核，由管理员统一创建。维护本人创建的既有竞赛；单领域模块按同组技术领域，跨领域模块按显式教练分配或竞赛创建人授权。资料、人员和结果仍按既有对象规则校验，不维护全局赛事人员和角色目录。
+    permissions: [assessments.view_competitionperson, assessments.view_competitionrole, assessments.view_assessment, assessments.change_assessment, assessments.view_assessmentmodule, assessments.add_assessmentmodule, assessments.change_assessmentmodule, assessments.view_assessmentparticipant, assessments.add_assessmentparticipant, assessments.change_assessmentparticipant, assessments.view_assessmentdocument, assessments.add_assessmentdocument, assessments.change_assessmentdocument, assessments.view_assessmentfinalresult, assessments.add_assessmentfinalresult, assessments.change_assessmentfinalresult, assessments.view_assessmentfinalscore, assessments.add_assessmentfinalscore, assessments.change_assessmentfinalscore, assessments.view_assessmentaward, assessments.add_assessmentaward, assessments.change_assessmentaward, assessments.view_assessmentresultaward, assessments.add_assessmentresultaward, assessments.change_assessmentresultaward]
   - code: scoring.view_schemes
     name: 评分 | 查看评分方案
     description: 查看评分方案及其评分结构。
@@ -125,11 +149,11 @@ bundles:
     permissions: [scoring.view_scoringresult]
   - code: scoring.view_all_results
     name: 评分 | 查看全部评分结果
-    description: 将评分结果范围扩大到全部人员。
+    description: 查看有权访问模块内全部选手的评分结果；模块仍按领域、显式分配或竞赛归属限制，全局竞赛查看权会扩大模块范围。
     permissions: [scoring.view_scoringresult, scoring.view_all_scoringresult]
   - code: scoring.maintain_scoring
     name: 评分 | 维护评分
-    description: 导入评分标准并维护评分结果。
+    description: 在同组技术领域、显式教练分配或竞赛归属允许的模块内导入评分标准并维护评分结果；全局竞赛维护权会扩大范围。
     permissions: [scoring.view_scoringscheme, scoring.add_scoringscheme, scoring.change_scoringscheme, scoring.view_scoringparserconfig, scoring.view_scoringschemeimport, scoring.add_scoringschemeimport, scoring.change_scoringschemeimport, scoring.view_scoringsubcriterion, scoring.view_scoringaspect, scoring.view_judgementoption, scoring.view_scoringresult, scoring.add_scoringresult, scoring.change_scoringresult, scoring.view_all_scoringresult, scoring.view_scoringresultrevision, scoring.view_scoringresultimport, scoring.add_scoringresultimport, scoring.change_scoringresultimport]
 
   - code: evidence.view_evidence
@@ -138,8 +162,16 @@ bundles:
     permissions: [evidence.view_knowledgeevidence, evidence.view_evidenceskillmap]
   - code: evidence.maintain_evidence
     name: 考点证据 | 维护
-    description: 按技术领域创建、审核和映射考点证据。
+    description: 按技术领域或对象归属创建、审核和映射考点证据，包含移除技能映射。
     permissions: [evidence.view_knowledgeevidence, evidence.add_knowledgeevidence, evidence.change_knowledgeevidence, evidence.view_evidenceskillmap, evidence.add_evidenceskillmap, evidence.change_evidenceskillmap, evidence.delete_evidenceskillmap]
+  - code: evidence.edit_evidence
+    name: 考点证据 | 日常维护（不含移除）
+    description: 按同组技术领域、显式教练分配或对象归属创建、审核和维护考点证据及技能映射，不包含移除映射。
+    permissions: [evidence.view_knowledgeevidence, evidence.add_knowledgeevidence, evidence.change_knowledgeevidence, evidence.view_evidenceskillmap, evidence.add_evidenceskillmap, evidence.change_evidenceskillmap]
+  - code: evidence.remove_skill_maps
+    name: 考点证据 | 移除技能映射
+    description: 在有权维护的考点证据内移除技能映射，属于另行授予的删除能力。
+    permissions: [evidence.view_knowledgeevidence, evidence.view_evidenceskillmap, evidence.delete_evidenceskillmap]
 
   - code: worldskills_forum.view_forum
     name: 世赛论坛 | 查看世赛论坛
@@ -154,15 +186,31 @@ bundles:
     description: 管理全部论坛内容和基础分类。
     permissions: [worldskills_forum.view_forumtopic, worldskills_forum.change_forumtopic, worldskills_forum.delete_forumtopic, worldskills_forum.change_all_forum_content, worldskills_forum.view_forumpost, worldskills_forum.change_forumpost, worldskills_forum.delete_forumpost, worldskills_forum.view_forumtranslation, worldskills_forum.change_forumtranslation, worldskills_forum.delete_forumtranslation, worldskills_forum.view_forumpostattachment, worldskills_forum.change_forumpostattachment, worldskills_forum.delete_forumpostattachment, worldskills_forum.view_forumcategory, worldskills_forum.add_forumcategory, worldskills_forum.change_forumcategory, worldskills_forum.view_forummodule, worldskills_forum.add_forummodule, worldskills_forum.change_forummodule, worldskills_forum.view_forumsourcerole, worldskills_forum.add_forumsourcerole, worldskills_forum.change_forumsourcerole, worldskills_forum.view_forumposttype, worldskills_forum.add_forumposttype, worldskills_forum.change_forumposttype, worldskills_forum.view_forumtag, worldskills_forum.add_forumtag, worldskills_forum.change_forumtag]
 
+  - code: feedback.view_feedback
+    name: 意见反馈 | 查看反馈
+    description: 查看站内公开反馈、本人私密反馈及其回复和附件；不允许查看他人私密反馈。
+    permissions: [feedback.view_feedback, feedback.view_feedbackreply, feedback.view_feedbackattachment]
+  - code: feedback.submit_feedback
+    name: 意见反馈 | 提交反馈
+    description: 提交反馈及附件，并查看公开反馈和本人私密反馈。
+    permissions: [feedback.view_feedback, feedback.view_feedbackreply, feedback.view_feedbackattachment, feedback.add_feedback, feedback.add_feedbackattachment]
+  - code: feedback.reply_feedback
+    name: 意见反馈 | 回复反馈
+    description: 回复有权查看的反馈并上传附件；普通用户不能回复已关闭反馈。
+    permissions: [feedback.view_feedback, feedback.view_feedbackreply, feedback.view_feedbackattachment, feedback.add_feedbackreply, feedback.add_feedbackattachment]
   - code: feedback.handle_feedback
     name: 意见反馈 | 处理意见反馈
     description: 查看私密反馈并更新反馈状态和处理结果。
-    permissions: [feedback.manage_feedback, feedback.view_private_feedback]
+    permissions: [feedback.view_feedback, feedback.view_feedbackreply, feedback.view_feedbackattachment, feedback.add_feedbackreply, feedback.add_feedbackattachment, feedback.manage_feedback, feedback.view_private_feedback]
   - code: feedback.identify_anonymous
     name: 意见反馈 | 查看匿名反馈人身份
     description: 在本人有权查看反馈的前提下查看匿名提交者身份。
     permissions: [feedback.view_anonymous_identity]
 
+  - code: glossary.view_glossary
+    name: 专业词汇 | 查看专业词汇
+    description: 仅浏览词库和正式词条，不授予学习记录写入、词条提案或词库管理权限。
+    permissions: [glossary.view_professionalglossary, glossary.view_glossaryentry]
   - code: glossary.study_glossary
     name: 专业词汇 | 学习专业词汇
     description: 查看词库和词条并记录本人学习进度。

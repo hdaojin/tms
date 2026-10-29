@@ -47,9 +47,11 @@
         <div class="card-body">
           <h3 class="card-title">WSOS 映射</h3>
           {% for mapping in skill.wsos_mappings.all %}
-            <a class="link link-primary" href="{% url 'standards:wsos_detail' mapping.wsos_section.wsos_version_id %}#section-{{ mapping.wsos_section_id }}">
+            {% if perms.standards.view_wsosversion %}<a class="link link-primary" href="{% url 'standards:wsos_detail' mapping.wsos_section.wsos_version_id %}#section-{{ mapping.wsos_section_id }}">
               {{ mapping.wsos_section.wsos_version.name }} · {{ mapping.wsos_section.code }} {{ mapping.wsos_section.name }}
-            </a>{% empty %}
+            </a>{% else %}
+              {{ mapping.wsos_section.wsos_version.name }} · {{ mapping.wsos_section.code }} {{ mapping.wsos_section.name }}
+            {% endif %}{% empty %}
             <p>暂无映射</p>
           {% endfor %}
         </div>

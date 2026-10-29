@@ -32,7 +32,7 @@ class TrainingPlanTable(BaseTable):
 
 class TrainingTaskTable(BaseTable):
     planned_date = BaseDateColumn()
-    actions = ActionsColumn("training:task_detail", "training:task_edit", edit_perm="training.change_trainingtask")
+    actions = ActionsColumn("training:task_detail", "training:task_edit", edit_perm="training.change_trainingtask", edit_allowed_attr="can_edit")
 
     class Meta(BaseTable.Meta):
         model = TrainingTask
@@ -41,7 +41,7 @@ class TrainingTaskTable(BaseTable):
 
 class TaskExecutionTable(BaseTable):
     actions = ActionsColumn(
-        "training:execution_detail", "training:execution_edit", edit_perm="training.change_taskexecution"
+        "training:execution_detail", "training:execution_edit", edit_perm="training.change_taskexecution", edit_allowed_attr="can_edit"
     )
 
     class Meta(BaseTable.Meta):
@@ -55,7 +55,7 @@ class TrainingLogTable(BaseTable):
         template_name="training/_log_content_cell.html", verbose_name="训练内容", order_by="topic"
     )
     document = tables.Column(verbose_name="日志附件", empty_values=(), orderable=False)
-    actions = ActionsColumn("training:log_detail", "training:log_edit", edit_perm="training.change_traininglog")
+    actions = ActionsColumn("training:log_detail", "training:log_edit", edit_perm="training.change_traininglog", edit_allowed_attr="can_edit")
 
     def render_author(self, value):
         return get_user_display_name(value)

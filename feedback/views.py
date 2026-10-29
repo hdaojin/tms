@@ -4,7 +4,7 @@ import mimetypes
 from pathlib import Path
 
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import FileResponse, Http404, HttpRequest
 from django.shortcuts import redirect, render
@@ -21,7 +21,7 @@ from .permissions import (
     can_manage_feedback,
     can_reply_feedback,
     can_view_anonymous_identity,
-    can_view_feedback,
+    can_view_attachment,
 )
 from .selectors import feedback_detail_for, visible_feedbacks_for
 from .services import add_feedback_reply, create_feedback, update_feedback_status
@@ -46,7 +46,8 @@ def _detail_context(request: HttpRequest, feedback: Feedback, *, reply_form=None
     }
 
 
-class FeedbackListView(TitleMixin, LoginRequiredMixin, FilterableListMixin, ListView):
+class FeedbackListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, FilterableListMixin, ListView):
+    permission_required = "feedback.view_feedback"
     template_name = "feedback/feedback_list.html"
     title = "意见反馈"
     title_icon = "icon-[tabler--message-report]"
@@ -109,11 +110,12 @@ class FeedbackListView(TitleMixin, LoginRequiredMixin, FilterableListMixin, List
                 "icon": "icon-[tabler--message-plus]",
                 "variant_class": "btn btn-primary btn-soft btn-sm",
             }
-        ]
+        ] if self.request.user.has_perm("feedback.add_feedback") else []
         return context
 
 
-class FeedbackCreateView(TitleMixin, LoginRequiredMixin, FormView):
+class FeedbackCreateView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, FormView):
+    permission_required = ("feedback.view_feedback", "feedback.add_feedback")
     template_name = "feedback/feedback_form.html"
     form_class = FeedbackForm
     title = "提交反馈"
@@ -139,7 +141,8 @@ class FeedbackCreateView(TitleMixin, LoginRequiredMixin, FormView):
         return redirect("feedback:detail", pk=feedback.pk)
 
 
-class FeedbackDetailView(TitleMixin, LoginRequiredMixin, TemplateView):
+class FeedbackDetailView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, TemplateView):
+    permission_required = "feedback.view_feedback"
     template_name = "feedback/feedback_detail.html"
     title = "反馈详情"
     title_icon = "icon-[tabler--message-report]"
@@ -154,7 +157,8 @@ class FeedbackDetailView(TitleMixin, LoginRequiredMixin, TemplateView):
         return context
 
 
-class FeedbackReplyView(LoginRequiredMixin, View):
+class FeedbackReplyView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = ("feedback.view_feedback", "feedback.add_feedbackreply")
     def post(self, request, pk):
         feedback = feedback_detail_for(request.user, pk)
         form = FeedbackReplyForm(request.POST, request.FILES)
@@ -179,7 +183,8 @@ class FeedbackReplyView(LoginRequiredMixin, View):
         )
 
 
-class FeedbackManageView(TitleMixin, LoginRequiredMixin, View):
+class FeedbackManageView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = ("feedback.view_feedback", "feedback.manage_feedback")
     title = "处理反馈"
     title_icon = "icon-[tabler--adjustments]"
 
@@ -222,7 +227,8 @@ class FeedbackManageView(TitleMixin, LoginRequiredMixin, View):
         )
 
 
-class FeedbackAttachmentView(LoginRequiredMixin, View):
+class FeedbackAttachmentView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = ("feedback.view_feedback", "feedback.view_feedbackattachment")
     image_content_types = {
         "jpg": "image/jpeg",
         "jpeg": "image/jpeg",
@@ -232,7 +238,7 @@ class FeedbackAttachmentView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         attachment = FeedbackAttachment.objects.select_related("feedback").filter(pk=pk).first()
-        if attachment is None or not can_view_feedback(request.user, attachment.feedback):
+        if attachment is None or not can_view_attachment(request.user, attachment):
             raise Http404
         if not attachment.file:
             raise Http404

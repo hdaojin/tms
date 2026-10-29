@@ -261,7 +261,8 @@ class UserListRoleColumnTests(TestCase):
 
 		soup = BeautifulSoup(response.content, 'html.parser')
 		headers = [th.get_text(strip=True) for th in soup.select('thead th')]
-		self.assertEqual(headers[1:3], ['姓名', '角色'])
+		name_index = headers.index('姓名')
+		self.assertEqual(headers[name_index:name_index + 2], ['姓名', '角色'])
 		sortable_headers = {a.get_text(strip=True) for a in soup.select('thead th a')}
 		self.assertSetEqual(
 			sortable_headers,
@@ -382,16 +383,15 @@ class UserListRoleColumnTests(TestCase):
 		self.assertIn('badge-error', admin_badge.get('class', []))
 		self.assertIsNone(soup.find('span', string='工作人员'))
 
-	def test_deactivating_user_fills_empty_leave_date(self):
+	def test_deactivating_user_preserves_empty_leave_date(self):
 		user = User.objects.create_user('deactivate-user', password='testpass123')
 		profile = UserProfile.objects.create(user=user)
-		today = timezone.localdate()
 
 		user.is_active = False
 		user.save(update_fields=['is_active'])
 
 		profile.refresh_from_db()
-		self.assertEqual(profile.leave_date, today)
+		self.assertIsNone(profile.leave_date)
 
 	def test_deactivating_user_preserves_existing_leave_date(self):
 		user = User.objects.create_user('deactivate-existing-leave-date', password='testpass123')
@@ -406,15 +406,13 @@ class UserListRoleColumnTests(TestCase):
 		profile.refresh_from_db()
 		self.assertEqual(profile.leave_date, date(2026, 5, 1))
 
-	def test_deactivating_user_without_profile_creates_leave_date(self):
+	def test_deactivating_user_without_profile_does_not_create_profile(self):
 		user = User.objects.create_user('deactivate-without-profile', password='testpass123')
-		today = timezone.localdate()
 
 		user.is_active = False
 		user.save(update_fields=['is_active'])
 
-		profile = UserProfile.objects.get(user=user)
-		self.assertEqual(profile.leave_date, today)
+		self.assertFalse(UserProfile.objects.filter(user=user).exists())
 
 
 class AccountPermissionBundleAccessTests(TestCase):

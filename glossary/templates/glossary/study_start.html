@@ -7,7 +7,7 @@
       <h2 class="card-title"><span class="icon-[tabler--player-pause] size-6" aria-hidden="true"></span>发现未结束的学习会话</h2>
       <p>{{ active_session.glossary }} · {{ active_session.get_mode_display }} · 已答 {{ active_session.answered_count }} 题</p>
       <div class="card-actions justify-end">
-        <form method="post" action="{% url 'glossary:study_stop' active_session.pk %}">{% csrf_token %}<button class="btn btn-ghost" type="submit">结束并查看统计</button></form>
+        {% if perms.glossary.change_studysession %}<form method="post" action="{% url 'glossary:study_stop' active_session.pk %}">{% csrf_token %}<button class="btn btn-ghost" type="submit">结束并查看统计</button></form>{% endif %}
         <a class="btn btn-primary" href="{% url 'glossary:study_session' active_session.pk %}">继续学习</a>
       </div>
     </div>

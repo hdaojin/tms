@@ -23,8 +23,8 @@
                 {% if new_user %}
                   <p class="text-base-content/70 mb-4">
                     欢迎 <span class="font-semibold text-primary">{{ new_user.username }}</span>
-                    {% if new_user.first_name %}
-                      ({{ new_user.first_name }})
+                    {% if new_user.last_name or new_user.first_name %}
+                      ({{ new_user.display_name }})
                     {% endif %}加入我们！
                   </p>
                 {% else %}

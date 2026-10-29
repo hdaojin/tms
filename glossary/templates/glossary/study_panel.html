@@ -21,11 +21,11 @@
           </dl>
         </div>
         <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-          <form method="post" action="{% url 'glossary:study_stop' session.pk %}">{% csrf_token %}<button class="btn btn-ghost w-full sm:w-auto" type="submit">停止学习</button></form>
-          <a class="btn btn-primary w-full sm:w-auto" href="{% url 'glossary:study_session' session.pk %}">下一题</a>
+          {% if perms.glossary.change_studysession %}<form method="post" action="{% url 'glossary:study_stop' session.pk %}">{% csrf_token %}<button class="btn btn-ghost w-full sm:w-auto" type="submit">停止学习</button></form>{% endif %}
+          {% if perms.glossary.view_studysession %}<a class="btn btn-primary w-full sm:w-auto" href="{% url 'glossary:study_session' session.pk %}">下一题</a>{% endif %}
         </div>
       {% else %}
-        <form method="post" action="{% url 'glossary:study_answer' session.pk %}" class="space-y-4" hx-post="{% url 'glossary:study_answer' session.pk %}" hx-target="#study-panel" hx-swap="outerHTML">
+        {% if perms.glossary.change_studysession and perms.glossary.add_studyattempt %}<form method="post" action="{% url 'glossary:study_answer' session.pk %}" class="space-y-4" hx-post="{% url 'glossary:study_answer' session.pk %}" hx-target="#study-panel" hx-swap="outerHTML">
           {% csrf_token %}
           <input type="hidden" name="attempt_id" value="{{ attempt.pk }}">
           {% include "components/form_errors.html" with form=form %}
@@ -34,8 +34,8 @@
             <button class="btn btn-ghost" type="submit" name="unknown" value="1" formnovalidate>不会</button>
             <button class="btn btn-primary" type="submit">提交答案</button>
           </div>
-        </form>
-        <form method="post" action="{% url 'glossary:study_stop' session.pk %}" class="text-center">{% csrf_token %}<button class="btn btn-link text-error" type="submit">停止学习</button></form>
+        </form>{% endif %}
+        {% if perms.glossary.change_studysession %}<form method="post" action="{% url 'glossary:study_stop' session.pk %}" class="text-center">{% csrf_token %}<button class="btn btn-link text-error" type="submit">停止学习</button></form>{% endif %}
       {% endif %}
     </div>
   </article>

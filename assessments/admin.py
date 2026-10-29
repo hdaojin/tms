@@ -37,7 +37,8 @@ class AssessmentTypeAdmin(StableCodeAdmin):
 
 @admin.register(CompetitionRole)
 class CompetitionRoleAdmin(StableCodeAdmin):
-    list_display = ("code", "name", "category", "order", "is_active")
+    list_display = ("code", "name", "english_name", "category", "order", "is_active")
+    search_fields = ("code", "name", "english_name")
     list_filter = ("category", "is_active")
 
 

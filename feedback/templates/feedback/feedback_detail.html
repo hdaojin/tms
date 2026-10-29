@@ -27,7 +27,7 @@
         {% endif %}
       </div>
       <div class="whitespace-pre-wrap break-words leading-7">{{ feedback.content }}</div>
-      {% if feedback.attachments.all %}
+      {% if perms.feedback.view_feedbackattachment and feedback.attachments.all %}
         <div class="flex flex-wrap gap-3 border-t border-base-300 pt-4">
           {% for attachment in feedback.attachments.all %}
             {% if attachment.is_safe_image %}

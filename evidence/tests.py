@@ -261,6 +261,17 @@ class EvidencePermissionBoundaryTests(TestCase):
         )
         return module
 
+    def test_action_links_use_same_object_scope_as_edit_endpoint(self):
+        self.linux_coach.user_permissions.add(Permission.objects.get(content_type__app_label="assessments", codename="view_all_assessment"))
+        self.client.force_login(self.linux_coach)
+        listing = self.client.get(reverse("evidence:evidence_list"))
+        self.assertContains(listing, reverse("evidence:evidence_edit", args=[self.linux_evidence.pk]))
+        self.assertNotContains(listing, reverse("evidence:evidence_edit", args=[self.windows_evidence.pk]))
+        detail = self.client.get(reverse("evidence:evidence_detail", args=[self.windows_evidence.pk]))
+        self.assertNotContains(detail, reverse("evidence:evidence_edit", args=[self.windows_evidence.pk]))
+        self.assertNotContains(detail, reverse("evidence:mapping_create", args=[self.windows_evidence.pk]))
+        self.assertEqual(self.client.get(reverse("evidence:evidence_edit", args=[self.windows_evidence.pk])).status_code, 404)
+
     def _evidence(self, module, title):
         return KnowledgeEvidence.objects.create(
             skill_project=self.project,

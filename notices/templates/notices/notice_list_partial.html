@@ -24,10 +24,10 @@
             <div class="flex items-center">
               <div class="flex items-center gap-1">
                 <span class="icon-[tabler--user] size-4"></span>
-                {% if user == notice.published_by %}
+                {% if user == notice.published_by and perms.notices.delete_notice %}
                   <div class="text-error mr-1">我</div>
                 {% else %}
-                  <div class="text-primary mr-1">{{ notice.published_by.get_full_name|default:notice.published_by.username }}</div>
+                  <div class="text-primary mr-1">{{ notice.published_by.display_name }}</div>
                 {% endif %}
               </div>
               <div class="mr-1">对</div>
@@ -44,7 +44,7 @@
             </div>
           </div>
         </div>
-        {% if user == notice.published_by %}
+        {% if user == notice.published_by and perms.notices.delete_notice %}
           <div class="card-actions">
             {% url 'notices:notice_delete' notice.id as delete_url %}
             {% with notice_id=notice.id|stringformat:"s" %}

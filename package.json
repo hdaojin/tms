@@ -21,7 +21,7 @@
     "build:css": "tailwindcss --input static/css/main.css --output static/css/output.css --minify",
     "build:frontend": "node scripts/sync-frontend-vendor.mjs && npm run build:css",
     "watch:css": "tailwindcss --input static/css/main.css --output static/css/output.css --watch",
-    "test:frontend": "node scripts/sync-frontend-vendor.mjs --check && node --test scripts/test-filepond.mjs",
+    "test:frontend": "node scripts/sync-frontend-vendor.mjs --check && node --test scripts/test-filepond.mjs scripts/test-list-bulk-actions.mjs",
     "format:frontend": "prettier --write package.json \"scripts/**/*.mjs\" \"static/css/main.css\"",
     "format:frontend:check": "prettier --check package.json \"scripts/**/*.mjs\" \"static/css/main.css\""
   },

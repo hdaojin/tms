@@ -1,0 +1,72 @@
+{% extends "layouts/app.html" %}
+{% load static %}
+{% block right_sidebar %}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-6xl space-y-5">
+  <div class="flex flex-wrap gap-3">
+    <a class="btn btn-ghost btn-sm" href="{% url 'accounts:role_list' %}">返回角色列表</a>
+    {% if source_group and not copying %}<a class="btn btn-outline btn-sm" href="{% url 'accounts:role_copy' source_group.pk %}">复制此角色</a>{% endif %}
+  </div>
+  <div class="alert alert-info"><p>业务权限明确授予；同一角色组同时提供能力和技术领域才能形成领域授权。用户可以兼任多个角色。复制角色保留权限组合，成员和领域留空。</p></div>
+  <form method="post" class="space-y-6" data-role-form>
+    {% csrf_token %}
+    {% include "components/form_errors.html" with form=form %}
+    <div class="grid gap-5 md:grid-cols-2">
+      {% include "components/field.html" with field=form.name %}
+      {% include "components/field.html" with field=form.description %}
+    </div>
+    <section class="space-y-4">
+      <h2 class="text-lg font-semibold">业务权限包</h2>
+      {{ form.bundles.errors }}
+      <label class="input w-full"><span>搜索</span><input type="search" data-bundle-search placeholder="搜索 APP、能力、范围或权限编码" aria-label="搜索权限包"></label>
+      {% for category, options in bundle_groups %}
+        <fieldset class="rounded-box border border-base-300 p-4 space-y-3" data-bundle-group>
+          <legend class="px-2 font-semibold">{{ category }}</legend>
+          {% for item in options %}
+            <label class="flex items-start gap-3 rounded-box p-3 hover:bg-base-200" data-bundle-option>
+              {{ item.option.tag }}
+              <span class="space-y-1">
+                <span class="block font-medium">{{ item.spec.name }}</span>
+                <span class="block text-sm">{{ item.spec.description }}</span>
+                <span class="block text-xs text-base-content/60">{{ item.spec.code }}</span>
+                <span class="block text-xs text-base-content/60">{{ item.spec.permissions|join:", " }}</span>
+              </span>
+            </label>
+          {% endfor %}
+        </fieldset>
+      {% endfor %}
+    </section>
+    <section class="grid gap-6 md:grid-cols-2">
+      <div class="space-y-3">
+        <h2 class="text-lg font-semibold">技术领域范围</h2>
+        {% include "components/field.html" with field=form.domains %}
+        <p class="text-sm text-warning">未配置领域时，相应领域维护能力不生效。标准可跨领域阅读；周期、计划及全体日志等能力的范围以各权限包说明为准。</p>
+      </div>
+      <div class="space-y-3">
+        <h2 class="text-lg font-semibold">成员分配</h2>
+        <label class="input w-full"><input type="search" data-member-search placeholder="搜索成员" aria-label="搜索角色成员"></label>
+        {{ form.members.errors }}
+        <div class="max-h-80 overflow-y-auto rounded-box border border-base-300 p-3 space-y-2">
+          {% for option in form.members %}<label class="flex items-center gap-3 p-2" data-member-option>{{ option.tag }}<span>{{ option.choice_label }}</span></label>{% empty %}<p>没有可分配的用户。</p>{% endfor %}
+        </div>
+        <p class="text-sm text-base-content/60">{{ form.members.help_text }}</p>
+      </div>
+    </section>
+    <details class="collapse collapse-arrow border border-base-300 bg-base-100">
+      <summary class="collapse-title font-medium">高级：额外原生权限</summary>
+      <div class="collapse-content">{% include "components/field.html" with field=form.explicit_permissions %}</div>
+    </details>
+    {% if preview %}
+      <section class="rounded-box border border-warning p-5 space-y-3" aria-label="授权变更预览">
+        <h2 class="text-lg font-semibold">保存前变更摘要</h2>
+        <p>受影响成员：{{ preview.affected_count }} 人。保存后生效；撤销本角色权限后，用户仍可能通过其他角色或个人授权获得能力。</p>
+        {% for change in preview.changes %}<div class="text-sm break-words"><strong>{{ change.label }}</strong><div>原值：{{ change.before }}</div><div>新值：{{ change.after }}</div></div>{% empty %}<p>没有配置差异。</p>{% endfor %}
+        <input type="hidden" name="preview_token" value="{{ preview.token }}">
+        <button class="btn btn-primary" type="submit" name="action" value="save">保存以上配置</button>
+      </section>
+    {% endif %}
+    <button class="btn btn-outline" type="submit" name="action" value="preview">预览变更</button>
+  </form>
+</div>
+<script src="{% static 'js/role-permissions.js' %}" defer></script>
+{% endblock %}

@@ -173,6 +173,21 @@ if https_status_matches_policy 401 0; then exit 11; fi
     assert "@@" not in result.stdout
 
 
+def test_explicitly_disabled_basic_auth_renders_django_only_and_checks_login_redirect():
+    result = bash_run('''
+set -Eeuo pipefail
+source "$1"
+TMS_BASIC_AUTH_ENABLED=0
+render_caddy_site "$(dirname "$1")/../deploy/production/tms.caddy"
+curl() { printf '302'; }
+https_healthcheck
+''')
+    assert "tms_basic_auth" not in result.stdout
+    assert "tms-basic-auth.caddy" not in result.stdout
+    assert "@@" not in result.stdout
+    assert "reverse_proxy 127.0.0.1:8010" in result.stdout
+
+
 @pytest.mark.parametrize("cidrs", ["10.21.57.72/24", "10.21.57.0/33", "10.21.57.1", "10.21.57.0/24;abort", "not-a-network"])
 def test_invalid_basic_auth_network_is_rejected(cidrs):
     with patch.dict(os.environ, {"TMS_TEST_CIDRS": cidrs}):

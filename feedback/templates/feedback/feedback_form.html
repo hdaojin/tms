@@ -9,7 +9,7 @@
         {% include "components/field.html" with field=form.category %}
         {% include "components/field.html" with field=form.title %}
         {% include "components/field.html" with field=form.content %}
-        {% include "feedback/fragments/attachment_picker.html" with field=form.attachments %}
+        {% if perms.feedback.add_feedbackattachment %}{% include "feedback/fragments/attachment_picker.html" with field=form.attachments %}{% endif %}
         {% include "components/field.html" with field=form.is_anonymous %}
         {% include "components/field.html" with field=form.is_private %}
       </div>

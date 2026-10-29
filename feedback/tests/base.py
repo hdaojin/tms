@@ -32,6 +32,8 @@ class FeedbackTestCase(TestCase):
         self.manager = user_model.objects.create_user(username="manager", password="test")
         self.private_viewer = user_model.objects.create_user(username="private-viewer", password="test")
         self.identity_viewer = user_model.objects.create_user(username="identity-viewer", password="test")
+        for user in (self.author, self.other, self.manager, self.private_viewer, self.identity_viewer):
+            self.grant(user, "view_feedback", "view_feedbackreply", "view_feedbackattachment", "add_feedback", "add_feedbackreply", "add_feedbackattachment")
         self.grant(self.manager, "manage_feedback", "view_private_feedback")
         self.grant(self.private_viewer, "view_private_feedback")
         self.grant(self.identity_viewer, "view_anonymous_identity")

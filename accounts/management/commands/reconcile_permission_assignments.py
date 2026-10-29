@@ -15,7 +15,9 @@ class Command(BaseCommand):
     help = "检查权限包与显式权限生成的原生权限投影；默认只报告，--apply 才修复。"
 
     def add_arguments(self, parser):
-        parser.add_argument("--apply", action="store_true", help="应用检测到的投影修复。")
+        mode = parser.add_mutually_exclusive_group()
+        mode.add_argument("--apply", action="store_true", help="应用检测到的投影修复。")
+        mode.add_argument("--dry-run", action="store_true", help="只报告投影差异，不写数据库（默认行为）。")
 
     def handle(self, *args, **options):
         apply_changes = options["apply"]

@@ -4,12 +4,22 @@
 
 {% block content %}
   <div class="space-y-8">
+    {% if user.is_superuser %}
+      <a class="btn btn-primary" href="{% url 'accounts:role_create' %}">创建角色</a>
+      <p class="text-sm">点击角色名称配置权限、领域和成员；也可复制角色后重新配置领域。</p>
+      <div class="flex flex-wrap gap-2">
+        {% for group in table.data %}
+          <a class="btn btn-outline btn-sm" href="{% url 'accounts:role_edit' group.pk %}">{{ group.name }}</a>
+          <a class="btn btn-ghost btn-sm" href="{% url 'accounts:role_copy' group.pk %}">复制 {{ group.name }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
     {% include "components/table_wrapper.html" with table=table %}
 
     <section id="permission-bundle-reference" class="space-y-4 pt-8">
       <div>
         <h2 class="text-lg font-semibold">业务权限包参考</h2>
-        <p class="text-sm text-base-content/60">以下内容来自随系统部署的权限包目录，仅供授权配置时查阅。</p>
+        <p class="text-sm text-base-content/60">业务能力均需明确授权。登录提供功能面板、本人资料查看与维护、登录退出及密码等基础账户操作；资料锁定后只读。关于页面和倒计时大屏为明确公开页面。权限包的对象范围和操作前提见用途说明。</p>
       </div>
       <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
         {% render_table permission_bundle_table %}

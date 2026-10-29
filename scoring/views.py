@@ -8,7 +8,7 @@ from django.views.generic import CreateView, DetailView, FormView, TemplateView,
 from django_tables2 import SingleTableView
 
 from assessments.models import AssessmentModule, AssessmentParticipant, CompetitionRole
-from assessments.selectors import visible_assessment_modules_for, visible_assessments_for
+from assessments.selectors import visible_assessment_modules_for, visible_assessments_for, assessments_in_scope_for
 from assessments.tables import AssessmentParticipantTable
 from core.utils.breadcrumbs import breadcrumb_link
 from core.utils.mixins import TitleMixin
@@ -205,6 +205,7 @@ class ScoringSchemeDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
         participant_table = AssessmentParticipantTable(participants)
         context["aspect_table"] = aspect_table
         context["participant_table"] = participant_table
+        context["can_add_participant"] = assessments_in_scope_for(self.request.user, "assessments.add_assessmentparticipant").filter(pk=self.object.assessment_module.assessment_id).exists()
         context["can_score_online"] = (
             self.request.user.has_perms(ONLINE_SCORING_PERMISSIONS)
             and scoring_modules_in_scope_for(

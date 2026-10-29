@@ -12,7 +12,20 @@
 </div>
 
 <!-- 用户账号信息卡片 -->
-{% include 'accounts/partials/user_info_card.html' with target_user=target_user %}
+{% include 'accounts/partials/user_info_card.html' with target_user=target_user email_field=form.email %}
+
+<!-- 独立用户管理操作区块 -->
+{% if user.is_superuser %}
+<section class="card bg-base-100 shadow-xl mb-4" aria-label="用户管理操作">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center gap-3 lg:flex-nowrap">
+      <a class="btn btn-primary btn-sm" href="{% url 'accounts:user_manage_single' target_user.pk %}">管理激活状态与离开日期</a>
+      <a class="btn btn-primary btn-sm" href="{% url 'accounts:user_roles' target_user.pk %}">分配角色</a>
+      <a class="btn btn-outline btn-sm" href="{% url 'accounts:user_permissions' target_user.pk %}">查看有效权限及来源</a>
+    </div>
+  </div>
+</section>
+{% endif %}
 
 <!-- 详细资料卡片 -->
 <div class="card bg-base-100 shadow-xl">
@@ -28,11 +41,55 @@
       {% endif %}
     </h2>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {% for field in form.visible_fields %}
-        {% include 'components/field.html' with field=field %}
-      {% endfor %}
-    </div>
+    {% if can_manage_profile %}
+    <form id="profile-form" method="post" action="{{ request.path }}">
+      {% csrf_token %}
+    {% endif %}
+      {% if form.non_field_errors %}
+        <div class="alert alert-error mb-4">{{ form.non_field_errors }}</div>
+      {% endif %}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for field in form.visible_fields %}
+          {% if field.name != 'email' %}
+            {% include 'components/field.html' with field=field %}
+          {% endif %}
+        {% endfor %}
+      </div>
+      {% if can_manage_profile %}
+      <div class="mt-6 flex flex-wrap items-center gap-3">
+        <button type="submit" name="action" value="save" class="btn btn-primary"{% if not can_edit_profile %} disabled{% endif %}>
+          <span class="icon-[tabler--device-floppy] size-5"></span>保存
+        </button>
+        {% if can_edit_profile %}
+          <button type="button" class="btn btn-warning" data-modal-target="lock-profile-modal">
+            <span class="icon-[tabler--lock] size-5"></span>锁定资料
+          </button>
+        {% else %}
+          <button type="button" class="btn btn-warning" data-modal-target="unlock-profile-modal">
+            <span class="icon-[tabler--lock-open] size-5"></span>解锁资料
+          </button>
+        {% endif %}
+      </div>
+    </form>
+    {% if can_edit_profile %}
+      {% include 'accounts/partials/profile_lock_modal.html' %}
+    {% else %}
+      <dialog id="unlock-profile-modal" class="modal">
+        <div class="modal-box">
+          <h3 class="text-lg font-bold">确认解锁资料</h3>
+          <p class="py-4 text-sm text-base-content/70">仅解除资料锁定，不保存其他字段。解锁后，用户本人也可重新编辑。</p>
+          <div class="modal-action">
+            <form method="post" action="{{ request.path }}">
+              {% csrf_token %}
+              <button type="submit" name="action" value="unlock" class="btn btn-warning">确认解锁</button>
+            </form>
+            <button type="button" class="btn" data-modal-close="unlock-profile-modal">取消</button>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>关闭</button></form>
+      </dialog>
+    {% endif %}
+    {% endif %}
   </div>
 </div>
 {% endblock %}

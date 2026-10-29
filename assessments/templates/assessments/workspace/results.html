@@ -8,8 +8,8 @@
       {% if can_manage_results %}
         <div class="flex flex-wrap justify-end gap-2">
           {% if can_create_award %}<a class="btn btn-outline btn-sm" href="{% url 'assessments:award_create' assessment.pk %}">新增奖项</a>{% endif %}
-          {% if can_generate_final_results %}<form method="post" action="{% url 'assessments:final_results_generate' assessment.pk %}">{% csrf_token %}<button class="btn btn-outline btn-sm" type="submit">生成或更新草稿结果</button></form>{% endif %}
-          {% if can_publish_final_results %}<form method="post" action="{% url 'assessments:final_results_publish' assessment.pk %}">{% csrf_token %}<button class="btn btn-primary btn-sm" type="submit">发布最终成绩</button></form>{% endif %}
+          {% if may_generate_final_results %}<form method="post" action="{% url 'assessments:final_results_generate' assessment.pk %}">{% csrf_token %}<button class="btn btn-outline btn-sm" type="submit" {% if not can_generate_final_results %}disabled title="需评测已完成且最终成绩尚未发布"{% endif %}>生成或更新草稿结果</button></form>{% endif %}
+          {% if may_publish_final_results %}<form method="post" action="{% url 'assessments:final_results_publish' assessment.pk %}">{% csrf_token %}<button class="btn btn-primary btn-sm" type="submit" {% if not can_publish_final_results %}disabled title="需评测已完成且最终成绩尚未发布"{% endif %}>发布最终成绩</button></form>{% endif %}
         </div>
         {% if assessment_awards %}<div class="flex flex-wrap items-center gap-2"><span class="text-sm text-base-content/60">本场奖项：</span>{% for award in assessment_awards %}<span class="badge badge-outline h-auto whitespace-normal">{{ award.name }}</span>{% endfor %}</div>{% endif %}
       {% endif %}

@@ -4,7 +4,7 @@
 
 {% block content %}
   <!-- 用户账号信息卡片 -->
-  {% include 'accounts/partials/user_info_card.html' with target_user=user %}
+  {% include 'accounts/partials/user_info_card.html' with target_user=user email_field=form.email %}
   
   <!-- 详细资料卡片 -->
   <div class="card bg-base-100 shadow-xl">
@@ -28,7 +28,7 @@
           </div>
         {% endif %}
         
-        <form action="{{ request.path }}" method="post">
+        <form id="profile-form" action="{{ request.path }}" method="post">
           {% csrf_token %}
           
           {# 隐藏字段 #}
@@ -50,7 +50,9 @@
           {# 表单字段 - 两列布局 #}
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {% for field in form.visible_fields %}
+              {% if field.name != 'email' %}
               {% include 'components/field.html' with field=field %}
+              {% endif %}
             {% endfor %}
           </div>
           
@@ -79,22 +81,7 @@
           </div>
           {% endif %}
         </form>
-        <dialog id="lock-profile-modal" class="modal">
-          <div class="modal-box">
-            <h3 class="text-lg font-bold">确认锁定资料</h3>
-            <p class="py-4 text-sm text-base-content/70">锁定后将无法修改，需联系管理员解锁。</p>
-            <div class="modal-action">
-              <form action="{{ request.path }}" method="post">
-                {% csrf_token %}
-                <button type="submit" name="action" value="lock" class="btn btn-warning">确认锁定</button>
-              </form>
-              <button type="button" class="btn" data-modal-close="lock-profile-modal">取消</button>
-            </div>
-          </div>
-          <form method="dialog" class="modal-backdrop">
-            <button>关闭</button>
-          </form>
-        </dialog>
+        {% if can_edit %}{% include 'accounts/partials/profile_lock_modal.html' %}{% endif %}
       </div>
     </div>
   </div>

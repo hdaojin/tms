@@ -52,6 +52,7 @@ class ActionsColumn(tables.Column):
     - *_perm: 对应操作权限；为空则不限制。
     - pk_field: URL 主键字段名，默认 pk。
     - *_label: 按钮文字。
+    - edit_allowed_attr: 可选的记录布尔属性，供 View 批量标注对象编辑授权；缺失时隐藏编辑。
     """
 
     def __init__(
@@ -71,6 +72,7 @@ class ActionsColumn(tables.Column):
         delete_label: str = "删除",
         delete_confirm_title: str = "确认删除",
         delete_confirm_message: str = "此操作不可撤销，确定要继续吗？",
+        edit_allowed_attr: str | None = None,
         **kwargs: Any,
     ) -> None:
         kwargs.setdefault("verbose_name", verbose_name)
@@ -82,6 +84,7 @@ class ActionsColumn(tables.Column):
         self.delete_url = delete_url
         self.view_perm = view_perm
         self.edit_perm = edit_perm
+        self.edit_allowed_attr = edit_allowed_attr
         self.delete_perm = delete_perm
         self.pk_field = pk_field
         self.view_label = view_label
@@ -118,7 +121,9 @@ class ActionsColumn(tables.Column):
             if href:
                 actions.append({"href": href, "label": self.view_label, "variant_class": "btn-soft btn-primary"})
 
-        if self._has_perm(user, self.edit_perm):
+        if self._has_perm(user, self.edit_perm) and (
+            self.edit_allowed_attr is None or getattr(record, self.edit_allowed_attr, False)
+        ):
             href = self._resolve_action(self.edit_url, pk)
             if href:
                 actions.append({"href": href, "label": self.edit_label, "variant_class": "btn-soft btn-warning"})

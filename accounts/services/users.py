@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from django.utils import timezone
 
 ROLE_STAFF = "工作人员"
 ROLE_SUPERUSER = "超级用户"
@@ -63,19 +62,3 @@ def _get_role_badge_class(role_name: str, *, size: str = "") -> str:
         else ROLE_BADGE_CLASSES.get(role_name, DEFAULT_ROLE_BADGE_CLASS)
     )
     return f"{css_class} {size}".strip()
-
-
-def fill_leave_date_on_deactivation(user, *, previous_is_active: bool) -> None:
-    """账号从有效变为无效时，给空离开日期补上当天日期。"""
-
-    if not previous_is_active or user.is_active:
-        return
-
-    from accounts.models import UserProfile
-
-    profile, _created = UserProfile.objects.get_or_create(user=user)
-    if profile.leave_date:
-        return
-
-    profile.leave_date = timezone.localdate()
-    profile.save(update_fields=["leave_date"])

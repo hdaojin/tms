@@ -25,7 +25,7 @@ class NoteRepo(models.Model):
 		"auth.Group",
 		blank=True,
 		verbose_name="可见用户组",
-		help_text="如果为空，表示所有登录用户可见；如果不为空，仅这些组的用户可见",
+		help_text="访问仍需“查看笔记”权限；为空时不额外限制仓库受众，否则仅指定组可见",
 	)
 	tags = models.CharField(
 		"标签",

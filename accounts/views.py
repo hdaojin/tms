@@ -1,12 +1,12 @@
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.decorators import login_not_required  # type: ignore
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.auth import get_user_model, login as auth_login
 from django.contrib.auth.models import Group
 from django.contrib.auth.views import LoginView
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Case, CharField, Count, F, OuterRef, Subquery, Value, When
 from django.db.models.functions import Coalesce
@@ -21,12 +21,16 @@ from .services.users import (
     get_user_role_badges,
 )
 from .services.registration import apply_default_registration_group
+from .services.profiles import update_profile
 from .tables import PermissionBundleReferenceTable, RoleListTable, UserListTable
 from core.permissions import get_permission_bundle_specs
 from core.utils.invitation import generate_invitation_code
 from core.utils.decorators import superuser_required
 from core.utils.mixins import TitleMixin
 from .models import UserProfile
+from .services.user_management import filter_users
+from .user_management_forms import UserActionForm, UserFilterForm
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 
 User = get_user_model()
 
@@ -69,7 +73,7 @@ def account_signup(request):
 
 def account_home(request):
     return render(request, 'accounts/home.html', {
-        'title': '用户中心',
+        'title': '功能面板',
         'title_icon': 'icon-[tabler--user]',
         'user': request.user
     })
@@ -86,34 +90,24 @@ def generate_invitation(request):
 
 
 @login_required
-@permission_required('accounts.change_userprofile', raise_exception=True)
 def account_profile(request):
-    """用户查看和编辑个人资料。锁定后不可修改，需管理员在后台解锁。"""
-
-    profile, _created = UserProfile.objects.get_or_create(user=request.user)
+    """用户查看和编辑个人资料。锁定后不可修改，需管理员解锁。"""
 
     if request.method == 'POST':
-        # 若已锁定则禁止任何提交
-        if profile.locked:
-            messages.info(request, "资料已锁定，如需修改请联系管理员在后台解锁。")
-            return redirect('accounts:profile')
-        
         action = request.POST.get('action', 'save')
-        form = ProfileForm(request.POST, instance=profile, request=request)
-        
-        if form.is_valid():
-            obj = form.save(commit=False)
-            # 锁定操作：保存并锁定
-            if action == 'lock':
-                obj.locked = True
-                obj.save()
-                messages.success(request, "个人资料已保存并锁定，无法再次修改。如需更改请联系管理员解锁。")
-            else:
-                # 仅保存
-                obj.save()
-                messages.success(request, "个人资料已保存。")
+        if action not in ('save', 'lock'):
+            raise PermissionDenied
+        try:
+            form = update_profile(actor=request.user, target_id=request.user.pk, action=action, data=request.POST)
+        except ValidationError as exc:
+            messages.info(request, '；'.join(exc.messages))
             return redirect('accounts:profile')
+        if not form.errors:
+            messages.success(request, "个人资料已保存并锁定，如需更改请联系管理员解锁。" if action == 'lock' else "个人资料已保存。")
+            return redirect('accounts:profile')
+        profile = form.instance
     else:
+        profile, _created = UserProfile.objects.get_or_create(user=request.user)
         form = ProfileForm(instance=profile, request=request)
 
     can_edit = (not profile.locked)
@@ -128,7 +122,7 @@ def account_profile(request):
     })
 
 
-class UserListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableView):
+class UserListView(FilterableListMixin, TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, SingleTableView):
     """显示所有用户列表（包含 Profile 信息）。
 
     需要 'accounts.view_all_profiles' 权限才能访问。
@@ -143,7 +137,30 @@ class UserListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, Sing
     title = "用户列表"
     title_icon = "icon-[tabler--users]"
 
-    def get_queryset(self):
+    def get_list_filter_specs(self):
+        filters = UserFilterForm()
+        return (
+            ListFilterSpec("q", "搜索用户", "search", placeholder="账号、完整姓名或学号"),
+            ListFilterSpec("active", "激活状态", "select", choices=filters.fields["active"].choices[1:], empty_label="全部状态"),
+            ListFilterSpec("role", "角色", "select", choices=filters.fields["role"].choices[1:], empty_label="全部角色"),
+        )
+
+    def apply_custom_filters(self, queryset):
+        filters = UserFilterForm(self.request.GET)
+        return filter_users(queryset, filters.cleaned_data) if filters.is_valid() else queryset.none()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["management_form"] = UserActionForm()
+        return context
+
+    def get_table_kwargs(self):
+        kwargs = super().get_table_kwargs()
+        if not self.request.user.is_superuser:
+            kwargs["exclude"] = ("selection",)
+        return kwargs
+
+    def get_base_queryset(self):
         """获取全部用户，并预加载 profile 与角色信息以优化查询。"""
         first_group_name = (
             Group.objects.filter(user=OuterRef("pk"))
@@ -179,7 +196,7 @@ class RoleListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, Sing
     model = Group
     table_class = RoleListTable
     template_name = "accounts/role_list.html"
-    permission_required = "accounts.view_all_profiles"
+    permission_required = "auth.view_group"
     raise_exception = True
     paginate_by = 20
     title = "角色列表"
@@ -211,21 +228,48 @@ class UserDetailView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, De
     context_object_name = "target_user"
     permission_required = "accounts.view_all_profiles"
     raise_exception = True
-    title = "{first_name}的详细信息"
+    title = "{display_name}的详细信息"
     title_icon = "icon-[tabler--user-circle]"
 
     def get_queryset(self):
         return User.objects.select_related("profile").prefetch_related("groups")
 
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_active or not request.user.is_superuser:
+            raise PermissionDenied
+        self.object = self.get_object()
+        action = request.POST.get("action", "save")
+        try:
+            form = update_profile(actor=request.user, target_id=self.object.pk, action=action, data=request.POST)
+        except ValidationError as exc:
+            messages.error(request, '；'.join(exc.messages))
+            return redirect("accounts:user_detail", pk=self.object.pk)
+        if form is None or not form.errors:
+            message = {
+                "save": "用户资料已保存。",
+                "lock": "用户资料已保存并锁定。",
+                "unlock": "用户资料已解锁，用户本人也可重新编辑。",
+            }[action]
+            messages.success(request, message)
+            return redirect("accounts:user_detail", pk=self.object.pk)
+        return self.render_to_response(self.get_context_data(form=form))
+
     def get_context_data(self, **kwargs):
+        form = kwargs.pop("form", None)
         context = super().get_context_data(**kwargs)
         target_user = context["target_user"]
-        profile, _ = UserProfile.objects.get_or_create(user=target_user)
-        # 复用 ProfileForm，设置为只读模式
-        form = ProfileForm(instance=profile)
-        for field in form.fields.values():
-            field.disabled = True
+        if form is None:
+            profile, _ = UserProfile.objects.get_or_create(user=target_user)
+            form = ProfileForm(instance=profile)
+        else:
+            profile = form.instance
+        can_manage_profile = self.request.user.is_active and self.request.user.is_superuser
+        if not can_manage_profile:
+            for field in form.fields.values():
+                field.disabled = True
         context["form"] = form
         context["profile"] = profile
         context["role_badges"] = get_user_role_badges(target_user, size="badge-lg")
+        context["can_manage_profile"] = can_manage_profile
+        context["can_edit_profile"] = can_manage_profile and not profile.locked
         return context

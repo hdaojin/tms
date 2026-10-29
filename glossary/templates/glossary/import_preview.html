@@ -64,7 +64,7 @@
           {% endfor %}
         </div>
         <div class="card-actions justify-end">
-          <a class="btn btn-ghost" href="{% url 'glossary:import_create' %}">重新上传</a>
+          {% if perms.glossary.add_glossaryimport %}<a class="btn btn-ghost" href="{% url 'glossary:import_create' %}">重新上传</a>{% endif %}
           <button class="btn btn-primary" type="submit">确认导入</button>
         </div>
       </div>
@@ -75,7 +75,7 @@
       <div class="card-body">
         <h2 class="card-title text-base">本批数据不能确认</h2>
         <p>请修正上方问题后重新上传；原文件与校验结果已留档。</p>
-        <div class="card-actions justify-end"><a class="btn btn-primary" href="{% url 'glossary:import_create' %}">重新上传</a></div>
+        <div class="card-actions justify-end">{% if perms.glossary.add_glossaryimport %}<a class="btn btn-primary" href="{% url 'glossary:import_create' %}">重新上传</a>{% endif %}</div>
       </div>
     </div>
   {% endif %}

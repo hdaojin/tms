@@ -87,6 +87,10 @@ class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
 
 class ProfileForm(StyledFormMixin, forms.ModelForm):
     """用户资料表单，用于编辑用户的个人信息。"""
+    email = forms.EmailField(
+        label="邮箱", required=False, max_length=254,
+        widget=forms.EmailInput(attrs={"form": "profile-form"}),
+    )
     class Meta:
         model = UserProfile
         # 不包含 user，一般在视图里用 request.user.profile 绑定
@@ -132,6 +136,8 @@ class ProfileForm(StyledFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.request = kwargs.pop("request", None)
         super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.initial.setdefault("email", self.instance.user.email)
         # 锁定后，前台一律禁用填写（不区分管理员）。
         if self.instance and self.instance.pk and self.instance.locked:
             for field in self.fields.values():
@@ -153,9 +159,9 @@ class ProfileForm(StyledFormMixin, forms.ModelForm):
         if join_date and leave_date and leave_date < join_date:
             self.add_error("leave_date", "离开日期不能早于入读日期。")
 
-        # 锁定后，前台不可修改（无论是否管理员）。管理员如需变更，请在后台解锁。
+        # 锁定后，前台不可修改（无论是否管理员）。管理员须先解锁。
         if self.instance and self.instance.pk and self.instance.locked:
-            raise forms.ValidationError("该用户资料已被锁定，无法修改。如需更改，请联系管理员在后台解除锁定后再尝试。")
+            raise forms.ValidationError("该用户资料已被锁定，无法修改。如需更改，请联系管理员解除锁定后再尝试。")
         
         return cleaned
 

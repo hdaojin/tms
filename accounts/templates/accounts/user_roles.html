@@ -1,0 +1,33 @@
+{% extends "layouts/app.html" %}
+{% load static %}
+{% block right_sidebar %}{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl space-y-5">
+  <p>为 {{ target_user }} 分配角色。领域范围在角色组内配置；个人直接授权保持不变。此操作不会设置周期成员、当前周期或任务教练身份，也不会激活账号。</p>
+  {% if target_user.is_superuser %}<div class="alert alert-info">该用户为超级管理员，调整角色不会撤销超级管理员能力。</div>{% endif %}
+  <form method="post" class="space-y-5">
+    {% csrf_token %}
+    {% include "components/form_errors.html" with form=form %}
+    <label class="input w-full"><input type="search" placeholder="搜索角色" aria-label="搜索角色" id="role-search"></label>
+    <fieldset class="space-y-3"><legend class="font-semibold">所属角色</legend>
+      {% for option in form.roles %}<label class="flex items-center gap-3 p-2" data-user-role-option>{{ option.tag }}<span>{{ option.choice_label }}</span></label>{% empty %}<p>尚无角色，请先在角色列表创建。</p>{% endfor %}
+    </fieldset>
+    {{ form.roles.errors }}
+    {% if preview %}
+      <section class="rounded-box border border-warning p-5 space-y-3">
+        <h2 class="text-lg font-semibold">保存前变更摘要</h2>
+        <p>新增角色：{{ preview.added|join:"、"|default:"无" }}</p>
+        <p>移除角色：{{ preview.removed|join:"、"|default:"无" }}</p>
+        <p>新增权限：{{ preview.granted|join:"、"|default:"无" }}</p>
+        <p>撤销权限：{{ preview.revoked|join:"、"|default:"无" }}</p>
+        <p>以上是原生权限的合并差异；功能面板和本人资料是基础账户能力，不受角色移除影响。实际业务操作仍受技术领域、对象归属和显式分配约束。移除角色还可能撤销领域范围，即使同名权限仍来自其他组。</p>
+        <input type="hidden" name="preview_token" value="{{ preview.token }}">
+        <button class="btn btn-primary" type="submit" name="action" value="save">保存以上角色分配</button>
+      </section>
+    {% endif %}
+    <button class="btn btn-outline" type="submit" name="action" value="preview">预览变更</button>
+    <a class="btn btn-ghost" href="{% url 'accounts:user_list' %}">返回用户列表</a>
+  </form>
+</div>
+<script src="{% static 'js/role-permissions.js' %}" defer></script>
+{% endblock %}

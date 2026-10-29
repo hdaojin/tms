@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.db.models import Q
+from django.db.models import Exists, OuterRef
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -10,21 +10,9 @@ from assessments.selectors import assessment_modules_in_scope_for
 from core.utils.mixins import TitleMixin
 from .forms import EvidenceSkillMapForm, KnowledgeEvidenceForm, KnowledgeEvidenceRejectForm
 from .models import EvidenceSkillMap, KnowledgeEvidence
-from .selectors import visible_evidences_for
+from .selectors import visible_evidences_for, manageable_evidences_for
 from .services import approve_evidence, approve_mapping, reject_evidence
 from .tables import KnowledgeEvidenceTable
-
-
-def manageable_evidences_for(user, permission="evidence.change_knowledgeevidence"):
-    queryset = KnowledgeEvidence.objects.all()
-    if not user.is_authenticated or not user.has_perm(permission):
-        return queryset.none()
-    if user.is_superuser or user.has_perm("assessments.change_all_assessment"):
-        return queryset
-    modules = assessment_modules_in_scope_for(user, permission)
-    return queryset.filter(
-        Q(assessment_module__in=modules) | Q(assessment_module__isnull=True, created_by=user)
-    ).distinct()
 
 
 class KnowledgeEvidenceListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
@@ -35,7 +23,7 @@ class KnowledgeEvidenceListView(TitleMixin, PermissionRequiredMixin, SingleTable
     permission_required = "evidence.view_knowledgeevidence"
 
     def get_queryset(self):
-        return visible_evidences_for(self.request.user).select_related("skill_project", "assessment_module")
+        return visible_evidences_for(self.request.user).annotate(can_edit=Exists(manageable_evidences_for(self.request.user).filter(pk=OuterRef("pk")))).select_related("skill_project", "assessment_module")
 
 
 class KnowledgeEvidenceDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -44,6 +32,12 @@ class KnowledgeEvidenceDetailView(TitleMixin, PermissionRequiredMixin, DetailVie
     context_object_name = "evidence"
     title = "{title}"
     permission_required = "evidence.view_knowledgeevidence"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        for name, permission in (("can_edit", "evidence.change_knowledgeevidence"), ("can_map", "evidence.add_evidenceskillmap"), ("can_delete_mapping", "evidence.delete_evidenceskillmap")):
+            context[name] = manageable_evidences_for(self.request.user, permission).filter(pk=self.object.pk).exists()
+        return context
 
     def get_queryset(self):
         return visible_evidences_for(self.request.user).prefetch_related("skill_mappings__skill")

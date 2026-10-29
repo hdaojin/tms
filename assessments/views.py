@@ -3,7 +3,7 @@ from pathlib import Path
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Exists, OuterRef
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.generic import CreateView, DetailView, FormView, UpdateView, View
@@ -52,6 +52,7 @@ from .models import (
 from .selectors import (
     calculated_final_result_preview,
     assessment_modules_in_scope_for,
+    assessments_in_scope_for,
     manageable_assessment_modules_for,
     manageable_assessments_for,
     manageable_final_results_for,
@@ -104,7 +105,7 @@ class AssessmentListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
             queryset = queryset.filter(status=value)
         if value := self.request.GET.get("q"):
             queryset = queryset.filter(name__icontains=value)
-        return queryset
+        return queryset.annotate(can_edit=Exists(manageable_assessments_for(self.request.user).filter(pk=OuterRef("pk"))))
 
 
 class CompetitionPersonListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
@@ -379,6 +380,11 @@ class AssessmentDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
         context.update(
             {
                 "can_manage_results": can_manage_results,
+                "may_generate_final_results": can_manage_results and self.request.user.has_perm("assessments.add_assessmentfinalresult"),
+                "may_publish_final_results": can_manage_results,
+                "can_add_participant": assessments_in_scope_for(self.request.user, "assessments.add_assessmentparticipant").filter(pk=self.object.pk).exists(),
+                "can_add_module": assessments_in_scope_for(self.request.user, "assessments.add_assessmentmodule").filter(pk=self.object.pk).exists(),
+                "can_upload_general_document": self.request.user.has_perm("assessments.add_assessmentdocument") and (self.object.created_by_id == self.request.user.pk or self.request.user.has_perm("assessments.change_all_assessment")),
                 "can_generate_final_results": bool(
                     can_manage_results
                     and self.request.user.has_perm("assessments.add_assessmentfinalresult")
@@ -599,7 +605,7 @@ class AssessmentModuleListView(TitleMixin, PermissionRequiredMixin, SingleTableV
     permission_required = "assessments.view_assessmentmodule"
 
     def get_queryset(self):
-        return visible_assessment_modules_for(self.request.user).select_related("assessment")
+        return visible_assessment_modules_for(self.request.user).annotate(can_edit=Exists(manageable_assessment_modules_for(self.request.user).filter(pk=OuterRef("pk")))).select_related("assessment")
 
 
 class AssessmentModuleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -608,6 +614,9 @@ class AssessmentModuleDetailView(TitleMixin, PermissionRequiredMixin, DetailView
     context_object_name = "module"
     title = "{name}"
     permission_required = "assessments.view_assessmentmodule"
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(can_edit=manageable_assessment_modules_for(self.request.user).filter(pk=self.object.pk).exists(), **kwargs)
 
     def get_breadcrumb_parents(self):
         assessment = self.object.assessment

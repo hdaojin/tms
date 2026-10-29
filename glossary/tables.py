@@ -10,7 +10,7 @@ class GlossaryBrowseTable(BaseTable):
 
 
 class ProfessionalGlossaryTable(BaseTable):
-    actions = ActionsColumn(view_url="glossary:manage_entry_list", edit_url="glossary:glossary_edit")
+    actions = ActionsColumn(view_url="glossary:manage_entry_list", view_perm="glossary.view_glossaryentry", edit_url="glossary:glossary_edit", edit_perm="glossary.change_professionalglossary")
 
     class Meta(BaseTable.Meta):
         model = ProfessionalGlossary

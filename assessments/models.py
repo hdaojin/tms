@@ -113,15 +113,16 @@ class CompetitionPerson(models.Model):
 
 class CompetitionRole(models.Model):
     class Category(models.TextChoices):
-        COMPETITOR = "competitor", "选手"
-        OFFICIAL = "official", "赛事官员"
-        EXPERT = "expert", "专家或裁判"
+        COMPETITOR = "competitor", "选手（Competitors）"
+        OFFICIAL = "official", "项目管理人员（Skill Positions）"
+        EXPERT = "expert", "专家或裁判（Experts）"
         COACH = "coach", "教练"
         STAFF = "staff", "工作人员"
         OTHER = "other", "其他"
 
     code = models.CharField("角色代码", max_length=50, unique=True)
     name = models.CharField("角色名称", max_length=120)
+    english_name = models.CharField("角色英文名称", max_length=160, blank=True)
     category = models.CharField("角色类别", max_length=20, choices=Category.choices)
     description = models.TextField("说明", blank=True)
     order = models.PositiveIntegerField("排序", default=0)

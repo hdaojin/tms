@@ -10,7 +10,7 @@ from core.constants import FEEDBACK_ATTACHMENT_MAX_COUNT, FEEDBACK_ATTACHMENT_MA
 from core.uploads import FEEDBACK_ATTACHMENT_UPLOAD_SPEC
 
 from .models import Feedback, FeedbackAttachment, FeedbackReply, FeedbackStatus, sanitize_original_filename
-from .permissions import can_manage_feedback, can_reply_feedback
+from .permissions import can_create_feedback, can_manage_feedback, can_reply_feedback
 
 
 def validate_feedback_attachments(attachments: Iterable) -> list:
@@ -38,6 +38,8 @@ def _delete_written_files(attachments: Iterable[FeedbackAttachment]) -> None:
 
 
 def _create_attachments(*, feedback, reply=None, actor, attachments) -> list[FeedbackAttachment]:
+    if attachments and not actor.has_perm("feedback.add_feedbackattachment"):
+        raise PermissionDenied("当前用户不能上传反馈附件。")
     created: list[FeedbackAttachment] = []
     for upload in attachments:
         attachment = FeedbackAttachment(
@@ -60,6 +62,8 @@ def _create_attachments(*, feedback, reply=None, actor, attachments) -> list[Fee
 
 
 def create_feedback(*, data: Mapping, attachments=(), actor) -> Feedback:
+    if not can_create_feedback(actor):
+        raise PermissionDenied("当前用户不能提交意见反馈。")
     files = validate_feedback_attachments(attachments)
     written_files: list[FeedbackAttachment] = []
     try:

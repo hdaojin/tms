@@ -1,0 +1,24 @@
+{% extends "layouts/app.html" %}
+{% block right_sidebar %}{% endblock %}
+{% block content %}
+<div class="space-y-6">
+  <p>用户：{{ target_user }}。个人直接授权在后台维护；本页按原生权限展示实际授权来源。</p>
+  <p>功能面板及本人资料查看与维护属于基础账户能力，无需角色或原生权限；资料锁定后仍只读。</p>
+  {% if not diagnostics.active %}<div class="alert alert-warning">该账号未激活，所列为已配置的授权，当前不能作为有效访问权限使用。</div>{% endif %}
+  {% if diagnostics.superuser %}<div class="alert alert-info">超级管理员可绕过领域范围；普通用户不能通过个人权限绕过领域限制。</div>{% endif %}
+  <div class="alert alert-info">领域操作需要同一个组同时提供对应权限和领域。不同角色的权限与范围不能拼接；跨领域任务还可能要求显式教练分配。权限组不等于周期成员身份。</div>
+  {% for source in diagnostics.sources %}
+    <section class="rounded-box border border-base-300 p-5 space-y-2">
+      <h2 class="text-lg font-semibold">{{ source.name }}</h2>
+      <p>技术领域：{{ source.domains|join:"、"|default:"未配置；不能单凭此来源获得领域维护权" }}</p>
+      <p>权限包：{{ source.bundles|join:"；"|default:"无" }}</p>
+      <p>额外原生权限：{% for permission in source.explicit %}{{ permission }}{% if not forloop.last %}；{% endif %}{% empty %}无{% endfor %}</p>
+      <details><summary class="cursor-pointer">实际展开权限（{{ source.permissions|length }}）</summary><ul class="list-disc pl-5 text-sm">{% for label in source.permissions %}<li>{{ label }}</li>{% empty %}<li>无</li>{% endfor %}</ul></details>
+    </section>
+  {% endfor %}
+  <section class="overflow-x-auto">
+    <h2 class="text-lg font-semibold">权限合并结果</h2>
+    <table class="table"><thead><tr><th>权限</th><th>授权来源</th></tr></thead><tbody>{% for row in diagnostics.permissions %}<tr><td>{{ row.name }}<br><code>{{ row.label }}</code></td><td>{{ row.sources|join:"、" }}</td></tr>{% empty %}<tr><td colspan="2">没有业务授权。</td></tr>{% endfor %}</tbody></table>
+  </section>
+</div>
+{% endblock %}

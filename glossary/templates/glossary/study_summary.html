@@ -9,7 +9,7 @@
     <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">正确率</div><div class="stat-value text-2xl">{{ accuracy }}%</div></div>
     <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">学习时长</div><div class="stat-value text-xl">{{ duration_text }}</div></div>
   </section>
-  <div class="flex flex-wrap justify-end gap-2"><a class="btn btn-outline" href="{% url 'glossary:my_stats' %}">查看历史统计</a><a class="btn btn-primary" href="{% url 'glossary:study_start' %}">开始新会话</a></div>
+  <div class="flex flex-wrap justify-end gap-2"><a class="btn btn-outline" href="{% url 'glossary:my_stats' %}">查看历史统计</a>{% if perms.glossary.view_glossaryentry and perms.glossary.add_studysession %}<a class="btn btn-primary" href="{% url 'glossary:study_start' %}">开始新会话</a>{% endif %}</div>
   <section class="space-y-2">
     {% for attempt in attempts %}
       <article class="rounded-box border border-base-300 bg-base-100 p-4">

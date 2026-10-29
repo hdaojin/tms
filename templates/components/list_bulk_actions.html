@@ -1,0 +1,19 @@
+{% comment %}
+仅呈现批量操作栏，不创建表单或判断业务授权。
+必传 operation_field、matching_count；allow_select_all 仅由业务后端显式提供。
+selection_label 默认“条记录”，selection_name 默认“selection”。
+表单、CSRF、行主键、筛选快照及目标端点由调用方负责，见 docs/developer/ui.md。
+{% endcomment %}
+<input type="hidden" name="{{ selection_name|default:'selection' }}" value="selected" data-selection-mode>
+<div class="flex flex-wrap items-center gap-3 rounded-box border border-base-300 bg-base-100 p-3 mb-4" aria-label="批量操作">
+  <label class="flex items-center gap-2" for="{{ operation_field.id_for_label }}">
+    <span>{{ operation_field.label|default:'操作' }}</span>{{ operation_field }}
+  </label>
+  <button class="btn btn-sm btn-primary" type="submit"{% if not matching_count %} disabled{% endif %}>执行</button>
+  <span class="text-sm" role="status" data-selection-status>已选择 0 {{ selection_label|default:'条记录' }}</span>
+  {% if allow_select_all and matching_count %}
+    <button type="button" class="link link-primary text-sm" data-select-all hidden>选择全部 {{ matching_count }} {{ selection_label|default:'条记录' }}（匹配结果）</button>
+  {% endif %}
+  <button type="button" class="link text-sm" data-clear-selection hidden>清空选择</button>
+  <span class="text-sm text-error" role="alert" data-selection-error hidden></span>
+</div>

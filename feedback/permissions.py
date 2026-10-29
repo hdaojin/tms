@@ -13,7 +13,15 @@ def _is_authenticated(user) -> bool:
 
 
 def can_manage_feedback(user) -> bool:
-    return bool(_is_authenticated(user) and (user.is_superuser or user.has_perm(MANAGE_FEEDBACK_PERMISSION)))
+    return bool(can_access_feedback(user) and user.has_perm(MANAGE_FEEDBACK_PERMISSION))
+
+
+def can_access_feedback(user) -> bool:
+    return bool(_is_authenticated(user) and user.has_perm("feedback.view_feedback"))
+
+
+def can_create_feedback(user) -> bool:
+    return bool(can_access_feedback(user) and user.has_perm("feedback.add_feedback"))
 
 
 def can_view_private_feedback(user) -> bool:
@@ -31,7 +39,7 @@ def can_view_anonymous_identity(user) -> bool:
 
 
 def can_view_feedback(user, feedback) -> bool:
-    if not _is_authenticated(user):
+    if not can_access_feedback(user):
         return False
     if not feedback.is_private:
         return True
@@ -42,7 +50,7 @@ def can_view_feedback(user, feedback) -> bool:
 
 
 def can_reply_feedback(user, feedback) -> bool:
-    if not can_view_feedback(user, feedback):
+    if not can_view_feedback(user, feedback) or not user.has_perm("feedback.add_feedbackreply"):
         return False
     if feedback.status == "closed" and not can_manage_feedback(user):
         return False
@@ -81,4 +89,4 @@ def get_reply_author_label(user, feedback, reply) -> str:
 
 
 def can_view_attachment(user, attachment) -> bool:
-    return can_view_feedback(user, attachment.feedback)
+    return bool(user.has_perm("feedback.view_feedbackattachment") and can_view_feedback(user, attachment.feedback))

@@ -30,7 +30,7 @@
   <div class="card-body">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h3 class="font-semibold">参评选手</h3>
-      {% if perms.assessments.add_assessmentparticipant %}
+      {% if can_add_participant %}
         <a href="{% url 'assessments:participant_create' %}?assessment={{ scheme.assessment_module.assessment_id }}" class="btn btn-primary btn-sm">新增选手</a>
       {% endif %}
     </div>

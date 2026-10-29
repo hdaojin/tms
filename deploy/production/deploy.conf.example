@@ -24,6 +24,8 @@ TMS_SWAP_SIZE=2G
 # bypass ONLY Caddy Basic Auth, not Django login or business permissions.
 # Example for a confirmed /24 LAN: "10.21.57.0/24"
 TMS_BASIC_AUTH_TRUSTED_CIDRS=""
+# Set to 0 only when explicitly retaining Django-only authentication.
+TMS_BASIC_AUTH_ENABLED=1
 
 # automatic: Caddy obtains/renews public certificates (public DNS + inbound ACME).
 # acme-sh: an existing acme.sh account issues/renews via DNS; see the manual.

@@ -73,12 +73,12 @@ sections:
             label: 意见反馈列表
             url_name: feedback:list
             icon_class: icon-[tabler--message-report] size-5 text-primary
-            login_required: true
+            permissions: [feedback.view_feedback]
           - key: feedback_create
             label: 提交反馈
             url_name: feedback:create
             icon_class: icon-[tabler--message-plus] size-5 text-success
-            login_required: true
+            permissions: [feedback.view_feedback, feedback.add_feedback]
 
   - key: worldskills_forum
     label: 世赛论坛
@@ -344,19 +344,19 @@ sections:
     icon_class: icon-[tabler--user-cog] size-5 text-primary
     items:
       - key: account_self
-        label: 个人账户
+        label: 用户中心
         icon_class: icon-[tabler--user] size-5 text-primary
         children:
           - key: accounts
-            label: 用户中心
+            label: 功能面板
             url_name: accounts:home
             icon_class: icon-[tabler--user] size-5 text-primary
-            permissions: [accounts.change_userprofile]
+            login_required: true
           - key: account_profile
             label: 个人资料
             url_name: accounts:profile
             icon_class: icon-[tabler--user-circle] size-5 text-primary
-            permissions: [accounts.change_userprofile]
+            login_required: true
           - key: samba
             label: Samba 账户
             url_name: samba:accounts
@@ -423,7 +423,7 @@ sections:
             label: 提交反馈
             url_name: feedback:create
             icon_class: icon-[tabler--message-plus] size-5 text-success
-            login_required: true
+            permissions: [feedback.view_feedback, feedback.add_feedback]
 
   - key: worldskills_forum
     label: 世赛论坛

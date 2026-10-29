@@ -16,12 +16,25 @@ User = get_user_model()
 class UserListTable(BaseTable):
     """用户列表表格，只显示关键信息，详细信息通过链接查看。"""
 
+    selection = tables.Column(
+        verbose_name=mark_safe(
+            '<input type="checkbox" class="checkbox checkbox-sm" aria-label="全选当前页" data-select-page>'
+        ),
+        empty_values=(), orderable=False,
+    )
+
+    def render_selection(self, record):
+        return format_html(
+            '<input type="checkbox" class="checkbox checkbox-sm" name="users" value="{}" aria-label="选择{}（{}）" data-row-selection>',
+            record.pk, get_user_display_name(record), record.username,
+        )
+
     # 序号列
     row_number = tables.Column(
         verbose_name="序号", empty_values=(), orderable=False
     )
 
-    # 姓名（从 User.first_name 获取）
+    # 姓名（显示姓与名的组合）
     first_name = tables.Column(
         verbose_name="姓名",
         empty_values=(),
@@ -138,6 +151,7 @@ class UserListTable(BaseTable):
     class Meta(BaseTable.Meta):
         model = User
         fields = (
+            "selection",
             "row_number",
             "first_name",
             "roles",

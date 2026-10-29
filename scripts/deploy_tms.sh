@@ -48,6 +48,7 @@ TMS_BIND="127.0.0.1:8010"
 TMS_WORKERS="2"
 TMS_SWAP_SIZE="2G"
 TMS_BASIC_AUTH_TRUSTED_CIDRS=""
+TMS_BASIC_AUTH_ENABLED=1
 TMS_TLS_MODE="automatic"
 TMS_ACME_USER="demo"
 TMS_ACME_HOME="/home/demo/.acme.sh"
@@ -151,6 +152,7 @@ safe_source_config() {
     [[ "${TMS_WORKERS}" =~ ^[1-9][0-9]*$ ]] || die "TMS_WORKERS 必须为正整数。"
     [[ "${TMS_SWAP_SIZE}" =~ ^[1-9][0-9]*[MG]$ ]] || die "TMS_SWAP_SIZE 必须为正整数加 M/G。"
     validate_tls_config
+    [[ "${TMS_BASIC_AUTH_ENABLED}" == 0 || "${TMS_BASIC_AUTH_ENABLED}" == 1 ]] || die "TMS_BASIC_AUTH_ENABLED 必须为 0 或 1。"
     TMS_BASIC_AUTH_TRUSTED_CIDRS="$(basic_auth_policy)" || die "可信认证网段配置无效。"
 }
 
@@ -194,6 +196,7 @@ validate_tls_config() {
 render_caddy_site() {
     local tls_directive='# Caddy Automatic HTTPS' template="${1:-${TEMPLATE_DIR}/tms.caddy}"
     local auth_matcher='@tms_basic_auth path *' trusted_cidrs
+    local auth_import='import /etc/caddy/tms-basic-auth.caddy'
     if [[ -n "${TMS_BASIC_AUTH_TRUSTED_CIDRS}" ]]; then
         trusted_cidrs="$(basic_auth_policy)" || return 1
         auth_matcher="@tms_basic_auth not remote_ip ${trusted_cidrs}"
@@ -201,8 +204,13 @@ render_caddy_site() {
     if [[ "${TMS_TLS_MODE}" == acme-sh ]]; then
         tls_directive="tls ${CERT_DIR}/current/fullchain.pem ${CERT_DIR}/current/privkey.pem"
     fi
+    if [[ "${TMS_BASIC_AUTH_ENABLED}" == 0 ]]; then
+        auth_matcher=''
+        auth_import=''
+    fi
     sed -e "s/@@DOMAIN@@/${TMS_DOMAIN}/g" -e "s/@@BIND@@/${TMS_BIND}/g" \
         -e "s|@@AUTH_MATCHER@@|${auth_matcher}|g" \
+        -e "s|@@AUTH_IMPORT@@|${auth_import}|g" \
         -e "s|@@TLS_DIRECTIVE@@|${tls_directive}|g" "${template}"
 }
 
@@ -499,7 +507,8 @@ cmd_plan() {
     printf '%s\n' "${sha}" >"${release_dir}/.tms-release-sha"
     chown "${TMS_DEPLOY_USER}:${TMS_DEPLOY_USER}" "${release_dir}/.tms-release-sha"
 
-    run_as_deployer bash -c 'cd "$1" && uv sync --locked --no-dev --python /usr/bin/python3.13' bash "${release_dir}"
+    # Release chown/chmod must not change shared cache inodes through hard links.
+    run_as_deployer bash -c 'cd "$1" && uv sync --locked --no-dev --link-mode copy --python /usr/bin/python3.13' bash "${release_dir}"
     [[ -s "${release_dir}/static/css/output.css" ]] || die "仓库缺少已构建的 static/css/output.css"
     [[ -d "${release_dir}/static/vendor" ]] || die "仓库缺少已提交的 static/vendor"
     candidate_django "${release_dir}" check
@@ -722,7 +731,9 @@ render_systemd_unit() {
 }
 
 install_service_and_caddy() {
-    [[ -s "${AUTH_USERS_FILE}" ]] || die "尚未配置 Basic Auth；先执行 tms-deploy auth add USERNAME。"
+    if [[ "${TMS_BASIC_AUTH_ENABLED}" == 1 ]]; then
+        [[ -s "${AUTH_USERS_FILE}" ]] || die "尚未配置 Basic Auth；先执行 tms-deploy auth add USERNAME。"
+    fi
     [[ -f /etc/caddy/Caddyfile ]] || die "缺少 /etc/caddy/Caddyfile"
     prepare_caddy_logging
     local verify_unit unit_backup site_backup main_backup rendered_unit
@@ -831,7 +842,9 @@ local_healthcheck() {
 https_healthcheck() {
     # Loopback may itself be explicitly trusted. Do not misreport it as failure.
     local attempt code response diagnostic='' requires_auth=1
-    if [[ -n "${TMS_BASIC_AUTH_TRUSTED_CIDRS}" ]]; then
+    if [[ "${TMS_BASIC_AUTH_ENABLED}" == 0 ]]; then
+        requires_auth=0
+    elif [[ -n "${TMS_BASIC_AUTH_TRUSTED_CIDRS}" ]]; then
         requires_auth="$(basic_auth_policy 127.0.0.1)" || return 1
     fi
     for attempt in {1..15}; do

@@ -21,19 +21,22 @@ ASSESSMENT_TYPES = [
 ]
 
 COMPETITION_ROLES = [
-    {"code": "project_manager", "name": "项目经理", "category": "official", "description": "", "order": 10, "is_active": True},
-    {"code": "skill_competition_manager", "name": "技能竞赛经理", "category": "official", "description": "", "order": 20, "is_active": True},
-    {"code": "venue_manager", "name": "场地经理", "category": "official", "description": "", "order": 30, "is_active": True},
-    {"code": "team_leader", "name": "领队", "category": "official", "description": "", "order": 40, "is_active": True},
-    {"code": "chief_expert", "name": "专家组长", "category": "expert", "description": "", "order": 50, "is_active": True},
-    {"code": "deputy_chief_expert", "name": "副专家组长", "category": "expert", "description": "", "order": 60, "is_active": True},
-    {"code": "expert", "name": "专家", "category": "expert", "description": "", "order": 70, "is_active": True},
-    {"code": "judge", "name": "裁判", "category": "expert", "description": "", "order": 80, "is_active": True},
-    {"code": "coach", "name": "教练", "category": "coach", "description": "", "order": 90, "is_active": True},
-    {"code": "competitor", "name": "选手", "category": "competitor", "description": "", "order": 100, "is_active": True},
-    {"code": "staff", "name": "工作人员", "category": "staff", "description": "", "order": 110, "is_active": True},
-    {"code": "observer", "name": "观察员", "category": "other", "description": "", "order": 120, "is_active": True},
-    {"code": "other", "name": "其他", "category": "other", "description": "", "order": 999, "is_active": True},
+    {"code": "skill_competition_manager", "name": "赛项经理", "english_name": "Skill Competition Manager (SCM)", "category": "official", "description": "", "order": 10, "is_active": True},
+    {"code": "chief_expert", "name": "首席专家", "english_name": "Chief Expert (CE)", "category": "official", "description": "", "order": 20, "is_active": True},
+    {"code": "venue_manager", "name": "场地经理", "english_name": "Workshop Manager (WM)", "category": "official", "description": "", "order": 30, "is_active": True},
+    {"code": "workshop_manager_assistant", "name": "场地经理助理", "english_name": "Workshop Manager Assistant (WMA)", "category": "official", "description": "", "order": 40, "is_active": True},
+    {"code": "skill_advisor", "name": "技能/技术顾问", "english_name": "Skill Advisor", "category": "official", "description": "", "order": 50, "is_active": True},
+    {"code": "competitions_committee_delegate_lead", "name": "竞赛委员会首席代表", "english_name": "Competitions Committee Delegate Lead", "category": "official", "description": "", "order": 60, "is_active": True},
+    {"code": "competitions_committee_delegate", "name": "竞赛委员会代表", "english_name": "Competitions Committee Delegate", "category": "official", "description": "", "order": 70, "is_active": True},
+    {"code": "expert", "name": "专家", "english_name": "Expert", "category": "expert", "description": "", "order": 80, "is_active": True},
+    {"code": "judge", "name": "裁判", "english_name": "Judge", "category": "expert", "description": "", "order": 90, "is_active": True},
+    {"code": "coach", "name": "教练", "english_name": "Coach", "category": "expert", "description": "", "order": 100, "is_active": True},
+    {"code": "competitor", "name": "选手", "english_name": "Competitor", "category": "competitor", "description": "", "order": 110, "is_active": True},
+    {"code": "reserve_competitor", "name": "备选选手", "english_name": "Reserve Competitor", "category": "competitor", "description": "", "order": 120, "is_active": True},
+    {"code": "interpreter", "name": "翻译", "english_name": "Interpreter", "category": "other", "description": "", "order": 130, "is_active": True},
+    {"code": "team_leader", "name": "领队", "english_name": "Team Leader", "category": "other", "description": "", "order": 140, "is_active": True},
+    {"code": "observer", "name": "观察员", "english_name": "Observer", "category": "other", "description": "", "order": 150, "is_active": True},
+    {"code": "staff", "name": "工作人员", "english_name": "Staff", "category": "other", "description": "", "order": 160, "is_active": True},
 ]
 
 BOOTSTRAP_DATA = [
