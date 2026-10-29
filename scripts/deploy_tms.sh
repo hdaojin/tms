@@ -114,6 +114,7 @@ usage() {
   tms-deploy rollback --to RELEASE_ID
   tms-deploy auth add|remove|list [USERNAME]
   tms-deploy admin create
+  tms-deploy manage COMMAND [ARGS...]
   tms-deploy prune [--keep NUMBER] [--yes]
   tms-deploy tls configure-acme|install|check
 
@@ -1135,6 +1136,23 @@ cmd_admin() {
     env_run_as_app "${RUNTIME_ENV}" "${CURRENT_LINK}/.venv/bin/python" "${CURRENT_LINK}/manage.py" createsuperuser
 }
 
+cmd_manage() (
+    require_root
+    require_root_owned_file "$0"
+    safe_source_config
+    [[ $# -ge 1 ]] || die "用法：tms-deploy manage COMMAND [ARGS...]"
+    [[ -L "${CURRENT_LINK}" && -f "${RUNTIME_ENV}" ]] || die "TMS 尚未部署。"
+    local release_dir
+    release_dir="$(readlink -f "${CURRENT_LINK}")"
+    [[ "${release_dir}" == "${RELEASES_DIR}/"* && -f "${release_dir}/manage.py" ]] || die "当前发布路径异常。"
+    run_as_app "${release_dir}/.venv/bin/python" -B -c \
+        'import sys; sys.exit(sys.version_info[:2] != (3, 13))' || \
+        die "当前发布的 Python 3.13 环境不可用；请先修复发布环境。"
+    cd "${release_dir}"
+    env_run_as_app "${RUNTIME_ENV}" "${release_dir}/.venv/bin/python" -B \
+        "${release_dir}/manage.py" "$@"
+)
+
 cmd_prune() {
     require_root
     require_root_owned_file "$0"
@@ -1182,6 +1200,7 @@ main() {
         rollback) cmd_rollback "$@" ;;
         auth) cmd_auth "$@" ;;
         admin) cmd_admin "$@" ;;
+        manage) cmd_manage "$@" ;;
         prune) cmd_prune "$@" ;;
         tls) cmd_tls "$@" ;;
         *) usage; die "未知命令：${command}" ;;

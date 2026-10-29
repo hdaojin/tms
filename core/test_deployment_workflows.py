@@ -201,6 +201,73 @@ basic_auth_policy
     assert "可信认证网段无效" in result.stderr
 
 
+@pytest.mark.parametrize("python_available", [True, False])
+def test_manage_pins_release_preserves_arguments_and_exit_status(python_available):
+    with patch.dict(os.environ, {"TMS_TEST_PYTHON_AVAILABLE": str(int(python_available))}):
+        result = bash_run('''
+set -Eeuo pipefail
+work="$(mktemp -d)"
+trap 'rm -f "$work/releases/active/manage.py" "$work/tms.env"; rmdir "$work/releases/active" "$work/releases" "$work/current" "$work"' EXIT
+source <(sed -e "s|^readonly ROOT_DIR=.*|readonly ROOT_DIR=\\"$work\\"|" \\
+    -e "s|^readonly ENV_DIR=.*|readonly ENV_DIR=\\"$work\\"|" \\
+    -e 's/\\[\\[ -L /[[ -d /g' "$1")
+mkdir -p "$work/current" "$work/releases/active"
+touch "$work/releases/active/manage.py" "$work/tms.env"
+require_root() { :; }
+require_root_owned_file() { :; }
+safe_source_config() { :; }
+readlink() { printf '%s\\n' "$work/releases/active"; }
+run_as_app() {
+    [[ "$#" == 4 && "$1" == "$work/releases/active/.venv/bin/python" && "$2" == -B && "$3" == -c ]] || return 91
+    [[ "$TMS_TEST_PYTHON_AVAILABLE" == 1 ]]
+}
+env_run_as_app() {
+    [[ "$PWD" == "$work/releases/active" ]] || return 92
+    [[ "$#" == 7 && "$1" == "$work/tms.env" && "$2" == "$PWD/.venv/bin/python" && "$3" == -B && "$4" == "$PWD/manage.py" ]] || return 93
+    [[ "$5" == bootstrap_tms && "$6" == --dry-run && "$7" == 'literal $value with spaces' ]] || return 94
+    printf 'MANAGEMENT_CALLED\\n'
+    return 23
+}
+main manage bootstrap_tms --dry-run 'literal $value with spaces'
+''', check=False)
+    if python_available:
+        assert result.returncode == 23
+        assert result.stdout.strip() == "MANAGEMENT_CALLED"
+    else:
+        assert result.returncode == 1
+        assert "MANAGEMENT_CALLED" not in result.stdout
+        assert "Python 3.13 环境不可用" in result.stderr
+
+
+def test_manage_requires_root_before_loading_configuration():
+    result = bash_run('''
+source "$1"
+require_root() { die "ROOT_REQUIRED"; }
+safe_source_config() { printf 'CONFIG_LOADED\\n'; }
+main manage check
+''', check=False)
+    assert result.returncode == 1
+    assert "ROOT_REQUIRED" in result.stderr
+    assert "CONFIG_LOADED" not in result.stdout
+
+
+def test_runtime_environment_is_loaded_without_inherited_variables():
+    result = bash_run('''
+source "$1"
+work="$(mktemp -d)"
+trap 'rm -f "$work/runtime.env"; rmdir "$work"' EXIT
+printf '# fixture\\nTEST_SETTING=literal $value with spaces\\n' >"$work/runtime.env"
+export TMS_INHERITED_ONLY=must-not-leak
+runuser() {
+    [[ "$1" == -u && "$2" == tms && "$3" == -- ]] || return 95
+    shift 3
+    "$@"
+}
+env_run_as_app "$work/runtime.env" "$TMS_TEST_PYTHON" -c 'import os, pathlib; assert os.environ["TEST_SETTING"] == "literal $value with spaces"; assert "TMS_INHERITED_ONLY" not in os.environ; assert pathlib.Path(os.environ["HOME"]).as_posix().endswith("/var/lib/tms")'
+''')
+    assert result.stdout == ""
+
+
 def test_update_entrypoint_rejects_first_install_and_unknown_commands():
     bash_run('''
 set -Eeuo pipefail

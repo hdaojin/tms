@@ -34,7 +34,7 @@ Skill performance → Coach review → 人工调整后续计划
 
 ### 后端
 
-- Python `>=3.13, <3.15`（仓库默认使用 3.14）
+- Python `>=3.13, <3.14`（开发、CI 与部署统一使用 3.13 系列）
 - Django 6
 - django-htmx
 - django-tables2
@@ -128,7 +128,7 @@ event_countdown
 
 ## 环境要求
 
-- Python `>=3.13, <3.15`（`.python-version` 当前固定为 3.14）
+- Python `>=3.13, <3.14`（`.python-version` 当前固定为 3.13）
 - uv
 - Node.js `>=22.12.0` 与 npm（仅开发环境或前端资源构建时需要）
 
@@ -445,6 +445,8 @@ sudo tms-deploy plan --revision develop --first-install  # 仅首次部署
 sudo tms-deploy plan --revision develop                  # 日常升级
 sudo tms-deploy apply <plan-id> --confirm-sha <完整SHA>
 sudo tms-deploy verify
+sudo tms-deploy manage check
+sudo tms-deploy manage bootstrap_tms --dry-run
 ```
 
 支持 `TMS_TLS_MODE=automatic`（公网 Caddy 自动证书）和 `TMS_TLS_MODE=acme-sh`
@@ -458,6 +460,11 @@ sudo tms-deploy verify
 `plan` 可解析分支，但生成计划后固定完整 SHA；`apply` 不接受浮动分支。审查后的
 [`scripts/deploy_tms.sh`](scripts/deploy_tms.sh) 应安装为 root 所有的 `/usr/local/sbin/tms-deploy`，
 日常部署不得直接 `sudo` 执行浮动分支里的脚本。
+
+生产管理命令使用 `sudo tms-deploy manage <命令> [参数...]`：自动固定当前发布目录、加载
+`/etc/tms/tms.env` 并以 `tms` 运行现有 Python 3.13 虚拟环境，不自动同步依赖。
+开发、CI 和部署统一使用 Python 3.13 系列；不要在生产发布目录执行普通 `uv run`，也不要在其中创建 `.env`。
+`bootstrap_tms` 先用 `--dry-run` 查看预览，实际执行时保留命令自身的交互确认；数据库迁移继续走部署流程。
 
 ### 生产环境变量
 

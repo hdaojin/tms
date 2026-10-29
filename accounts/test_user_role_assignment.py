@@ -59,7 +59,7 @@ class UserRoleAssignmentTests(TestCase):
         direct = Permission.objects.get(content_type__app_label="notes", codename="view_noterepo")
         self.user.user_permissions.add(direct)
         self.client.force_login(self.admin)
-        self.assertContains(self.client.get(reverse("accounts:user_list")), self.url)
+        self.assertNotContains(self.client.get(reverse("accounts:user_list")), self.url)
         self.assertContains(self.client.get(reverse("accounts:user_detail", args=[self.user.pk])), self.url)
         preview = self.client.post(self.url, {"roles": [self.group.pk], "action": "preview"})
         self.assertContains(preview, "训练角色")

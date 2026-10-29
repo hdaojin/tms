@@ -32,6 +32,7 @@ class DeploymentAssetsTests(SimpleTestCase):
             "rollback --to RELEASE_ID",
             "auth add|remove|list [USERNAME]",
             "admin create",
+            "manage COMMAND [ARGS...]",
             "prune [--keep NUMBER] [--yes]",
         ):
             self.assertIn(command, script)
@@ -50,7 +51,7 @@ class DeploymentAssetsTests(SimpleTestCase):
             'CADDY_TEMPLATE_SHA256=',
             'sha256sum -c "${plan_id}.manifest.sha256"',
             'StrictHostKeyChecking=yes',
-            'uv sync --locked --no-dev --python /usr/bin/python3.13',
+            'uv sync --locked --no-dev --link-mode copy --python /usr/bin/python3.13',
         ):
             self.assertIn(setting, script)
 

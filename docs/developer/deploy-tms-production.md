@@ -91,6 +91,7 @@ tms-deploy status [--json]
 tms-deploy rollback --to <release-id>
 tms-deploy auth add|remove|list [用户名]
 tms-deploy admin create
+tms-deploy manage COMMAND [ARGS...]
 tms-deploy prune --keep 5 [--yes]
 tms-deploy tls configure-acme|install|check
 ```
@@ -107,6 +108,30 @@ tms-deploy tls configure-acme|install|check
 与 `static/vendor/` 必须已经提交。
 
 `--link-mode copy` 避免随后对不可变 release 执行 chown/chmod 时，通过硬链接修改部署用户的 uv 缓存权限。
+
+### 4.1 生产管理命令与 Python 环境
+
+开发、CI 和部署统一使用 Python 3.13 系列。生产构建以 Debian 的 `/usr/bin/python3.13` 为基础，
+依赖安装到每个 release 独立的 `.venv`；运行服务使用 `tms`，拉取与构建使用部署账号，系统配置与发布权限由 root 管理。
+
+```bash
+sudo tms-deploy manage check
+sudo tms-deploy manage showmigrations --plan
+sudo tms-deploy manage bootstrap_tms --dry-run
+sudo tms-deploy manage bootstrap_tms
+```
+
+`manage` 将 `current` 解析为固定 release，在该目录运行，以服务账号检查 Python 3.13 可执行性，
+加载 `/etc/tms/tms.env` 后调用 `.venv/bin/python -B manage.py`，清除调用者继承的环境变量并原样传递参数。
+交互输入和命令退出码保留，不经过 `uv run`，不自动同步依赖或提升数据库权限；迁移仍通过发布流程使用专用迁移账号。
+Bootstrap 预览与实际写入是独立操作，修复环境不自动执行初始化。
+
+不要在生产发布目录执行普通 `uv run` 或放置 `.env`。`.python-version` 与构建解释器不一致时，
+uv 可能重建 `.venv`；root 用户还可能选中 `/root` 内的解释器，使服务账号无法启动。
+解释器跨 3.13/3.14 切换须重新构建环境，不复制历史虚拟环境：命令入口通常绑定原发布绝对路径。
+环境损坏时保留原环境与版本提示文件副本，在原 `.venv` 路径用明确的 Python 3.13、锁文件和复制模式重建，
+恢复发布只读权限，先执行管理命令检查，再重启并验证 HTTP。损坏环境副本只用于留证，不能视为可启动回滚点。
+若临时纠正已发布目录中的版本提示文件，须记录维护例外，并在后续正常发布中纳入仓库版本；不因此重跑迁移或 Bootstrap。
 
 ## 5. 首次部署
 
