@@ -6,4 +6,5 @@
   <p>未设置有效的当前周期，请联系管理员。</p>
 {% endif %}
 {{ block.super }}
+{% if show_log_templates %}{% include "training/_log_template_links.html" %}{% endif %}
 {% endblock %}

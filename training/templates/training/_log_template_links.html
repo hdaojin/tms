@@ -1,0 +1,17 @@
+<section id="log-template-downloads" class="card mt-5 border border-base-300 bg-base-100" aria-labelledby="log-template-heading">
+  <div class="card-body">
+    <h2 id="log-template-heading" class="card-title">训练日志模板</h2>
+    {% if not template_cycle_selected %}
+      <p>请先选择有效的训练周期，再查看可用模板。</p>
+    {% else %}
+      <ul class="space-y-3">
+        {% for template in log_templates %}
+          <li>
+            <a class="link link-primary" href="{% url 'training:log_template_download' template.pk %}{% if template_backfill %}?backfill=1{% endif %}">{{ template.name }}</a>
+            {% if template.description %}<p class="whitespace-pre-wrap text-sm text-base-content/70">{{ template.description }}</p>{% endif %}
+          </li>
+        {% empty %}<li>该周期暂无日志模板。</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</section>

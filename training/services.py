@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingTask
 from .log_files import DUPLICATE_LOG_MESSAGE, build_log_filename
+from core.uploads import TRAINING_LOG_UPLOAD_SPEC
 
 
 @transaction.atomic
@@ -57,6 +58,8 @@ def save_training_log(log, executions, *, backfill=False):
     if not log.pk and not log.document:
         raise ValidationError({"document": "请上传日志文件。"})
     upload = log.document if log.document and not log.document._committed else None
+    if upload:
+        TRAINING_LOG_UPLOAD_SPEC.validate_file(upload)
     saved_name = None
     storage = log.document.storage
     try:

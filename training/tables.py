@@ -13,6 +13,22 @@ from core.tables import ActionsColumn, BaseDateColumn, BaseDateTimeColumn, BaseT
 
 from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
 from .log_management import can_manage_log_deletions
+from .models import TrainingLogTemplate
+
+
+class TrainingLogTemplateTable(BaseTable):
+    created_at = BaseDateTimeColumn()
+    updated_at = BaseDateTimeColumn()
+    actions = ActionsColumn(
+        "training:log_template_download", "training:log_template_edit", "training:log_template_delete",
+        view_label="下载", view_perm="training.view_traininglogtemplate",
+        edit_perm="training.change_traininglogtemplate", delete_perm="training.delete_traininglogtemplate",
+        delete_confirm_title="删除日志模板", delete_confirm_message="确认删除此模板及其文件？已提交的训练日志不受影响。",
+    )
+
+    class Meta(BaseTable.Meta):
+        model = TrainingLogTemplate
+        fields = ["name", "training_cycle", "is_active", "order", "created_at", "updated_at", "actions"]
 
 
 class TrainingCycleTable(BaseTable):

@@ -22,6 +22,29 @@ from .log_files import TrainingLogStorage
 training_storage = PrivateMediaStorage("training")
 
 
+def log_template_upload_path(instance, filename):
+    return str(Path("log-templates", str(instance.training_cycle_id), Path(filename).name))
+
+
+class TrainingLogTemplate(TimestampedModel):
+    name = models.CharField("模板名称", max_length=150)
+    training_cycle = models.ForeignKey("TrainingCycle", verbose_name="训练周期", on_delete=models.PROTECT,
+                                       related_name="log_templates")
+    file = models.FileField("模板文件", storage=training_storage, upload_to=log_template_upload_path,
+                            max_length=500, validators=[*TRAINING_LOG_UPLOAD_SPEC.validators(),
+                                                        UploadSignatureValidator()])
+    description = models.TextField("说明", blank=True)
+    order = models.PositiveIntegerField("显示顺序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "训练日志模板"
+        ordering = ["order", "name", "pk"]
+
+    def __str__(self):
+        return self.name
+
+
 def training_upload_path(instance, filename):
     if hasattr(instance, "training_task"):
         task = instance.training_task

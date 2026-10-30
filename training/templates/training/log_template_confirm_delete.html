@@ -1,0 +1,12 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+  <div class="card border border-base-300 bg-base-100"><div class="card-body">
+    <p>确认删除“{{ object.name }}”（{{ object.training_cycle.name }}）及其模板文件？已提交的训练日志不受影响。</p>
+    <form method="post">{% csrf_token %}
+      <div class="flex justify-end gap-3">
+        <a class="btn btn-ghost" href="{% url 'training:log_template_list' %}">取消</a>
+        <button class="btn btn-error" type="submit">确认删除</button>
+      </div>
+    </form>
+  </div></div>
+{% endblock %}

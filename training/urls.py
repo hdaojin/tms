@@ -1,8 +1,15 @@
 from django.urls import path
 from . import views
+from . import log_template_views as template_views
 
 app_name = "training"
 urlpatterns = [
+    path("log-templates/", template_views.LogTemplateListView.as_view(), name="log_template_list"),
+    path("log-templates/create/", template_views.LogTemplateCreateView.as_view(), name="log_template_create"),
+    path("log-templates/links/", template_views.log_template_links, name="log_template_links"),
+    path("log-templates/<int:pk>/edit/", template_views.LogTemplateUpdateView.as_view(), name="log_template_edit"),
+    path("log-templates/<int:pk>/delete/", template_views.LogTemplateDeleteView.as_view(), name="log_template_delete"),
+    path("log-templates/<int:pk>/download/", template_views.LogTemplateDownloadView.as_view(), name="log_template_download"),
     path("", views.TrainingCycleListView.as_view(), name="cycle_list"),
     path("cycles/create/", views.TrainingCycleCreateView.as_view(), name="cycle_create"),
     path("cycles/version-fields/", views.training_cycle_version_fields, name="cycle_version_fields"),

@@ -20,6 +20,7 @@ from .models import (
     TrainingCycleSkillTreeVersion,
     TrainingCycleMember,
     TrainingLog,
+    TrainingLogTemplate,
     TrainingPlan,
     TrainingTask,
     TrainingTaskCoach,
@@ -31,6 +32,26 @@ from .log_files import DUPLICATE_LOG_MESSAGE, build_log_filename
 
 
 User = get_user_model()
+
+
+class TrainingLogTemplateForm(StyledFormMixin, forms.ModelForm):
+    class Meta:
+        model = TrainingLogTemplate
+        fields = ["name", "training_cycle", "file", "description", "order", "is_active"]
+        widgets = {"description": forms.Textarea(attrs={"rows": 3})}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["file"].widget.attrs.update(TRAINING_LOG_UPLOAD_SPEC.widget_attrs())
+        self.fields["file"].help_text = TRAINING_LOG_UPLOAD_SPEC.help_text("上传日志模板")
+        # 替换是可选操作，不允许清空必需文件。
+        self.fields["file"].widget = forms.FileInput(attrs=self.fields["file"].widget.attrs)
+
+    def _get_validation_exclusions(self):
+        exclusions = super()._get_validation_exclusions()
+        if self.instance.pk and not self.files.get("file"):
+            exclusions.add("file")
+        return exclusions
 
 
 class TrainingLogStatisticsForm(StyledFormMixin, forms.Form):

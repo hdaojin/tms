@@ -172,7 +172,7 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
 
     @patch("django.utils.timezone.localdate", return_value=date(2026, 1, 2))
     def test_service_rechecks_status_after_form_validation(self, mock_today):
-        form = TrainingLogForm(self.data(), {"document": SimpleUploadedFile("log.txt", b"training")},
+        form = TrainingLogForm(self.data(), {"document": SimpleUploadedFile("log.pdf", b"%PDF-1.4\ntraining")},
                                author=self.user)
         self.assertTrue(form.is_valid(), form.errors)
         self.cycle1.status = TrainingCycle.Status.COMPLETED
@@ -189,13 +189,13 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
     @patch("django.utils.timezone.localdate", return_value=date(2026, 1, 2))
     def test_daily_ignores_forged_cycle_and_service_rechecks(self, mock_today):
         form = TrainingLogForm(self.data(training_cycle=self.cycle2.pk),
-                               {"document": SimpleUploadedFile("log.txt", b"training")}, author=self.user)
+                               {"document": SimpleUploadedFile("log.pdf", b"%PDF-1.4\ntraining")}, author=self.user)
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.save().training_cycle_id, self.cycle1.pk)
         self.other.is_current = True
         save_cycle_member(self.other)
         log = TrainingLog(training_cycle=self.cycle1, author=self.user, training_date=date(2026, 1, 1), topic="伪造")
-        log.document = SimpleUploadedFile("log.txt", b"training")
+        log.document = SimpleUploadedFile("log.pdf", b"%PDF-1.4\ntraining")
         with self.assertRaisesMessage(ValidationError, "当前周期"):
             save_training_log(log, [])
 
@@ -203,7 +203,7 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
         self.cycle2.status = TrainingCycle.Status.COMPLETED
         self.cycle2.save()
         form = TrainingLogForm(self.data(training_cycle=self.cycle2.pk),
-                               {"document": SimpleUploadedFile("log.txt", b"training")},
+                               {"document": SimpleUploadedFile("log.pdf", b"%PDF-1.4\ntraining")},
                                author=self.user, backfill=True)
         self.assertTrue(form.is_valid(), form.errors)
         form.save()

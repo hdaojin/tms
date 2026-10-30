@@ -161,6 +161,8 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 
 ## URL、导航与模板布局
 
+- 训练日志模板管理入口为 `training:log_template_list`，菜单及页面要求独立的 `view_traininglogtemplate` 权限，写操作另需对应新增、修改、删除权限。提交页模板下载复用新增日志权限与周期成员/状态校验，不要求模板管理权限；模板文件属于 `training` 并经私有下载视图提供。
+
 - APP URL 使用 `app_name` namespace，并由 `tmsproject/urls.py` `include()`。
 - 导航的唯一配置入口是 `core/config/navigation.yml`；不要恢复旧 `core/config/menus/*.yml` / `menus.yml` 体系。
 - 页面按用途扩展：`templates/layouts/app.html`、`minimal.html`、`auth.html`、`print.html`、`htmx.html`；`templates/base.html` 仅作为兼容/薄入口，不应成为新页面首选布局。

@@ -177,6 +177,11 @@ sections:
             url_name: training:log_backfill
             icon_class: icon-[tabler--upload] size-5 text-success
             permissions: [training.add_traininglog]
+          - key: training_log_templates
+            label: 训练日志模板
+            url_name: training:log_template_list
+            icon_class: icon-[tabler--file-text] size-5 text-success
+            permissions: [training.view_traininglogtemplate]
       - key: glossary_learning_group
         label: 专业词汇学习
         icon_class: icon-[tabler--language] size-5 text-accent

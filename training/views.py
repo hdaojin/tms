@@ -708,6 +708,25 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     permission_required = "training.add_traininglog"
     backfill = False
 
+    def get_form(self, form_class=None):
+        from .log_template_views import configure_log_template_form
+
+        form = super().get_form(form_class)
+        if not self.object:
+            configure_log_template_form(form, backfill=self.backfill)
+        return form
+
+    def get_context_data(self, **kwargs):
+        from .log_template_views import log_template_context
+
+        context = super().get_context_data(**kwargs)
+        if not self.object:
+            form = context["form"]
+            context.update(log_template_context(self.request.user, form["training_cycle"].value(),
+                                                backfill=self.backfill))
+            context["show_log_templates"] = True
+        return context
+
     def get_breadcrumb_parents(self):
         if not self.request.user.has_perm("training.view_traininglog"):
             return []

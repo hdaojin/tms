@@ -35,6 +35,18 @@ bundles:
     name: 训练管理 | 选手训练
     description: 查看本人任务、维护执行记录和训练日志。
     permissions: [training.view_trainingcycle, training.view_trainingplan, training.view_trainingtask, training.view_taskexecution, training.change_taskexecution, training.view_traininglog, training.add_traininglog, training.change_traininglog]
+  - code: training.view_log_templates
+    name: 训练管理 | 查看日志模板
+    description: 查看全系统训练日志模板管理页并下载模板，包含停用模板。
+    permissions: [training.view_traininglogtemplate]
+  - code: training.maintain_log_templates
+    name: 训练管理 | 维护日志模板
+    description: 上传、修改、替换和启停全系统周期的日志模板。
+    permissions: [training.view_traininglogtemplate, training.add_traininglogtemplate, training.change_traininglogtemplate]
+  - code: training.delete_log_templates
+    name: 训练管理 | 删除日志模板
+    description: 确认后删除全系统周期的日志模板及其文件。
+    permissions: [training.view_traininglogtemplate, training.delete_traininglogtemplate]
   - code: training.view_training
     name: 训练管理 | 查看训练
     description: 全系统周期和计划可读；任务按领域、本人执行或显式教练分配可见，执行按本人或任务教练可见，日志默认仅本人。

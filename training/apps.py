@@ -6,6 +6,12 @@ class TrainingConfig(AppConfig):
     name = 'training'
 
     def ready(self):
+        from django.db.models.signals import post_delete
+        from .log_templates import delete_template_file
+        from .models import TrainingLogTemplate
+
+        post_delete.connect(delete_template_file, sender=TrainingLogTemplate,
+                            dispatch_uid="training_log_template_cleanup", weak=False)
         from core.utils.signals import register_file_cleanup_signals
         from .models import TaskExecutionAttachment, TrainingLog, TrainingPlan, TrainingTaskAttachment
 
