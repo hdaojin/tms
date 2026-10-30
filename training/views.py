@@ -8,6 +8,7 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.functional import cached_property
 from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
@@ -19,6 +20,10 @@ from accounts.user_management_forms import UserFilterForm
 from core.utils.listing import FilterableListMixin, ListFilterSpec
 from .member_tables import CycleCandidateTable, CycleMemberTable
 from .member_management import MemberActionForm, prepare_member_add, preview_member_add, confirm_member_add, load_member_add
+from .log_management import (
+    LogFilterForm, LogDeleteActionForm, filter_training_logs, can_manage_log_deletions,
+    preview_log_deletion, confirm_log_deletion, log_list_return_url,
+)
 
 from core.utils.breadcrumbs import breadcrumb_link
 from core.utils.mixins import TitleMixin
@@ -580,21 +585,82 @@ class TrainingLogMonthlyStatView(TitleMixin, PermissionRequiredMixin, TemplateVi
         return context
 
 
-class TrainingLogListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
+class TrainingLogListView(FilterableListMixin, ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = TrainingLog
     table_class = TrainingLogTable
     title = "训练日志"
     permission_required = "training.view_traininglog"
     create_url_name = "training:log_create"
     create_label = "提交当天训练日志"
+    template_name = "training/log_list.html"
+    title_icon = "icon-[tabler--notebook]"
+    table_pagination = {"per_page": 25}
+    list_filter_compact = True
+
+    @cached_property
+    def filter_form(self):
+        return LogFilterForm(self.request.GET, user=self.request.user)
+
+    def get_list_filter_specs(self):
+        return (
+            ListFilterSpec("q", "搜索日志", "search", placeholder="姓名、账号、学号、主题、摘要或文件名"),
+            ListFilterSpec("cycle", "训练周期", "select",
+                           choices=[(cycle.pk, cycle.name) for cycle in self.filter_form.fields["cycle"].queryset],
+                           empty_label="全部训练周期"),
+            ListFilterSpec("date_from", "训练日期从", "date", placeholder="从"),
+            ListFilterSpec("date_to", "训练日期至", "date", placeholder="至"),
+            ListFilterSpec("member_role", "周期身份", "select", choices=TrainingCycleMember.Role.choices,
+                           empty_label="全部周期身份"),
+        )
 
     def get_queryset(self):
         from django.db.models import Exists, OuterRef
+        queryset = filter_training_logs(self.request.user, self.request.GET) if self.filter_form.is_valid() else TrainingLog.objects.none()
         return (
-            training_logs_visible_to(self.request.user)
+            queryset
             .select_related("training_cycle", "author")
             .annotate(execution_count=Count("executions"), can_edit=Exists(training_logs_changeable_by(self.request.user).filter(pk=OuterRef("pk"))))
         )
+
+    def get_table_kwargs(self):
+        return {"can_bulk_delete": can_manage_log_deletions(self.request.user)}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(filter_form=self.filter_form, bulk_form=LogDeleteActionForm(),
+                       can_bulk_delete=can_manage_log_deletions(self.request.user))
+        return context
+
+    def post(self, request, *args, **kwargs):
+        if not can_manage_log_deletions(request.user):
+            raise PermissionDenied
+        try:
+            if request.POST.get("stage", "preview") == "confirm":
+                query = confirm_log_deletion(actor=request.user, token=request.POST.get("token", ""))
+                messages.success(request, "已删除所选训练日志及其文件。")
+                return redirect(log_list_return_url(query))
+            action = LogDeleteActionForm(request.POST)
+            if request.POST.get("stage", "preview") != "preview" or request.POST.get("selection") != "selected" or not action.is_valid():
+                raise ValidationError("请选择有效的批量操作和日志。")
+            if not self.filter_form.is_valid():
+                raise ValidationError("筛选条件无效，请返回列表重新筛选。")
+            self.object_list = self.get_queryset()
+            table = self.get_table(**self.get_table_kwargs())
+            ids = normalize_ids(request.POST.getlist("logs"))
+            if not set(ids) <= {row.record.pk for row in table.page.object_list}:
+                raise ValidationError("所选日志不属于当前筛选页，请重新选择。")
+            preview = preview_log_deletion(actor=request.user, ids=ids, return_query=request.GET.urlencode())
+            from core.utils.breadcrumbs import build_breadcrumbs
+
+            title = "确认批量删除训练日志"
+            return render(request, "training/log_bulk_delete.html", {
+                **preview, "title": title, "title_icon": self.title_icon,
+                "breadcrumbs": build_breadcrumbs(request, title, [breadcrumb_link("训练日志", "training:log_list")]),
+                "return_url": log_list_return_url(preview["return_query"]),
+            })
+        except ValidationError as exc:
+            messages.error(request, "；".join(exc.messages))
+            return redirect(log_list_return_url(request.GET.urlencode()))
 
 
 class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -705,7 +771,15 @@ class TrainingLogDeleteView(TitleMixin, PermissionRequiredMixin, DeleteView):
         return training_logs_deletable_by(self.request.user)
 
     def get_success_url(self):
-        return reverse("training:log_list")
+        return log_list_return_url(self.request.GET.get("return_query", ""))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["cancel_url"] = (
+            self.get_success_url() if "return_query" in self.request.GET
+            else reverse("training:log_detail", args=[self.object.pk])
+        )
+        return context
 
 
 class TrainingLogArchiveExportView(PermissionRequiredMixin, SingleTableView):

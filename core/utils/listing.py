@@ -14,7 +14,7 @@ class ListFilterSpec:
 
     name: str
     label: str
-    control: Literal["select", "search"]
+    control: Literal["select", "search", "date"]
     lookup: str | None = None
     choices: Sequence[tuple[object, object]] | None = None
     empty_label: str = "全部"
@@ -37,8 +37,9 @@ class FilterableListMixin:
 
     htmx_partial_name = "results"
     list_filter_target_id = "list-results"
+    list_filter_compact = False
     list_filter_trigger = (
-        "submit, change from:.list-filter-select, input changed delay:400ms "
+        "submit, change from:.list-filter-select, change from:.list-filter-date, input changed delay:400ms "
         "from:.list-filter-search, search from:.list-filter-search"
     )
 
@@ -137,6 +138,7 @@ class FilterableListMixin:
                 "list_filter_url": self.request.path,
                 "list_filter_target_id": self.list_filter_target_id,
                 "list_filter_trigger": self.list_filter_trigger,
+                "list_filter_compact": self.list_filter_compact,
             }
         )
         return context

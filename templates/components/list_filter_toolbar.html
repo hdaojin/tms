@@ -10,10 +10,10 @@
       hx-target="#{{ list_filter_target_id }}"
       hx-push-url="true"
       hx-sync="this:replace">
-  <div class="grid grid-cols-2 gap-2 md:flex md:flex-wrap md:items-center">
+  <div class="grid grid-cols-2 gap-2 md:flex {% if list_filter_compact %}md:items-center{% else %}md:flex-wrap md:items-center{% endif %}">
     {% for control in list_filter_controls %}
       {% if control.type == "select" %}
-        <label class="min-w-0 md:w-36 md:shrink-0">
+        <label class="min-w-0 {% if list_filter_compact %}md:flex-1{% else %}md:w-36 md:shrink-0{% endif %}">
           <span class="sr-only">{{ control.label }}</span>
           <select class="list-filter-select select w-full md:select-sm" name="{{ control.name }}">
             <option value="">{{ control.empty_label }}</option>
@@ -23,13 +23,20 @@
           </select>
         </label>
       {% elif control.type == "search" %}
-        <label class="col-span-2 min-w-0 md:min-w-64 md:flex-1">
+        <label class="col-span-2 min-w-0 {% if not list_filter_compact %}md:min-w-64{% endif %} md:flex-1">
           <span class="sr-only">{{ control.label }}</span>
-          <input class="list-filter-search input w-full md:input-sm"
+          <input class="list-filter-search input {% if list_filter_compact %}min-w-0{% endif %} w-full md:input-sm"
                  type="search"
                  name="{{ control.name }}"
                  value="{{ control.value }}"
                  placeholder="{{ control.placeholder }}">
+        </label>
+      {% elif control.type == "date" %}
+        <label class="flex min-w-0 items-center gap-1 {% if list_filter_compact %}md:flex-1{% else %}md:w-44{% endif %}">
+          <span class="shrink-0 text-sm">{{ control.placeholder|default:control.label }}</span>
+          <input class="list-filter-date input min-w-0 w-full md:input-sm"
+                 type="date" name="{{ control.name }}" value="{{ control.value }}"
+                 aria-label="{{ control.label }}">
         </label>
       {% endif %}
     {% endfor %}

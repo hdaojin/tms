@@ -54,6 +54,23 @@ class ListPageTemplateTests(SimpleTestCase):
         self.assertIsNone(soup.select_one("[data-test-table]"))
 
 
+class FilterToolbarTests(SimpleTestCase):
+    def test_existing_layout_is_default_and_compact_layout_is_opt_in(self):
+        controls = [
+            {"type": "search", "name": "q", "label": "搜索", "value": "", "placeholder": "姓名"},
+            {"type": "select", "name": "role", "label": "角色", "value": "", "empty_label": "全部角色", "choices": []},
+        ]
+        context = {"list_filter_controls": controls, "list_filter_url": "/users/", "list_filter_target_id": "list-results"}
+        default = BeautifulSoup(render_to_string("components/list_filter_toolbar.html", context), "html.parser")
+        self.assertIn("md:min-w-64", default.select_one('input[name="q"]').parent["class"])
+        self.assertIn("md:w-36", default.select_one('select[name="role"]').parent["class"])
+        compact = BeautifulSoup(render_to_string("components/list_filter_toolbar.html", {
+            **context, "list_filter_compact": True,
+        }), "html.parser")
+        self.assertNotIn("md:min-w-64", compact.select_one('input[name="q"]').parent["class"])
+        self.assertIn("md:flex-1", compact.select_one('select[name="role"]').parent["class"])
+
+
 class BulkToolbarTests(SimpleTestCase):
     class ActionForm(forms.Form):
         operation = forms.ChoiceField(

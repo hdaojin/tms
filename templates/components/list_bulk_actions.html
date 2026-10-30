@@ -6,8 +6,8 @@ selection_label 默认“条记录”，selection_name 默认“selection”。
 {% endcomment %}
 <input type="hidden" name="{{ selection_name|default:'selection' }}" value="selected" data-selection-mode>
 <div class="flex flex-wrap items-center gap-3 rounded-box border border-base-300 bg-base-100 p-3 mb-4" aria-label="批量操作">
-  <label class="flex items-center gap-2" for="{{ operation_field.id_for_label }}">
-    <span>{{ operation_field.label|default:'操作' }}</span>{{ operation_field }}
+  <label class="flex shrink-0 items-center gap-2" for="{{ operation_field.id_for_label }}">
+    <span class="shrink-0 whitespace-nowrap">{{ operation_field.label|default:'操作' }}</span>{{ operation_field }}
   </label>
   <button class="btn btn-sm btn-primary" type="submit"{% if not matching_count %} disabled{% endif %}>执行</button>
   <span class="text-sm" role="status" data-selection-status>已选择 0 {{ selection_label|default:'条记录' }}</span>

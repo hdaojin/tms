@@ -1,14 +1,18 @@
 from pathlib import Path
+from urllib.parse import urlencode
 
 import django_tables2 as tables
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils import timezone
+from django.template.loader import render_to_string
+from django.utils.safestring import mark_safe
 
 from accounts.services.users import get_user_display_name
 from core.tables import ActionsColumn, BaseDateColumn, BaseDateTimeColumn, BaseTable
 
-from .models import TaskExecution, TrainingCycle, TrainingLog, TrainingPlan, TrainingTask
+from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
+from .log_management import can_manage_log_deletions
 
 
 class TrainingCycleTable(BaseTable):
@@ -50,12 +54,43 @@ class TaskExecutionTable(BaseTable):
         fields = ["training_task", "user", "status", "actual_minutes", "actions"]
 
 
+class TrainingLogActionsColumn(ActionsColumn):
+    def render(self, record, table, **kwargs):
+        request = getattr(table, "request", None)
+        user = getattr(request, "user", None)
+        actions = [{"href": reverse("training:log_detail", args=[record.pk]), "label": "查看",
+                    "variant_class": "btn-soft btn-primary"}]
+        if user and user.has_perm("training.change_traininglog") and getattr(record, "can_edit", False):
+            actions.append({"href": reverse("training:log_edit", args=[record.pk]), "label": "编辑",
+                            "variant_class": "btn-soft btn-warning"})
+        if user and can_manage_log_deletions(user):
+            query = urlencode({"return_query": request.GET.urlencode()})
+            actions.append({"href": reverse("training:log_delete", args=[record.pk]) + "?" + query,
+                            "label": "删除", "variant_class": "btn-soft btn-error"})
+        # 单条删除进入确认页，避免批量表单中嵌套行内弹窗的 POST 表单。
+        return mark_safe(render_to_string("components/table_actions.html", {"actions": actions}, request=request))
+
+
 class TrainingLogTable(BaseTable):
+    selection = tables.CheckBoxColumn(accessor="pk", orderable=False, attrs={
+        "th__input": {"class": "checkbox checkbox-sm", "aria-label": "全选当前页", "data-select-page": ""},
+        "td__input": {"class": "checkbox checkbox-sm", "name": "logs", "aria-label": "选择日志", "data-row-selection": ""},
+    })
     training_date = BaseDateColumn()
+    member_role = tables.Column(verbose_name="周期身份", empty_values=())
     created_at = BaseDateTimeColumn(verbose_name="提交时间", format="Y-m-d H:i")
 
     document = tables.Column(verbose_name="日志附件", empty_values=(), orderable=False)
-    actions = ActionsColumn("training:log_detail", "training:log_edit", edit_perm="training.change_traininglog", edit_allowed_attr="can_edit")
+    actions = TrainingLogActionsColumn()
+
+    def __init__(self, *args, **kwargs):
+        self.can_bulk_delete = kwargs.pop("can_bulk_delete", False)
+        super().__init__(*args, **kwargs)
+        if not self.can_bulk_delete:
+            self.columns.hide("selection")
+
+    def render_member_role(self, value):
+        return dict(TrainingCycleMember.Role.choices).get(value, "未关联")
 
     def render_created_at(self, value, record):
         displayed = timezone.localtime(value).strftime("%Y-%m-%d %H:%M")
@@ -80,4 +115,4 @@ class TrainingLogTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = TrainingLog
-        fields = ["training_date", "training_cycle", "author", "created_at", "document", "actions"]
+        fields = ["selection", "training_date", "training_cycle", "author", "member_role", "created_at", "document", "actions"]

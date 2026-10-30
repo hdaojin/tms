@@ -1,0 +1,15 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="card border border-base-300 bg-base-100"><div class="card-body">
+  <h2 class="card-title">确认批量删除训练日志</h2>
+  <p>将删除以下 {{ count }} 条训练日志、日志与任务执行的关联及日志文件。任务执行本身不会删除，此操作无法撤销。</p>
+  <div class="overflow-x-auto"><table class="table">
+    <thead><tr><th>作者</th><th>账号</th><th>训练日期</th><th>训练周期</th><th>日志文件</th></tr></thead>
+    <tbody>{% for row in rows %}<tr><td>{{ row.author }}</td><td>{{ row.username }}</td><td>{{ row.date|date:"Y-m-d" }}</td><td>{{ row.cycle }}</td><td>{{ row.filename }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <form method="post">
+    {% csrf_token %}<input type="hidden" name="stage" value="confirm"><input type="hidden" name="token" value="{{ token }}">
+    <div class="card-actions"><a class="btn btn-ghost" href="{{ return_url }}">取消</a><button class="btn btn-error" type="submit">确认删除 {{ count }} 条日志</button></div>
+  </form>
+</div></div>
+{% endblock %}

@@ -1,28 +1,25 @@
 {% extends "common/table_page.html" %}
-
-{% block content %}
-<div class="flex flex-wrap items-center justify-between gap-3">
-  <form method="get" class="flex flex-wrap items-center gap-2">
-    <select name="year" class="select select-sm">
-      {% for month in months %}
-        <option value="{{ month.year }}" {% if month.year == selected_year and month.month == selected_month %}selected{% endif %}>{{ month.year }}</option>
-      {% endfor %}
-    </select>
-    <select name="month" class="select select-sm">
-      {% for month in months %}
-        <option value="{{ month.month }}" {% if month.year == selected_year and month.month == selected_month %}selected{% endif %}>{{ month.month|stringformat:"02d" }}月</option>
-      {% endfor %}
-    </select>
-    <button class="btn btn-sm" type="submit">筛选</button>
-  </form>
-  <div class="flex gap-2">
-    {% if perms.training.export_traininglog_archive %}
-      <a href="{% url 'training:log_export' %}?year={{ selected_year }}&month={{ selected_month }}" class="btn btn-outline btn-sm">导出 ZIP</a>
+{% load static %}
+{% block list_filters %}
+  {% if create_url_name %}
+    <div class="mb-3 flex justify-end"><a class="btn btn-primary btn-sm" href="{% url create_url_name %}">{{ create_label }}</a></div>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+{% block list_results %}
+  {% partialdef results inline %}
+    {% if filter_form.errors %}<div class="alert alert-error mb-3" role="alert">{{ filter_form.errors }}</div>{% endif %}
+    {% if can_bulk_delete %}
+    <form method="post" data-bulk-list data-matching-count="{{ table.paginator.count }}" data-selection-label="条日志" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="stage" value="preview">
+      {% include "components/list_bulk_actions.html" with operation_field=bulk_form.operation matching_count=table.paginator.count selection_label="条日志" %}
     {% endif %}
-    {% if perms.training.add_traininglog %}
-      <a href="{% url 'training:log_upload' %}" class="btn btn-primary btn-sm">上传日志</a>
-    {% endif %}
-  </div>
-</div>
-{{ block.super }}
+    {% include "components/table_wrapper.html" with table=table %}
+    {% if can_bulk_delete %}</form>{% endif %}
+  {% endpartialdef %}
+{% endblock %}
+{% block extra_js %}
+  {{ block.super }}
+  <script src="{% static 'js/list-bulk-actions.js' %}" defer></script>
 {% endblock %}
