@@ -1,8 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
-from django.db.models import Count
+from django.db.models import Count, F
 from pathlib import Path
 
 from django.http import HttpResponse
@@ -12,6 +11,14 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
+from django.http import QueryDict
+from django import forms
+from django.contrib.auth import get_user_model
+from accounts.services.user_management import filter_users, normalize_ids
+from accounts.user_management_forms import UserFilterForm
+from core.utils.listing import FilterableListMixin, ListFilterSpec
+from .member_tables import CycleCandidateTable, CycleMemberTable
+from .member_management import MemberActionForm, prepare_member_add, preview_member_add, confirm_member_add, load_member_add
 
 from core.utils.breadcrumbs import breadcrumb_link
 from core.utils.mixins import TitleMixin
@@ -88,11 +95,13 @@ class TrainingCycleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
         )
 
 
-class TrainingCycleMembersView(TitleMixin, PermissionRequiredMixin, FormView):
+class TrainingCycleMembersView(FilterableListMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
     template_name = "training/cycle_members.html"
-    form_class = CycleMemberAddForm
     title = "周期成员管理"
+    title_icon = "icon-[tabler--users]"
     permission_required = "training.view_trainingcyclemember"
+    table_pagination = {"per_page": 25}
+    model = get_user_model()
 
     def dispatch(self, request, *args, **kwargs):
         self.cycle = get_object_or_404(TrainingCycle, pk=kwargs["pk"])
@@ -104,41 +113,130 @@ class TrainingCycleMembersView(TitleMixin, PermissionRequiredMixin, FormView):
                     breadcrumb_link(self.cycle.name, "training:cycle_detail", args=[self.cycle.pk])]
         return []
 
-    def get_form(self, form_class=None):
-        form = super().get_form(form_class)
-        form.fields["users"].queryset = form.fields["users"].queryset.exclude(
-            training_cycle_memberships__training_cycle=self.cycle
-        )
-        if not self.request.user.has_perm("training.change_trainingcyclemember"):
-            form.fields.pop("is_current")
-        return form
+    @property
+    def adding(self):
+        return self.request.GET.get("mode") == "add"
+
+    def get_list_filter_specs(self):
+        specs = [ListFilterSpec("mode", "成员列表", "select", choices=[("add", "添加成员")], empty_label="已有成员"),
+                 ListFilterSpec("q", "搜索用户", "search", placeholder="账号、完整姓名或学号"),
+                 ListFilterSpec("role", "用户角色", "select", choices=UserFilterForm().fields["role"].choices[1:],
+                                empty_label="全部用户角色")]
+        if not self.request.user.has_perm("training.add_trainingcyclemember"):
+            specs = specs[1:]
+        if not self.adding:
+            specs += [ListFilterSpec("member_role", "周期身份", "select", choices=TrainingCycleMember.Role.choices,
+                                    empty_label="全部周期身份"),
+                      ListFilterSpec("current", "当前周期", "select", choices=[("1", "是"), ("0", "否")],
+                                     empty_label="全部当前状态")]
+        return specs
+
+    def get_queryset(self):
+        filters = UserFilterForm(self.request.GET)
+        if not filters.is_valid() or self.request.GET.get("mode", "") not in ("", "add"):
+            raise ValidationError("筛选条件无效，请重新选择。")
+        queryset = self.model.objects.select_related("profile").prefetch_related("groups")
+        if self.adding:
+            if not self.request.user.has_perm("training.add_trainingcyclemember"):
+                raise PermissionDenied
+            queryset = queryset.filter(is_active=True).exclude(training_cycle_memberships__training_cycle=self.cycle)
+        else:
+            queryset = queryset.filter(training_cycle_memberships__training_cycle=self.cycle).annotate(
+                member_pk=F("training_cycle_memberships__pk"),
+                member_cycle_id=F("training_cycle_memberships__training_cycle_id"),
+                member_role=F("training_cycle_memberships__role"),
+                member_current=F("training_cycle_memberships__is_current"),
+            )
+            role, current = self.request.GET.get("member_role", ""), self.request.GET.get("current", "")
+            if role not in ("", *TrainingCycleMember.Role.values) or current not in ("", "0", "1"):
+                raise ValidationError("筛选条件无效，请重新选择。")
+            if role:
+                queryset = queryset.filter(member_role=role)
+            if current:
+                queryset = queryset.filter(member_current=current == "1")
+        return filter_users(queryset, filters.cleaned_data).order_by(F("profile__join_date").desc(nulls_last=True), "-pk")
+
+    def get(self, request, *args, **kwargs):
+        try:
+            return super().get(request, *args, **kwargs)
+        except ValidationError as exc:
+            return HttpResponse("；".join(exc.messages), status=400)
+
+    def get_table_class(self):
+        return CycleCandidateTable if self.adding else CycleMemberTable
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(cycle=self.cycle, adding=self.adding, action_form=MemberActionForm())
+        return context
+
+    def return_url(self, query):
+        allowed = {"mode", "q", "role", "member_role", "current", "sort", "page"}
+        params = QueryDict(query).copy()
+        for key in list(params):
+            if key not in allowed:
+                del params[key]
+        return self.request.path + ("?" + params.urlencode() if params else "")
+
+    def render_step(self, template, context):
+        from core.utils.breadcrumbs import build_breadcrumbs
+
+        context.update(title=self.get_title(), title_icon=self.title_icon,
+                       breadcrumbs=build_breadcrumbs(self.request, self.get_title(), self.get_breadcrumb_parents()))
+        return render(self.request, template, context)
 
     def post(self, request, *args, **kwargs):
         if not request.user.has_perm("training.add_trainingcyclemember"):
             raise PermissionDenied
-        return super().post(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["cycle"] = self.cycle
-        context["members"] = self.cycle.members.select_related("user").order_by("user__username")
-        return context
-
-    def form_valid(self, form):
-        if not self.request.user.has_perm("training.add_trainingcyclemember"):
-            raise PermissionDenied
+        stage = request.POST.get("stage", "select")
         try:
-            with transaction.atomic():
-                for user in sorted(form.cleaned_data["users"], key=lambda item: item.pk):
-                    save_cycle_member(TrainingCycleMember(
-                        training_cycle=self.cycle, user=user, role=form.cleaned_data["role"],
-                        is_current=form.cleaned_data.get("is_current", False),
-                    ))
+            if stage == "confirm":
+                query = confirm_member_add(actor=request.user, cycle=self.cycle, token=request.POST.get("token", ""))
+                messages.success(request, "已添加周期成员。")
+                return redirect(self.return_url(query))
+            if stage == "select":
+                action = MemberActionForm(request.POST)
+                if request.POST.get("selection") != "selected" or not action.is_valid() or not self.adding:
+                    raise ValidationError("请选择有效操作和当前页成员。")
+                self.object_list = self.get_queryset()
+                table = self.get_table()
+                ids = normalize_ids(request.POST.getlist("users"))
+                page_ids = {row.record.pk for row in table.page.object_list}
+                if not set(ids) <= page_ids:
+                    raise ValidationError("所选用户不属于当前筛选页，请重新选择。")
+                state = prepare_member_add(actor=request.user, cycle=self.cycle, ids=ids,
+                                           return_query=request.GET.urlencode())
+                form = CycleMemberAddForm(initial={"users": ids})
+            elif stage == "parameters":
+                token = request.POST.get("token", "")
+                data, users = load_member_add(actor=request.user, cycle=self.cycle, token=token, stage="parameters")
+                bound = request.POST.copy()
+                bound.setlist("users", [str(pk) for pk in data["ids"]])
+                form = CycleMemberAddForm(bound)
+                state = {"token": token, "users": users, "return_query": data["return_query"]}
+            else:
+                raise ValidationError("操作步骤无效。")
+            form.fields["users"].widget = forms.MultipleHiddenInput()
+            if not request.user.has_perm("training.change_trainingcyclemember"):
+                form.fields.pop("is_current")
+            if stage == "parameters" and form.is_valid():
+                try:
+                    preview = preview_member_add(actor=request.user, cycle=self.cycle, token=state["token"],
+                                                 role=form.cleaned_data["role"],
+                                                 is_current=form.cleaned_data.get("is_current", False))
+                except ValidationError as exc:
+                    form.add_error(None, "；".join(exc.messages))
+                else:
+                    return self.render_step("training/member_add_confirm.html", {
+                        "cycle": self.cycle, **preview, "return_url": self.return_url(preview["return_query"]),
+                    })
+            return self.render_step("training/member_add_parameters.html", {
+                "cycle": self.cycle, "form": form, **state,
+                "return_url": self.return_url(state["return_query"]),
+            })
         except ValidationError as exc:
-            form.add_error(None, "；".join(exc.messages))
-            return self.form_invalid(form)
-        messages.success(self.request, "已添加周期成员。")
-        return redirect("training:cycle_members", pk=self.cycle.pk)
+            messages.error(request, "；".join(exc.messages))
+            return redirect(self.return_url(request.GET.urlencode()))
 
 
 class TrainingCycleMemberEditView(TitleMixin, PermissionRequiredMixin, FormView):
@@ -488,7 +586,7 @@ class TrainingLogListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, Si
     title = "训练日志"
     permission_required = "training.view_traininglog"
     create_url_name = "training:log_create"
-    create_label = "新增训练日志"
+    create_label = "提交当天训练日志"
 
     def get_queryset(self):
         from django.db.models import Exists, OuterRef
@@ -540,7 +638,7 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingLog
     form_class = TrainingLogForm
     template_name = "training/log_form.html"
-    title = "新增训练日志"
+    title = "提交当天训练日志"
     permission_required = "training.add_traininglog"
     backfill = False
 

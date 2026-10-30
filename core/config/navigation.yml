@@ -162,7 +162,7 @@ sections:
             icon_class: icon-[tabler--file-text] size-5 text-success
             permissions: [training.view_traininglog]
           - key: training_log_create
-            label: 新增训练日志
+            label: 提交当天训练日志
             url_name: training:log_create
             icon_class: icon-[tabler--upload] size-5 text-success
             permissions:

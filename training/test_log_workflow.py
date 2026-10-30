@@ -28,7 +28,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(log.updated_at, created)
         for index, summary in enumerate(["更新摘要", "更新摘要"], start=1):
             saved = created + timedelta(hours=index)
-            form = TrainingLogForm(self.data(summary=summary), instance=log, author=self.user)
+            form = TrainingLogForm(self.data(summary=summary), instance=log, author=self.user, backfill=True)
             self.assertTrue(form.is_valid(), form.errors)
             with patch("django.utils.timezone.now", return_value=saved):
                 form.save()
@@ -63,9 +63,9 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         )
         with patch.object(log.document.storage, "open", side_effect=AssertionError("列表不应读取文件")):
             response = self.client.get(reverse("training:log_list"))
-        for text in ["训练内容", "日志附件", "未附文件", log.canonical_filename]:
+        for text in ["提交时间", "日志附件", "未附文件", log.canonical_filename]:
             self.assertContains(response, text)
-        for text in ["关联任务数", "暂无摘要", "训练摘要"]:
+        for text in ["训练内容", "关联任务数", "暂无摘要", "训练摘要"]:
             self.assertNotContains(response, text)
         records = list(response.context["table"].data)
         self.assertEqual([record.execution_count for record in records], [0, 0])
@@ -75,9 +75,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
                 row.get_cell("author")
                 row.get_cell("training_cycle")
                 row.get_cell("document")
-                content = row.get_cell("topic")
-                self.assertIn(row.record.topic, content)
-                self.assertNotIn("<a", content)
+                self.assertNotIn("topic", table.columns.names())
             self.assertNotIn("execution_count", table.columns.names())
 
     def test_admin_displays_readonly_record_times_and_name(self):
@@ -141,25 +139,30 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         with timezone.override("Asia/Shanghai"), patch("django.utils.timezone.now", return_value=now):
             today = date(2026, 10, 29)
             tomorrow = today + timedelta(days=1)
-            for backfill in (False, True):
-                form = TrainingLogForm(self.data(training_date=tomorrow.isoformat()),
-                                       {"document": self.upload()}, author=self.user, backfill=backfill)
+            daily = TrainingLogForm(self.data(training_date=tomorrow.isoformat()),
+                                    {"document": self.upload()}, author=self.user)
+            self.assertTrue(daily.is_valid(), daily.errors)
+            self.assertEqual(daily.cleaned_data["training_date"], today)
+            self.assertTrue(daily.fields["training_date"].disabled)
+            for rejected in (today, tomorrow):
+                form = TrainingLogForm(self.data(training_date=rejected.isoformat()),
+                                       {"document": self.upload()}, author=self.user, backfill=True)
                 self.assertFalse(form.is_valid())
-                self.assertIn("训练日期不能晚于今天", str(form.errors["training_date"]))
-                log = TrainingLog(training_cycle=self.period, author=self.user, training_date=tomorrow,
-                                  topic="未来日志", document=self.upload())
-                with self.assertRaisesMessage(ValidationError, "训练日期不能晚于今天"):
-                    save_training_log(log, [], backfill=backfill)
-                valid = TrainingLogForm(self.data(training_date=today.isoformat()),
-                                        {"document": self.upload()}, author=self.user, backfill=backfill)
-                self.assertTrue(valid.is_valid(), valid.errors)
-                self.assertEqual(valid.fields["training_date"].widget.attrs["max"], today.isoformat())
+                log = TrainingLog(training_cycle=self.period, author=self.user, training_date=rejected,
+                                  topic="补交日志", document=self.upload())
+                with self.assertRaises(ValidationError):
+                    save_training_log(log, [], backfill=True)
+            yesterday = today - timedelta(days=1)
+            valid = TrainingLogForm(self.data(training_date=yesterday.isoformat()),
+                                    {"document": self.upload()}, author=self.user, backfill=True)
+            self.assertTrue(valid.is_valid(), valid.errors)
+            self.assertEqual(valid.fields["training_date"].widget.attrs["max"], yesterday.isoformat())
             admin_form = TrainingLogAdminForm(
                 self.data(author=self.user.pk, training_date=tomorrow.isoformat()),
                 {"document": self.upload()},
             )
             self.assertFalse(admin_form.is_valid())
-            self.assertIn("训练日期不能晚于今天", str(admin_form.errors["training_date"]))
+            self.assertIn("训练日期必须为今天", str(admin_form.errors["training_date"]))
         self.assertFalse(TrainingLog.objects.exists())
         self.assertEqual(list(Path(self.media.name).rglob("*.pdf")), [])
 
@@ -167,7 +170,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         log = TrainingLog.objects.create(training_cycle=self.period, author=self.user,
                                          training_date=date(2026, 3, 2), topic="旧日志")
         future = timezone.localdate() + timedelta(days=1)
-        form = TrainingLogForm(self.data(training_date=future.isoformat()), instance=log, author=self.user)
+        form = TrainingLogForm(self.data(training_date=future.isoformat()), instance=log, author=self.user, backfill=True)
         self.assertFalse(form.is_valid())
         self.assertIn("训练日期不能晚于今天", str(form.errors["training_date"]))
         log.training_date = future
@@ -177,7 +180,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(log.training_date, date(2026, 3, 2))
 
     def create_log(self, user=None, **kwargs):
-        backfill = kwargs.pop("backfill", False)
+        backfill = kwargs.pop("backfill", True)
         form = TrainingLogForm(self.data(**kwargs), {"document": self.upload()}, author=user or self.user,
                                backfill=backfill)
         self.assertTrue(form.is_valid(), form.errors)
@@ -193,6 +196,9 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(form["training_cycle"].value(), self.period.pk)
         self.assertNotContains(response, '<select name="training_cycle"')
         self.assertContains(response, f'value="{today:%Y-%m-%d}"')
+        self.assertContains(response, "提交当天训练日志")
+        self.assertContains(response, "只能提交当天训练日志；历史日志请使用")
+        self.assertContains(response, f'href="{reverse("training:log_backfill")}">补交入口</a>')
         recent.status = "completed"
         recent.save()
         self.period.status = "completed"
@@ -201,7 +207,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
 
     def test_names_roles_original_extension_and_training_month(self):
         for user, label in [(self.user, "选手日志-夏国金"), (self.coach, "教练日志-肖威")]:
-            form = TrainingLogForm(self.data(), {"document": self.upload("original.PDF")}, author=user)
+            form = TrainingLogForm(self.data(), {"document": self.upload("original.PDF")}, author=user, backfill=True)
             self.assertTrue(form.is_valid(), form.errors)
             log = form.save()
             expected = f"网络系统管理项目2026年03月02日{label}.PDF"
@@ -211,12 +217,12 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
 
     def test_duplicate_author_day_and_same_name_different_author(self):
         self.create_log()
-        form = TrainingLogForm(self.data(), {"document": SimpleUploadedFile("different.txt", b"text")}, author=self.user)
+        form = TrainingLogForm(self.data(), {"document": SimpleUploadedFile("different.txt", b"text")}, author=self.user, backfill=True)
         self.assertFalse(form.is_valid())
         self.assertIn(DUPLICATE_LOG_MESSAGE, str(form.errors))
         other = User.objects.create_user("same_name", last_name="夏", first_name="国金")
         TrainingCycleMember.objects.create(training_cycle=self.period, user=other, role="competitor", is_current=True)
-        form = TrainingLogForm(self.data(), {"document": self.upload()}, author=other)
+        form = TrainingLogForm(self.data(), {"document": self.upload()}, author=other, backfill=True)
         self.assertFalse(form.is_valid())
         self.assertIn(DUPLICATE_LOG_MESSAGE, str(form.errors))
 
@@ -235,10 +241,10 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.assertFalse(TrainingLogForm(self.data(), author=outsider).is_valid())
         self.user.first_name = self.user.last_name = ""
         self.user.save()
-        form = TrainingLogForm(self.data(), {"document": self.upload()}, author=self.user)
+        form = TrainingLogForm(self.data(), {"document": self.upload()}, author=self.user, backfill=True)
         self.assertFalse(form.is_valid())
         self.assertIn("真实姓名", str(form.errors))
-        form = TrainingLogForm(self.data(), author=self.user)
+        form = TrainingLogForm(self.data(), author=self.user, backfill=True)
         self.assertFalse(form.is_valid())
         self.assertIn("document", form.errors)
         log = TrainingLog.objects.create(training_cycle=self.period, author=self.user,
@@ -270,7 +276,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
     def test_old_text_log_can_edit_without_upload(self):
         log = TrainingLog.objects.create(training_cycle=self.period, author=self.user,
                                          training_date=date(2026, 3, 2), topic="旧日志")
-        form = TrainingLogForm(self.data(summary="补充说明"), instance=log, author=self.user)
+        form = TrainingLogForm(self.data(summary="补充说明"), instance=log, author=self.user, backfill=True)
         self.assertTrue(form.is_valid(), form.errors)
         form.save()
         log.refresh_from_db()
@@ -351,7 +357,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(len(list(Path(self.media.name).rglob("*.pdf"))), 1)
 
     def test_failed_save_cleans_new_file_and_record(self):
-        form = TrainingLogForm(self.data(), {"document": self.upload()}, author=self.user)
+        form = TrainingLogForm(self.data(), {"document": self.upload()}, author=self.user, backfill=True)
         self.assertTrue(form.is_valid(), form.errors)
         original_save = TrainingLog.save
 
@@ -368,7 +374,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
     def test_text_log_can_add_file_and_historical_file_stays_untouched(self):
         log = TrainingLog.objects.create(training_cycle=self.period, author=self.user, training_date=date(2026, 3, 2),
                                          topic="文字日志")
-        form = TrainingLogForm(self.data(), {"document": self.upload()}, instance=log, author=self.user)
+        form = TrainingLogForm(self.data(), {"document": self.upload()}, instance=log, author=self.user, backfill=True)
         self.assertTrue(form.is_valid(), form.errors)
         form.save()
         legacy = TrainingLog.objects.create(training_cycle=self.period, author=self.coach, training_date=date(2026, 3, 2),
@@ -385,11 +391,11 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         log = TrainingLog(training_cycle=self.period, author=self.user, training_date=date(2026, 3, 2),
                           topic="并发重复", document=self.upload())
         with self.assertRaisesMessage(ValidationError, DUPLICATE_LOG_MESSAGE):
-            save_training_log(log, [])
+            save_training_log(log, [], backfill=True)
         self.assertEqual(len(list(Path(self.media.name).rglob("*.pdf"))), 1)
 
     def test_http_upload_duplicate_and_delete_return_to_list(self):
-        url = reverse("training:log_create")
+        url = reverse("training:log_backfill")
         response = self.client.post(url, self.data(document=self.upload()))
         log = TrainingLog.objects.get(author=self.user)
         self.assertRedirects(response, reverse("training:log_detail", args=[log.pk]))
@@ -401,14 +407,60 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(reverse("training:log_delete", args=[log.pk]), follow=True)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "新增训练日志")
+        self.assertContains(response, "提交当天训练日志")
 
     def test_orphaned_storage_collision_returns_form_error_without_new_record(self):
         filename = "logs/C1/2026/03/网络系统管理项目2026年03月02日选手日志-夏国金.pdf"
         storage = TrainingLog._meta.get_field("document").storage
         storage.save(filename, self.upload())
-        response = self.client.post(reverse("training:log_create"), self.data(document=self.upload()))
+        response = self.client.post(reverse("training:log_backfill"), self.data(document=self.upload()))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, DUPLICATE_LOG_MESSAGE)
         self.assertFalse(TrainingLog.objects.exists())
         self.assertTrue(storage.exists(filename))
+
+    def test_optional_content_and_backfill_submission_time(self):
+        log = self.create_log(topic="", summary="")
+        self.assertTrue(log.is_backfill)
+        submitted = log.created_at
+        cell = TrainingLogTable([log]).rows[0].get_cell("created_at")
+        self.assertIn("text-warning", cell)
+        self.assertIn("历史补交日志的提交时间", cell)
+        self.assertIn(timezone.localtime(submitted).strftime("%Y-%m-%d %H:%M"), cell)
+        form = TrainingLogForm(self.data(topic="", summary="更新"), instance=log, author=self.user)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        log.refresh_from_db()
+        self.assertTrue(log.is_backfill)
+        self.assertEqual(log.created_at, submitted)
+
+    def test_daily_submission_ignores_posted_date_and_backfill_flag(self):
+        form = TrainingLogForm(self.data(training_date="2026-03-02", topic="", summary="", is_backfill=True),
+                               {"document": self.upload()}, author=self.user)
+        self.assertTrue(form.is_valid(), form.errors)
+        log = form.save()
+        self.assertEqual(log.training_date, timezone.localdate())
+        self.assertFalse(log.is_backfill)
+        self.assertNotIn("text-warning", TrainingLogTable([log]).rows[0].get_cell("created_at"))
+
+    def test_cycle_edit_renders_iso_dates(self):
+        from .forms import TrainingCycleForm
+
+        self.period.end_date = date(2026, 12, 31)
+        self.period.save()
+        form = TrainingCycleForm(instance=self.period)
+        self.assertIn(f'value="{self.period.start_date:%Y-%m-%d}"', str(form["start_date"]))
+        self.assertIn('value="2026-12-31"', str(form["end_date"]))
+        self.grant(self.user, "change_trainingcycle")
+        response = self.client.get(reverse("training:cycle_edit", args=[self.period.pk]))
+        self.assertEqual(response.context["form"].instance.pk, self.period.pk)
+        self.assertContains(response, f'value="{self.period.start_date:%Y-%m-%d}"')
+        self.assertContains(response, 'value="2026-12-31"')
+
+    def test_daily_service_rejects_historical_date(self):
+        log = TrainingLog(training_cycle=self.period, author=self.user,
+                          training_date=timezone.localdate() - timedelta(days=1),
+                          topic="", document=self.upload())
+        with self.assertRaisesMessage(ValidationError, "训练日期必须为今天"):
+            save_training_log(log, [])
+        self.assertFalse(TrainingLog.objects.exists())

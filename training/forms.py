@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from datetime import timedelta
+
 from django import forms
 from django.utils import timezone
+from django.utils.html import format_html
 from django.contrib.auth import get_user_model
 from django.db import models, transaction
 from django.urls import reverse
@@ -71,8 +74,8 @@ class TrainingCycleForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.Mod
             "description",
         ]
         widgets = {
-            "start_date": forms.DateInput(attrs={"type": "date"}),
-            "end_date": forms.DateInput(attrs={"type": "date"}),
+            "start_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "end_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "description": forms.Textarea(attrs={"rows": 4}),
         }
 
@@ -509,8 +512,18 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
             self.fields["training_cycle"].disabled = True
             self.fields["training_cycle"].widget = forms.HiddenInput()
             self.current_cycle = self.instance.training_cycle
+        if not self.instance.pk and not self.backfill:
+            self.initial["training_date"] = timezone.localdate()
+            self.fields["training_date"].disabled = True
+            self.fields["training_date"].help_text = format_html(
+                '只能提交当天训练日志；历史日志请使用<a class="link link-primary" href="{}">补交入口</a>。',
+                reverse("training:log_backfill"),
+            )
+        elif not self.instance.pk:
+            self.initial["training_date"] = timezone.localdate() - timedelta(days=1)
         self.fields["document"].widget.attrs.update(TRAINING_LOG_UPLOAD_SPEC.widget_attrs())
-        self.fields["training_date"].widget.attrs["max"] = timezone.localdate().isoformat()
+        latest_date = timezone.localdate() - timedelta(days=1) if self.backfill and not self.instance.pk else timezone.localdate()
+        self.fields["training_date"].widget.attrs["max"] = latest_date.isoformat()
         self.fields["document"].help_text = TRAINING_LOG_UPLOAD_SPEC.help_text("上传日志文件")
         self.fields["document"].required = not self.instance.pk
         if self.instance.pk and self.instance.document:

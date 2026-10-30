@@ -1,0 +1,15 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="card bg-base-100 shadow-sm"><div class="card-body">
+  <h2 class="card-title">确认添加周期成员</h2>
+  <p>向“{{ cycle.name }}”添加 {{ rows|length }} 位成员，周期身份：{{ role_label }}。</p>
+  <div class="overflow-x-auto"><table class="table">
+    <thead><tr><th>姓名</th><th>账号</th><th>原当前周期</th><th>保存后当前周期</th></tr></thead>
+    <tbody>{% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ row.username }}</td><td>{{ row.before }}</td><td>{{ row.after }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <form method="post">
+    {% csrf_token %}<input type="hidden" name="stage" value="confirm"><input type="hidden" name="token" value="{{ token }}">
+    <div class="flex gap-3"><button class="btn btn-primary" type="submit">确认添加</button><a class="btn btn-ghost" href="{{ return_url }}">取消</a></div>
+  </form>
+</div></div>
+{% endblock %}

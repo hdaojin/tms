@@ -42,8 +42,12 @@ def validate_new_log(log, *, backfill=False):
     if backfill:
         if cycle.status not in {cycle.Status.ACTIVE, cycle.Status.COMPLETED}:
             raise ValidationError("历史补交仅支持进行中或已完成的训练周期。")
+        if log.training_date >= timezone.localdate():
+            raise ValidationError({"training_date": "补交历史训练日志的日期必须早于今天。"})
     elif not member.is_current or cycle.status != cycle.Status.ACTIVE:
         raise ValidationError("未设置有效的当前周期，请联系管理员。")
+    elif log.training_date != timezone.localdate():
+        raise ValidationError({"training_date": "日常新增训练日志的训练日期必须为今天。"})
     if log.training_date < cycle.start_date or (cycle.end_date and log.training_date > cycle.end_date):
         raise ValidationError("训练日期必须位于训练周期日期范围内。")
 
@@ -61,6 +65,7 @@ def save_training_log(log, executions, *, backfill=False):
             if not log.pk:
                 get_user_model().objects.select_for_update().get(pk=log.author_id)
                 validate_new_log(log, backfill=backfill)
+                log.is_backfill = backfill
             if log.pk:
                 previous = TrainingLog.objects.select_for_update().get(pk=log.pk)
                 if previous.training_cycle_id != log.training_cycle_id:

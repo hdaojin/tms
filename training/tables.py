@@ -3,9 +3,10 @@ from pathlib import Path
 import django_tables2 as tables
 from django.urls import reverse
 from django.utils.html import format_html
+from django.utils import timezone
 
 from accounts.services.users import get_user_display_name
-from core.tables import ActionsColumn, BaseDateColumn, BaseTable
+from core.tables import ActionsColumn, BaseDateColumn, BaseDateTimeColumn, BaseTable
 
 from .models import TaskExecution, TrainingCycle, TrainingLog, TrainingPlan, TrainingTask
 
@@ -51,11 +52,19 @@ class TaskExecutionTable(BaseTable):
 
 class TrainingLogTable(BaseTable):
     training_date = BaseDateColumn()
-    topic = tables.TemplateColumn(
-        template_name="training/_log_content_cell.html", verbose_name="训练内容", order_by="topic"
-    )
+    created_at = BaseDateTimeColumn(verbose_name="提交时间", format="Y-m-d H:i")
+
     document = tables.Column(verbose_name="日志附件", empty_values=(), orderable=False)
     actions = ActionsColumn("training:log_detail", "training:log_edit", edit_perm="training.change_traininglog", edit_allowed_attr="can_edit")
+
+    def render_created_at(self, value, record):
+        displayed = timezone.localtime(value).strftime("%Y-%m-%d %H:%M")
+        if record.is_backfill:
+            return format_html(
+                '<span class="text-warning" title="历史补交日志的提交时间" aria-label="历史补交日志，提交时间{}">{}</span>',
+                displayed, displayed,
+            )
+        return displayed
 
     def render_author(self, value):
         return get_user_display_name(value)
@@ -71,4 +80,4 @@ class TrainingLogTable(BaseTable):
 
     class Meta(BaseTable.Meta):
         model = TrainingLog
-        fields = ["training_date", "training_cycle", "author", "topic", "document", "actions"]
+        fields = ["training_date", "training_cycle", "author", "created_at", "document", "actions"]

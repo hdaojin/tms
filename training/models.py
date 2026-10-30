@@ -656,7 +656,8 @@ class TrainingLog(TimestampedModel):
         settings.AUTH_USER_MODEL, verbose_name="作者", on_delete=models.PROTECT, related_name="training_logs"
     )
     training_date = models.DateField("训练日期", default=timezone.localdate)
-    topic = models.CharField("训练主题", max_length=150)
+    topic = models.CharField("训练主题", max_length=150, blank=True)
+    is_backfill = models.BooleanField("历史补交", default=False, editable=False)
     summary = models.TextField("训练摘要", blank=True)
     document = models.FileField(
         "日志文件",

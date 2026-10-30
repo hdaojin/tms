@@ -79,7 +79,14 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(self.client.post(url, {}).status_code, 403)
         self.grant("add_trainingcyclemember")
         new_user = User.objects.create_user("new")
-        response = self.client.post(url, {"users": [new_user.pk], "role": "coach", "is_current": "on"})
+        url += "?mode=add"
+        parameters = self.client.post(url, {"users": [new_user.pk], "operation": "add", "selection": "selected"})
+        self.assertEqual(parameters.status_code, 200)
+        self.assertFalse(TrainingCycleMember.objects.filter(user=new_user).exists())
+        preview = self.client.post(url, {"stage": "parameters", "token": parameters.context["token"],
+                                         "role": "coach", "is_current": "on"})
+        self.assertFalse(TrainingCycleMember.objects.filter(user=new_user).exists())
+        response = self.client.post(url, {"stage": "confirm", "token": preview.context["token"]})
         self.assertEqual(response.status_code, 302)
         self.assertFalse(TrainingCycleMember.objects.get(user=new_user).is_current)
         edit = reverse("training:member_edit", args=[self.cycle2.pk, self.other.pk])
@@ -101,10 +108,15 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
                 raise ValidationError("第二项失败")
             return original(member, *args, **kwargs)
 
+        url += "?mode=add"
+        parameters = self.client.post(url, {"users": [user.pk for user in users],
+                                             "operation": "add", "selection": "selected"})
+        preview = self.client.post(url, {"stage": "parameters", "token": parameters.context["token"],
+                                         "role": "coach", "is_current": "on"})
         with patch.object(TrainingCycleMember, "save", fail_second):
             self.assertContains(self.client.post(url, {
-                "users": [user.pk for user in users], "role": "coach", "is_current": "on",
-            }), "第二项失败")
+                "stage": "confirm", "token": preview.context["token"],
+            }, follow=True), "第二项失败")
         self.assertFalse(TrainingCycleMember.objects.filter(user__in=users).exists())
 
     def test_task_and_log_protect_members(self):
@@ -158,7 +170,8 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(TrainingCycleMember.objects.get(user=new_user).is_current)
 
-    def test_service_rechecks_status_after_form_validation(self):
+    @patch("django.utils.timezone.localdate", return_value=date(2026, 1, 2))
+    def test_service_rechecks_status_after_form_validation(self, mock_today):
         form = TrainingLogForm(self.data(), {"document": SimpleUploadedFile("log.txt", b"training")},
                                author=self.user)
         self.assertTrue(form.is_valid(), form.errors)
@@ -173,14 +186,15 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertFalse(TrainingCycleMember.objects.filter(user=self.user, is_current=True).exists())
 
-    def test_daily_ignores_forged_cycle_and_service_rechecks(self):
+    @patch("django.utils.timezone.localdate", return_value=date(2026, 1, 2))
+    def test_daily_ignores_forged_cycle_and_service_rechecks(self, mock_today):
         form = TrainingLogForm(self.data(training_cycle=self.cycle2.pk),
                                {"document": SimpleUploadedFile("log.txt", b"training")}, author=self.user)
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.save().training_cycle_id, self.cycle1.pk)
         self.other.is_current = True
         save_cycle_member(self.other)
-        log = TrainingLog(training_cycle=self.cycle1, author=self.user, training_date=date(2026, 1, 3), topic="伪造")
+        log = TrainingLog(training_cycle=self.cycle1, author=self.user, training_date=date(2026, 1, 1), topic="伪造")
         log.document = SimpleUploadedFile("log.txt", b"training")
         with self.assertRaisesMessage(ValidationError, "当前周期"):
             save_training_log(log, [])

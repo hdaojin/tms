@@ -1,0 +1,17 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="card bg-base-100 shadow-sm"><div class="card-body">
+  <h2 class="card-title">{{ cycle.name }} · 批量添加成员</h2>
+  <p>已固定 {{ users|length }} 位用户。填写周期身份后预览变更。</p>
+  <ul class="list-disc pl-4">{% for person in users %}<li>{{ person.display_name }}（{{ person.username }}）</li>{% endfor %}</ul>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="stage" value="parameters">
+    <input type="hidden" name="token" value="{{ token }}">
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    {{ form.non_field_errors }}
+    {% for field in form.visible_fields %}{% include "components/field.html" with field=field %}{% endfor %}
+    <div class="flex gap-3 mt-4"><button class="btn btn-primary" type="submit">预览变更</button><a class="btn btn-ghost" href="{{ return_url }}">取消</a></div>
+  </form>
+</div></div>
+{% endblock %}
