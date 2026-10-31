@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 
 {% block content %}
   <div class="space-y-4">
@@ -69,7 +69,7 @@
             <p>
               折算分值
               {{ assessment_history.weighted_mark }}{% if assessment_history.latest_date %}
-                · 最近 {{ assessment_history.latest_date }}
+                · 最近 {{ assessment_history.latest_date|keep_date_parts }}
               {% endif %}
             </p>
           {% else %}
@@ -138,7 +138,7 @@
               {% for item in assessment_performance.trend %}
                 <tr>
                   <td>
-                    {{ item.aspect__scheme__assessment_module__assessment__start_date }}
+                    {{ item.aspect__scheme__assessment_module__assessment__start_date|keep_date_parts }}
                   </td>
                   <td>{% if can_open_assessment %}<a class="link" href="{% url 'assessments:assessment_detail' item.aspect__scheme__assessment_module__assessment_id %}?tab=analysis">{{ item.aspect__scheme__assessment_module__assessment__name }}</a>{% else %}{{ item.aspect__scheme__assessment_module__assessment__name }}{% endif %}</td>
                   <td>{{ item.participant__display_name }}</td>

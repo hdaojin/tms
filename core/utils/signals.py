@@ -75,12 +75,20 @@ def register_file_cleanup_signals(
             # 检查文件是否被替换（文件名不同或新文件为空）
             if (not new_file) or (old_file.name != getattr(new_file, 'name', None)):
                 storage = old_file.storage
-                try:
-                    if storage.exists(old_file.name):
-                        storage.delete(old_file.name)
-                        logger.debug(f"已删除旧文件: {old_file.name}")
-                except Exception as e:
-                    logger.exception(f"删除旧文件失败 {old_file.name}: {e}")
+                name = old_file.name
+
+                def delete_old_file():
+                    try:
+                        if storage.exists(name):
+                            storage.delete(name)
+                            logger.debug(f"已删除旧文件: {name}")
+                    except Exception as e:
+                        logger.exception(f"删除旧文件失败 {name}: {e}")
+
+                if delete_on_commit:
+                    transaction.on_commit(delete_old_file, using=kwargs.get("using"))
+                else:
+                    delete_old_file()
     
     # 使用 dispatch_uid 避免重复注册
     uid_prefix = f"{model._meta.app_label}_{model._meta.model_name}"

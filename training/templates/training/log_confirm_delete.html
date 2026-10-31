@@ -1,10 +1,10 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 {% block content %}
   <form method="post" class="card border border-base-300">
     {% csrf_token %}
     <div class="card-body">
       <h2 class="card-title">确认删除训练日志</h2>
-      <p>{{ object.training_date }} · {{ object.author.display_name }} · {{ object.training_cycle.name }}</p>
+      <p>{{ object.training_date|keep_date_parts }} · {{ object.author.display_name }} · {{ object.training_cycle.name }}</p>
       <p>将删除整条日志、关联任务的日志关联及日志文件。任务执行本身不会删除，此操作无法撤销。</p>
       <div class="card-actions">
         <a href="{{ cancel_url }}" class="btn btn-ghost">取消</a>

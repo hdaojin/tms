@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 
 {% block content %}
 <div class="space-y-4">
@@ -17,7 +17,7 @@
         <thead><tr><th>词条</th><th>词库</th><th>总计</th><th>正确 / 错误 / 正确率</th><th>英译中（对 / 错 / 正确率）</th><th>中译英（对 / 错 / 正确率）</th><th>最近学习</th></tr></thead>
         <tbody>
           {% for row in entry_rows %}
-            <tr><td class="text-left"><div class="font-medium">{{ row.entry__english_term }}</div><div class="text-xs text-base-content/60">{{ row.entry__chinese_translation }}</div></td><td>{{ row.entry__glossary__skill_project__code }} / {{ row.entry__glossary__name }}</td><td>{{ row.total }}</td><td><span class="text-success">{{ row.correct }}</span> / <span class="text-error">{{ row.wrong }}</span> / {{ row.accuracy }}%</td><td>{{ row.en_to_zh_correct }} / {{ row.en_to_zh_wrong }} / {{ row.en_to_zh_accuracy }}%</td><td>{{ row.zh_to_en_correct }} / {{ row.zh_to_en_wrong }} / {{ row.zh_to_en_accuracy }}%</td><td>{{ row.last_studied|date:'Y-m-d H:i' }}</td></tr>
+            <tr><td class="text-left"><div class="font-medium">{{ row.entry__english_term }}</div><div class="text-xs text-base-content/60">{{ row.entry__chinese_translation }}</div></td><td>{{ row.entry__glossary__skill_project__code }} / {{ row.entry__glossary__name }}</td><td>{{ row.total }}</td><td><span class="text-success">{{ row.correct }}</span> / <span class="text-error">{{ row.wrong }}</span> / {{ row.accuracy }}%</td><td>{{ row.en_to_zh_correct }} / {{ row.en_to_zh_wrong }} / {{ row.en_to_zh_accuracy }}%</td><td>{{ row.zh_to_en_correct }} / {{ row.zh_to_en_wrong }} / {{ row.zh_to_en_accuracy }}%</td><td>{{ row.last_studied|date:'Y-m-d H:i'|keep_date_parts }}</td></tr>
           {% empty %}<tr><td colspan="7" class="py-8 text-center text-base-content/60">当前筛选范围内暂无作答记录。</td></tr>{% endfor %}
         </tbody>
       </table>

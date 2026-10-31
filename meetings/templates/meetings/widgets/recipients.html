@@ -1,0 +1,23 @@
+<div data-recipient-picker data-search-url="{{ widget.search_url }}" data-meeting-id="{{ widget.meeting_id }}"
+     data-field-name="{{ widget.name }}" class="min-w-0 space-y-3">
+  <p class="text-xs text-base-content/70">仅可搜索已启用且具备会议查看权限的账号。</p>
+  <div data-recipient-selected class="flex flex-wrap gap-2" aria-label="已选人员">
+    {% for person in widget.selected %}
+      <span data-recipient-id="{{ person.id }}" data-recipient-label="{{ person.label }}" data-unavailable="{{ person.unavailable|yesno:'true,false' }}" class="badge badge-outline h-auto max-w-full gap-2 py-2">
+        <input type="hidden" name="{{ widget.name }}" value="{{ person.id }}">
+        <span class="min-w-0 break-all whitespace-normal">{{ person.label }}{% if person.unavailable %}（当前不可阅读）{% endif %}</span>
+        <button type="button" class="shrink-0" data-recipient-remove aria-label="移除 {{ person.label }}">×</button>
+      </span>
+    {% endfor %}
+  </div>
+  <label class="flex flex-wrap items-center gap-2">
+    <span>搜索人员</span>
+    <input type="search" id="{{ widget.attrs.id }}" class="input w-full sm:w-80" data-recipient-query
+           placeholder="输入姓名或账号，不输入时不显示候选" autocomplete="off"
+           aria-invalid="{{ widget.aria_invalid }}" aria-describedby="{{ widget.aria_describedby }}">
+  </label>
+  <p id="{{ widget.attrs.id }}_status" data-recipient-status class="text-sm text-base-content/70" role="status" aria-live="polite"></p>
+  <div data-recipient-results class="flex flex-wrap gap-2" aria-label="人员搜索结果"></div>
+  <button type="button" class="btn btn-outline btn-sm" data-recipient-more hidden>加载更多</button>
+  <noscript><p class="text-warning">搜索及添加指定人员需要启用 JavaScript；仍可使用角色选择，已有人员会保留。</p></noscript>
+</div>

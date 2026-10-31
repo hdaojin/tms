@@ -19,6 +19,9 @@ class BaseDateColumn(tables.DateColumn):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("format", "Y-m-d")
         super().__init__(*args, **kwargs)
+        self.template_code = '{% load date_display %}' + self.template_code.replace(
+            '|default:default', '|keep_date_parts|default:default'
+        )
 
 
 class BaseDateTimeColumn(tables.DateTimeColumn):
@@ -27,6 +30,9 @@ class BaseDateTimeColumn(tables.DateTimeColumn):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("format", "Y-m-d H:i:s")
         super().__init__(*args, **kwargs)
+        self.template_code = '{% load date_display %}' + self.template_code.replace(
+            '|default:default', '|keep_date_parts|default:default'
+        )
 
 
 class BaseTable(tables.Table):

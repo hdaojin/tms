@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 {% load feedback_tags form_extras %}
 {% block content %}
 <div class="space-y-5">
@@ -19,7 +19,7 @@
           <h1 class="text-2xl font-bold break-words">{{ feedback.title }}</h1>
           <div class="mt-2 text-sm text-base-content/60">
             {% feedback_author feedback as author_label %}
-            <span>{{ author_label }}</span> · {{ feedback.created_at|date:"Y-m-d H:i" }}
+            <span>{{ author_label }}</span> · {{ feedback.created_at|date:"Y-m-d H:i"|keep_date_parts }}
           </div>
         </div>
         {% if can_manage %}
@@ -65,7 +65,7 @@
         <div class="whitespace-pre-wrap break-words">{{ feedback.resolution }}</div>
         {% if feedback.resolved_by %}
           {% user_display feedback.resolved_by as resolved_label %}
-          <div class="text-sm text-base-content/60">处理人：{{ resolved_label }} · {{ feedback.resolved_at|date:"Y-m-d H:i" }}</div>
+          <div class="text-sm text-base-content/60">处理人：{{ resolved_label }} · {{ feedback.resolved_at|date:"Y-m-d H:i"|keep_date_parts }}</div>
         {% endif %}
       {% else %}
         <p class="text-sm text-base-content/60">工作人员尚未填写处理结果。</p>

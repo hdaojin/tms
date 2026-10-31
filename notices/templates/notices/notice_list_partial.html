@@ -1,3 +1,4 @@
+{% load date_display %}
 {% for notice in notices %}
   <div class="card card-border bg-base-100 mb-4 shadow-sm {% if forloop.first and not request.GET.page or forloop.first and request.GET.page == '1' %}shadow-info{% endif %}">
     <div class="card-body">
@@ -18,7 +19,7 @@
 
             <div class="flex items-center gap-1">
               <span class="icon-[tabler--calendar] size-4"></span>
-              {{ notice.published_at|date:'Y年m月d日 H:i:s' }}
+              {{ notice.published_at|date:'Y年m月d日 H:i:s'|keep_date_parts }}
             </div>
 
             <div class="flex items-center">

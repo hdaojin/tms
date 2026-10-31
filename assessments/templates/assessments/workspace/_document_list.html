@@ -1,3 +1,4 @@
+{% load date_display %}
 {% load form_extras %}
 
 <div class="overflow-hidden rounded-box border border-base-300">
@@ -41,7 +42,7 @@
             <div class="min-w-0">
               <dt class="text-xs text-base-content/60 lg:hidden">版本</dt>
               <dd class="break-words">{{ document.version|default:"—" }}</dd>
-              {% if document.document_date %}<dd>资料日期：{{ document.document_date|date:"Y.m.d" }}</dd>{% endif %}
+              {% if document.document_date %}<dd>资料日期：{{ document.document_date|date:"Y.m.d"|keep_date_parts }}</dd>{% endif %}
             </div>
             <div class="min-w-0">
               <dt class="text-xs text-base-content/60 lg:hidden">文件大小</dt>
@@ -61,7 +62,7 @@
             </div>
             <div class="min-w-0">
               <dt class="text-xs text-base-content/60 lg:hidden">上传时间</dt>
-              <dd class="whitespace-nowrap">{{ document.created_at|date:"Y-m-d H:i" }}</dd>
+              <dd>{{ document.created_at|date:"Y-m-d H:i"|keep_date_parts }}</dd>
             </div>
           </dl>
 

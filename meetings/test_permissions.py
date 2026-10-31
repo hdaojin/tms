@@ -150,6 +150,7 @@ class MeetingViewPermissionTests(TestCase):
             reverse("meetings:meeting_upload"),
             data={
                 "title": "晨会",
+                "is_public": "on",
                 "date": date(2026, 1, 4).isoformat(),
                 "file": SimpleUploadedFile(
                     "morning.pdf",

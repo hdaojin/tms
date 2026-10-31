@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
@@ -32,7 +32,7 @@
 
         <div class="flex items-center gap-1">
           <span class="icon-[tabler--calendar] size-4"></span>
-          发布时间：{{ notice.published_at|date:'Y年m月d日 H:i:s' }}
+          发布时间：{{ notice.published_at|date:'Y年m月d日 H:i:s'|keep_date_parts }}
         </div>
       </div>
     </div>

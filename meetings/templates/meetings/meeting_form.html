@@ -1,0 +1,31 @@
+{% extends "common/form.html" %}
+
+{% block form_content %}
+  {% if object %}<p class="font-medium">{{ object.title }}</p>{% endif %}
+  <form action="{{ request.get_full_path }}" method="post" {% if form.is_multipart %}enctype="multipart/form-data"{% endif %}
+        class="space-y-6" data-meeting-audience-form>
+    {% csrf_token %}
+    {% include "components/form_errors.html" with form=form %}
+    {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+    {% for field in form.visible_fields %}
+      {% if field.name != 'visible_groups' and field.name != 'visible_users' %}
+        {% include "components/field.html" with field=field %}
+      {% endif %}
+    {% endfor %}
+    <p class="text-sm text-base-content/70">可见人员仍须具备会议查看权限。上传者具备查看权限时及超级管理员始终可见。</p>
+    <div class="space-y-4" data-audience-limited {% if form.is_public.value %}hidden{% endif %}>
+      {% include "components/field.html" with field=form.visible_groups wrapper_class="min-w-0" %}
+      {% include "components/field.html" with field=form.visible_users wrapper_class="min-w-0 grid-cols-1" %}
+    </div>
+    <div class="flex flex-wrap justify-end gap-3">
+      {% if cancel_url %}<a class="btn btn-ghost" href="{{ cancel_url }}">取消</a>{% endif %}
+      <button type="reset" class="btn btn-ghost">重置</button>
+      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+    </div>
+  </form>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  {{ form.media }}
+{% endblock %}

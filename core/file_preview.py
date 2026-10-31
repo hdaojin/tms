@@ -26,6 +26,7 @@ class FilePreviewKind(StrEnum):
 class FilePreviewMetadata:
     label: str
     value: str
+    is_date: bool = False
 
 
 @dataclass(frozen=True)

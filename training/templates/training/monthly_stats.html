@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 {% block content %}
 <div class="card bg-base-100 shadow-sm"><div class="card-body">
   <form method="get" class="grid grid-cols-2 gap-2">
@@ -12,12 +12,12 @@
   <p>按训练日期统计，补交后更新对应日期；不计算应交率或判断迟交。仅展示您有权查看的人员范围。</p>
   {% if selected_cycle %}
     <h2 class="card-title">{{ selected_cycle.name }} · 提交统计</h2>
-    {% if range_start %}<p>{{ range_start|date:"Y-m-d" }} 至 {{ range_end|date:"Y-m-d" }}</p>{% endif %}
+    {% if range_start %}<p>{{ range_start|date:"Y-m-d"|keep_date_parts }} 至 {{ range_end|date:"Y-m-d"|keep_date_parts }}</p>{% endif %}
     <h3 class="font-semibold">每日提交名单</h3>
     <div class="overflow-x-auto"><table class="table table-sm">
       <thead><tr><th>训练日期</th><th>已提交人员</th><th>未提交人员</th></tr></thead>
       <tbody>{% for row in rows %}<tr>
-        <td>{{ row.date|date:"Y-m-d" }}</td>
+        <td>{{ row.date|date:"Y-m-d"|keep_date_parts }}</td>
         <td>{% for person in row.submitted %}{% if can_view_log %}<a class="link" href="{% url 'training:log_detail' person.log_id %}">{{ person.name }}</a>{% else %}{{ person.name }}{% endif %}{% if not forloop.last %}、{% endif %}{% empty %}无{% endfor %}</td>
         <td>{% for name in row.unsubmitted %}{{ name }}{% if not forloop.last %}、{% endif %}{% empty %}无{% endfor %}</td>
       </tr>{% empty %}<tr><td colspan="3">所选月份与周期截至今天的日期范围没有交集。</td></tr>{% endfor %}</tbody>

@@ -820,7 +820,7 @@ class AssessmentDocumentDetailView(TitleMixin, AssessmentDocumentAccessMixin, De
             FilePreviewMetadata("所属模块", document.module.name if document.module_id else "公共资料"),
         ]
         if document.document_date:
-            metadata.append(FilePreviewMetadata("资料日期", document.document_date.strftime("%Y.%m.%d")))
+            metadata.append(FilePreviewMetadata("资料日期", document.document_date.strftime("%Y.%m.%d"), is_date=True))
         if document.version:
             metadata.insert(1, FilePreviewMetadata("版本", document.version))
 

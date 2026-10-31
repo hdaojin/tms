@@ -1,10 +1,11 @@
+{% load date_display %}
 <section class="space-y-4">
   <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
     <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">状态</div><div class="stat-value text-xl">{{ assessment.get_status_display }}</div></div>
-    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">日期</div><div class="stat-value text-xl">{{ assessment.start_date }}</div><div class="stat-desc">至 {{ assessment.end_date|default:"未设置" }}</div></div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">日期</div><div class="stat-value text-xl">{{ assessment.start_date|keep_date_parts }}</div><div class="stat-desc">至 {{ assessment.end_date|default:"未设置"|keep_date_parts }}</div></div>
     <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">可见模块</div><div class="stat-value text-xl">{{ workspace_modules|length }}</div></div>
     <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">选手</div><div class="stat-value text-xl">{{ competitor_count }}</div><div class="stat-desc">共 {{ workspace_participants|length }} 名参与人员</div></div>
-    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">最终成绩</div><div class="stat-value text-xl">{% if assessment.results_published_at %}已发布{% else %}未发布{% endif %}</div>{% if assessment.results_published_at %}<div class="stat-desc">{{ assessment.results_published_at }}</div>{% endif %}</div>
+    <div class="stat rounded-box border border-base-300 bg-base-100"><div class="stat-title">最终成绩</div><div class="stat-value text-xl">{% if assessment.results_published_at %}已发布{% else %}未发布{% endif %}</div>{% if assessment.results_published_at %}<div class="stat-desc">{{ assessment.results_published_at|keep_date_parts }}</div>{% endif %}</div>
   </div>
 
   {% if available_lifecycle_actions %}
@@ -31,8 +32,8 @@
           <div><dt class="text-base-content/60">级别</dt><dd>{{ assessment.level|default:"-" }}</dd></div>
           <div><dt class="text-base-content/60">地点</dt><dd class="break-words">{{ assessment.location|default:"-" }}</dd></div>
           <div><dt class="text-base-content/60">创建人</dt><dd>{{ assessment.created_by|default:"-" }}</dd></div>
-          <div><dt class="text-base-content/60">实际启动</dt><dd>{{ assessment.started_at|default:"-" }}</dd></div>
-          <div><dt class="text-base-content/60">实际完成</dt><dd>{{ assessment.completed_at|default:"-" }}</dd></div>
+          <div><dt class="text-base-content/60">实际启动</dt><dd>{{ assessment.started_at|default:"-"|keep_date_parts }}</dd></div>
+          <div><dt class="text-base-content/60">实际完成</dt><dd>{{ assessment.completed_at|default:"-"|keep_date_parts }}</dd></div>
         </dl>
       </div>
     </div>

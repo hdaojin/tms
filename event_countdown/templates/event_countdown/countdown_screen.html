@@ -1,4 +1,4 @@
-{% extends "layouts/base.html" %}
+{% extends "layouts/base.html" %}{% load date_display %}
 {% load static %}
 
 {% block body_class %}countdown-body min-h-dvh overflow-hidden bg-slate-950 text-slate-100{% endblock %}
@@ -59,7 +59,7 @@
           </div>
           <div class="hud-panel-solid mono-font inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-slate-100">
             <span class="icon-[tabler--clock-hour-4] size-5 text-cyan-300" aria-hidden="true"></span>
-            <time datetime="{{ server_now|date:'c' }}" data-countdown-current-time>{{ server_now|date:"Y-m-d H:i:s" }}</time>
+            <time datetime="{{ server_now|date:'c' }}" data-countdown-current-time>{{ server_now|date:"Y-m-d H:i:s"|keep_date_parts }}</time>
           </div>
         </div>
       </header>

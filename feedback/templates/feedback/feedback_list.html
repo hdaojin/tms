@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 {% load feedback_tags %}
 
 {% partialdef results %}
@@ -23,7 +23,7 @@
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-base-content/60">
             {% feedback_author feedback as author_label %}
             <span>{{ author_label }}</span>
-            <span>{{ feedback.updated_at|date:"Y-m-d H:i" }}</span>
+            <span>{{ feedback.updated_at|date:"Y-m-d H:i"|keep_date_parts }}</span>
             <span><span class="icon-[tabler--messages] size-4 align-middle" aria-hidden="true"></span> {{ feedback.reply_count|default:0 }}</span>
             {% if feedback.attachment_count %}<span><span class="icon-[tabler--paperclip] size-4 align-middle" aria-hidden="true"></span> {{ feedback.attachment_count }}</span>{% endif %}
           </div>

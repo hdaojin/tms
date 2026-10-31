@@ -25,6 +25,13 @@ def meeting_file_validator(file):
 
 
 class Meeting(UploadedDocumentModel):
+    is_public = models.BooleanField("所有人", default=True, help_text="所有具备会议查看权限的有效登录用户可见。")
+    visible_groups = models.ManyToManyField(
+        "auth.Group", blank=True, related_name="visible_meetings", verbose_name="可见角色"
+    )
+    visible_users = models.ManyToManyField(
+        "auth.User", blank=True, related_name="visible_meetings", verbose_name="指定人员"
+    )
     title = models.CharField(max_length=200, verbose_name="会议名称")
     date = models.DateField(
         verbose_name="会议日期",
@@ -63,5 +70,5 @@ class Meeting(UploadedDocumentModel):
 
 
 # 注册文件清理信号
-register_file_cleanup_signals(Meeting, file_field="file")
+register_file_cleanup_signals(Meeting, file_field="file", delete_on_commit=True)
     

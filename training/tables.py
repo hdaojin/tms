@@ -10,6 +10,7 @@ from django.utils.safestring import mark_safe
 
 from accounts.services.users import get_user_display_name
 from core.tables import ActionsColumn, BaseDateColumn, BaseDateTimeColumn, BaseTable
+from core.templatetags.date_display import keep_date_parts
 
 from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
 from .log_management import can_manage_log_deletions
@@ -113,9 +114,9 @@ class TrainingLogTable(BaseTable):
         if record.is_backfill:
             return format_html(
                 '<span class="text-warning" title="历史补交日志的提交时间" aria-label="历史补交日志，提交时间{}">{}</span>',
-                displayed, displayed,
+                displayed, keep_date_parts(displayed),
             )
-        return displayed
+        return keep_date_parts(displayed)
 
     def render_author(self, value):
         return get_user_display_name(value)

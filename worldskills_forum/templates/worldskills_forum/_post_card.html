@@ -1,3 +1,4 @@
+{% load date_display %}
 <article class="card border border-base-300 bg-base-100 shadow-sm" id="post-{{ post.pk }}">
   <div class="card-body gap-4">
     <div class="flex flex-wrap items-center gap-2">
@@ -21,7 +22,7 @@
     {% endif %}
     <details class="rounded-lg bg-base-200 p-3"><summary class="cursor-pointer font-medium">查看英文原文</summary><div class="mt-3 whitespace-pre-wrap break-words">{{ post.original_content|urlize }}</div><a class="link link-primary mt-3 inline-block" href="{{ post.source_url|default:post.topic.source_url }}" target="_blank" rel="noopener noreferrer">查看论坛原帖 →</a></details>
     <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-base-content/65">
-      <span>{{ post.author_name }} · 论坛发布 {{ post.posted_at|date:'Y-m-d H:i' }} · 归档发布 {{ post.translation.published_at|date:'Y-m-d H:i' }}</span>
+      <span>{{ post.author_name }} · 论坛发布 {{ post.posted_at|date:'Y-m-d H:i'|keep_date_parts }} · 归档发布 {{ post.translation.published_at|date:'Y-m-d H:i'|keep_date_parts }}</span>
       {% if show_actions %}<span class="flex gap-2">{% if post.can_edit %}<a class="btn btn-ghost btn-xs" href="{% url 'worldskills_forum:post_edit' post.pk %}">编辑</a>{% if perms.worldskills_forum.change_forumpostattachment %}<a class="btn btn-ghost btn-xs" href="{% url 'worldskills_forum:attachment_manage' post.pk %}">管理附件</a>{% endif %}{% endif %}{% if perms.worldskills_forum.delete_forumpost %}{% if post.created_by_id == request.user.pk or perms.worldskills_forum.change_all_forum_content %}<a class="btn btn-error btn-outline btn-xs" href="{% url 'worldskills_forum:post_delete' post.pk %}">删除</a>{% endif %}{% endif %}</span>{% endif %}
     </div>
   </div>

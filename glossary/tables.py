@@ -10,6 +10,7 @@ class GlossaryBrowseTable(BaseTable):
 
 
 class ProfessionalGlossaryTable(BaseTable):
+    updated_at = BaseDateTimeColumn(format="SHORT_DATETIME_FORMAT")
     actions = ActionsColumn(view_url="glossary:manage_entry_list", view_perm="glossary.view_glossaryentry", edit_url="glossary:glossary_edit", edit_perm="glossary.change_professionalglossary")
 
     class Meta(BaseTable.Meta):
@@ -18,6 +19,7 @@ class ProfessionalGlossaryTable(BaseTable):
 
 
 class GlossaryEntryTable(BaseTable):
+    updated_at = BaseDateTimeColumn(format="SHORT_DATETIME_FORMAT")
     actions = ActionsColumn(edit_url="glossary:entry_edit", edit_perm="glossary.change_glossaryentry")
 
     class Meta(BaseTable.Meta):

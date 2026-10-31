@@ -77,7 +77,18 @@
 
     function tick() {
       const now = new Date(Date.now() + clockOffset);
-      setText(nodes.currentTime, formatTime(now));
+      if (nodes.currentTime) {
+        const value = formatTime(now);
+        const parts = value.split(" ");
+        const fragments = parts.map((part) => {
+          const span = document.createElement("span");
+          span.className = "date-part";
+          span.textContent = part;
+          return span;
+        });
+        nodes.currentTime.replaceChildren(fragments[0], " ", fragments[1]);
+        nodes.currentTime.setAttribute("aria-label", value);
+      }
 
       if (!target || Number.isNaN(target.getTime())) {
         setFinishedState(stage, true);

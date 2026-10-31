@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 
 {% block content %}
 <div class="grid gap-4 xl:grid-cols-3">
@@ -118,7 +118,7 @@
         <div class="space-y-1 text-sm text-base-content/70">
           <p>{{ scheme_import.source_document.filename }}</p>
           <p>导入人：{{ scheme_import.imported_by|default:"-" }}</p>
-          <p>导入时间：{{ scheme_import.imported_at }}</p>
+          <p>导入时间：{{ scheme_import.imported_at|keep_date_parts }}</p>
         </div>
       </div>
     </div>

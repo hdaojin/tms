@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 
 {% block content %}
 <div class="grid gap-4 lg:grid-cols-3">
@@ -17,7 +17,7 @@
   <aside class="card border border-base-300 bg-base-100 shadow-sm">
     <div class="card-body text-sm">
       <h2 class="card-title text-base">提案信息</h2>
-      <p>词库：{{ proposal.glossary }}</p><p>提交人：{{ proposal.submitted_by }}</p><p>提交时间：{{ proposal.created_at }}</p>
+      <p>词库：{{ proposal.glossary }}</p><p>提交人：{{ proposal.submitted_by }}</p><p>提交时间：{{ proposal.created_at|keep_date_parts }}</p>
       <div class="card-actions mt-3">
         {% if proposal.status != 'approved' and proposal.submitted_by == request.user and perms.glossary.change_glossaryentryproposal %}<a class="btn btn-outline btn-sm" href="{% url 'glossary:proposal_edit' proposal.pk %}">修改并重提</a>{% endif %}
         {% if perms.glossary.change_professionalglossary and proposal.status == 'pending' %}

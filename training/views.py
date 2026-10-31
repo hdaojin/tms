@@ -695,7 +695,7 @@ class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
             source_label="训练日志", source_url=reverse("training:log_list"),
             title=log.topic, description=log.summary,
             metadata=(FilePreviewMetadata("训练周期", log.training_cycle.name),
-                      FilePreviewMetadata("训练日期", log.training_date.strftime("%Y-%m-%d"))),
+                      FilePreviewMetadata("训练日期", log.training_date.strftime("%Y-%m-%d"), is_date=True)),
         )
         return context
 

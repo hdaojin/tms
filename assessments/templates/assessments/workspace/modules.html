@@ -1,3 +1,4 @@
+{% load date_display %}
 <section class="space-y-4">
   <div class="flex flex-wrap justify-end gap-2">
     {% if can_upload_general_document %}
@@ -34,7 +35,7 @@
           <dl class="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
             <div>
               <dt class="text-base-content/60">计划时间</dt>
-              <dd>{{ module.scheduled_start_at|default:"-" }}{% if module.scheduled_end_at %} 至 {{ module.scheduled_end_at }}{% endif %}</dd>
+              <dd>{{ module.scheduled_start_at|default:"-"|keep_date_parts }}{% if module.scheduled_end_at %} 至 {{ module.scheduled_end_at|keep_date_parts }}{% endif %}</dd>
             </div>
             <div>
               <dt class="text-base-content/60">时长 / 总分</dt>

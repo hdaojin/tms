@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 
 {% block content %}
 <div class="space-y-4">
@@ -15,7 +15,7 @@
       </div>
       <dl class="grid gap-2 text-sm md:grid-cols-2">
         <div><dt class="text-base-content/60">SHA256</dt><dd class="break-all font-mono">{{ glossary_import.sha256 }}</dd></div>
-        <div><dt class="text-base-content/60">导入人 / 时间</dt><dd>{{ glossary_import.imported_by }} / {{ glossary_import.created_at }}</dd></div>
+        <div><dt class="text-base-content/60">导入人 / 时间</dt><dd>{{ glossary_import.imported_by }} / {{ glossary_import.created_at|keep_date_parts }}</dd></div>
       </dl>
       <div class="card-actions justify-end">
         <a class="btn btn-outline" href="{% url 'glossary:import_download' glossary_import.pk %}">下载源 XLSX</a>

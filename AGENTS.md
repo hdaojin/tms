@@ -135,6 +135,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 
 ## 用户、角色与权限
 
+- 会议记录权限与受众叠加：“所有人”仍需有效账号及 `meetings.view_meeting`；限定范围取所选 Group 的实时成员与指定 User 的并集。有效 superuser 始终可见，上传者有基础查看权限时可见本人记录；其他修改、删除权限不能绕过范围。列表、详情、文件端点、后台复用 meetings 的统一 selector/policy；受众设置需修改权限，人员搜索仅供有权上传或设置目标记录受众的人使用，不授予账号权限。
 - 保持 Django 默认 `auth.User`；不要引入自定义 User 模型。
 - 全局登录由 `LoginRequiredMiddleware` 强制；公开 view 必须显式使用 `login_not_required`。
 - Django Permission 是运行时唯一授权事实来源；业务权限包只用于部署期授权配置与原生权限投影。

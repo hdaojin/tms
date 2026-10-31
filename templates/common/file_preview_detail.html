@@ -1,4 +1,4 @@
-{% extends "layouts/app.html" %}
+{% extends "layouts/app.html" %}{% load date_display %}
 {% load static %}
 
 {% block extra_js %}
@@ -103,7 +103,7 @@
           {% block file_timestamps %}
           <div class="py-3">
             <dt class="text-base-content/60">上传时间</dt>
-            <dd class="mt-1">{% if file_preview.uploaded_at %}{{ file_preview.uploaded_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</dd>
+            <dd class="mt-1">{% if file_preview.uploaded_at %}{{ file_preview.uploaded_at|date:"Y-m-d H:i"|keep_date_parts }}{% else %}—{% endif %}</dd>
           </div>
           {% endblock %}
           <div class="py-3">
@@ -113,7 +113,7 @@
           {% for item in file_preview.metadata %}
             <div class="py-3">
               <dt class="text-base-content/60">{{ item.label }}</dt>
-              <dd class="mt-1 break-words">{{ item.value|default:"—" }}</dd>
+              <dd class="mt-1 break-words">{% if item.is_date %}{{ item.value|default:"—"|keep_date_parts }}{% else %}{{ item.value|default:"—" }}{% endif %}</dd>
             </div>
           {% endfor %}
           {% if file_preview.description %}
