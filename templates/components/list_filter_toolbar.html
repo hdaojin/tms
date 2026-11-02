@@ -10,6 +10,7 @@
       hx-target="#{{ list_filter_target_id }}"
       hx-push-url="true"
       hx-sync="this:replace">
+  {% for field in list_filter_hidden_fields %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endfor %}
   <div class="grid grid-cols-2 gap-2 md:flex {% if list_filter_compact %}md:items-center{% else %}md:flex-wrap md:items-center{% endif %}">
     {% for control in list_filter_controls %}
       {% if control.type == "select" %}
@@ -22,6 +23,14 @@
             {% endfor %}
           </select>
         </label>
+      {% elif control.type == "checkboxes" %}
+        <details class="dropdown">
+          <summary class="btn btn-outline md:btn-sm">{{ control.label }}（多选）</summary>
+          <fieldset class="dropdown-content z-20 rounded-box border border-base-300 bg-base-100 p-3 shadow-sm min-w-36">
+            <legend class="sr-only">{{ control.label }}</legend><p class="text-xs text-base-content/60">不勾选表示全部</p>
+            {% for option in control.choices %}<label class="flex items-center gap-2 py-1"><input type="checkbox" class="checkbox checkbox-sm list-filter-select" name="{{ control.name }}" value="{{ option.value }}"{% if option.value in control.values %} checked{% endif %}>{{ option.label }}</label>{% endfor %}
+          </fieldset>
+        </details>
       {% elif control.type == "search" %}
         <label class="col-span-2 min-w-0 {% if not list_filter_compact %}md:min-w-64{% endif %} md:flex-1">
           <span class="sr-only">{{ control.label }}</span>
@@ -41,7 +50,7 @@
       {% endif %}
     {% endfor %}
     <div class="col-span-2 flex shrink-0 items-center justify-end gap-1 md:ml-auto">
-      <a class="btn btn-ghost px-3 md:btn-sm" href="{{ list_filter_url }}">重置</a>
+      <a class="btn btn-ghost px-3 md:btn-sm" href="{{ list_filter_reset_url|default:list_filter_url }}">重置</a>
     </div>
   </div>
 </form>

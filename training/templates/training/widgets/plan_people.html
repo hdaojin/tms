@@ -1,0 +1,34 @@
+<div data-plan-people data-search-url="{{ widget.search_url }}" data-field-name="{{ widget.name }}">
+  <div data-plan-selected class="flex flex-wrap gap-2">
+    {% for person in widget.selected %}
+      <span data-person-id="{{ person.id }}" data-person-label="{{ person.label }}" data-unavailable="{{ person.unavailable|yesno:'true,false' }}" class="badge badge-outline h-auto">
+        <input type="hidden" name="{{ widget.name }}" value="{{ person.id }}">
+        {{ person.label }}{% if person.unavailable %}（账号停用或缺少权限）{% endif %}
+      </span>
+    {% endfor %}
+  </div>
+  <button type="button" data-plan-open class="link link-primary mt-2">选择人员</button>
+  <noscript>搜索和添加人员需要启用 JavaScript；已有选择会保留。</noscript>
+  <dialog data-plan-dialog class="modal">
+    <div class="modal-box space-y-6">
+      <h3 class="text-lg font-bold">选择{{ widget.picker_title }}</h3>
+      <div class="space-y-4">
+      <label class="fieldset">
+        <span class="fieldset-legend">搜索姓名或账号</span>
+        <input type="search" data-plan-query class="input w-full" autocomplete="off">
+      </label>
+      <p data-plan-status role="status" aria-live="polite"></p>
+      <div data-plan-results class="flex flex-wrap gap-2"></div>
+      <button type="button" data-plan-more class="btn btn-outline btn-sm" hidden>加载更多</button>
+      </div>
+      <div class="space-y-3">
+      <p class="font-semibold">已选择：</p>
+      <div data-plan-staged class="flex flex-wrap gap-2"></div>
+      </div>
+      <div class="modal-action">
+        <button type="button" data-plan-cancel class="btn btn-ghost">取消</button>
+        <button type="button" data-plan-confirm class="btn btn-primary">确定</button>
+      </div>
+    </div>
+  </dialog>
+</div>

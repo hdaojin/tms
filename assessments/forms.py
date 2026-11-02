@@ -161,7 +161,9 @@ class AssessmentModuleForm(ImmutableCodeFormMixin, StyledFormMixin, forms.ModelF
         widgets = {
             "description": forms.Textarea(attrs={"rows": 4}),
             "code": forms.TextInput(attrs={"maxlength": 8, "pattern": "[A-Za-z0-9]{1,8}"}),
-            "scheduled_start_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "scheduled_start_at": forms.DateTimeInput(
+                format="%Y-%m-%dT%H:%M:%S", attrs={"type": "datetime-local", "step": "1"}
+            ),
         }
 
     def __init__(self, *args, user=None, permission="assessments.change_assessmentmodule", **kwargs):

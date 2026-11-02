@@ -1,0 +1,47 @@
+{% extends "common/form.html" %}
+{% load static %}
+
+{% block form_content %}
+  <form method="post" action="{{ request.path }}" class="space-y-6">
+    {% csrf_token %}
+    {% include "components/form_errors.html" with form=form %}
+    <div class="grid gap-4 md:grid-cols-2">
+      {% include "components/field.html" with field=form.training_cycle %}
+      {% include "components/field.html" with field=form.title %}
+      {% include "components/field.html" with field=form.start_date %}
+      {% include "components/field.html" with field=form.end_date %}
+    </div>
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend">每日时段</legend>
+      <p>早读和晚上可将起止时间同时留空，表示不设置该时段。</p>
+      {% include "training/partials/plan_time_pair.html" with label="早读" start=form.early_start end=form.early_end %}
+      {% include "training/partials/plan_time_pair.html" with label="上午" start=form.morning_start end=form.morning_end %}
+      {% include "training/partials/plan_time_pair.html" with label="下午" start=form.afternoon_start end=form.afternoon_end %}
+      {% include "training/partials/plan_time_pair.html" with label="晚上" start=form.evening_start end=form.evening_end %}
+    </fieldset>
+    {% include "components/field.html" with field=form.objective %}
+    {% include "components/field.html" with field=form.schedulers %}
+    {% include "components/field.html" with field=form.approvers %}
+    {% if form.competitors %}<section data-plan-participants>
+      {% include "components/field.html" with field=form.all_competitors %}
+      <fieldset data-plan-individuals class="space-y-4">
+        {% include "components/field.html" with field=form.competitor_groups %}
+        {% include "components/field.html" with field=form.competitors %}
+      </fieldset>
+    </section>{% endif %}
+    {% if form.reason %}{% include "components/field.html" with field=form.reason %}{% endif %}
+    <p>{% if form.instance.published_at %}保存会更新计划并保留已发布状态。{% else %}保存会保留未发布的计划，之后可以继续编辑。{% endif %}
+      首次保存后训练周期和日期范围固定；发布计划后，有查看权限的参与选手可以查看计划。排班和任务需要分别发布。</p>
+    <div class="flex flex-wrap justify-end gap-3">
+      <button type="reset" class="btn btn-ghost">重置</button>
+      <button type="submit" name="action" value="save" class="btn btn-outline">保存</button>
+      <button type="submit" name="action" value="publish" class="btn btn-primary">发布</button>
+    </div>
+  </form>
+{% endblock %}
+
+{% block extra_js %}
+  {{ block.super }}
+  {{ form.media }}
+  <script src="{% static 'js/training-plan-people.js' %}" defer></script>
+{% endblock %}

@@ -1,0 +1,1 @@
+{% for domain in record.domains.all %}{{ domain.name }}{% if domain.pk == record.primary_domain_id %}（主要）{% endif %}{% if not forloop.last %}、{% endif %}{% empty %}—{% endfor %}

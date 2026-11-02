@@ -248,8 +248,12 @@ class StatisticsFilterForm(StyledFormMixin, forms.Form):
     user = forms.ModelChoiceField(label="学习者", queryset=get_user_model().objects.none(), required=False)
     skill_project = forms.ModelChoiceField(label="技能项目", queryset=SkillProject.objects.none(), required=False)
     glossary = forms.ModelChoiceField(label="专业词库", queryset=ProfessionalGlossary.objects.none(), required=False)
-    date_from = forms.DateField(label="开始日期", required=False, widget=forms.DateInput(attrs={"type": "date"}))
-    date_to = forms.DateField(label="结束日期", required=False, widget=forms.DateInput(attrs={"type": "date"}))
+    date_from = forms.DateField(
+        label="开始日期", required=False, widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
+    )
+    date_to = forms.DateField(
+        label="结束日期", required=False, widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"})
+    )
 
     def __init__(self, *args, include_user=True, **kwargs):
         super().__init__(*args, **kwargs)

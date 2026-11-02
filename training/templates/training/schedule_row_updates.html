@@ -1,0 +1,1 @@
+<template>{% for row in updated_table.rows %}<tr id="schedule-slot-{{ row.record.pk }}" hx-swap-oob="outerHTML">{% for column, cell in row.items %}<td {{ column.attrs.td.as_html }}>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</template>

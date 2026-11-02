@@ -50,8 +50,9 @@ function fixture(initial = []) {
   const requests = [];
   const timers = new Map();
   let counter = 0;
+  const documentHandlers = {};
   vm.runInNewContext(source, {
-    document: { readyState: "complete", querySelectorAll: () => [root], createElement: () => new Element() },
+    document: { readyState: "complete", querySelectorAll: () => [root], createElement: () => new Element(), addEventListener: (name, handler) => { documentHandlers[name] = handler; } },
     window: { location: { origin: "https://tms.example" } },
     URL, AbortController,
     fetch: (url, options) => new Promise((resolve) => { requests.push({ url, options, resolve }); }),
@@ -67,8 +68,18 @@ function fixture(initial = []) {
     requests[index].resolve({ ok, redirected: false, json: async () => ({ results, has_more: hasMore }) });
     await new Promise((resolve) => setImmediate(resolve));
   }
-  return { form, all, selected, results, query, status, more, area, requests, tick, enter, respond };
+  return { form, all, selected, results, query, status, more, area, requests, tick, enter, respond, documentHandlers };
 }
+
+test("HTMX initialization preserves an already initialized picker and its selections", async () => {
+  const f = fixture([{ id: 1, label: "已有选手" }]);
+  f.enter("选手");
+  await f.respond(0, [{ id: 2, label: "新选手" }]);
+  f.results.children[0].handlers.click();
+  f.documentHandlers["htmx:load"]();
+  assert.equal(f.selected.children.length, 2);
+  assert.equal(f.requests.length, 1);
+});
 
 test("empty search never fetches all users; requests include object scope and paging", async () => {
   const f = fixture();

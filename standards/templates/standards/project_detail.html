@@ -39,7 +39,6 @@
                   <h3 class="card-title">{{ domain.name }}</h3>
                   {% if not domain.is_active %}<span class="badge badge-warning badge-sm">已停用</span>{% endif %}
                 </div>
-                <p class="text-sm text-base-content/60">{{ domain.code }}</p>
               </div>
               {% if domain.can_edit_domain %}
                 <a class="btn btn-ghost btn-xs" href="{% url 'standards:domain_edit' project.pk domain.pk %}">编辑</a>

@@ -32,6 +32,8 @@ return render(request, "demo/list.html#results", context)
 
 - `components/form.html`
 - `components/field.html`
+- `components/detail_field.html`
+- `components/record_timestamps.html`
 - `components/table_wrapper.html`
 - `components/list_filter_toolbar.html`
 - `components/list_bulk_actions.html`
@@ -44,6 +46,14 @@ return render(request, "demo/list.html#results", context)
 组件参数中的 variant/size/icon class 必须由 Python 或调用方白名单提供完整类名，禁止 `text-{{ color }}`、`size-{{ size }}`、`icon-[{{ name }}]`。
 
 组件局部标题不得复用页面级 `title` 变量；例如表格包装组件使用 `table_title` 或 `wrapper_title`，页面标题只由 `partials/page_header.html` 渲染。
+
+## 表单与详情页的视觉一致性
+
+- 设计或修改页面时，以全站现有布局、DaisyUI 主题和公共组件为基准。同一对象的详情页与新增／编辑页应保持对应字段的顺序、列数和响应式断点，以及标签、内容的字体、字号和颜色一致；详情独有的信息可安排在对应字段之后。
+- 普通内容区块与表单卡片保持相同的边框、圆角、背景、阴影和内距，优先使用 `card border border-base-300 bg-base-100 shadow-sm` 与 `card-body`；同一页面的并列区块使用一致的容器样式。
+- 表单字段复用 `components/field.html`；普通只读详情使用 `<dl>` 和 `components/detail_field.html`，与表单标签及输入框视觉保持一致。多行文字保留换行并随内容增长；长内容能够换行、选择和复制。详情使用语义化文本，不渲染禁用的输入控件来冒充只读内容。
+- 创建和修改时间继续使用 `components/record_timestamps.html`；需要与表单字段对齐时，可传入 `timestamp_wrapper_class`、`timestamp_label_class`、`timestamp_value_class`，不改变其他页面默认展示。
+- 适配手机和窄屏，保留清晰的阅读顺序；列表、文件预览等有不同用途的页面可根据内容选择合适布局。既有页面在相关任务中逐步对齐，不因本规范批量改造无关页面。
 
 ## 文件上传
 

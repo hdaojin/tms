@@ -211,5 +211,6 @@
     const init = () => document.querySelectorAll("[data-recipient-picker]").forEach(initPicker);
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();
+    document.addEventListener("htmx:load", init);
   }
 })();

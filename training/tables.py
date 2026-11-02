@@ -43,9 +43,13 @@ class TrainingCycleTable(BaseTable):
 
 
 class TrainingPlanTable(BaseTable):
+    def render_status(self, record):
+        return record.display_status
+
     start_date = BaseDateColumn()
     end_date = BaseDateColumn()
-    actions = ActionsColumn("training:plan_detail", "training:plan_edit", edit_perm="training.change_trainingplan")
+    actions = ActionsColumn("training:plan_detail", "training:plan_edit", edit_perm="training.change_trainingplan",
+                            edit_allowed_attr="can_edit")
 
     class Meta(BaseTable.Meta):
         model = TrainingPlan

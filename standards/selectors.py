@@ -278,7 +278,7 @@ def skill_training_investment(skill):
         latest_date=Max("training_task__planned_date"),
         task_count=Count("training_task", distinct=True),
         completed_count=Count("pk", filter=Q(status=TaskExecution.Status.COMPLETED)),
-        partial_count=Count("pk", filter=Q(status=TaskExecution.Status.PARTIALLY_COMPLETED)),
+        partial_count=Count("pk", filter=Q(status__in=[TaskExecution.Status.PARTIALLY_COMPLETED, TaskExecution.Status.UNFINISHED])),
         blocked_count=Count("pk", filter=Q(status=TaskExecution.Status.BLOCKED)),
         actual_minutes=Coalesce(Sum("actual_minutes"), 0),
     )

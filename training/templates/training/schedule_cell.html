@@ -1,0 +1,10 @@
+{% if not slot.matches_filter %}<div class="min-w-44 rounded-box bg-base-200/40 p-3 text-sm text-base-content/40">不符合筛选</div>
+{% elif not slot.is_configured %}<div class="min-w-44 rounded-box bg-base-200 p-3 text-sm text-base-content/50">未启用</div>
+{% elif slot.content_visible %}
+<article class="relative min-w-48 rounded-box border border-base-300 bg-base-100 p-3 text-left space-y-2" {% if can_schedule %}data-slot-edit="{% url 'training:schedule_edit' plan.pk %}?days={{ slot.day_id }}&amp;slot={{ slot.pk }}{{ slot.editor_suffix }}" tabindex="0" role="button" aria-label="编辑{{ slot.day.date|date:'Y-m-d' }}{{ slot.get_period_display }}排班"{% endif %}>
+<div class="flex flex-wrap items-center justify-between gap-2"><span class="badge badge-sm {{ slot.state_class }}">{{ slot.state_label }}</span>
+{% if can_schedule %}<button type="button" class="btn btn-ghost btn-xs" disabled aria-label="时段操作暂不开放" title="本版本暂不开放">⋯</button>{% endif %}</div>
+<div class="flex flex-wrap gap-2 text-xs text-base-content/60"><span class="whitespace-nowrap">{% if slot.starts_at %}{{ slot.starts_at|date:'H:i' }}–{{ slot.ends_at|date:'H:i' }}{% else %}时间待补录{% endif %}</span>{% if plan.schedule_published_at %}<span>排班已发布</span>{% else %}<span>排班草稿</span>{% endif %}{% if slot.is_locked %}<span>已结束</span>{% endif %}</div>
+<p class="text-sm font-medium">{{ slot.domain_label }}</p><p class="text-sm">{{ slot.coach_label }}</p>
+{% include 'training/entry_tasks.html' with record=slot %}
+</article>{% else %}<div class="min-w-44 p-3 text-base-content/40">—</div>{% endif %}

@@ -1,0 +1,9 @@
+<div class="grid grid-cols-[3rem_minmax(0,8rem)_1rem_minmax(0,8rem)] items-center gap-2">
+  <span>{{ label }}{% if start.field.required %}<span class="text-error">*</span>{% endif %}：</span>
+  <label><span class="sr-only">{{ label }}开始时间</span>{{ start }}</label>
+  <span>–</span>
+  <label><span class="sr-only">{{ label }}结束时间</span>{{ end }}</label>
+  {% for error in start.errors %}<span class="col-span-full text-error">{{ error }}</span>{% endfor %}
+  {% for error in end.errors %}<span class="col-span-full text-error">{{ error }}</span>{% endfor %}
+</div>
+{% if start.help_text %}<p>{{ start.help_text }}</p>{% endif %}

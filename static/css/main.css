@@ -487,3 +487,11 @@
 #feedback-filter-indicator.htmx-request {
   display: inline-block;
 }
+
+@layer utilities {
+  @media (min-width: 64rem) {
+    html[data-desktop-nav-collapsed="true"] [data-app-left-sidebar] {
+      display: none;
+    }
+  }
+}

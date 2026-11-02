@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django import forms
+from django.db import transaction
 from accounts.services.users import get_user_display_name
 from .models import (
     TaskExecution,
@@ -15,24 +16,133 @@ from .models import (
     TrainingTaskCoach,
     TrainingTaskDomain,
     TrainingTaskSkill,
+    TrainingChangeRecord,
+    TrainingChangeAttachment,
+    TrainingScheduleChange,
+    TrainingScheduleDay,
+    TrainingScheduleSlot,
 )
 from .services import save_cycle_member, validate_new_log
+from .models import TrainingPeriodConfig, TrainingPlanParticipant, TrainingAssignmentCoach, PersonalTrainingTask, TrainingProgress, TrainingProgressRevision, TrainingProgressAttachment, TrainingStateChange, TrainingCoachFeedback
 
-admin.site.register(
-    [
-        TrainingCycle,
-        TrainingCycleSkillTreeVersion,
-        TrainingPlan,
-        TrainingTask,
-        TrainingTaskDomain,
-        TrainingTaskSkill,
-        TrainingTaskCoach,
-        TrainingTaskAttachment,
-        TaskExecution,
-        TaskExecutionAttachment,
-        TrainingLogExecution,
-    ]
-)
+admin.site.register(TrainingLogExecution)
+
+
+@admin.register(TrainingCycle)
+class TrainingCycleAdmin(admin.ModelAdmin):
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        if obj.pk:
+            TrainingCycle.objects.select_for_update().get(pk=obj.pk)
+        obj.save()
+
+
+@admin.register(TrainingCycleSkillTreeVersion)
+class TrainingCycleSkillTreeVersionAdmin(admin.ModelAdmin):
+    # 批量删除会绕过模型的快照锁定和领域引用校验。
+    actions = None
+
+    def get_readonly_fields(self, request, obj=None):
+        return ("training_cycle", "technical_domain") if obj else ()
+
+    def has_delete_permission(self, request, obj=None):
+        return super().has_delete_permission(request, obj) and (obj is None or not obj.removal_error())
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        cycle = TrainingCycle.objects.select_for_update().get(pk=obj.training_cycle_id)
+        obj.training_cycle = cycle
+        obj.save()
+        cycle.save(update_fields=["updated_at"])
+
+    @transaction.atomic
+    def delete_model(self, request, obj):
+        cycle = TrainingCycle.objects.select_for_update().get(pk=obj.training_cycle_id)
+        obj.training_cycle = cycle
+        obj.delete()
+        cycle.save(update_fields=["updated_at"])
+
+
+class TrainingWorkflowReadOnlyAdmin(admin.ModelAdmin):
+    """工作流写入统一从前台事务服务完成，后台仅供查阅。"""
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        # 后台没有独立的人员/计划范围写入入口。
+        return queryset if request.user.is_active and request.user.is_superuser else queryset.none()
+
+
+for workflow_model in (
+    TrainingPlan, TrainingTask, TrainingTaskDomain, TrainingTaskSkill, TrainingTaskCoach, TaskExecution,
+    TrainingScheduleDay, TrainingScheduleSlot, TrainingScheduleChange, TrainingChangeRecord,
+    TrainingPlanParticipant, TrainingAssignmentCoach, PersonalTrainingTask, TrainingProgress,
+    TrainingProgressRevision, TrainingProgressAttachment, TrainingStateChange, TrainingCoachFeedback,
+    TrainingTaskAttachment, TaskExecutionAttachment,
+):
+    admin.site.register(workflow_model, TrainingWorkflowReadOnlyAdmin)
+
+admin.site.register(TrainingChangeAttachment, TrainingWorkflowReadOnlyAdmin)
+
+
+class TrainingPeriodConfigAdminForm(forms.ModelForm):
+    class Meta:
+        model = TrainingPeriodConfig
+        fields = "__all__"
+
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get("start_time"), cleaned.get("end_time")
+        if start is None or end is None:
+            return cleaned
+        periods = {obj.period: (obj.start_time, obj.end_time) for obj in TrainingPeriodConfig.objects.all()}
+        periods[self.instance.period] = (start, end)
+        previous_end = None
+        for period in TrainingScheduleSlot.Period.values:
+            if period not in periods:
+                continue
+            period_start, period_end = periods[period]
+            if period_start >= period_end or (previous_end and period_start < previous_end):
+                raise forms.ValidationError("时段须按早读、上午、下午、晚上顺序排列，且不能重叠或跨午夜。")
+            previous_end = period_end
+        return cleaned
+
+
+@admin.register(TrainingPeriodConfig)
+class TrainingPeriodConfigAdmin(admin.ModelAdmin):
+    form = TrainingPeriodConfigAdminForm
+    list_display = ("period", "start_time", "end_time", "updated_at")
+    readonly_fields = ("period",)
+
+    @transaction.atomic
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        if request.method == "POST":
+            list(TrainingPeriodConfig.objects.select_for_update().order_by("pk"))
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def has_module_permission(self, request):
+        return request.user.is_active and request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_module_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class CycleMemberAdminForm(forms.ModelForm):

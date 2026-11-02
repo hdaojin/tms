@@ -586,8 +586,8 @@ class MobileNavigationTemplateTests(TestCase):
             user,
         )
 
+        self.assertNotIn("新增训练周期", html)
         for label in [
-            "新增训练周期",
             "新增训练日志",
             "长期赛事人员",
             "赛事角色配置",
@@ -598,6 +598,15 @@ class MobileNavigationTemplateTests(TestCase):
             "录入奖惩记录",
         ]:
             self.assertIn(label, html)
+
+    def test_training_cycle_creation_is_not_a_navigation_entry(self):
+        user = User.objects.create_user(username="cycle-create-nav", password="testpass123")
+        user = self._grant_permissions(user, "training.view_trainingcycle", "training.add_trainingcycle")
+        html = self._render_menu_tag(
+            "{% load menu_tags %}{% render_mobile_navigation %}", reverse("accounts:home"), user,
+        )
+        self.assertIn(reverse("training:cycle_list"), html)
+        self.assertNotIn(reverse("training:cycle_create"), html)
 
     def test_assessment_navigation_exposes_only_business_entries_and_keeps_workspace_routes_active(self):
         user = User.objects.create_user(username="assessment-nav-user", password="testpass123")

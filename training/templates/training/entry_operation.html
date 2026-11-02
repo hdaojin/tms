@@ -1,0 +1,10 @@
+{% extends 'layouts/app.html' %}
+{% block content %}<section class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body"><h2 class="card-title">批量编排 · {{ plan.title }}</h2>
+{% if error %}<p class="alert alert-error">{{ error }}</p>{% endif %}
+{% if preview %}<h3 class="font-semibold">确认固定目标与变更（{{ preview.rows|length }} 项）</h3><p>复制仅包含排班，不复制任务；已有内容不会隐式删除。已发布或过期变更将提交审批。</p>
+{% for row in readable_rows %}<article class="border-b border-base-300 py-3"><h4 class="font-medium">{{ row.label }}</h4><pre class="whitespace-pre-wrap break-words">{{ row.diff }}</pre></article>{% endfor %}
+{% if preview.skipped %}<details open><summary>跳过 {{ preview.skipped|length }} 项</summary>{% for message in preview.skipped %}<p>{{ message }}</p>{% endfor %}</details>{% endif %}
+<form method="post">{% csrf_token %}<input type="hidden" name="token" value="{{ token }}"><button class="btn btn-primary">{% if preview.approval_required %}确认提交审批{% else %}确认执行{% endif %}</button><a class="btn btn-ghost" href="{% url 'training:entry_operation' plan.pk %}">重新选择</a></form>
+{% elif form %}{% if selected_targets %}<details open><summary>已固定 {{ selected_targets|length }} 个目标时段</summary><ul>{% for slot in selected_targets %}<li>{{ slot.day.date|date:"Y-m-d" }} · {{ slot.get_period_display }}</li>{% endfor %}</ul><p class="text-sm">日期条件不会扩大已勾选的名单；更换目标请返回列表重新选择。</p></details>{% endif %}<p class="text-sm text-base-content/60">选定日期或日期范围；星期用于进一步收窄。复制整周时按星期对应来源周。批量任务每行标题生成一项独立草稿。</p><form method="post" class="space-y-4" data-entry-operation>{% csrf_token %}{{ form.non_field_errors }}<div class="grid gap-4 md:grid-cols-2">{% for field in form.hidden_fields %}{{ field }}{% endfor %}{% for field in form.visible_fields %}<div data-operation-field="{{ field.name }}">{% include 'components/field.html' with field=field %}</div>{% endfor %}</div><button class="btn btn-primary">预览目标与差异</button></form>{% endif %}
+<a class="btn btn-ghost" href="{{ return_url|default:request.path }}">返回计划</a></div></section>{% endblock %}
+{% block extra_js %}{% load static %}<script src="{% static 'js/training-entries.js' %}" defer></script>{% endblock %}

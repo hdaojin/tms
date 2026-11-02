@@ -3,7 +3,7 @@ from __future__ import annotations
 from calendar import monthrange
 from datetime import date, timedelta
 
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 
 from accounts.services.users import get_user_display_name
@@ -71,9 +71,17 @@ def visible_training_tasks_for(user, queryset=None):
         return queryset.none()
     if user.is_superuser:
         return queryset
+    from .scheduling import visible_plans
+    active_assignment = TaskExecution.objects.filter(training_task_id=OuterRef("pk"), user=user, revoked_at__isnull=True).exclude(status="cancelled")
+    queryset = queryset.annotate(_assigned_to_viewer=Exists(active_assignment))
+    scheduled = Q(schedule_slot__isnull=False, training_plan__in=visible_plans(user)) & (
+        Q(status="published", _assigned_to_viewer=True, training_plan__published_at__isnull=False, training_plan__schedule_published_at__isnull=False) | Q(schedule_slot__coaches=user)
+        | Q(training_plan__schedulers=user) | Q(training_plan__approvers=user)
+        | Q(training_plan__created_by=user)
+    )
     domains = scoped_domains_for(user, "training.view_trainingtask")
     return queryset.filter(
-        Q(executions__user=user) | Q(coach_links__user=user) | Q(domain_links__technical_domain__in=domains)
+        scheduled | (Q(schedule_slot__isnull=True) & (Q(executions__user=user) | Q(coach_links__user=user) | Q(domain_links__technical_domain__in=domains) | Q(training_plan__schedulers=user)))
     ).distinct()
 
 
@@ -82,21 +90,31 @@ def manageable_training_tasks_for(user, queryset=None):
     if not user.has_perm("training.change_trainingtask"):
         return queryset.none()
     if user.is_superuser:
-        return queryset
+        return queryset.exclude(status="cancelled")
+    role = Q(schedule_slot__coaches=user)
+    if user.has_perm("training.schedule_trainingplan"):
+        role |= Q(training_plan__schedulers=user)
+    scheduled = queryset.filter(role, schedule_slot__isnull=False,
+                                schedule_slot__kind__in=["technical", "general"]).exclude(status="cancelled")
+    queryset = queryset.filter(schedule_slot__isnull=True)
     domains = scoped_domains_for(user, "training.change_trainingtask")
     single_domain = queryset.annotate(domain_count=Count("domain_links", distinct=True)).filter(
         domain_count=1,
         domain_links__technical_domain__in=domains,
     )
     explicit = queryset.filter(coach_links__user=user)
-    return (single_domain | explicit).distinct()
+    return (single_domain | explicit | scheduled).distinct()
 
 
 def visible_task_executions_for(user, queryset=None):
     queryset = queryset if queryset is not None else TaskExecution.objects.all()
     if user.is_superuser:
         return queryset
-    return queryset.filter(Q(user=user) | Q(training_task__coach_links__user=user)).distinct()
+    return queryset.filter(
+        Q(user=user, training_task__schedule_slot__isnull=True)
+        | (Q(user=user, training_task__status="published", revoked_at__isnull=True, training_task__training_plan__published_at__isnull=False, training_task__training_plan__schedule_published_at__isnull=False) & ~Q(status="cancelled"))
+        | Q(training_task__coach_links__user=user)
+    ).distinct()
 
 
 def training_logs_visible_to(user, queryset=None):

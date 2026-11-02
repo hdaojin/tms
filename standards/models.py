@@ -85,11 +85,12 @@ class TechnicalDomain(models.Model):
         verbose_name_plural = "技术领域"
         ordering = ["skill_project", "order", "code", "name"]
         constraints = [
-            models.UniqueConstraint(fields=["skill_project", "code"], name="uniq_technicaldomain_project_code")
+            models.UniqueConstraint(fields=["skill_project", "code"], name="uniq_technicaldomain_project_code"),
+            models.UniqueConstraint(fields=["skill_project", "name"], name="uniq_technicaldomain_project_name"),
         ]
 
     def __str__(self):
-        return f"{self.skill_project.code} / {self.code} - {self.name}"
+        return self.name
 
 
 class TechnicalDomainGroupScope(models.Model):

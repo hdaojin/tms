@@ -57,7 +57,7 @@ class TrainingActionVisibilityTests(TrainingFixtureMixin, TestCase):
 
     def test_task_edit_hidden_when_visible_through_execution_but_not_manageable(self):
         url = reverse("training:task_edit", args=[self.task.pk])
-        self.assertNotContains(self.client.get(reverse("training:task_list")), url)
+        self.assertRedirects(self.client.get(reverse("training:task_list")), reverse("training:plan_list"), fetch_redirect_response=False)
         self.assertNotContains(self.client.get(reverse("training:task_detail", args=[self.task.pk])), url)
         self.assertEqual(self.client.get(url).status_code, 404)
         group = Group.objects.create(name="有领域的任务维护")
@@ -66,8 +66,9 @@ class TrainingActionVisibilityTests(TrainingFixtureMixin, TestCase):
         )
         TechnicalDomainGroupScope.objects.create(group=group, technical_domain=self.linux)
         self.user.groups.add(group)
-        self.assertContains(self.client.get(reverse("training:task_list")), url)
-        self.assertContains(self.client.get(reverse("training:task_detail", args=[self.task.pk])), url)
+        # 历史任务须由指定任务管理员整理进时段，同领域权限不恢复独立编辑入口。
+        self.assertNotContains(self.client.get(reverse("training:task_detail", args=[self.task.pk])), url)
+        self.assertEqual(self.client.get(url).status_code, 404)
 
     def test_execution_edit_link_only_for_own_execution(self):
         other_cycle = self.cycle(code="OTHER")
@@ -88,7 +89,7 @@ class TrainingActionVisibilityTests(TrainingFixtureMixin, TestCase):
             requirements="要求",
             created_by=self.owner,
         )
-        task.coach_links.create(user=self.user, role="primary")
+        task.coach_links.create(user=self.user)
         other = TaskExecution.objects.create(training_task=task, user=self.owner)
         response = self.client.get(reverse("training:execution_list"))
         mine = TaskExecution.objects.get(training_task=self.task, user=self.user)

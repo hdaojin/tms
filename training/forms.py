@@ -6,10 +6,11 @@ from django import forms
 from django.utils import timezone
 from django.utils.html import format_html
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.db import models, transaction
 from django.urls import reverse
 
-from core.uploads import TRAINING_ATTACHMENT_UPLOAD_SPEC, TRAINING_LOG_UPLOAD_SPEC
+from core.uploads import TRAINING_LOG_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
 from standards.forms import DefaultSkillProjectFormMixin
 from standards.models import Skill, SkillProject, SkillTreeVersion, TechnicalDomain
@@ -17,7 +18,6 @@ from standards.models import Skill, SkillProject, SkillTreeVersion, TechnicalDom
 from .models import (
     TaskExecution,
     TrainingCycle,
-    TrainingCycleSkillTreeVersion,
     TrainingCycleMember,
     TrainingLog,
     TrainingLogTemplate,
@@ -27,8 +27,11 @@ from .models import (
     TrainingTaskDomain,
     TrainingTaskSkill,
 )
-from .services import publish_training_task, save_training_log, validate_new_log
+from .services import (
+    publish_training_task, save_cycle_tree_versions, save_training_log, validate_cycle_tree_versions, validate_new_log,
+)
 from .log_files import DUPLICATE_LOG_MESSAGE, build_log_filename
+from .plan_people import PlanStaffSelect, eligible_staff
 
 
 User = get_user_model()
@@ -89,9 +92,9 @@ class TrainingCycleForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.Mod
             "parent",
             "code",
             "name",
+            "status",
             "start_date",
             "end_date",
-            "status",
             "description",
         ]
         widgets = {
@@ -117,129 +120,22 @@ class TrainingCycleForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.Mod
             )
         else:
             self.fields["parent"].queryset = TrainingCycle.objects.none()
-        parent = None
-        parent_id = self.data.get("parent") if self.is_bound else self.initial.get("parent")
-        if parent_id:
-            parent_id = getattr(parent_id, "pk", parent_id)
-            parent = TrainingCycle.objects.filter(pk=parent_id, skill_project=project).first()
-        elif self.instance.parent_id:
-            parent = self.instance.parent
-
-        context_url = reverse("training:cycle_version_fields")
+        context_url = reverse("training:cycle_parent_field")
+        if self.instance.pk:
+            context_url += f"?cycle_id={self.instance.pk}"
         self.fields["skill_project"].widget.attrs.update(
             {
                 "hx-get": context_url,
-                "hx-target": "#cycle-version-context",
+                "hx-target": "#cycle-parent-context",
                 "hx-trigger": "change",
                 "hx-include": "closest form",
-                "data-cycle-version-context-trigger": "true",
             }
         )
-        self.fields["parent"].widget.attrs.update(
-            {
-                "hx-get": context_url,
-                "hx-target": "#cycle-version-context",
-                "hx-trigger": "change",
-                "hx-include": "closest form",
-                "data-cycle-version-context-trigger": "true",
-            }
-        )
-
-        existing_links = {
-            link.technical_domain_id: link
-            for link in (
-                self.instance.skill_tree_version_links.select_related(
-                    "technical_domain", "skill_tree_version"
-                ).all()
-                if self.instance.pk
-                else ()
-            )
-        }
-        if parent is not None:
-            domains = TechnicalDomain.objects.filter(
-                pk__in=parent.skill_tree_version_links.values("technical_domain_id")
-            )
-        elif project is not None:
-            domains = TechnicalDomain.objects.filter(skill_project=project, is_active=True)
-            if existing_links:
-                domains = TechnicalDomain.objects.filter(
-                    models.Q(skill_project=project, is_active=True) | models.Q(pk__in=existing_links)
-                )
-        else:
-            domains = TechnicalDomain.objects.none()
-        self.version_fields = []
-        for domain in domains.order_by("order", "code", "pk"):
-            field_name = f"tree_version_{domain.pk}"
-            versions = SkillTreeVersion.objects.filter(technical_domain=domain).order_by(
-                "-is_current", "-created_at", "-pk"
-            )
-            current_version = versions.filter(is_current=True).first()
-            if current_version is not None:
-                empty_label = "不纳入当前周期"
-            elif versions.exists():
-                empty_label = "尚无当前技能树（可选择历史版本）"
-            else:
-                empty_label = "尚无技能树版本"
-            field = forms.ModelChoiceField(
-                label=f"{domain.name}技能树版本",
-                queryset=versions,
-                required=False,
-                empty_label=empty_label,
-            )
-            if field_name in self.initial:
-                field.initial = self.initial[field_name]
-            elif domain.pk in existing_links:
-                field.initial = existing_links[domain.pk].skill_tree_version
-            elif parent is not None:
-                parent_link = parent.skill_tree_version_links.filter(technical_domain=domain).first()
-                if parent_link:
-                    field.initial = parent_link.skill_tree_version
-            else:
-                field.initial = current_version
-            if self.instance.pk and self.instance.skill_tree_bindings_locked:
-                field.disabled = True
-            field.widget.attrs["data-cycle-version-field"] = "true"
-            self.fields[field_name] = field
-            self.version_fields.append((field_name, domain))
 
     def clean(self):
         cleaned = super().clean()
         if not self.instance.pk and cleaned.get("status") != TrainingCycle.Status.PLANNING:
             self.add_error("status", "新建周期必须先保存为筹备中，再按顺序推进状态。")
-        selected = {
-            domain.pk: cleaned.get(field_name)
-            for field_name, domain in self.version_fields
-            if cleaned.get(field_name) is not None
-        }
-        if not selected:
-            raise forms.ValidationError("训练周期必须至少固定一个技术领域的技能树版本。")
-        if self.instance.pk:
-            existing = dict(
-                self.instance.skill_tree_version_links.values_list(
-                    "technical_domain_id", "skill_tree_version_id"
-                )
-            )
-            selected_ids = {domain_id: tree.pk for domain_id, tree in selected.items()}
-            if self.instance.skill_tree_bindings_locked and selected_ids != existing:
-                raise forms.ValidationError("训练周期的技能树版本快照已经锁定，不能再修改。")
-            removed_domain_ids = set(existing) - set(selected_ids)
-            used_domain = TrainingTaskDomain.objects.filter(
-                training_task__training_plan__training_cycle=self.instance,
-                technical_domain_id__in=removed_domain_ids,
-            ).select_related("technical_domain").first()
-            if used_domain:
-                raise forms.ValidationError(
-                    f"技术领域“{used_domain.technical_domain.name}”已被训练任务使用，不能从周期中移除。"
-                )
-            child_link = TrainingCycleSkillTreeVersion.objects.filter(
-                training_cycle__parent=self.instance,
-                technical_domain_id__in=removed_domain_ids,
-            ).select_related("technical_domain").first()
-            if child_link:
-                raise forms.ValidationError(
-                    f"技术领域“{child_link.technical_domain.name}”已被阶段周期使用，不能从父周期中移除。"
-                )
-        cleaned["selected_tree_versions"] = selected
         return cleaned
 
     @transaction.atomic
@@ -247,42 +143,151 @@ class TrainingCycleForm(DefaultSkillProjectFormMixin, StyledFormMixin, forms.Mod
         cycle = super().save(commit=False)
         if not commit:
             return cycle
-        target_status = cycle.status
-        was_planning = not cycle.pk or TrainingCycle.objects.filter(
-            pk=cycle.pk, status=TrainingCycle.Status.PLANNING
-        ).exists()
-        if was_planning and target_status != TrainingCycle.Status.PLANNING:
-            cycle.status = TrainingCycle.Status.PLANNING
+        if cycle.pk:
+            TrainingCycle.objects.select_for_update().get(pk=cycle.pk)
         cycle.save()
-        if not cycle.skill_tree_bindings_locked:
-            selected = self.cleaned_data["selected_tree_versions"]
-            for domain_id, tree in selected.items():
-                TrainingCycleSkillTreeVersion.objects.update_or_create(
-                    training_cycle=cycle,
-                    technical_domain_id=domain_id,
-                    defaults={"skill_tree_version": tree},
-                )
-            for link in cycle.skill_tree_version_links.exclude(technical_domain_id__in=selected):
-                link.delete()
-        if cycle.status != target_status:
-            cycle.status = target_status
-            cycle.save(update_fields=["status", "updated_at"])
+        self.save_m2m()
         return cycle
 
 
+class TrainingCycleTreeVersionsForm(StyledFormMixin, forms.Form):
+    def __init__(self, *args, cycle, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cycle = cycle
+        existing_links = {
+            link.technical_domain_id: link
+            for link in cycle.skill_tree_version_links.select_related("technical_domain", "skill_tree_version")
+        }
+        if cycle.parent_id:
+            domains = TechnicalDomain.objects.filter(
+                pk__in=cycle.parent.skill_tree_version_links.values("technical_domain_id")
+            )
+        else:
+            domains = TechnicalDomain.objects.filter(
+                models.Q(skill_project=cycle.skill_project, is_active=True) | models.Q(pk__in=existing_links)
+            )
+        self.version_fields = []
+        locked = cycle.skill_tree_bindings_locked
+        for domain in domains.order_by("order", "code", "pk"):
+            field_name = f"tree_version_{domain.pk}"
+            field = forms.ModelChoiceField(
+                label=f"{domain.name}技能树版本",
+                queryset=SkillTreeVersion.objects.filter(technical_domain=domain).select_related(
+                    "technical_domain"
+                ).order_by("-is_current", "-created_at", "-pk"),
+                required=False,
+                empty_label="不纳入当前周期",
+                disabled=locked and (domain.pk in existing_links or not cycle.can_add_skill_tree_bindings),
+            )
+            if domain.pk in existing_links:
+                field.initial = existing_links[domain.pk].skill_tree_version
+            field.widget.attrs["class"] = "select w-full"
+            self.fields[field_name] = field
+            self.version_fields.append((field_name, domain))
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.errors:
+            return cleaned
+        selected = {
+            domain.pk: cleaned.get(field_name)
+            for field_name, domain in self.version_fields
+            if cleaned.get(field_name) is not None
+        }
+        validate_cycle_tree_versions(self.cycle, selected)
+        cleaned["selected_tree_versions"] = selected
+        return cleaned
+
+    def save(self):
+        return save_cycle_tree_versions(self.cycle, self.cleaned_data["selected_tree_versions"])
+
+
 class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
+    reason = forms.CharField(label="时段时间调整原因", required=False, widget=forms.Textarea(attrs={"rows": 2}))
+    all_competitors = forms.BooleanField(label="全部选手", required=False, help_text="保存时纳入当前训练周期内所有选手；之后新增成员不自动加入。")
+    competitor_groups = forms.ModelMultipleChoiceField(label="按群组指定", queryset=Group.objects.none(), required=False, help_text="可多选群组；仅纳入本周期选手，与下方指定个人合并去重。")
+    competitors = forms.ModelMultipleChoiceField(label="指定个人", queryset=get_user_model().objects.none(), required=False, widget=PlanStaffSelect())
     class Meta:
         model = TrainingPlan
-        fields = ["training_cycle", "title", "start_date", "end_date", "objective", "status", "source_file"]
+        fields = ["training_cycle", "title", "start_date", "end_date", *TrainingPlan.TIME_FIELDS, "objective", "schedulers", "approvers"]
         widgets = {
-            "start_date": forms.DateInput(attrs={"type": "date"}),
-            "end_date": forms.DateInput(attrs={"type": "date"}),
+            "start_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "end_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "objective": forms.Textarea(attrs={"rows": 4}),
+            "schedulers": PlanStaffSelect(),
+            "approvers": PlanStaffSelect(),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["source_file"].widget.attrs.update(TRAINING_ATTACHMENT_UPLOAD_SPEC.widget_attrs())
+        self.fields["training_cycle"].empty_label = "请选择训练周期"
+        unknown_periods = set()
+        if self.instance.pk:
+            from .models import TrainingScheduleSlot
+            unknown_periods = set(TrainingScheduleSlot.objects.filter(
+                day__training_plan=self.instance, is_configured=True, ends_at__isnull=True
+            ).values_list("period", flat=True))
+        for name in TrainingPlan.TIME_FIELDS:
+            self.fields[name].required = name.startswith(("morning_", "afternoon_"))
+            self.fields[name].widget = forms.TimeInput(format="%H:%M", attrs={"type": "time", "class": "input w-full"})
+            if self.instance.pk and getattr(self.instance, name) is None and name.rsplit("_", 1)[0] in unknown_periods:
+                self.fields[name].help_text = "历史时间缺失或不一致，请核对后填写；普通保存不改变已结束快照。"
+        if not self.instance.pk:
+            self.fields.pop("competitors")
+            self.fields.pop("all_competitors")
+            self.fields.pop("competitor_groups")
+            self.fields.pop("reason")
+            from .models import TrainingPeriodConfig
+            for config in TrainingPeriodConfig.objects.all():
+                self.initial.setdefault(f"{config.period}_start", config.start_time)
+                self.initial.setdefault(f"{config.period}_end", config.end_time)
+        else:
+            for name in ("training_cycle", "start_date", "end_date"):
+                self.fields[name].help_text = "首次保存后固定；需要改变请另建计划。"
+            for name in ("start_date", "end_date"):
+                self.fields[name].widget.attrs["readonly"] = True
+        cycle_id = self.data.get("training_cycle") if self.is_bound else (self.instance.training_cycle_id or self.initial.get("training_cycle"))
+        if self.instance.pk:
+            cycle_id = self.instance.training_cycle_id
+        if self.instance.pk and str(cycle_id).isdigit():
+            self.fields["competitors"].queryset = get_user_model().objects.filter(training_cycle_memberships__training_cycle_id=cycle_id, training_cycle_memberships__role="competitor")
+        if self.instance.pk:
+            self.initial["competitors"] = list(self.instance.participants.filter(is_active=True).values_list("user_id", flat=True))
+            self.initial.setdefault("all_competitors", not self.initial["competitors"])
+            self.fields["competitor_groups"].queryset = Group.objects.filter(user__training_cycle_memberships__training_cycle_id=cycle_id, user__training_cycle_memberships__role="competitor").distinct().order_by("name", "pk")
+            if self.is_bound and forms.BooleanField(required=False).clean(self.data.get("all_competitors")):
+                self.fields["competitors"].disabled = True
+                self.fields["competitor_groups"].disabled = True
+            self.fields["competitors"].queryset = get_user_model().objects.filter(models.Q(pk__in=self.fields["competitors"].queryset.values("pk")) | models.Q(training_plan_participations__training_plan=self.instance))
+            self.fields["competitors"].help_text = "仅选择本周期选手；新增成员不自动获得历史任务，退出不删除已有执行。"
+        from accounts.services.users import get_user_full_info
+        for name in ("schedulers", "approvers", *(("competitors",) if self.instance.pk else ())):
+            field = self.fields[name]
+            field.widget.plan_id = self.instance.pk
+            ids = [str(pk) for pk in (self[name].value() or []) if str(pk).isdecimal()]
+            eligible_ids = set(eligible_staff(name).filter(pk__in=ids).values_list("pk", flat=True)) if name != "competitors" else set()
+            field.widget.selected = [
+                {"id": person.pk, "label": get_user_full_info(person),
+                 "unavailable": name != "competitors" and person.pk not in eligible_ids}
+                for person in field.queryset.filter(pk__in=ids).order_by("last_name", "first_name", "username", "pk")
+            ]
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.instance.pk:
+            previous = TrainingPlan.objects.get(pk=self.instance.pk)
+            if {"training_cycle", "start_date", "end_date"}.intersection(self.changed_data):
+                raise forms.ValidationError("计划创建后不能修改周期和日期范围，请另建计划。")
+            if set(TrainingPlan.TIME_FIELDS).intersection(self.changed_data) and previous.schedule_published_at and not cleaned.get("reason", "").strip():
+                self.add_error("reason", "已发布排班的时间调整须填写原因并提交审批。")
+        for name in ("schedulers", "approvers"):
+            previous_ids = set(getattr(self.instance, name).values_list("pk", flat=True)) if self.instance.pk else set()
+            selected_ids = {person.pk for person in cleaned.get(name, ())}
+            new_ids = selected_ids - previous_ids
+            eligible_ids = set(eligible_staff(name).filter(pk__in=new_ids).values_list("pk", flat=True))
+            if new_ids - eligible_ids:
+                self.add_error(name, "新指定的人员必须账号有效且具有对应权限。")
+        return cleaned
 
 
 class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
@@ -293,13 +298,12 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
         label="主要技术领域", queryset=TechnicalDomain.objects.none(), required=False
     )
     skills = forms.ModelMultipleChoiceField(
-        label="技能", queryset=Skill.objects.none(), widget=forms.CheckboxSelectMultiple
+        label="技能", queryset=Skill.objects.none(), widget=forms.CheckboxSelectMultiple, required=False
     )
-    primary_skill = forms.ModelChoiceField(label="主要技能", queryset=Skill.objects.none())
+    primary_skill = forms.ModelChoiceField(label="主要技能", queryset=Skill.objects.none(), required=False)
     coaches = forms.ModelMultipleChoiceField(
         label="负责教练", queryset=User.objects.none(), widget=forms.CheckboxSelectMultiple
     )
-    primary_coach = forms.ModelChoiceField(label="主教练", queryset=User.objects.none(), required=False)
     competitors = forms.ModelMultipleChoiceField(
         label="分配选手", queryset=User.objects.none(), widget=forms.CheckboxSelectMultiple, required=False
     )
@@ -318,7 +322,7 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
             "order",
         ]
         widgets = {
-            "planned_date": forms.DateInput(attrs={"type": "date"}),
+            "planned_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "description": forms.Textarea(attrs={"rows": 3}),
             "requirements": forms.Textarea(attrs={"rows": 5}),
         }
@@ -365,7 +369,6 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
                 training_cycle_memberships__role=TrainingCycleMember.Role.COMPETITOR,
             ).distinct()
             self.fields["coaches"].queryset = coaches
-            self.fields["primary_coach"].queryset = coaches
             self.fields["competitors"].queryset = competitors
         if self.instance.pk:
             self.fields["domains"].initial = self.instance.domain_links.values_list("technical_domain_id", flat=True)
@@ -381,11 +384,6 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
                 .first()
             )
             self.fields["coaches"].initial = self.instance.coach_links.values_list("user_id", flat=True)
-            self.fields["primary_coach"].initial = (
-                self.instance.coach_links.filter(role=TrainingTaskCoach.Role.PRIMARY)
-                .values_list("user_id", flat=True)
-                .first()
-            )
             self.fields["competitors"].initial = self.instance.executions.values_list("user_id", flat=True)
 
     def clean(self):
@@ -397,13 +395,9 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
             self.add_error("primary_domain", "主要技术领域必须包含在技术领域中。")
         if cleaned.get("primary_skill") and cleaned["primary_skill"] not in skills:
             self.add_error("primary_skill", "主要技能必须包含在技能中。")
-        if cleaned.get("primary_coach") and cleaned["primary_coach"] not in coaches:
-            self.add_error("primary_coach", "主教练必须包含在负责教练中。")
         if cleaned.get("status") == TrainingTask.Status.PUBLISHED:
             if not domains:
                 self.add_error("domains", "发布任务前必须至少选择一个技术领域。")
-            if not cleaned.get("primary_skill"):
-                self.add_error("primary_skill", "发布任务前必须选择主要技能。")
             if not coaches:
                 self.add_error("coaches", "发布任务前必须至少选择一位教练。")
         if self.instance.pk and self.instance.is_locked and self.has_changed():
@@ -433,7 +427,6 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
         skills = list(self.cleaned_data["skills"])
         primary_skill = self.cleaned_data["primary_skill"]
         coaches = list(self.cleaned_data["coaches"])
-        primary_coach = self.cleaned_data.get("primary_coach")
         if not task.is_locked:
             task.domain_links.all().delete()
             for domain in domains:
@@ -457,7 +450,6 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
             TrainingTaskCoach.objects.create(
                 training_task=task,
                 user=coach,
-                role=TrainingTaskCoach.Role.PRIMARY if coach == primary_coach else TrainingTaskCoach.Role.COLLABORATOR,
             )
         if task.status == TrainingTask.Status.PUBLISHED:
             publish_training_task(
@@ -467,6 +459,12 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
 
 
 class TaskExecutionForm(StyledFormMixin, forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.training_task_id and self.instance.training_task.schedule_slot_id:
+            from .process import STATES
+            self.fields["status"].choices = STATES
+
     class Meta:
         model = TaskExecution
         fields = [

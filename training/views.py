@@ -1,7 +1,8 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Count, F
+from django.core.paginator import Paginator
+from django.db.models import BooleanField, Count, Exists, F, OuterRef, Q, Value
 from pathlib import Path
 
 from django.http import HttpResponse
@@ -38,6 +39,7 @@ from .forms import (
     CycleMemberEditForm,
     TaskExecutionForm,
     TrainingCycleForm,
+    TrainingCycleTreeVersionsForm,
     TrainingLogForm,
     TrainingLogStatisticsForm,
     TrainingPlanForm,
@@ -72,13 +74,24 @@ class ListPageMixin:
         return context
 
 
-class TrainingCycleListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
+class TrainingCycleListView(FilterableListMixin, ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = TrainingCycle
     table_class = TrainingCycleTable
+    template_name = "training/cycle_list.html"
     title = "训练周期"
     permission_required = "training.view_trainingcycle"
     create_url_name = "training:cycle_create"
     create_label = "新增训练周期"
+    table_pagination = {"per_page": 25}
+    search_fields = ("code", "name", "skill_project__name")
+    list_filter_specs = (
+        ListFilterSpec("q", "搜索训练周期", "search", placeholder="搜索周期代码、名称或技能项目"),
+        ListFilterSpec("status", "状态", "select", lookup="status", choices=TrainingCycle.Status.choices,
+                       empty_label="全部状态"),
+    )
+
+    def get_base_queryset(self):
+        return super().get_base_queryset().select_related("skill_project")
 
 
 class TrainingCycleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -98,6 +111,35 @@ class TrainingCycleDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
             "skill_tree_version_links__technical_domain",
             "skill_tree_version_links__skill_tree_version",
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["tree_versions_locked"] = not self.object.can_add_skill_tree_bindings
+        context["tree_versions_append_only"] = self.object.status == TrainingCycle.Status.ACTIVE
+        if self.request.user.has_perm("training.change_trainingcycle") and "cycle_form" not in context:
+            context["cycle_form"] = TrainingCycleForm(instance=self.object)
+        if self.request.user.has_perm("training.view_trainingcyclemember"):
+            members = self.object.members.select_related("user").order_by("user__last_name", "user__first_name", "pk")
+            context["members_page"] = Paginator(members, 25).get_page(self.request.GET.get("members_page"))
+        return context
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.has_perm("training.change_trainingcycle"):
+            raise PermissionDenied
+        # 保存时不要沿用详情页预取的快照，状态校验需要读取锁定后的最新关系。
+        self.object = self.get_object(queryset=self.get_queryset().prefetch_related(None))
+        form = TrainingCycleForm(request.POST, instance=self.object)
+        if form.is_valid():
+            try:
+                form.save()
+            except ValidationError as exc:
+                form.add_error(None, "；".join(exc.messages))
+            else:
+                messages.success(request, "已保存训练周期信息。")
+                return redirect(request.get_full_path())
+        # ModelForm 校验会修改内存中的实例；其他区块必须继续展示已保存的数据。
+        self.object = self.get_object()
+        return self.render_to_response(self.get_context_data(cycle_form=form))
 
 
 class TrainingCycleMembersView(FilterableListMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
@@ -312,13 +354,17 @@ class TrainingCycleCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         form = context["form"]
-        version_field_names = {name for name, _domain in form.version_fields}
-        context["base_fields"] = [
-            field for field in form.visible_fields() if field.name not in version_field_names and field.name != "parent"
-        ]
+        context["base_fields"] = [field for field in form.visible_fields() if field.name != "parent"]
         context["parent_field"] = form["parent"]
-        context["version_fields"] = [form[name] for name, _domain in form.version_fields]
         return context
+
+    def form_valid(self, form):
+        try:
+            self.object = form.save()
+        except ValidationError as exc:
+            form.add_error(None, "；".join(exc.messages))
+            return self.form_invalid(form)
+        return redirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse("training:cycle_detail", args=[self.object.pk])
@@ -329,43 +375,96 @@ class TrainingCycleUpdateView(TrainingCycleCreateView, UpdateView):
     permission_required = "training.change_trainingcycle"
 
 
+class TrainingCycleTreeVersionsUpdateView(TitleMixin, PermissionRequiredMixin, FormView):
+    template_name = "training/cycle_tree_versions_form.html"
+    form_class = TrainingCycleTreeVersionsForm
+    title = "编辑领域技能树版本快照"
+    permission_required = "training.change_trainingcycle"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.cycle = get_object_or_404(TrainingCycle.objects.select_related("skill_project", "parent"), pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_breadcrumb_parents(self):
+        if not self.request.user.has_perm("training.view_trainingcycle"):
+            return []
+        return [breadcrumb_link("训练周期", "training:cycle_list"),
+                breadcrumb_link(self.cycle.name, "training:cycle_detail", args=[self.cycle.pk])]
+
+    def get_form_kwargs(self):
+        return {**super().get_form_kwargs(), "cycle": self.cycle}
+
+    def get_context_data(self, **kwargs):
+        return {**super().get_context_data(**kwargs), "cycle": self.cycle,
+                "tree_versions_locked": not self.cycle.can_add_skill_tree_bindings,
+                "tree_versions_append_only": self.cycle.status == TrainingCycle.Status.ACTIVE}
+
+    def form_valid(self, form):
+        try:
+            form.save()
+        except ValidationError as exc:
+            form.add_error(None, "；".join(exc.messages))
+            return self.form_invalid(form)
+        messages.success(self.request, "已保存领域技能树版本快照。")
+        return redirect("training:cycle_detail", pk=self.cycle.pk)
+
+
 @require_GET
-def training_cycle_version_fields(request):
+def training_cycle_parent_field(request):
     if not (
         request.user.has_perm("training.add_trainingcycle")
         or request.user.has_perm("training.change_trainingcycle")
     ):
-        from django.core.exceptions import PermissionDenied
-
         raise PermissionDenied
-    initial = {
-        "skill_project": request.GET.get("skill_project"),
-        "parent": request.GET.get("parent"),
-    }
-    preserved = set(filter(None, request.GET.getlist("preserved")))
-    for name in preserved:
-        initial[name] = request.GET.get(name)
-    form = TrainingCycleForm(initial=initial)
-    for name, _domain in form.version_fields:
-        if name in preserved:
-            form.fields[name].widget.attrs["data-cycle-version-touched"] = "true"
-    return render(
-        request,
-        "training/partials/cycle_version_fields.html",
-        {
-            "parent_field": form["parent"],
-            "version_fields": [form[name] for name, _domain in form.version_fields],
-        },
-    )
+    cycle_id = request.GET.get("cycle_id", "")
+    cycle = get_object_or_404(TrainingCycle, pk=cycle_id) if cycle_id.isdigit() else None
+    form = TrainingCycleForm(data=request.GET, instance=cycle)
+    return render(request, "training/partials/cycle_parent_field.html", {"parent_field": form["parent"]})
 
 
-class TrainingPlanListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
+class TrainingPlanListView(FilterableListMixin, ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
+    template_name = "training/plan_list.html"
     model = TrainingPlan
     table_class = TrainingPlanTable
     title = "训练计划"
     permission_required = "training.view_trainingplan"
     create_url_name = "training:plan_create"
     create_label = "新增训练计划"
+    table_pagination = {"per_page": 25}
+    search_fields = ("title", "training_cycle__code", "training_cycle__name")
+    status_filter = ListFilterSpec(
+        "status", "状态", "select",
+        choices=(("unpublished", "未发布"), ("published", "已发布"), ("completed", "已完成")),
+        empty_label="全部状态",
+    )
+    list_filter_specs = (
+        ListFilterSpec("q", "搜索训练计划", "search", placeholder="搜索计划标题或周期代码、名称"),
+        status_filter,
+    )
+
+    def get_base_queryset(self):
+        from .scheduling import visible_plans
+        queryset = visible_plans(self.request.user).select_related("training_cycle")
+        if self.request.user.is_active and self.request.user.is_superuser:
+            return queryset.annotate(can_edit=Value(True, output_field=BooleanField()))
+        # 与 plan_manager 的创建人／排班人员范围一致，避免逐行查询。
+        scope = Q(created_by=self.request.user)
+        if self.request.user.has_perm("training.schedule_trainingplan"):
+            scope |= Q(schedulers=self.request.user)
+        manageable = TrainingPlan.objects.filter(pk=OuterRef("pk")).filter(scope)
+        return queryset.annotate(can_edit=Exists(manageable) if self.request.user.has_perm("training.change_trainingplan") else Value(False, output_field=BooleanField()))
+
+    def apply_custom_filters(self, queryset):
+        status = self.get_filter_value(self.status_filter)
+        if not status:
+            return queryset
+        # 与 TrainingPlan.display_status 一致：结束日期过后优先显示已完成。
+        today = timezone.localdate()
+        if status == "completed":
+            return queryset.filter(end_date__lt=today)
+        if status in {"unpublished", "published"}:
+            return queryset.filter(end_date__gte=today, published_at__isnull=status == "unpublished")
+        return queryset
 
 
 class TrainingPlanDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -384,10 +483,22 @@ class TrainingPlanDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
 class TrainingPlanCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingPlan
     form_class = TrainingPlanForm
-    template_name = "common/form.html"
-    extra_context = {"grid_class": "grid gap-4 md:grid-cols-2"}
+    template_name = "training/plan_form.html"
+    extra_context = {"publish_button": True}
     title = "新增训练计划"
     permission_required = "training.add_trainingplan"
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if self.object is None:
+            if not self.request.user.is_superuser and self.request.user.has_perm("training.schedule_trainingplan"):
+                initial["schedulers"] = [self.request.user.pk]
+            cycle_id = TrainingCycleMember.objects.filter(
+                user=self.request.user, is_current=True
+            ).values_list("training_cycle_id", flat=True).first()
+            if cycle_id is not None:
+                initial["training_cycle"] = cycle_id
+        return initial
 
     def get_breadcrumb_parents(self):
         if not self.request.user.has_perm("training.view_trainingplan"):
@@ -395,8 +506,14 @@ class TrainingPlanCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
         return [breadcrumb_link("训练计划", "training:plan_list")]
 
     def form_valid(self, form):
-        form.instance.created_by = self.request.user
-        return super().form_valid(form)
+        from .scheduling import save_plan_definition
+        try:
+            self.object = save_plan_definition(form, self.request.user, publish=self.request.POST.get("action") == "publish")
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
+        messages.success(self.request, "计划已保存；时间调整已提交审批，批准前保留原时间。" if getattr(self.object, "_time_change_requested", False) else "计划已保存并发布。" if self.request.POST.get("action") == "publish" else "计划已保存。")
+        return redirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse("training:plan_detail", args=[self.object.pk])
@@ -405,6 +522,17 @@ class TrainingPlanCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
 class TrainingPlanUpdateView(TrainingPlanCreateView, UpdateView):
     title = "编辑训练计划"
     permission_required = "training.change_trainingplan"
+
+    def get_queryset(self):
+        from .scheduling import visible_plans
+        return visible_plans(self.request.user)
+
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        from .scheduling import plan_manager
+        if not plan_manager(self.request.user, obj):
+            raise PermissionDenied
+        return obj
 
 
 class TrainingTaskListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
@@ -418,20 +546,46 @@ class TrainingTaskListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, S
     def get_queryset(self):
         from django.db.models import Exists, OuterRef
         return visible_training_tasks_for(self.request.user).annotate(
-            can_edit=Exists(manageable_training_tasks_for(self.request.user).filter(pk=OuterRef("pk")))
+            can_edit=Exists(manageable_training_tasks_for(self.request.user).filter(
+                pk=OuterRef("pk"), schedule_slot__isnull=False,
+                schedule_slot__kind__in=["technical", "general"],
+            ).exclude(status="cancelled"))
         ).select_related(
             "training_plan", "training_plan__training_cycle"
         )
 
 
 class MyTrainingView(TrainingTaskListView):
+    template_name = "training/my_training.html"
     title = "我的训练"
     create_url_name = None
 
     def get_queryset(self):
-        return (
-            super().get_queryset().filter(executions__user=self.request.user).distinct()
+        queryset = (
+            super().get_queryset().filter(executions__user=self.request.user, executions__revoked_at__isnull=True).exclude(status="cancelled").distinct()
         )
+        if value := self.request.GET.get("date"):
+            from datetime import date
+            try:
+                queryset = queryset.filter(planned_date=date.fromisoformat(value))
+            except ValueError:
+                return queryset.none()
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        from .process import personal_tasks_for
+        from .scheduling import visible_plans
+        context = super().get_context_data(**kwargs)
+        personal = personal_tasks_for(self.request.user).filter(user=self.request.user)
+        when = self.request.GET.get("date", "")
+        if when:
+            try:
+                from datetime import date
+                personal = personal.filter(date=date.fromisoformat(when))
+            except ValueError:
+                personal = personal.none()
+        context.update(personal_tasks=personal, personal_plans=visible_plans(self.request.user).filter(participants__user=self.request.user, participants__is_active=True))
+        return context
 
 
 class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -442,12 +596,37 @@ class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     permission_required = "training.view_trainingtask"
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(can_edit=manageable_training_tasks_for(self.request.user).filter(pk=self.object.pk).exists(), **kwargs)
+        from .scheduling import can_fill, task_manager
+        task, user = self.object, self.request.user
+        can_edit = bool(task.schedule_slot_id and can_fill(user, task.schedule_slot))
+        can_skills = can_fill(user, task.schedule_slot, skills_only=True) if task.schedule_slot_id else task_manager(user, task.training_plan) and user.has_perm("training.change_trainingtask")
+        executions = visible_task_executions_for(user).filter(training_task=task).select_related("user")
+        if not user.has_perm("training.view_taskexecution"):
+            executions = executions.none()
+        from .schedule_history import decorate_history
+        from .scheduling import staff
+        from django.db.models import Q
+        history = task.training_plan.change_records.filter(
+            Q(task=task) | Q(task__isnull=True, action__in=["批准排班调整", "批准调整"])
+        ).select_related("actor")
+        if not staff(user, task.training_plan) and not task.coach_links.filter(user=user).exists():
+            history = history.none()
+        history = [record for record in history[:100] if record.task_id == task.pk or any(
+            (change["type"] == "slot" and change.get("id") == task.schedule_slot_id)
+            or (change["type"] == "day" and task.schedule_slot_id and change.get("id") == task.schedule_slot.day_id)
+            or (change["type"] == "swap" and task.schedule_slot_id in change["slots"])
+            or (change["type"] == "task" and change.get("id") == task.pk)
+            or change["type"] == "times"
+            for change in record.after.get("调整", [])
+        )]
+        history, _ = decorate_history(history)
+        from .process_views import markdown
+        return super().get_context_data(can_edit=can_edit, can_skills=can_skills, visible_executions=executions, task_history=history, description_html=markdown(task.description), **kwargs)
 
     def get_breadcrumb_parents(self):
         if not self.request.user.has_perm("training.view_trainingtask"):
             return []
-        return [breadcrumb_link("训练任务", "training:task_list")]
+        return [breadcrumb_link("训练计划", "training:plan_list"), breadcrumb_link(self.object.training_plan.title, "training:plan_detail", args=[self.object.training_plan_id])]
 
     def get_queryset(self):
         return visible_training_tasks_for(self.request.user).prefetch_related(
@@ -538,10 +717,14 @@ class TaskExecutionUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
     permission_required = "training.change_taskexecution"
 
     def get_queryset(self):
-        return TaskExecution.objects.filter(user=self.request.user)
+        return visible_task_executions_for(self.request.user).filter(user=self.request.user)
 
     def form_valid(self, form):
-        self.object = update_execution_facts(self.get_object(), user=self.request.user, **form.cleaned_data)
+        try:
+            self.object = update_execution_facts(self.get_object(), user=self.request.user, **form.cleaned_data)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
         return HttpResponse(status=302, headers={"Location": self.get_success_url()})
 
     def get_success_url(self):

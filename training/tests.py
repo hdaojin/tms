@@ -15,7 +15,7 @@ from standards.models import (
     TechnicalDomainGroupScope,
 )
 
-from .forms import TrainingCycleForm, TrainingTaskForm
+from .forms import TrainingCycleForm, TrainingCycleTreeVersionsForm, TrainingTaskForm
 from .models import (
     TaskExecution,
     TrainingCycle,
@@ -36,7 +36,23 @@ from .services import publish_training_task
 User = get_user_model()
 
 
+def configure_test_periods():
+    from datetime import time
+    from .models import TrainingPeriodConfig
+    for period, start, end in [("early", 8, 9), ("morning", 9, 12), ("afternoon", 14, 17), ("evening", 19, 21)]:
+        TrainingPeriodConfig.objects.get_or_create(period=period, defaults={"start_time": time(start), "end_time": time(end)})
+
+
 class TrainingFixtureMixin:
+    def confirm_change_coaches(self, change):
+        from .change_workflow import next_coach
+        from .scheduling import review_change
+        while True:
+            change.refresh_from_db()
+            if change.status != "pending" or not (coach_id := next_coach(change)):
+                break
+            review_change(change, User.objects.get(pk=coach_id), approve=True)
+
     def setUp(self):
         super().setUp()
         self.project = SkillProject.objects.create(code="NS", name="网络系统管理", is_default=True)
@@ -143,7 +159,7 @@ class TrainingCycleVersionBindingTests(TrainingFixtureMixin, TestCase):
         with self.assertRaisesMessage(ValidationError, "至少固定一个技术领域"):
             cycle.save()
 
-    def test_form_defaults_currents_and_requires_at_least_one(self):
+    def test_cycle_form_allows_planning_without_versions_and_versions_can_be_cleared(self):
         form = TrainingCycleForm(
             data={
                 "skill_project": self.project.pk,
@@ -154,30 +170,27 @@ class TrainingCycleVersionBindingTests(TrainingFixtureMixin, TestCase):
                 "end_date": "2026-02-28",
                 "status": TrainingCycle.Status.PLANNING,
                 "description": "",
-                f"tree_version_{self.linux.pk}": self.linux_tree.pk,
-                f"tree_version_{self.windows.pk}": self.windows_tree.pk,
             }
         )
         self.assertTrue(form.is_valid(), form.errors)
         cycle = form.save()
+        self.assertFalse(cycle.skill_tree_version_links.exists())
+
+        versions = TrainingCycleTreeVersionsForm(
+            cycle=cycle,
+            data={
+                f"tree_version_{self.linux.pk}": self.linux_tree.pk,
+                f"tree_version_{self.windows.pk}": self.windows_tree.pk,
+            },
+        )
+        self.assertTrue(versions.is_valid(), versions.errors)
+        versions.save()
         self.assertEqual(cycle.skill_tree_version_links.count(), 2)
 
-        empty = TrainingCycleForm(
-            data={
-                "skill_project": self.project.pk,
-                "parent": "",
-                "code": "EMPTY",
-                "name": "空周期",
-                "start_date": "2026-03-01",
-                "end_date": "2026-03-31",
-                "status": TrainingCycle.Status.PLANNING,
-                "description": "",
-                f"tree_version_{self.linux.pk}": "",
-                f"tree_version_{self.windows.pk}": "",
-            }
-        )
-        self.assertFalse(empty.is_valid())
-        self.assertIn("至少固定一个技术领域", str(empty.non_field_errors()))
+        empty = TrainingCycleTreeVersionsForm(cycle=cycle, data={})
+        self.assertTrue(empty.is_valid(), empty.errors)
+        empty.save()
+        self.assertFalse(cycle.skill_tree_version_links.exists())
 
     def test_form_requires_new_cycle_to_start_in_planning(self):
         form = TrainingCycleForm(
@@ -197,14 +210,17 @@ class TrainingCycleVersionBindingTests(TrainingFixtureMixin, TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("必须先保存为筹备中", str(form.errors["status"]))
 
-    def test_form_parent_choices_prefill_but_saved_child_is_independent(self):
+    def test_form_parent_choices_are_not_prefilled_and_saved_child_is_independent(self):
         parent = self.cycle("PARENT")
         self.bind(parent)
-        form = TrainingCycleForm(initial={"skill_project": self.project.pk, "parent": parent.pk})
+        child = self.cycle("CHILD", parent=parent)
+        form = TrainingCycleTreeVersionsForm(cycle=child)
         field_name = f"tree_version_{self.linux.pk}"
         self.assertIn(field_name, form.fields)
-        self.assertEqual(form.fields[field_name].initial, self.linux_tree)
+        self.assertIsNone(form.fields[field_name].initial)
         self.assertNotIn(f"tree_version_{self.windows.pk}", form.fields)
+        self.bind(child)
+        self.assertEqual(TrainingCycleTreeVersionsForm(cycle=child).fields[field_name].initial, self.linux_tree)
 
     def test_started_execution_locks_cycle_bindings(self):
         cycle = self.cycle()
@@ -236,7 +252,7 @@ class TrainingCycleVersionBindingTests(TrainingFixtureMixin, TestCase):
             status=TaskExecution.Status.IN_PROGRESS,
         )
         self.assertTrue(cycle.skill_tree_bindings_locked)
-        form = TrainingCycleForm(instance=cycle)
+        form = TrainingCycleTreeVersionsForm(cycle=cycle)
         self.assertTrue(form.fields[f"tree_version_{self.linux.pk}"].disabled)
 
     def test_locked_binding_cannot_be_changed_or_deleted_outside_form(self):
@@ -253,12 +269,11 @@ class TrainingCycleVersionBindingTests(TrainingFixtureMixin, TestCase):
         link.skill_tree_version = history
         with self.assertRaisesMessage(ValidationError, "快照已经锁定"):
             link.save()
-        with self.assertRaisesMessage(ValidationError, "快照已经锁定"):
-            TrainingCycleSkillTreeVersion.objects.create(
-                training_cycle=cycle,
-                technical_domain=self.windows,
-                skill_tree_version=self.windows_tree,
-            )
+        TrainingCycleSkillTreeVersion.objects.create(
+            training_cycle=cycle,
+            technical_domain=self.windows,
+            skill_tree_version=self.windows_tree,
+        )
         with self.assertRaisesMessage(ValidationError, "快照已经锁定"):
             TrainingCycleSkillTreeVersion.objects.get(pk=link.pk).delete()
 
@@ -274,37 +289,33 @@ class TrainingCycleVersionBindingTests(TrainingFixtureMixin, TestCase):
         )
         self.bind(child)
 
-        form = TrainingCycleForm(
+        form = TrainingCycleTreeVersionsForm(
             data={
-                "skill_project": self.project.pk,
-                "parent": "",
-                "code": parent.code,
-                "name": parent.name,
-                "start_date": "2026-01-01",
-                "end_date": "2026-01-31",
-                "status": TrainingCycle.Status.PLANNING,
-                "description": "",
                 f"tree_version_{self.linux.pk}": "",
                 f"tree_version_{self.windows.pk}": self.windows_tree.pk,
             },
-            instance=parent,
+            cycle=parent,
         )
         self.assertFalse(form.is_valid())
         self.assertIn("已被阶段周期使用", str(form.non_field_errors()))
 
-    def test_cycle_form_fragment_requires_permission(self):
+    def test_cycle_parent_fragment_requires_permission_and_filters_project(self):
+        parent = self.cycle("PARENT")
         user = User.objects.create_user(username="cycle-form-user")
+        self.client.force_login(user)
+        url = reverse("training:cycle_parent_field")
+        self.assertEqual(self.client.get(url, {"skill_project": self.project.pk}).status_code, 403)
         user.user_permissions.add(
             Permission.objects.get(content_type__app_label="training", codename="add_trainingcycle")
         )
         self.client.force_login(user)
         response = self.client.get(
-            reverse("training:cycle_version_fields"),
+            url,
             {"skill_project": self.project.pk},
             HTTP_HX_REQUEST="true",
         )
-        self.assertContains(response, f"tree_version_{self.linux.pk}")
-        self.assertContains(response, "Linux V1")
+        self.assertContains(response, parent.name)
+        self.assertNotContains(response, "tree_version_")
 
 
 class TrainingWorkflowTests(TrainingFixtureMixin, TestCase):
@@ -364,7 +375,6 @@ class TrainingWorkflowTests(TrainingFixtureMixin, TestCase):
         TrainingTaskCoach.objects.create(
             training_task=self.task,
             user=self.coach,
-            role=TrainingTaskCoach.Role.PRIMARY,
         )
 
     def test_task_domain_must_be_bound_by_cycle(self):

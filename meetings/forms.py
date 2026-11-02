@@ -86,7 +86,7 @@ class MeetingUploadForm(DefaultTodayDateFormMixin, MeetingAudienceForm):
             'title': forms.TextInput(
                 attrs={'type': 'text', 'aria-label': 'title-input', 'placeholder': '例如: 网络系统管理项目周例会'}
             ),
-            'date': forms.DateInput(attrs={'type': 'date', 'aria-label': 'date-input'}),
+            'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'aria-label': 'date-input'}),
             'file': forms.FileInput(
                 attrs=MEETING_FILE_UPLOAD_SPEC.widget_attrs(
                     type='file',

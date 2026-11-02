@@ -7,11 +7,66 @@ from pathlib import PurePosixPath
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
-from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingTask
+from .models import (
+    TaskExecution, TrainingCycle, TrainingCycleMember, TrainingCycleSkillTreeVersion, TrainingLog,
+    TrainingScheduleSlot, TrainingTask, TrainingTaskDomain,
+)
 from .log_files import DUPLICATE_LOG_MESSAGE, build_log_filename
 from core.uploads import TRAINING_LOG_UPLOAD_SPEC
+
+
+def validate_cycle_tree_versions(cycle, selected):
+    """校验快照调整及被排班、任务和阶段周期使用的领域。"""
+    existing = dict(cycle.skill_tree_version_links.values_list("technical_domain_id", "skill_tree_version_id"))
+    if cycle.skill_tree_bindings_locked:
+        if not cycle.can_add_skill_tree_bindings:
+            raise ValidationError("训练周期的技能树版本快照已经锁定，不能再修改。")
+        if any(domain_id not in selected or selected[domain_id].pk != tree_id for domain_id, tree_id in existing.items()):
+            raise ValidationError("进行中的周期只能追加新领域，已有快照不能替换或删除。")
+    removed = set(existing) - set(selected)
+    if TrainingScheduleSlot.objects.filter(day__training_plan__training_cycle=cycle).filter(
+        Q(domains__pk__in=removed) | Q(primary_domain_id__in=removed)
+    ).exists():
+        raise ValidationError("该技术领域已被排班使用，不能从周期中移除。")
+    used_domain = TrainingTaskDomain.objects.filter(
+        training_task__training_plan__training_cycle=cycle, technical_domain_id__in=removed
+    ).select_related("technical_domain").first()
+    if used_domain:
+        raise ValidationError(f"技术领域“{used_domain.technical_domain.name}”已被训练任务使用，不能从周期中移除。")
+    child_link = TrainingCycleSkillTreeVersion.objects.filter(
+        training_cycle__parent=cycle, technical_domain_id__in=removed
+    ).select_related("technical_domain").first()
+    if child_link:
+        raise ValidationError(f"技术领域“{child_link.technical_domain.name}”已被阶段周期使用，不能从父周期中移除。")
+    for domain_id, tree in selected.items():
+        if tree.technical_domain_id != domain_id or tree.technical_domain.skill_project_id != cycle.skill_project_id:
+            raise ValidationError("所选技能树版本不属于周期的技能项目和对应技术领域。")
+    if cycle.parent_id:
+        allowed = set(cycle.parent.skill_tree_version_links.values_list("technical_domain_id", flat=True))
+        if not set(selected).issubset(allowed):
+            raise ValidationError("阶段周期只能使用父周期已经包含的技术领域。")
+
+
+@transaction.atomic
+def save_cycle_tree_versions(cycle, selected):
+    """重新锁定周期并校验后，原子保存领域版本快照。"""
+    cycle = TrainingCycle.objects.select_for_update().select_related("parent").get(pk=cycle.pk)
+    validate_cycle_tree_versions(cycle, selected)
+    existing_domains = set(cycle.skill_tree_version_links.values_list("technical_domain_id", flat=True))
+    locked = cycle.skill_tree_bindings_locked
+    for domain_id, tree in selected.items():
+        if locked and domain_id in existing_domains:
+            continue
+        TrainingCycleSkillTreeVersion.objects.update_or_create(
+            training_cycle=cycle, technical_domain_id=domain_id, defaults={"skill_tree_version": tree}
+        )
+    for link in cycle.skill_tree_version_links.exclude(technical_domain_id__in=selected):
+        link.delete()
+    cycle.save(update_fields=["updated_at"])
+    return cycle
 
 
 @transaction.atomic
@@ -99,6 +154,11 @@ def save_training_log(log, executions, *, backfill=False):
 @transaction.atomic
 def publish_training_task(task, competitor_ids, user=None):
     task = TrainingTask.objects.select_for_update().get(pk=task.pk)
+    if task.schedule_slot_id:
+        from .scheduling import publish_slot_task
+        if user is None:
+            raise ValidationError("发布计划内任务必须提供操作者。")
+        return publish_slot_task(task, user)
     if not task.domain_links.exists():
         raise ValidationError("发布训练任务前必须至少关联一个技术领域。")
     cycle_domain_ids = set(
@@ -107,8 +167,6 @@ def publish_training_task(task, competitor_ids, user=None):
     task_domain_ids = set(task.domain_links.values_list("technical_domain_id", flat=True))
     if not task_domain_ids.issubset(cycle_domain_ids):
         raise ValidationError("训练任务只能使用周期已固定技能树版本的技术领域。")
-    if not task.skill_links.filter(role="primary").exists():
-        raise ValidationError("发布训练任务前必须至少关联一个主要技能。")
     if not task.coach_links.exists():
         raise ValidationError("发布训练任务前必须至少分配一位教练。")
     competitor_ids = set(competitor_ids)
@@ -128,10 +186,20 @@ def publish_training_task(task, competitor_ids, user=None):
 
 @transaction.atomic
 def update_execution_facts(execution, *, user, **values):
+    from .models import TrainingPlan
+    plan_id = execution.training_task.training_plan_id
+    TrainingPlan.objects.select_for_update().get(pk=plan_id)
     execution = TaskExecution.objects.select_for_update().get(pk=execution.pk)
     if execution.user_id != user.pk:
         raise ValidationError("选手只能修改自己的任务执行记录。")
+    if execution.training_task.schedule_slot_id and (
+        execution.training_task.status != "published" or execution.status == "cancelled" or execution.revoked_at
+    ):
+        raise ValidationError("任务未发布或任务、分配已取消，不能更新执行。")
     allowed = {"status", "actual_minutes", "completion_note", "problems", "problem_resolved", "solution", "reflection"}
+    if execution.training_task.schedule_slot_id and "status" in values:
+        from .process import change_state
+        execution = change_state(execution, user, values.pop("status"))
     for key, value in values.items():
         if key in allowed:
             setattr(execution, key, value)
@@ -143,6 +211,9 @@ def update_execution_facts(execution, *, user, **values):
 def record_coach_feedback(execution, *, user, feedback):
     execution = TaskExecution.objects.select_for_update().get(pk=execution.pk)
     task = execution.training_task
+    if task.schedule_slot_id:
+        from .process import add_feedback
+        return add_feedback(execution, user, feedback)
     if not user.is_superuser and not task.coach_links.filter(user=user).exists():
         raise ValidationError("只有任务教练或超级管理员可以填写教练反馈。")
     execution.coach_feedback = feedback

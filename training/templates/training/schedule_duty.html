@@ -1,0 +1,1 @@
+{% if record.day.duty_all %}全体{% else %}{% for person in record.day.duty_coaches.all %}{{ person.display_name }}{% if not forloop.last %}、{% endif %}{% empty %}—{% endfor %}{% endif %}{% if record.day.note %}<p class="text-sm whitespace-pre-line">{{ record.day.note }}</p>{% endif %}

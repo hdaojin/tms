@@ -80,7 +80,7 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
                 'hx-target': '#id_severity',
                 'hx-swap': 'innerHTML',
             }),
-            'occurred_date': forms.DateInput(attrs={'type': 'date', 'aria-label': 'date-input'}),
+            'occurred_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'aria-label': 'date-input'}),
             'reason': forms.Textarea(attrs={
                 'rows': 3,
                 'aria-label': 'reason-input',

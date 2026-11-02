@@ -1,0 +1,1 @@
+<template>{% for row in rows %}<tr {{ row.attrs.as_html }} hx-swap-oob="outerHTML"{% if row.record.week_start %} data-week="{{ row.record.week_start }}"{% endif %}>{% for column, cell in row.items %}<td {{ column.attrs.td.as_html }}>{{ cell }}</td>{% endfor %}</tr>{% endfor %}</template>

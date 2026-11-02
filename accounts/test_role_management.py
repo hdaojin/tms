@@ -45,7 +45,11 @@ class DefaultRoleTests(TestCase):
             group = GroupProfile.objects.get(codename=code).group
             self.assertFalse(group.user_set.exists())
             self.assertFalse(group.technical_domain_scopes.exists())
-            self.assertFalse(group.permissions.filter(codename__startswith="delete_").exists())
+            deletions = group.permissions.filter(codename__startswith="delete_")
+            if code == "competitor":
+                self.assertEqual(set(deletions.values_list("content_type__app_label", "codename")), {("training", "delete_personaltrainingtask")})
+            else:
+                self.assertFalse(deletions.exists())
             user = User.objects.create_user(f"role-{code}")
             user.groups.add(group)
             for label in (
@@ -68,12 +72,16 @@ class DefaultRoleTests(TestCase):
                 self.assertFalse(user.has_perm(label), (code, label))
             positive = {
                 "competitor": [
+                    "training.add_trainingprogress",
+                    "training.add_personaltrainingtask",
+                    "training.delete_personaltrainingtask",
                     "training.change_taskexecution",
                     "training.add_traininglog",
                     "scoring.view_scoringresult",
                     "behaviors.be_conduct_subject",
                 ],
                 "coach": [
+                    "training.add_trainingcoachfeedback",
                     "standards.change_skill",
                     "standards.change_skilltreenode",
                     "training.change_trainingtask",

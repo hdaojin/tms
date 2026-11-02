@@ -6,6 +6,9 @@
         <span class="icon-[tabler--menu-2] size-6"></span>
       </label>
     {% endif %}
+    {% if desktop_nav %}<button type="button" class="btn btn-ghost btn-square hidden lg:inline-flex" data-desktop-nav-toggle aria-controls="tms-desktop-sidebar" aria-expanded="true" aria-label="收起导航" title="收起导航">
+      <span class="icon-[tabler--menu-2] size-6" aria-hidden="true"></span>
+    </button>{% endif %}
     <a href="/" class="btn btn-ghost min-w-0 gap-2 px-2">
       <img src="{% static 'images/logo.png' %}" alt="TMS" class="size-8" />
       <span class="hidden truncate text-lg font-bold sm:inline">{{ site_info.site_short_name }}</span>

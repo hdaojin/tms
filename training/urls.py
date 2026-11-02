@@ -1,9 +1,22 @@
 from django.urls import path
 from . import views
 from . import log_template_views as template_views
+from . import schedule_views
+from . import plan_people
+from . import process_views
+from . import workbook_views
+from . import entry_views
 
 app_name = "training"
 urlpatterns = [
+    path("plans/<int:pk>/entries/", entry_views.entry_operation, name="entry_operation"),
+    path("plans/<int:pk>/withdraw/<str:level>/", entry_views.withdraw_publication, name="withdraw_publication"),
+    path("plans/<int:pk>/withdraw/task/<int:task_id>/", entry_views.withdraw_publication, {"level": "task"}, name="withdraw_task"),
+    path("plans/<int:pk>/swap/", schedule_views.swap_schedule, name="schedule_swap"),
+    path("attachments/<str:kind>/<int:pk>/", process_views.attachment_download, name="attachment_download"),
+    path("plans/<int:plan_pk>/personal/create/", process_views.personal_edit, name="personal_create"),
+    path("personal/<int:pk>/", process_views.target_detail, {"personal": True}, name="personal_detail"),
+    path("personal/<int:pk>/edit/", process_views.personal_edit, name="personal_edit"),
     path("log-templates/", template_views.LogTemplateListView.as_view(), name="log_template_list"),
     path("log-templates/create/", template_views.LogTemplateCreateView.as_view(), name="log_template_create"),
     path("log-templates/links/", template_views.log_template_links, name="log_template_links"),
@@ -12,9 +25,10 @@ urlpatterns = [
     path("log-templates/<int:pk>/download/", template_views.LogTemplateDownloadView.as_view(), name="log_template_download"),
     path("", views.TrainingCycleListView.as_view(), name="cycle_list"),
     path("cycles/create/", views.TrainingCycleCreateView.as_view(), name="cycle_create"),
-    path("cycles/version-fields/", views.training_cycle_version_fields, name="cycle_version_fields"),
+    path("cycles/parent-field/", views.training_cycle_parent_field, name="cycle_parent_field"),
     path("cycles/<int:pk>/", views.TrainingCycleDetailView.as_view(), name="cycle_detail"),
     path("cycles/<int:pk>/edit/", views.TrainingCycleUpdateView.as_view(), name="cycle_edit"),
+    path("cycles/<int:pk>/tree-versions/", views.TrainingCycleTreeVersionsUpdateView.as_view(), name="cycle_tree_versions"),
     path("cycles/<int:pk>/members/", views.TrainingCycleMembersView.as_view(), name="cycle_members"),
     path("cycles/<int:pk>/members/<int:member_pk>/edit/",
          views.TrainingCycleMemberEditView.as_view(), name="member_edit"),
@@ -22,15 +36,30 @@ urlpatterns = [
          views.TrainingCycleMemberDeleteView.as_view(), name="member_delete"),
     path("plans/", views.TrainingPlanListView.as_view(), name="plan_list"),
     path("plans/create/", views.TrainingPlanCreateView.as_view(), name="plan_create"),
-    path("plans/<int:pk>/", views.TrainingPlanDetailView.as_view(), name="plan_detail"),
+    path("plans/staff-search/", plan_people.plan_staff_search, name="plan_staff_search"),
+    path("plans/<int:pk>/", schedule_views.PlanDetailView.as_view(), name="plan_detail"),
     path("plans/<int:pk>/edit/", views.TrainingPlanUpdateView.as_view(), name="plan_edit"),
-    path("tasks/", views.TrainingTaskListView.as_view(), name="task_list"),
-    path("tasks/create/", views.TrainingTaskCreateView.as_view(), name="task_create"),
+    path("plans/<int:pk>/initialize/", schedule_views.initialize, name="schedule_initialize"),
+    path("plans/<int:pk>/publish/", schedule_views.publish, name="schedule_publish"),
+    path("plans/<int:pk>/schedule/", schedule_views.edit_schedule, name="schedule_edit"),
+    path("plans/<int:pk>/schedule/bulk/", schedule_views.schedule_bulk, name="schedule_bulk"),
+    path("plans/<int:pk>/export/", schedule_views.export_plan, name="plan_export"),
+    path("plans/<int:pk>/import/", workbook_views.import_plan, name="plan_import"),
+    path("plans/<int:pk>/import-template/", workbook_views.import_template, name="plan_import_template"),
+    path("schedule-changes/<int:pk>/review/", schedule_views.review, name="schedule_review"),
+    path("slots/<int:slot_pk>/tasks/create/", schedule_views.task_edit, name="slot_task_create"),
+    path("slots/<int:pk>/tasks/clear/", schedule_views.clear_slot_tasks, name="slot_tasks_clear"),
+    path("slots/<int:pk>/competitors/", schedule_views.task_competitor_search, name="task_competitor_search"),
+    path("tasks/", schedule_views.legacy_task_list, name="task_list"),
+    path("tasks/create/", schedule_views.legacy_task_create, name="task_create"),
     path("tasks/<int:pk>/", views.TrainingTaskDetailView.as_view(), name="task_detail"),
-    path("tasks/<int:pk>/edit/", views.TrainingTaskUpdateView.as_view(), name="task_edit"),
+    path("tasks/<int:pk>/edit/", schedule_views.task_edit, name="task_edit"),
+    path("tasks/<int:pk>/action/", schedule_views.task_action, name="task_action"),
+    path("tasks/<int:pk>/skills/", schedule_views.task_skills, name="task_skills"),
+    path("tasks/<int:pk>/attach/", schedule_views.legacy_attach, name="legacy_attach"),
     path("my/", views.MyTrainingView.as_view(), name="my_training"),
     path("executions/", views.TaskExecutionListView.as_view(), name="execution_list"),
-    path("executions/<int:pk>/", views.TaskExecutionDetailView.as_view(), name="execution_detail"),
+    path("executions/<int:pk>/", process_views.target_detail, name="execution_detail"),
     path("executions/<int:pk>/edit/", views.TaskExecutionUpdateView.as_view(), name="execution_edit"),
     path("executions/<int:pk>/feedback/", views.CoachFeedbackView.as_view(), name="execution_feedback"),
     path("logs/", views.TrainingLogListView.as_view(), name="log_list"),

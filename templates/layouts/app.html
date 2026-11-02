@@ -1,16 +1,22 @@
 {% extends "layouts/base.html" %}
-{% load menu_tags %}
+{% load menu_tags static %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <script src="{% static 'js/sidebar.js' %}"></script>
+{% endblock %}
 
 {% block body %}
   <div class="drawer flex min-h-dvh flex-col">
     <input id="tms-app-drawer" type="checkbox" class="drawer-toggle" />
 
     {% block header %}
-      {% include "partials/header.html" %}
+      {% include "partials/header.html" with desktop_nav=True %}
     {% endblock %}
 
     <div class="drawer-content flex min-h-0 min-w-0 flex-1">
       <aside
+        id="tms-desktop-sidebar"
         class="{% if wide_sidebars %}xl:w-80{% else %}overflow-y-auto{% endif %} hidden w-72 shrink-0 border-r border-base-300 bg-base-100 lg:block print:hidden"
         data-app-left-sidebar
       >

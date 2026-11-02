@@ -957,6 +957,9 @@ class ConductRecordListViewTests(TestCase):
         response = self.client.get(reverse('behaviors:conductrecord_list'))
         content = response.content.decode()
 
+        self.assertTemplateUsed(response, 'common/table_page.html')
+        self.assertContains(response, 'tms-container-full')
+
         self.assertContains(response, '奖惩性质')
         self.assertContains(response, '具体原因/描述')
         self.assertNotContains(response, '记录人')

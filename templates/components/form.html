@@ -24,6 +24,7 @@ hx_attrs 为后端构造的完整属性字符串，避免在模板中拼接复�
     {% if show_reset|default:True %}
       <button type="reset" class="btn btn-ghost">{{ reset_label|default:"重置" }}</button>
     {% endif %}
-    <button type="submit" class="btn btn-primary">{{ submit_label|default:"提交" }}</button>
+    <button type="submit" {% if publish_button %}name="action" value="save"{% endif %} class="btn btn-primary">{{ submit_label|default:"提交" }}</button>
+    {% if publish_button %}<button type="submit" name="action" value="publish" class="btn btn-primary">发布</button>{% endif %}
   </div>
 </form>

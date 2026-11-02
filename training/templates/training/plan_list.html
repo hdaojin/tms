@@ -1,0 +1,7 @@
+{% extends "training/object_list.html" %}
+
+{% block list_results %}
+  {% partialdef results inline %}
+    {% include "components/table_wrapper.html" with table=table %}
+  {% endpartialdef %}
+{% endblock %}

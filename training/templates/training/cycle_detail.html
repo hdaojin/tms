@@ -1,35 +1,119 @@
 {% extends "layouts/app.html" %}{% load date_display %}
 
 {% block content %}
-<div class="card bg-base-100 shadow-sm">
-  <div class="card-body">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
+<div class="space-y-4">
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      {% if cycle_form %}
+      <details class="group peer" data-cycle-editor{% if cycle_form.is_bound %} open{% endif %}>
+        <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3">
+          <h2 class="card-title">训练周期信息</h2>
+          <span class="btn btn-outline btn-sm">
+            <span class="group-open:hidden">编辑</span>
+            <span class="hidden group-open:inline">收起</span>
+          </span>
+        </summary>
+        <form method="post" class="mt-4 space-y-6">
+          {% csrf_token %}
+          {% include "components/form_errors.html" with form=cycle_form %}
+          <div class="grid gap-4 md:grid-cols-2">
+            {% for field in cycle_form.visible_fields %}
+              {% if field.name != "parent" %}{% include "components/field.html" with field=field %}{% endif %}
+            {% endfor %}
+          </div>
+          <div id="cycle-parent-context">
+            {% include "training/partials/cycle_parent_field.html" with parent_field=cycle_form.parent %}
+          </div>
+          <dl class="grid gap-4 md:grid-cols-2">
+            {% include "components/record_timestamps.html" with created_at=cycle.created_at updated_at=cycle.updated_at timestamp_wrapper_class="fieldset" timestamp_label_class="fieldset-legend" timestamp_value_class="input h-auto min-h-10 w-full cursor-default whitespace-normal py-2" only %}
+          </dl>
+          <div class="flex justify-end gap-3">
+            <button class="btn btn-ghost" type="reset">重置</button>
+            <button class="btn btn-primary" type="submit">保存</button>
+          </div>
+        </form>
+      </details>
+      {% else %}
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 class="card-title">训练周期信息</h2>
-        <p class="text-sm text-base-content/70">{{ cycle.code }} / {{ cycle.skill_project }}</p>
+      </div>
+      {% endif %}
+      <dl class="grid gap-4 md:grid-cols-2{% if cycle_form %} peer-open:hidden{% endif %}">
+        {% include "components/detail_field.html" with label="技能项目" value=cycle.skill_project only %}
+        {% include "components/detail_field.html" with label="周期代码" value=cycle.code only %}
+        {% include "components/detail_field.html" with label="周期名称" value=cycle.name only %}
+        {% include "components/detail_field.html" with label="状态" value=cycle.get_status_display only %}
+        {% include "components/detail_field.html" with label="开始日期" value=cycle.start_date|keep_date_parts only %}
+        {% if cycle.end_date %}
+          {% include "components/detail_field.html" with label="结束日期" value=cycle.end_date|keep_date_parts only %}
+        {% else %}
+          {% include "components/detail_field.html" with label="结束日期" value="未设置" only %}
+        {% endif %}
+        {% include "components/detail_field.html" with label="描述" value=cycle.description|default:"暂无描述" multiline=True full_width=True only %}
+        {% include "components/detail_field.html" with label="父周期" value=cycle.parent|default:"无" full_width=True only %}
+        {% include "components/record_timestamps.html" with created_at=cycle.created_at updated_at=cycle.updated_at timestamp_wrapper_class="fieldset" timestamp_label_class="fieldset-legend" timestamp_value_class="input h-auto min-h-10 w-full cursor-default whitespace-normal py-2" only %}
+      </dl>
+    </div>
+  </section>
+
+  <section id="cycle-members" class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="card-title">周期成员列表</h2>
+        {% if perms.training.view_trainingcyclemember %}
+          <a href="{% url 'training:cycle_members' cycle.pk %}" class="btn btn-outline btn-sm">
+            {% if perms.training.add_trainingcyclemember or perms.training.change_trainingcyclemember or perms.training.delete_trainingcyclemember %}编辑成员{% else %}查看成员{% endif %}
+          </a>
+        {% endif %}
       </div>
       {% if perms.training.view_trainingcyclemember %}
-        <a href="{% url 'training:cycle_members' cycle.pk %}" class="btn btn-outline btn-sm">成员管理</a>
-      {% endif %}
-      {% if perms.training.change_trainingcycle %}
-        <a href="{% url 'training:cycle_edit' cycle.pk %}" class="btn btn-outline btn-sm">编辑</a>
+        <p>共 {{ members_page.paginator.count }} 位成员。</p>
+        <div class="overflow-x-auto"><table class="table table-sm">
+          <thead><tr><th>姓名</th><th>账号</th><th>周期身份</th><th>当前周期</th></tr></thead>
+          <tbody>
+            {% for member in members_page %}
+              <tr><td>{{ member.user.display_name }}</td><td>{{ member.user.username }}</td><td>{{ member.get_role_display }}</td><td>{{ member.is_current|yesno:"是,否" }}</td></tr>
+            {% empty %}<tr><td colspan="4">暂无周期成员。</td></tr>{% endfor %}
+          </tbody>
+        </table></div>
+        {% if members_page.has_other_pages %}
+          <div class="flex items-center gap-3">
+            {% if members_page.has_previous %}<a class="btn btn-ghost btn-sm" href="?members_page={{ members_page.previous_page_number }}#cycle-members">上一页</a>{% endif %}
+            <span>第 {{ members_page.number }} / {{ members_page.paginator.num_pages }} 页</span>
+            {% if members_page.has_next %}<a class="btn btn-ghost btn-sm" href="?members_page={{ members_page.next_page_number }}#cycle-members">下一页</a>{% endif %}
+          </div>
+        {% endif %}
+      {% else %}
+        <p>您没有查看周期成员的权限。</p>
       {% endif %}
     </div>
-    <p>{{ cycle.start_date|keep_date_parts }}{% if cycle.end_date %} - {{ cycle.end_date|keep_date_parts }}{% endif %}</p>
-    <p class="whitespace-pre-line">{{ cycle.description|default:"暂无描述" }}</p>
-    <div class="divider">领域技能树版本快照</div>
-    <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-      {% for link in cycle.skill_tree_version_links.all %}
-        <div class="rounded-box border border-base-300 p-3">
-          <p class="font-semibold">{{ link.technical_domain.name }}</p>
-          <a class="link link-primary text-sm" href="{% url 'standards:tree_detail' link.skill_tree_version_id %}">
-            {{ link.skill_tree_version.name }}（{{ link.skill_tree_version.version }}）
-          </a>
-        </div>
-      {% empty %}
-        <p class="text-sm text-base-content/60">尚未固定领域技能树版本。</p>
-      {% endfor %}
+  </section>
+
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="card-title">领域技能树版本快照</h2>
+        {% if perms.training.change_trainingcycle %}
+          {% if tree_versions_locked %}
+            <button class="btn btn-outline btn-sm" type="button" disabled title="该周期快照已锁定">编辑</button>
+          {% else %}
+            <a href="{% url 'training:cycle_tree_versions' cycle.pk %}" class="btn btn-outline btn-sm">{% if tree_versions_append_only %}追加领域{% else %}编辑{% endif %}</a>
+          {% endif %}
+        {% endif %}
+      </div>
+      <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {% for link in cycle.skill_tree_version_links.all %}
+          <div class="rounded-box border border-base-300 p-3">
+            <p class="font-semibold">{{ link.technical_domain.name }}</p>
+            {% if perms.standards.view_skilltreeversion %}<a class="link link-primary text-sm" href="{% url 'standards:tree_detail' link.skill_tree_version_id %}">{% endif %}
+              {{ link.skill_tree_version.name }}（{{ link.skill_tree_version.version }}）
+            {% if perms.standards.view_skilltreeversion %}</a>{% endif %}
+          </div>
+        {% empty %}
+          <p class="text-sm text-base-content/60">尚未固定领域技能树版本。进入进行中前请先配置。</p>
+        {% endfor %}
+      </div>
     </div>
-  </div>
+  </section>
 </div>
 {% endblock %}

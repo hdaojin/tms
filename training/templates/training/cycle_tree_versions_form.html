@@ -1,0 +1,23 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+<section class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body">
+    <h2 class="card-title">{{ cycle.name }} · 领域技能树版本快照</h2>
+    <p>选择需要纳入周期的领域及版本；进入“进行中”前至少选择一个领域。</p>
+    {% if tree_versions_locked %}
+      <p class="text-warning">该周期快照已锁定，不能新增、替换或删除。</p>
+    {% endif %}
+    {% if tree_versions_append_only %}<p>进行中的周期仅可追加新领域，已有领域版本不能替换或删除；不会自动调整排班、任务或权限。</p>{% endif %}
+    <form method="post" class="space-y-6">
+      {% csrf_token %}
+      {% include "components/form_errors.html" with form=form %}
+      {% include "training/partials/cycle_version_fields.html" %}
+      <div class="flex justify-end gap-3">
+        <a class="btn btn-ghost" href="{% url 'training:cycle_detail' cycle.pk %}">返回</a>
+        {% if not tree_versions_locked %}<button class="btn btn-primary" type="submit">保存</button>{% endif %}
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

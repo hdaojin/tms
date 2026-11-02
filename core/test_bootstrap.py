@@ -42,6 +42,8 @@ def find_record(plan, model_label, *key_values):
 
 class BootstrapTestMixin:
     def clear_bootstrap_data(self):
+        from training.models import TrainingPeriodConfig
+        TrainingPeriodConfig.objects.all().delete()
         ScoringParserConfig.objects.all().delete()
         ConductItem.objects.all().delete()
         ConductSeverityRule.objects.all().delete()

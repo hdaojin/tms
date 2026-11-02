@@ -1,0 +1,12 @@
+{% comment %}
+详情页只读字段，沿用表单字段的标签和输入框视觉样式。
+参数：label、value；multiline 表示多行内容，full_width 表示在两列布局中占满整行。
+{% endcomment %}
+<div class="fieldset{% if full_width %} md:col-span-2{% endif %}">
+  <dt class="fieldset-legend">{{ label }}</dt>
+  {% if multiline %}
+    <dd class="textarea w-full whitespace-pre-wrap break-words">{{ value }}</dd>
+  {% else %}
+    <dd class="input h-auto min-h-10 w-full cursor-default whitespace-normal py-2"><span class="min-w-0 break-words">{{ value }}</span></dd>
+  {% endif %}
+</div>

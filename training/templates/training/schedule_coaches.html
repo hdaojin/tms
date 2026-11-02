@@ -1,0 +1,1 @@
+{% if record.coaches_all %}全体{% else %}{% for person in record.coaches.all %}{{ person.display_name }}{% if not forloop.last %}、{% endif %}{% empty %}—{% endfor %}{% endif %}
