@@ -60,6 +60,8 @@ def render(request, template, context=None, **kwargs):
         "training/schedule_clear.html": "清空排班确认",
         "training/slot_tasks_clear.html": "清空任务确认",
         "training/workbook_import.html": "导入训练计划",
+        "training/plan_clear.html": "清空训练计划",
+        "training/plan_publish.html": "统一发布全部任务",
     }.get(template, "训练计划")
     parents = [breadcrumb_link("训练计划", "training:plan_list")] if request.user.has_perm("training.view_trainingplan") else []
     if plan and parents and context.get("can_view_plan", True):
@@ -130,7 +132,15 @@ class PlanDetailView(TrainingPlanDetailView):
 
     def get_context_data(self, **kwargs):
         from .schedule_display import plan_context
-        return plan_context(self, super().get_context_data(**kwargs))
+        from django.core.paginator import Paginator
+
+        context = plan_context(self, super().get_context_data(**kwargs))
+        if context["can_see_management"]:
+            members = self.object.participants.filter(is_active=True).select_related("user").order_by(
+                "user__last_name", "user__first_name", "pk",
+            )
+            context["members_page"] = Paginator(members, 25).get_page(self.request.GET.get("members_page"))
+        return context
 
 
 def _success(request, plan, text):

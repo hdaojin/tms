@@ -44,3 +44,20 @@ class CycleMemberTable(CycleCandidateTable):
         fields = ("first_name", "username", "roles", "join_date", "member_role", "member_current", "member_actions")
         sequence = fields
         exclude = (*CycleCandidateTable.Meta.exclude, "selection")
+
+
+class PlanMemberTable(CycleCandidateTable):
+    participating = tables.BooleanColumn(verbose_name="参与中", yesno=("是", "否"))
+    member_actions = tables.Column(verbose_name="操作", empty_values=(), orderable=False)
+
+    def render_member_actions(self, record):
+        if not record.participating:
+            return "已退出"
+        url = reverse("training:plan_member_remove", args=[record.participant_plan_id, record.participant_id])
+        query = self.request.GET.urlencode()
+        return format_html('<a class="btn btn-outline btn-sm" href="{}{}">退出计划</a>', url, "?" + query if query else "")
+
+    class Meta(CycleCandidateTable.Meta):
+        fields = ("first_name", "username", "roles", "join_date", "participating", "member_actions")
+        sequence = fields
+        exclude = (*CycleCandidateTable.Meta.exclude, "selection")

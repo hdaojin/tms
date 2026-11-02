@@ -13,7 +13,7 @@ from . import scheduling as service
 from .models import TaskExecution, TrainingPlan, TrainingScheduleSlot, TrainingTask
 
 
-def has_execution_facts(tasks):
+def execution_facts(tasks):
     return (
         TaskExecution.objects.filter(training_task__in=tasks)
         .filter(
@@ -32,8 +32,11 @@ def has_execution_facts(tasks):
             | ~Q(solution="")
             | ~Q(reflection="")
         )
-        .exists()
     )
+
+
+def has_execution_facts(tasks):
+    return execution_facts(tasks).exists()
 
 
 def fingerprint(plan, slot_ids, day_ids):
@@ -395,17 +398,12 @@ def preview_swap(plan, user, command):
 
 def withdrawal_state(plan, user, level, task_id=None):
     task = plan.tasks.select_related("schedule_slot__day__training_plan").get(pk=task_id) if level == "task" else None
-    allowed = (
-        service.can_fill(user, task.schedule_slot)
-        if task and task.schedule_slot_id
-        else service.plan_manager(user, plan)
-        if level == "plan"
-        else service.can_schedule(user, plan)
-        if level == "schedule"
-        else False
-    )
-    if not allowed:
+    if not service.privileged(user) or level not in {"task", "schedule", "plan"}:
         raise PermissionDenied
+    if level == "plan" and (plan.schedule_published_at or plan.tasks.filter(status="published").exists()):
+        raise ValidationError("请先撤回全部任务和排班发布。")
+    if level == "schedule" and plan.tasks.filter(status="published").exists():
+        raise ValidationError("请先撤回全部任务发布。")
     if not (
         task.status == "published" if task else plan.published_at if level == "plan" else plan.schedule_published_at
     ):

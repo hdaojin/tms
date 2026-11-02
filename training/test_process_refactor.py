@@ -228,8 +228,8 @@ class TrainingProcessTests(ProcessFixture, TestCase):
                 scheduling.save_slot_task(self.slot, self.coach, {"title": "改写"}, task=task)
             with self.assertRaises(ValidationError):
                 scheduling.assign_competitors(task, self.coach)
-            change = scheduling.cancel_task(task, self.coach, "申请取消")
-            self.assertEqual(change.status, "pending")
+            with self.assertRaisesMessage(ValidationError, "撤回"):
+                scheduling.cancel_task(task, self.coach, "申请取消")
             task.refresh_from_db()
             self.assertEqual(task.status, "published")
             process.change_state(execution, self.student, "completed")

@@ -22,13 +22,7 @@
     {% include "components/field.html" with field=form.objective %}
     {% include "components/field.html" with field=form.schedulers %}
     {% include "components/field.html" with field=form.approvers %}
-    {% if form.competitors %}<section data-plan-participants>
-      {% include "components/field.html" with field=form.all_competitors %}
-      <fieldset data-plan-individuals class="space-y-4">
-        {% include "components/field.html" with field=form.competitor_groups %}
-        {% include "components/field.html" with field=form.competitors %}
-      </fieldset>
-    </section>{% endif %}
+    <p>参与选手请在保存计划后，从计划详情页的“编辑成员”单独维护。</p>
     {% if form.reason %}{% include "components/field.html" with field=form.reason %}{% endif %}
     <p>{% if form.instance.published_at %}保存会更新计划并保留已发布状态。{% else %}保存会保留未发布的计划，之后可以继续编辑。{% endif %}
       首次保存后训练周期和日期范围固定；发布计划后，有查看权限的参与选手可以查看计划。排班和任务需要分别发布。</p>

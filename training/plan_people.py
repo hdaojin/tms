@@ -39,9 +39,8 @@ class PlanStaffSelect(RecipientSelect):
         url = reverse("training:plan_staff_search")
         if self.plan_id:
             url += f"?plan={self.plan_id}"
-        role = "competitor" if name == "competitors" else name
-        url += ("&" if "?" in url else "?") + f"role={role}"
-        context["widget"].update(search_url=url, picker_title={"schedulers": "排班人员", "approvers": "审批人员", "competitors": "参与选手"}.get(name, "人员"))
+        url += ("&" if "?" in url else "?") + f"role={name}"
+        context["widget"].update(search_url=url, picker_title={"schedulers": "排班人员", "approvers": "审批人员"}.get(name, "人员"))
         return context
 
 
@@ -69,12 +68,7 @@ def plan_staff_search(request):
         .filter(Q(username__icontains=query) | Q(_plan_staff_name__icontains=query))
         .order_by("last_name", "first_name", "username", "pk")
     )
-    if request.GET.get("role") == "competitor":
-        cycle_id = str(plan.training_cycle_id) if plan_id else request.GET.get("cycle", "")
-        if not cycle_id.isdecimal():
-            return JsonResponse({"results": [], "has_more": False})
-        users = users.filter(training_cycle_memberships__training_cycle_id=cycle_id, training_cycle_memberships__role="competitor")
-    elif request.GET.get("role") in {"schedulers", "approvers"}:
+    if request.GET.get("role") in {"schedulers", "approvers"}:
         users = users.filter(pk__in=eligible_staff(request.GET["role"]).values("pk"))
     else:
         return JsonResponse({"error": "人员职责无效。"}, status=400)

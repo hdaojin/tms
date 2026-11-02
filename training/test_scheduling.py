@@ -273,6 +273,8 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
             service.assign_competitors(task, self.coach, reason="调整名单", selected=[self.student.pk])
         self.assertFalse(task.executions.exists())
         service.publish_slot_task(task, self.coach)
+        task.status = "draft"
+        task.save(update_fields=["status", "updated_at"])
         service.cancel_task(task, self.coach, "取消")
         with self.assertRaisesMessage(ValidationError, "已发布任务"):
             service.assign_competitors(task, self.coach, reason="调整名单", selected=[self.student.pk])
@@ -354,12 +356,12 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         service.publish_slot_task(task, self.coach)
         execution = task.executions.get(user=self.student)
         update_execution_facts(execution, user=self.student, status="in_progress")
-        service.cancel_task(task, self.coach, "调整任务")
+        with self.assertRaisesMessage(ValidationError, "撤回"):
+            service.cancel_task(task, self.coach, "调整任务")
         execution.refresh_from_db()
         self.assertIsNotNone(execution.started_at)
         self.assertEqual(task.executions.count(), 2)
-        with self.assertRaises(ValidationError):
-            update_execution_facts(execution, user=self.student, status="completed")
+        update_execution_facts(execution, user=self.student, status="completed")
 
     def test_audit_records_cannot_be_overwritten(self):
         record = service.audit(self.plan, self.admin, "测试记录")
@@ -643,23 +645,25 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         self.ready()
         task = self.new_task()
         ids = list(task.executions.values_list("pk", flat=True))
-        _, guard = withdrawal_state(self.plan, self.coach, "task", task.pk)
-        token = signing.dumps({"user": self.coach.pk, "plan": self.plan.pk, "level": "task", "task": task.pk,
+        _, guard = withdrawal_state(self.plan, self.admin, "task", task.pk)
+        token = signing.dumps({"user": self.admin.pk, "plan": self.plan.pk, "level": "task", "task": task.pk,
             "reason": "修订", "guard": guard}, salt="training.withdraw")
-        withdraw(self.plan, self.coach, token)
+        withdraw(self.plan, self.admin, token)
         task.refresh_from_db()
         self.assertEqual(task.status, "draft")
         service.publish_slot_task(task, self.coach)
         self.assertEqual(ids, list(task.executions.values_list("pk", flat=True)))
-        _, guard = withdrawal_state(self.plan, self.scheduler, "schedule")
-        token = signing.dumps({"user": self.scheduler.pk, "plan": self.plan.pk, "level": "schedule",
+        _, guard = withdrawal_state(self.plan, self.admin, "task", task.pk)
+        withdraw(self.plan, self.admin, signing.dumps({"user": self.admin.pk, "plan": self.plan.pk, "level": "task", "task": task.pk, "reason": "修订", "guard": guard}, salt="training.withdraw"))
+        _, guard = withdrawal_state(self.plan, self.admin, "schedule")
+        token = signing.dumps({"user": self.admin.pk, "plan": self.plan.pk, "level": "schedule",
             "reason": "修订", "guard": guard}, salt="training.withdraw")
-        withdraw(self.plan, self.scheduler, token)
+        withdraw(self.plan, self.admin, token)
         self.plan.refresh_from_db()
         task.refresh_from_db()
         self.assertIsNone(self.plan.schedule_published_at)
         self.assertIsNotNone(self.plan.published_at)
-        self.assertEqual(task.status, "published")
+        self.assertEqual(task.status, "draft")
 
     def test_entries_withdraw_forbidden_after_progress(self):
         from .entry_operations import withdrawal_state
@@ -668,7 +672,7 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         execution = task.executions.get(user=self.student)
         from .models import TrainingProgress
         TrainingProgress.objects.create(execution=execution, author=self.student, completed="已学习")
-        for user, level, task_id in [(self.admin, "plan", None), (self.scheduler, "schedule", None), (self.coach, "task", task.pk)]:
+        for user, level, task_id in [(self.admin, "plan", None), (self.admin, "schedule", None), (self.admin, "task", task.pk)]:
             with self.assertRaises(ValidationError):
                 withdrawal_state(self.plan, user, level, task_id)
 
@@ -691,6 +695,14 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         from .entry_operations import withdrawal_state
         self.ready()
         task = self.new_task()
+        from . import plan_clear
+        state = plan_clear.state(self.plan, self.admin, "withdraw_tasks")
+        plan_clear.execute(self.plan, self.admin, "withdraw_tasks", "修订", state["digest"])
+        from django.core import signing
+        from .entry_operations import withdraw
+        _, guard = withdrawal_state(self.plan, self.admin, "schedule")
+        withdraw(self.plan, self.admin, signing.dumps({"user": self.admin.pk, "plan": self.plan.pk, "level": "schedule", "reason": "修订", "guard": guard}, salt="training.withdraw"))
+        self.plan.refresh_from_db()
         self.client.force_login(self.admin)
         url = reverse("training:withdraw_publication", args=[self.plan.pk, "plan"])
         response = self.client.post(url, {"reason": "修订", "return_query": "tab=details&period=morning&page=9&next=https://invalid.example"})
@@ -701,17 +713,15 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         self.assertNotIn("invalid.example", response.url)
         self.plan.refresh_from_db()
         self.assertIsNone(self.plan.published_at)
-        self.assertIsNotNone(self.plan.schedule_published_at)
+        self.assertIsNone(self.plan.schedule_published_at)
         task.refresh_from_db()
-        self.assertEqual(task.status, "published")
+        self.assertEqual(task.status, "draft")
         later = self.person("late-member", "competitor")
         TrainingPlanParticipant.objects.create(training_plan=self.plan, user=later)
         self.plan.published_at = timezone.now()
         self.plan.save()
-        _, guard = withdrawal_state(self.plan, self.coach, "task", task.pk)
-        from django.core import signing
-        from .entry_operations import withdraw
-        withdraw(self.plan, self.coach, signing.dumps({"user": self.coach.pk, "plan": self.plan.pk, "task": task.pk, "level": "task", "reason": "修订", "guard": guard}, salt="training.withdraw"))
+        self.plan.schedule_published_at = timezone.now()
+        self.plan.save()
         service.publish_slot_task(task, self.coach)
         self.assertFalse(task.executions.filter(user=later).exists())
 

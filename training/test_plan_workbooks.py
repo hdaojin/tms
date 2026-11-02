@@ -2,16 +2,52 @@ from io import BytesIO
 from copy import copy
 from unittest.mock import patch
 
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
+from django.urls import reverse
 from openpyxl import load_workbook
 
 from . import scheduling
-from .plan_workbooks import TEMPLATE, build_plan_workbook, preview_import
+from .plan_workbooks import TEMPLATE, build_plan_workbook, confirm_import, preview_import
 from .test_process_refactor import ProcessFixture
 
 
 class PlanWorkbookTests(ProcessFixture, TestCase):
+    def test_import_uses_full_page_through_preview_and_confirmation(self):
+        self.empty_plan()
+        self.client.force_login(self.admin)
+        url = reverse("training:plan_import", args=[self.plan.pk])
+        detail_url = reverse("training:plan_detail", args=[self.plan.pk])
+        detail = self.client.get(detail_url)
+        self.assertContains(detail, f'href="{url}">导入 Excel</a>', html=False)
+        page = self.client.get(url)
+        self.assertContains(page, f'href="{detail_url}">取消</a>', html=False)
+        self.assertNotContains(page, 'hx-post=')
+        upload = SimpleUploadedFile(
+            "plan.xlsx", self.workbook().getvalue(),
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        preview = self.client.post(url, {"file": upload})
+        self.assertContains(preview, "确认导入")
+        self.assertContains(preview, "任务分配选手（2 人）")
+        self.assertContains(preview, self.student.username)
+        self.assertNotContains(preview, 'hx-post=')
+        response = self.client.post(url, {"token": preview.context["token"]})
+        self.assertRedirects(response, detail_url)
+
+    def test_export_and_import_template_show_weekday_as_text(self):
+        for import_template in (False, True):
+            with self.subTest(import_template=import_template):
+                sheet = load_workbook(
+                    BytesIO(build_plan_workbook(self.plan, import_template=import_template))
+                )["训练计划"]
+                for row in (3, 7):
+                    day = sheet.cell(row, 1).value
+                    weekday = sheet.cell(row, 2)
+                    self.assertEqual(weekday.value, "星期" + "一二三四五六日"[day.weekday()])
+                    self.assertEqual(weekday.data_type, "s")
+
     def test_export_only_contains_viewers_assigned_task_content(self):
         self.task(title="只给选手一的保密任务", assign_all=False, competitors=[self.student.pk])
         self.task(title="只给选手二的保密任务", assign_all=False, competitors=[self.student2.pk])
@@ -23,11 +59,33 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
         self.assertNotIn("只给选手一", str(list(second.values)))
 
     def test_import_confirmation_rechecks_tasks_created_after_preview(self):
+        self.empty_plan()
         _, payload = preview_import(self.plan, self.admin, self.workbook())
-        self.task(title="预览后新增")
+        from .models import TrainingTask
+        TrainingTask.objects.create(training_plan=self.plan, schedule_slot=self.slot, planned_date=self.plan.start_date,
+                                    title="预览后新增", created_by=self.admin)
         with self.assertRaisesMessage(ValidationError, "已有任务"):
-            scheduling.save_schedule(self.plan, self.admin, payload, "过时预览")
+            confirm_import(self.plan, self.admin, payload, self.members())
         self.assertEqual(self.plan.tasks.count(), 1)
+
+    def empty_plan(self):
+        self.plan.schedule_published_at = None
+        self.plan.save(update_fields=["schedule_published_at", "updated_at"])
+        for day in self.plan.schedule_days.all():
+            day.duty_coaches.clear()
+            day.duty_all, day.note = False, ""
+            day.save()
+            for slot in day.slots.all():
+                slot.domains.clear()
+                slot.coaches.clear()
+                slot.primary_domain = None
+                slot.coaches_all = False
+                slot.kind = "pending" if slot.is_configured else "unused"
+                slot.save()
+        self.slot.refresh_from_db()
+
+    def members(self):
+        return list(self.plan.participants.filter(is_active=True).order_by("user_id").values_list("user_id", flat=True))
 
     def workbook(self, task="一个完整任务\n第二段说明"):
         workbook = load_workbook(BytesIO(build_plan_workbook(self.plan)))
@@ -65,32 +123,48 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
         self.assertEqual(TEMPLATE.read_bytes(), before)
         self.assertEqual(load_workbook(BytesIO(build_plan_workbook(self.plan))).sheetnames, ["训练计划"])
 
-    def test_partial_import_one_cell_one_task_and_approval(self):
+    def test_one_cell_one_task_with_unpublished_schedule(self):
+        self.empty_plan()
+        self.plan.participants.update(was_initial=False)
         records, payload = preview_import(self.plan, self.admin, self.workbook())
         self.assertEqual([record["status"] for record in records], ["成功"])
-        request = scheduling.save_schedule(self.plan, self.admin, payload, "导入任务")
-        self.assertEqual(self.plan.tasks.count(), 0)
-        self.confirm_change_coaches(request)
-        scheduling.review_change(request, self.admin, approve=True)
+        confirm_import(self.plan, self.admin, payload, self.members())
         task = self.plan.tasks.get()
         self.assertEqual(task.description, "一个完整任务\n第二段说明")
         self.assertEqual(task.status, "draft")
         self.assertEqual(task.executions.count(), 0)
+        self.assertEqual(task.selected_competitors.count(), 2)
+        self.assertIsNone(self.plan.schedule_published_at)
+        self.slot.refresh_from_db()
+        self.assertEqual(self.slot.primary_domain_id, self.linux.pk)
+        with self.assertRaisesMessage(ValidationError, "已有任务"):
+            preview_import(self.plan, self.admin, self.workbook())
+        for day in self.plan.schedule_days.all():
+            if day.pk == self.slot.day_id:
+                day.duty_coaches.add(self.coach)
+            for slot in day.slots.exclude(pk=self.slot.pk).filter(is_configured=True):
+                slot.kind = "rest"
+                slot.save()
+        scheduling.publish_schedule(self.plan, self.admin)
+        self.plan.participants.filter(user=self.student).update(is_active=False)
+        task.refresh_from_db()
         scheduling.publish_slot_task(task, self.coach)
-        self.assertEqual(task.executions.count(), 2)
-        records, payload = preview_import(self.plan, self.admin, self.workbook())
-        self.assertEqual(records[0]["status"], "错误")
-        self.assertEqual(payload, [])
+        self.assertEqual(set(task.executions.values_list("user_id", flat=True)), {self.student.pk, self.student2.pk})
 
-    def test_confirm_rechecks_lock_and_preserves_all_data(self):
+    def test_confirm_rechecks_whole_plan_and_preserves_all_data(self):
+        self.empty_plan()
         records, payload = preview_import(self.plan, self.admin, self.workbook())
-        with patch("django.utils.timezone.now", return_value=self.slot.ends_at):
-            request = scheduling.save_schedule(self.plan, self.admin, payload, "逾时导入，补记实际安排")
-            self.assertEqual(request.confirmations, [])
+        day = self.plan.schedule_days.last()
+        day.note = "预览后修改"
+        day.save()
+        with self.assertRaisesMessage(ValidationError, "已有值班或备注"):
+            confirm_import(self.plan, self.admin, payload, self.members())
         self.assertEqual(self.plan.tasks.count(), 0)
-        self.assertEqual(self.plan.schedule_changes.count(), 1)
+        self.slot.refresh_from_db()
+        self.assertEqual(self.slot.kind, "pending")
 
-    def test_invalid_row_does_not_remove_valid_rows_and_weekday_warning(self):
+    def test_invalid_row_blocks_all_and_weekday_warning(self):
+        self.empty_plan()
         stream = self.workbook()
         workbook = load_workbook(stream)
         sheet = workbook["训练计划"]
@@ -102,4 +176,75 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
         output.seek(0)
         records, payload = preview_import(self.plan, self.admin, output)
         self.assertEqual([record["status"] for record in records], ["警告", "错误"])
-        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload, [])
+        self.client.force_login(self.admin)
+        response = self.client.post(reverse("training:plan_import", args=[self.plan.pk]), {
+            "file": SimpleUploadedFile("plan.xlsx", output.getvalue(),
+                                       content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        })
+        self.assertFalse(response.context["token"])
+        self.assertContains(response, "错误日期")
+
+    def test_import_rolls_back_all_changes_on_failure(self):
+        self.empty_plan()
+        _, payload = preview_import(self.plan, self.admin, self.workbook())
+        with patch("training.scheduling.save_slot_task", side_effect=ValidationError("失败")):
+            with self.assertRaises(ValidationError):
+                confirm_import(self.plan, self.admin, payload, self.members())
+        self.slot.refresh_from_db()
+        self.assertEqual(self.slot.kind, "pending")
+        self.assertFalse(self.plan.tasks.exists())
+
+    def test_cancelled_task_history_does_not_prevent_import(self):
+        self.empty_plan()
+        from .models import TrainingTask
+        old = TrainingTask.objects.create(training_plan=self.plan, schedule_slot=self.slot,
+                                          planned_date=self.plan.start_date, title="历史任务",
+                                          status="cancelled", created_by=self.admin)
+        _, payload = preview_import(self.plan, self.admin, self.workbook())
+        confirm_import(self.plan, self.admin, payload, self.members())
+        old.refresh_from_db()
+        self.assertEqual(old.status, "cancelled")
+        self.assertEqual(self.plan.tasks.filter(status="draft").count(), 1)
+
+    def test_scheduler_can_import_without_being_slot_coach(self):
+        self.empty_plan()
+        scheduler = self.person("other-scheduler", "coach")
+        self.plan.schedulers.add(scheduler)
+        _, payload = preview_import(self.plan, scheduler, self.workbook())
+        confirm_import(self.plan, scheduler, payload, self.members())
+        self.assertEqual(self.plan.tasks.count(), 1)
+        with self.assertRaises(PermissionDenied):
+            preview_import(self.plan, self.student, self.workbook())
+
+    def test_warning_allows_import_but_empty_snapshot_blocks_task(self):
+        self.empty_plan()
+        workbook = load_workbook(self.workbook())
+        workbook["训练计划"]["B4"] = "星期一"
+        output = BytesIO()
+        workbook.save(output)
+        records, payload = preview_import(self.plan, self.admin, BytesIO(output.getvalue()))
+        self.assertEqual(records[0]["status"], "警告")
+        self.assertTrue(payload)
+        self.plan.participants.update(is_active=False)
+        records, payload = preview_import(self.plan, self.admin, BytesIO(output.getvalue()))
+        self.assertEqual(records[0]["status"], "错误")
+        self.assertIn("当前参与选手", records[0]["message"])
+        self.assertFalse(payload)
+
+    def test_confirm_rechecks_initial_competitors_and_permission(self):
+        self.empty_plan()
+        scheduler = self.person("changing-scheduler", "coach")
+        self.plan.schedulers.add(scheduler)
+        _, payload = preview_import(self.plan, scheduler, self.workbook())
+        members = self.members()
+        self.plan.participants.filter(user=self.student).update(is_active=False)
+        with self.assertRaisesMessage(ValidationError, "参与选手已经变化"):
+            confirm_import(self.plan, scheduler, payload, members)
+        self.plan.participants.filter(user=self.student).update(is_active=True)
+        from django.contrib.auth.models import Permission
+        scheduler.user_permissions.remove(Permission.objects.get(content_type__app_label="training", codename="add_trainingtask"))
+        scheduler = type(scheduler).objects.get(pk=scheduler.pk)
+        with self.assertRaises(PermissionDenied):
+            confirm_import(self.plan, scheduler, payload, members)
+        self.assertFalse(self.plan.tasks.exists())

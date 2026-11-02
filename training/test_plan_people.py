@@ -146,45 +146,20 @@ class PlanPeopleTests(TrainingFixtureMixin, TestCase):
         data.update({"morning_start": "09:00", "morning_end": "12:00", "afternoon_start": "14:00", "afternoon_end": "17:00"})
         return data | extra
 
-    def test_empty_edit_defaults_all_but_only_save_applies_snapshot(self):
+    def test_edit_does_not_accept_or_modify_participants(self):
         from .forms import TrainingPlanForm
-        self.assertTrue(TrainingPlanForm(instance=self.plan)["all_competitors"].value())
-        self.assertFalse(self.plan.participants.exists())
-        response = self.client.post(reverse("training:plan_edit", args=[self.plan.pk]), self.edit_data(all_competitors="on"))
+        from .models import TrainingPlanParticipant
+        participant = TrainingPlanParticipant.objects.create(training_plan=self.plan, user=self.people[-1])
+        form = TrainingPlanForm(instance=self.plan)
+        for name in ("competitors", "all_competitors", "competitor_groups"):
+            self.assertNotIn(name, form.fields)
+        response = self.client.post(reverse("training:plan_edit", args=[self.plan.pk]),
+                                    self.edit_data(all_competitors="on", competitors=[self.people[0].pk]))
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(set(self.plan.participants.filter(is_active=True).values_list("user_id", flat=True)), {self.people[-1].pk})
-        newcomer = User.objects.create_user("late-plan-student")
-        TrainingCycleMember.objects.create(training_cycle=self.period, user=newcomer, role="competitor")
-        self.assertFalse(self.plan.participants.filter(user=newcomer).exists())
-        self.assertFalse(TrainingPlanForm(instance=self.plan)["all_competitors"].value())
-        self.client.post(reverse("training:plan_edit", args=[self.plan.pk]), self.edit_data(all_competitors="on"))
-        self.assertTrue(self.plan.participants.filter(user=newcomer, is_active=True).exists())
-        self.assertFalse(self.plan.participants.filter(was_initial=True).exists())
+        participant.refresh_from_db()
+        self.assertTrue(participant.is_active)
+        self.assertEqual(self.plan.participants.count(), 1)
 
-    def test_group_and_individual_selection_is_cycle_intersection_and_union(self):
-        from django.contrib.auth.models import Group
-        extra = User.objects.create_user("second-team-student")
-        TrainingCycleMember.objects.create(training_cycle=self.period, user=extra, role="competitor")
-        first = Group.objects.create(name="第一梯队")
-        second = Group.objects.create(name="第二梯队")
-        first.user_set.add(self.people[-1], self.people[0])
-        second.user_set.add(extra, self.people[-1])
-        url = reverse("training:plan_edit", args=[self.plan.pk])
-        response = self.client.post(url, self.edit_data(competitor_groups=[first.pk, second.pk], competitors=[extra.pk]))
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(set(self.plan.participants.filter(is_active=True).values_list("user_id", flat=True)), {extra.pk, self.people[-1].pk})
-        first.user_set.clear()
-        self.assertEqual(self.plan.participants.filter(is_active=True).count(), 2)
-        response = self.client.post(url, self.edit_data(competitors=[self.people[0].pk]))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("competitors", response.context["form"].errors)
-        unrelated = Group.objects.create(name="无关组")
-        response = self.client.post(url, self.edit_data(competitor_groups=[unrelated.pk]))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("competitor_groups", response.context["form"].errors)
-
-    def test_competitor_search_ignores_forged_cycle_for_existing_plan(self):
-        other = self.cycle("OTHER-SEARCH")
-        TrainingCycleMember.objects.create(training_cycle=other, user=self.people[0], role="competitor")
-        response = self.client.get(self.search_url, {"plan": self.plan.pk, "cycle": other.pk, "role": "competitor", "q": "staff-candidate"})
-        self.assertEqual([row["id"] for row in response.json()["results"]], [self.people[-1].pk])
+    def test_staff_search_rejects_old_competitor_picker(self):
+        response = self.client.get(self.search_url, {"plan": self.plan.pk, "role": "competitor", "q": "staff"})
+        self.assertEqual(response.status_code, 400)

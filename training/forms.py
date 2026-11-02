@@ -6,7 +6,6 @@ from django import forms
 from django.utils import timezone
 from django.utils.html import format_html
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.db import models, transaction
 from django.urls import reverse
 
@@ -204,9 +203,6 @@ class TrainingCycleTreeVersionsForm(StyledFormMixin, forms.Form):
 
 class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
     reason = forms.CharField(label="时段时间调整原因", required=False, widget=forms.Textarea(attrs={"rows": 2}))
-    all_competitors = forms.BooleanField(label="全部选手", required=False, help_text="保存时纳入当前训练周期内所有选手；之后新增成员不自动加入。")
-    competitor_groups = forms.ModelMultipleChoiceField(label="按群组指定", queryset=Group.objects.none(), required=False, help_text="可多选群组；仅纳入本周期选手，与下方指定个人合并去重。")
-    competitors = forms.ModelMultipleChoiceField(label="指定个人", queryset=get_user_model().objects.none(), required=False, widget=PlanStaffSelect())
     class Meta:
         model = TrainingPlan
         fields = ["training_cycle", "title", "start_date", "end_date", *TrainingPlan.TIME_FIELDS, "objective", "schedulers", "approvers"]
@@ -233,9 +229,6 @@ class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
             if self.instance.pk and getattr(self.instance, name) is None and name.rsplit("_", 1)[0] in unknown_periods:
                 self.fields[name].help_text = "历史时间缺失或不一致，请核对后填写；普通保存不改变已结束快照。"
         if not self.instance.pk:
-            self.fields.pop("competitors")
-            self.fields.pop("all_competitors")
-            self.fields.pop("competitor_groups")
             self.fields.pop("reason")
             from .models import TrainingPeriodConfig
             for config in TrainingPeriodConfig.objects.all():
@@ -246,29 +239,15 @@ class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
                 self.fields[name].help_text = "首次保存后固定；需要改变请另建计划。"
             for name in ("start_date", "end_date"):
                 self.fields[name].widget.attrs["readonly"] = True
-        cycle_id = self.data.get("training_cycle") if self.is_bound else (self.instance.training_cycle_id or self.initial.get("training_cycle"))
-        if self.instance.pk:
-            cycle_id = self.instance.training_cycle_id
-        if self.instance.pk and str(cycle_id).isdigit():
-            self.fields["competitors"].queryset = get_user_model().objects.filter(training_cycle_memberships__training_cycle_id=cycle_id, training_cycle_memberships__role="competitor")
-        if self.instance.pk:
-            self.initial["competitors"] = list(self.instance.participants.filter(is_active=True).values_list("user_id", flat=True))
-            self.initial.setdefault("all_competitors", not self.initial["competitors"])
-            self.fields["competitor_groups"].queryset = Group.objects.filter(user__training_cycle_memberships__training_cycle_id=cycle_id, user__training_cycle_memberships__role="competitor").distinct().order_by("name", "pk")
-            if self.is_bound and forms.BooleanField(required=False).clean(self.data.get("all_competitors")):
-                self.fields["competitors"].disabled = True
-                self.fields["competitor_groups"].disabled = True
-            self.fields["competitors"].queryset = get_user_model().objects.filter(models.Q(pk__in=self.fields["competitors"].queryset.values("pk")) | models.Q(training_plan_participations__training_plan=self.instance))
-            self.fields["competitors"].help_text = "仅选择本周期选手；新增成员不自动获得历史任务，退出不删除已有执行。"
         from accounts.services.users import get_user_full_info
-        for name in ("schedulers", "approvers", *(("competitors",) if self.instance.pk else ())):
+        for name in ("schedulers", "approvers"):
             field = self.fields[name]
             field.widget.plan_id = self.instance.pk
             ids = [str(pk) for pk in (self[name].value() or []) if str(pk).isdecimal()]
-            eligible_ids = set(eligible_staff(name).filter(pk__in=ids).values_list("pk", flat=True)) if name != "competitors" else set()
+            eligible_ids = set(eligible_staff(name).filter(pk__in=ids).values_list("pk", flat=True))
             field.widget.selected = [
                 {"id": person.pk, "label": get_user_full_info(person),
-                 "unavailable": name != "competitors" and person.pk not in eligible_ids}
+                 "unavailable": person.pk not in eligible_ids}
                 for person in field.queryset.filter(pk__in=ids).order_by("last_name", "first_name", "username", "pk")
             ]
 

@@ -81,6 +81,7 @@ def entry_context(view, day_table, *, matching_only=False):
     visible_tasks = (
         visible_training_tasks_for(user)
         .filter(training_plan=plan)
+        .exclude(status="cancelled")
         .only("pk", "schedule_slot_id", "training_plan_id", "title", "status", "order")
         .order_by("order", "pk")
     )

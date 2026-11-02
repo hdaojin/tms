@@ -51,9 +51,6 @@
       const url = new URL(root.dataset.searchUrl, window.location.origin);
       url.searchParams.set('q', term);
       url.searchParams.set('page', String(page + 1));
-      if (root.dataset.fieldName === 'competitors') {
-        url.searchParams.set('cycle', root.closest('form')?.querySelector('[name="training_cycle"]')?.value || '');
-      }
       status.textContent = '正在搜索…';
       try {
         const response = await fetch(url, { credentials: 'same-origin' });
@@ -115,24 +112,8 @@
       if (dialog.open) dialog.close();
     });
   }
-  function participants(root) {
-    if (root.dataset.bound) return;
-    root.dataset.bound = 'true';
-    const all = root.querySelector('[name="all_competitors"]');
-    const individuals = root.querySelector('[data-plan-individuals]');
-    const sync = () => {
-      individuals.disabled = all.checked;
-      individuals.hidden = all.checked;
-      const groups = individuals.querySelector('[name="competitor_groups"]');
-      if (groups) groups.disabled = all.checked;
-    };
-    all.addEventListener('change', sync);
-    root.closest('form')?.addEventListener('reset', () => setTimeout(sync, 0));
-    sync();
-  }
   function refresh() {
     document.querySelectorAll('[data-plan-people]').forEach(init);
-    document.querySelectorAll('[data-plan-participants]').forEach(participants);
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', refresh, { once: true });

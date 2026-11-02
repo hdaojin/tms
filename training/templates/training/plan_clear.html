@@ -1,0 +1,22 @@
+{% extends 'layouts/app.html' %}
+{% block content %}
+<section class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body">
+  <h2 class="card-title">{{ action_label }} · {{ plan.title }}</h2>
+  {% if error %}<p class="alert alert-error">{{ error }}</p>{% endif %}
+  {% if preview %}
+    {% if action == 'clear_schedule' %}
+      <p>将清空全部排班、每天的值班教练和备注，保留日期和时段时间。未启用时段保持未启用。</p>
+      {% for day in preview.days %}<p>{{ day.date|date:'Y-m-d' }} · 值班：{% for coach in day.duty_coaches.all %}{{ coach.display_name }} {% empty %}{% if day.duty_all %}全体{% else %}无{% endif %}{% endfor %} · 备注：{{ day.note|default:'无' }}</p>{% endfor %}
+      {% for slot in preview.slots %}<p>{{ slot }} · {{ slot.get_kind_display }} · 领域：{% for domain in slot.domains.all %}{{ domain.name }} {% empty %}无{% endfor %} · 教练：{% for coach in slot.coaches.all %}{{ coach.display_name }} {% empty %}{% if slot.coaches_all %}全体{% else %}无{% endif %}{% endfor %}</p>{% endfor %}
+    {% else %}
+      <p>共 {{ preview.targets|length }} 项任务；任务及其附件、分配和历史记录保留。</p>
+      {% for task in preview.targets %}<p>{{ task.planned_date|date:'Y-m-d' }} · {{ task.title }} · {{ task.get_status_display }}</p>{% endfor %}
+    {% endif %}
+    <form method="post" class="space-y-4">{% csrf_token %}
+      {% if token %}<p>原因：{{ form.reason.value }}</p><input type="hidden" name="token" value="{{ token }}"><button class="btn btn-error">确认{{ action_label }}</button>
+      {% else %}{% include 'components/field.html' with field=form.reason %}<button class="btn btn-primary">预览确认</button>{% endif %}
+    </form>
+  {% endif %}
+  <a class="btn btn-ghost" href="{% url 'training:plan_detail' plan.pk %}">返回训练计划</a>
+</div></section>
+{% endblock %}

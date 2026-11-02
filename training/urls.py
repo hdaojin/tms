@@ -6,9 +6,12 @@ from . import plan_people
 from . import process_views
 from . import workbook_views
 from . import entry_views
+from . import plan_member_views
 
 app_name = "training"
 urlpatterns = [
+    path("plans/<int:pk>/publish-tasks/", entry_views.publish_all_tasks, name="publish_all_tasks"),
+    path("plans/<int:pk>/clear/<str:action>/", entry_views.clear_plan, name="plan_clear"),
     path("plans/<int:pk>/entries/", entry_views.entry_operation, name="entry_operation"),
     path("plans/<int:pk>/withdraw/<str:level>/", entry_views.withdraw_publication, name="withdraw_publication"),
     path("plans/<int:pk>/withdraw/task/<int:task_id>/", entry_views.withdraw_publication, {"level": "task"}, name="withdraw_task"),
@@ -39,6 +42,9 @@ urlpatterns = [
     path("plans/staff-search/", plan_people.plan_staff_search, name="plan_staff_search"),
     path("plans/<int:pk>/", schedule_views.PlanDetailView.as_view(), name="plan_detail"),
     path("plans/<int:pk>/edit/", views.TrainingPlanUpdateView.as_view(), name="plan_edit"),
+    path("plans/<int:pk>/members/", plan_member_views.PlanMembersView.as_view(), name="plan_members"),
+    path("plans/<int:pk>/members/<int:member_pk>/remove/",
+         plan_member_views.PlanMemberRemoveView.as_view(), name="plan_member_remove"),
     path("plans/<int:pk>/initialize/", schedule_views.initialize, name="schedule_initialize"),
     path("plans/<int:pk>/publish/", schedule_views.publish, name="schedule_publish"),
     path("plans/<int:pk>/schedule/", schedule_views.edit_schedule, name="schedule_edit"),

@@ -6,12 +6,13 @@ from io import BytesIO
 from pathlib import Path
 
 from django.core.exceptions import PermissionDenied, ValidationError
+from django.db import transaction
 from openpyxl import load_workbook
 from openpyxl.utils.datetime import from_excel
 
 from accounts.services.users import get_user_display_name
 from . import scheduling
-from .models import TrainingScheduleSlot
+from .models import TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot, TrainingTask
 
 TEMPLATE = Path(__file__).parent / "resources" / "templates" / "training_plan.xlsx"
 HEADERS = ["日期", "星期", "时间", "领域", "训练任务", "负责教练", "值班教练", "备注"]
@@ -87,7 +88,7 @@ def build_plan_workbook(plan, user=None, *, import_template=False):
             duty = "" if import_template else ("全体" if day.duty_all else "\n".join(get_user_display_name(user) for user in day.duty_coaches.all()))
             values = [
                 day.date,
-                day.date,
+                "星期" + "一二三四五六日"[day.date.weekday()],
                 label,
                 ("、".join(domain.name for domain in slot.domains.all()) or slot.get_kind_display()) if slot and not import_template else "",
                 task_text,
@@ -99,7 +100,6 @@ def build_plan_workbook(plan, user=None, *, import_template=False):
                 cell = sheet.cell(row + offset, col, value)
                 if isinstance(value, str):
                     cell.data_type = "s"
-            # 延续原表星期的日期格式，底层使用真实日期而不是手工星期文本。
             sheet.row_dimensions[row + offset].height = max(
                 heights[style_row] or 30, 18 * max(len(task_text.splitlines()), len(coaches.splitlines()), 1)
             )
@@ -143,11 +143,45 @@ def _person_ids(text, coaches, *, require_primary=True):
     return False, sorted(ids), None
 
 
-def preview_import(plan, user, file):
-    if not scheduling.can_schedule(user, plan):
+def check_empty_plan(plan, user):
+    if not scheduling.can_schedule(user, plan) or not user.has_perm("training.add_trainingtask"):
         raise PermissionDenied
     if not plan.published_at:
         raise ValidationError("请先发布计划，再导入排班。")
+    if plan.schedule_published_at:
+        raise ValidationError("仅能导入排班尚未发布的空计划。")
+    if plan.tasks.exclude(status="cancelled").exists():
+        raise ValidationError("计划已有任务，请先清空全部任务。")
+    if plan.schedule_days.filter(duty_all=True).exists() or plan.schedule_days.exclude(note="").exists() or plan.schedule_days.filter(duty_coaches__isnull=False).exists():
+        raise ValidationError("计划已有值班或备注，请先清空全部排班。")
+    slots = TrainingScheduleSlot.objects.filter(day__training_plan=plan)
+    if (slots.filter(is_configured=True).exclude(kind="pending").exists()
+        or slots.filter(is_configured=False).exclude(kind="unused").exists()
+        or slots.filter(primary_domain__isnull=False).exists()
+        or slots.filter(coaches_all=True).exists()
+        or slots.filter(domains__isnull=False).exists()
+        or slots.filter(coaches__isnull=False).exists()):
+        raise ValidationError("计划已有排班，请先清空全部排班。")
+
+
+@transaction.atomic
+def confirm_import(plan, user, payload, members):
+    plan = TrainingPlan.objects.select_for_update().get(pk=plan.pk)
+    list(TrainingScheduleDay.objects.select_for_update().filter(training_plan=plan))
+    list(TrainingScheduleSlot.objects.select_for_update().filter(day__training_plan=plan))
+    list(TrainingTask.objects.select_for_update().filter(training_plan=plan))
+    check_empty_plan(plan, user)
+    current_members = list(plan.participants.filter(is_active=True).order_by("user_id").values_list("user_id", flat=True))
+    if members != current_members:
+        raise ValidationError("计划参与选手已经变化，请重新预览。")
+    if not payload:
+        raise ValidationError("没有可导入的内容。")
+    scheduling._apply_changes(plan, payload, user, approved=True, draft_import=True)
+    scheduling.audit(plan, user, "导入排班和任务草稿", after={"调整": payload})
+
+
+def preview_import(plan, user, file):
+    check_empty_plan(plan, user)
     try:
         workbook = load_workbook(file, data_only=False)
     except Exception as exc:
@@ -242,7 +276,7 @@ def preview_import(plan, user, file):
                     raise ValidationError("目标时段已有冲突排班，不允许覆盖。")
             if before["kind"] not in {"pending", "unused"} and before["kind"] != after["kind"]:
                 raise ValidationError("目标时段已有冲突类型，不允许覆盖。")
-            if task_text and slot.tasks.exists():
+            if task_text and slot.tasks.exclude(status="cancelled").exists():
                 raise ValidationError("目标时段已有任务，不允许覆盖或重复导入。")
             if task_text:
                 if after["kind"] not in scheduling.ACTIVE_KINDS:
@@ -250,14 +284,12 @@ def preview_import(plan, user, file):
                         task_text = ""
                     else:
                         raise ValidationError("导入任务需要有效训练领域或综合活动排班。")
-                if task_text and not plan.schedule_published_at:
-                    raise ValidationError("请先发布排班，再导入训练任务。")
                 if task_text and (
                     not user.has_perm("training.add_trainingtask")
                 ):
                     raise ValidationError("无权编制该时段任务。")
-                if task_text and not plan.participants.filter(was_initial=True).exists():
-                    raise ValidationError("计划缺少创建时选手快照，不能默认分配导入任务。")
+                if task_text and not plan.participants.filter(is_active=True).exists():
+                    raise ValidationError("计划没有当前参与选手，请先通过计划详情页的“编辑成员”添加选手。")
             if slot.is_configured:
                 scheduling.validate_slot(plan, after, publishing=bool(task_text))
             candidate = dict(changes)
@@ -314,4 +346,6 @@ def preview_import(plan, user, file):
     payload = [
         change for change in changes.values() if change["before"] != change["after"] or change.get("import_task")
     ]
+    if any(record["status"] == "错误" for record in records):
+        payload = []
     return records, payload

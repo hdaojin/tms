@@ -247,6 +247,58 @@ class WithdrawForm(StyledFormMixin, forms.Form):
 
 
 @require_http_methods(["GET", "POST"])
+def publish_all_tasks(request, pk):
+    from . import plan_publish
+
+    plan = get_plan(request.user, pk)
+    error, result, token = "", None, ""
+    try:
+        if request.method == "POST":
+            data = signing.loads(request.POST.get("token", ""), salt="training.publish_all", max_age=600)
+            if data["user"] != request.user.pk or data["plan"] != plan.pk:
+                raise PermissionDenied
+            plan_publish.publish(plan, request.user, data["digest"])
+            messages.success(request, "全部任务草稿已发布。")
+            return redirect("training:plan_detail", pk=plan.pk)
+        result = plan_publish.preview(plan, request.user)
+        if result["can_confirm"]:
+            token = signing.dumps({"user": request.user.pk, "plan": plan.pk, "digest": result["digest"]},
+                                  salt="training.publish_all", compress=True)
+    except (ValidationError, signing.BadSignature) as exc:
+        error = "；".join(exc.messages) if isinstance(exc, ValidationError) else "预览已过期或被修改，请重新预览。"
+    return render(request, "training/plan_publish.html", {"plan": plan, "result": result, "token": token, "error": error})
+
+
+@require_http_methods(["GET", "POST"])
+def clear_plan(request, pk, action):
+    from . import plan_clear
+
+    plan = get_plan(request.user, pk)
+    labels = {"withdraw_tasks": "撤回全部任务发布", "clear_tasks": "清空全部任务", "clear_schedule": "清空全部排班"}
+    if action not in labels:
+        raise Http404
+    form = WithdrawForm(request.POST if request.method == "POST" else None)
+    preview, token, error = None, "", ""
+    try:
+        preview = plan_clear.state(plan, request.user, action)
+        if request.method == "POST" and request.POST.get("token"):
+            data = signing.loads(request.POST["token"], salt="training.plan_clear", max_age=600)
+            if data["user"] != request.user.pk or data["plan"] != plan.pk or data["action"] != action:
+                raise PermissionDenied
+            plan_clear.execute(plan, request.user, action, data["reason"], data["digest"])
+            messages.success(request, f"{labels[action]}已完成。")
+            return redirect("training:plan_detail", pk=plan.pk)
+        if request.method == "POST" and form.is_valid():
+            token = signing.dumps({"user": request.user.pk, "plan": plan.pk, "action": action,
+                                   "reason": form.cleaned_data["reason"], "digest": preview["digest"]},
+                                  salt="training.plan_clear", compress=True)
+    except (ValidationError, signing.BadSignature) as exc:
+        error = "；".join(exc.messages) if isinstance(exc, ValidationError) else "预览已过期或被修改，请重新预览。"
+    return render(request, "training/plan_clear.html", {"plan": plan, "action_label": labels[action],
+                  "action": action, "preview": preview, "form": form, "token": token, "error": error})
+
+
+@require_http_methods(["GET", "POST"])
 def withdraw_publication(request, pk, level, task_id=None):
     plan = get_plan(request.user, pk)
     try:

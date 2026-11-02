@@ -53,7 +53,7 @@ def validate_cycle_tree_versions(cycle, selected):
 @transaction.atomic
 def save_cycle_tree_versions(cycle, selected):
     """重新锁定周期并校验后，原子保存领域版本快照。"""
-    cycle = TrainingCycle.objects.select_for_update().select_related("parent").get(pk=cycle.pk)
+    cycle = TrainingCycle.objects.select_for_update().get(pk=cycle.pk)
     validate_cycle_tree_versions(cycle, selected)
     existing_domains = set(cycle.skill_tree_version_links.values_list("technical_domain_id", flat=True))
     locked = cycle.skill_tree_bindings_locked
