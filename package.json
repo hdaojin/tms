@@ -12,7 +12,7 @@
     "daisyui": "^5.7.50",
     "filepond": "beta",
     "mermaid": "^12.2.0",
-    "pdfjs-dist": "6.4.299",
+    "pdfjs-dist": "^6.4.299",
     "prettier": "^3.9.10",
     "prettier-plugin-jinja-template": "^2.2.0",
     "prettier-plugin-tailwindcss": "^0.8.1",

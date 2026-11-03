@@ -3,7 +3,10 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 
-const source = readFileSync(new URL("../static/meetings/recipients.js", import.meta.url), "utf8");
+const source = readFileSync(
+  new URL("../static/meetings/recipients.js", import.meta.url),
+  "utf8",
+);
 
 function fixture(initial = []) {
   class Element {
@@ -15,14 +18,30 @@ function fixture(initial = []) {
       this.value = "";
       this.textContent = "";
     }
-    addEventListener(type, handler) { this.handlers[type] = handler; }
-    append(...children) { this.children.push(...children); }
-    replaceChildren(...children) { this.children = children; }
-    setAttribute(name, value) { this.attrs[name] = value; }
-    removeAttribute(name) { delete this.attrs[name]; }
-    focus() { this.focused = true; }
-    get childElementCount() { return this.children.length; }
-    querySelectorAll() { return this.children; }
+    addEventListener(type, handler) {
+      this.handlers[type] = handler;
+    }
+    append(...children) {
+      this.children.push(...children);
+    }
+    replaceChildren(...children) {
+      this.children = children;
+    }
+    setAttribute(name, value) {
+      this.attrs[name] = value;
+    }
+    removeAttribute(name) {
+      delete this.attrs[name];
+    }
+    focus() {
+      this.focused = true;
+    }
+    get childElementCount() {
+      return this.children.length;
+    }
+    querySelectorAll() {
+      return this.children;
+    }
   }
   const form = new Element();
   const all = new Element();
@@ -30,7 +49,11 @@ function fixture(initial = []) {
   const selected = new Element();
   selected.children = initial.map((person) => {
     const tag = new Element();
-    tag.dataset = { recipientId: String(person.id), recipientLabel: person.label, unavailable: person.unavailable ? "true" : "false" };
+    tag.dataset = {
+      recipientId: String(person.id),
+      recipientLabel: person.label,
+      unavailable: person.unavailable ? "true" : "false",
+    };
     return tag;
   });
   const results = new Element();
@@ -41,34 +64,79 @@ function fixture(initial = []) {
   form.querySelector = () => all;
   form.querySelectorAll = () => [area];
   const root = new Element();
-  root.dataset = { searchUrl: "/meetings/recipients/search/", fieldName: "visible_users", meetingId: "17" };
+  root.dataset = {
+    searchUrl: "/meetings/recipients/search/",
+    fieldName: "visible_users",
+    meetingId: "17",
+  };
   root.closest = () => form;
-  root.querySelector = (selector) => ({
-    "[data-recipient-selected]": selected, "[data-recipient-results]": results,
-    "[data-recipient-query]": query, "[data-recipient-status]": status, "[data-recipient-more]": more,
-  })[selector];
+  root.querySelector = (selector) =>
+    ({
+      "[data-recipient-selected]": selected,
+      "[data-recipient-results]": results,
+      "[data-recipient-query]": query,
+      "[data-recipient-status]": status,
+      "[data-recipient-more]": more,
+    })[selector];
   const requests = [];
   const timers = new Map();
   let counter = 0;
   const documentHandlers = {};
   vm.runInNewContext(source, {
-    document: { readyState: "complete", querySelectorAll: () => [root], createElement: () => new Element(), addEventListener: (name, handler) => { documentHandlers[name] = handler; } },
+    document: {
+      readyState: "complete",
+      querySelectorAll: () => [root],
+      createElement: () => new Element(),
+      addEventListener: (name, handler) => {
+        documentHandlers[name] = handler;
+      },
+    },
     window: { location: { origin: "https://tms.example" } },
-    URL, AbortController,
-    fetch: (url, options) => new Promise((resolve) => { requests.push({ url, options, resolve }); }),
-    setTimeout: (callback) => { const id = ++counter; timers.set(id, callback); return id; },
+    URL,
+    AbortController,
+    fetch: (url, options) =>
+      new Promise((resolve) => {
+        requests.push({ url, options, resolve });
+      }),
+    setTimeout: (callback) => {
+      const id = ++counter;
+      timers.set(id, callback);
+      return id;
+    },
     clearTimeout: (id) => timers.delete(id),
   });
-  function tick() { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach((callback) => callback()); }
+  function tick() {
+    const callbacks = [...timers.values()];
+    timers.clear();
+    callbacks.forEach((callback) => callback());
+  }
   function enter(value) {
     query.value = value;
     query.handlers.keydown({ key: "Enter", preventDefault() {} });
   }
   async function respond(index, results, hasMore = false, ok = true) {
-    requests[index].resolve({ ok, redirected: false, json: async () => ({ results, has_more: hasMore }) });
+    requests[index].resolve({
+      ok,
+      redirected: false,
+      json: async () => ({ results, has_more: hasMore }),
+    });
     await new Promise((resolve) => setImmediate(resolve));
   }
-  return { form, all, selected, results, query, status, more, area, requests, tick, enter, respond, documentHandlers };
+  return {
+    form,
+    all,
+    selected,
+    results,
+    query,
+    status,
+    more,
+    area,
+    requests,
+    tick,
+    enter,
+    respond,
+    documentHandlers,
+  };
 }
 
 test("HTMX initialization preserves an already initialized picker and its selections", async () => {

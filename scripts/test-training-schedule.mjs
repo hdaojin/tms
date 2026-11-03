@@ -3,12 +3,22 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 
-const source = readFileSync(new URL("../static/js/training-schedule.js", import.meta.url), "utf8");
+const source = readFileSync(
+  new URL("../static/js/training-schedule.js", import.meta.url),
+  "utf8",
+);
 
 function fixture() {
   const events = {};
   const requests = [];
-  const dialog = { open: false, opened: 0, showModal() { this.open = true; this.opened += 1; } };
+  const dialog = {
+    open: false,
+    opened: 0,
+    showModal() {
+      this.open = true;
+      this.opened += 1;
+    },
+  };
   const elements = {
     "schedule-dialog": dialog,
     "schedule-results": { id: "schedule-results" },
@@ -16,17 +26,23 @@ function fixture() {
   };
   vm.runInNewContext(source, {
     document: {
-      addEventListener: (name, handler) => { events[name] = handler; },
+      addEventListener: (name, handler) => {
+        events[name] = handler;
+      },
       getElementById: (id) => elements[id] || null,
     },
-    window: { htmx: { trigger: (element, name) => requests.push([element.id, name]) } },
+    window: {
+      htmx: { trigger: (element, name) => requests.push([element.id, name]) },
+    },
   });
   return { events, requests, dialog, elements };
 }
 
 test("only a swapped editor opens the task dialog and an open dialog stays open", () => {
   const f = fixture();
-  f.events["htmx:afterSwap"]({ detail: { target: { id: "schedule-results" } } });
+  f.events["htmx:afterSwap"]({
+    detail: { target: { id: "schedule-results" } },
+  });
   assert.equal(f.dialog.opened, 0);
   f.events["htmx:afterSwap"]({ detail: { target: { id: "schedule-editor" } } });
   f.events["htmx:afterSwap"]({ detail: { target: { id: "schedule-editor" } } });

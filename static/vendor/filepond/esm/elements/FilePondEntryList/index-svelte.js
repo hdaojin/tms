@@ -1,58 +1,58 @@
 /*!
-* FilePond v5.0.0-beta.74
+* FilePond v5.0.0-beta.77
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import { onDestroy as xt } from "../../vendor/svelte/src/index-client.js";
-import { user_effect as k, template_effect as It } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
+import { user_effect as T, template_effect as It } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
 import { push as Rt, pop as At } from "../../vendor/svelte/src/internal/client/context.js";
-import { get as t, untrack as b } from "../../vendor/svelte/src/internal/client/runtime.js";
-import { $window as Ct, child as Tt, sibling as kt, only_child as Mt } from "../../vendor/svelte/src/internal/client/dom/operations.js";
+import { get as t, untrack as b, tick as Ct } from "../../vendor/svelte/src/internal/client/runtime.js";
+import { $window as kt, child as Tt, sibling as Mt, only_child as wt } from "../../vendor/svelte/src/internal/client/dom/operations.js";
 import { set as n, state as c } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
-import { set_text as wt } from "../../vendor/svelte/src/internal/client/render.js";
+import { set_text as Ot } from "../../vendor/svelte/src/internal/client/render.js";
 import { user_derived as l } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { from_html as Ot, append as Pt } from "../../vendor/svelte/src/internal/client/dom/template.js";
+import { from_html as Pt, append as _t } from "../../vendor/svelte/src/internal/client/dom/template.js";
 import { attach as Z } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
-import { delegate as _t, event as Nt, delegated as xe } from "../../vendor/svelte/src/internal/client/dom/elements/events.js";
-import { proxy as Ft } from "../../vendor/svelte/src/internal/client/proxy.js";
-import { bind_this as Gt } from "../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
+import { delegate as Nt, event as Ft, delegated as xe } from "../../vendor/svelte/src/internal/client/dom/elements/events.js";
+import { proxy as Gt } from "../../vendor/svelte/src/internal/client/proxy.js";
+import { bind_this as Kt } from "../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
 import { bind_window_size as Ie } from "../../vendor/svelte/src/internal/client/dom/elements/bindings/window.js";
 import { prop as s } from "../../vendor/svelte/src/internal/client/reactivity/props.js";
-import { dragArea as Kt } from "../attachments/drag-area.js";
-import { dropArea as Bt } from "../attachments/drop-area.js";
+import { dragArea as Bt } from "../attachments/drag-area.js";
+import { dropArea as Lt } from "../attachments/drop-area.js";
 import { arrayMove as Re, arrayInsertAtIndex as Ae } from "../../utils/array.js";
-import { ORIGIN as P, vectorCreate as $, vectorEqual as Lt, vectorSubtract as Ut, vectorAdd as zt } from "../../utils/vector.js";
-import { rectPad as ee, rectContainsPoint as te, rectFromBounds as Ce, rectCenter as jt } from "../../utils/rect.js";
-import { passthrough as Vt, noop as _ } from "../../utils/placeholder.js";
-import { measurable as Te } from "../attachments/measurable.js";
-import { dispatchCustomEvent as N, setBooleanAttribute as qt } from "../../utils/dom.js";
-import { setAppContext as Ht } from "./contexts/appContext.js";
-import { setDragContext as Wt } from "./contexts/dragContext.js";
-import { setDropContext as Xt } from "./contexts/dropContext.js";
-import { getUniqueId as ke } from "../../utils/string.js";
-import { setSpringElementTreeContext as Jt } from "./contexts/springElementTreeContext.js";
-import { sizeFromRect as Qt } from "../../utils/size.js";
+import { ORIGIN as P, vectorCreate as $, vectorEqual as Ut, vectorSubtract as zt, vectorAdd as jt } from "../../utils/vector.js";
+import { rectPad as ee, rectContainsPoint as te, rectFromBounds as Ce, rectCenter as Vt } from "../../utils/rect.js";
+import { passthrough as qt, noop as _ } from "../../utils/placeholder.js";
+import { measurable as ke } from "../attachments/measurable.js";
+import { dispatchCustomEvent as N, setBooleanAttribute as Ht } from "../../utils/dom.js";
+import { setAppContext as Wt } from "./contexts/appContext.js";
+import { setDragContext as Xt } from "./contexts/dragContext.js";
+import { setDropContext as Jt } from "./contexts/dropContext.js";
+import { getUniqueId as Te } from "../../utils/string.js";
+import { setSpringElementTreeContext as Qt } from "./contexts/springElementTreeContext.js";
+import { sizeFromRect as Yt } from "../../utils/size.js";
 import { isNumber as Me } from "../../utils/test.js";
-import Yt from "../components/NodeList/index-svelte.js";
-import { hasOwnProp as Zt } from "../../utils/object.js";
-import { getDragTargetIndex as $t, getDropTargetIndex as er } from "../common/dragDrop.js";
-import { clamp as tr } from "../../utils/math.js";
-import { isActivationKeyboardEvent as we, isArrowKeyboardEvent as rr, getDirectionFromKeyboardEvent as nr, isTabKeyboardEvent as ir, isCancelKeyboardEvent as or } from "../../utils/keyboard.js";
-import { stringReplaceVariables as ar } from "../common/string.js";
-import { createMotionStateObserver as sr, shouldReduceMotion as dr } from "../common/motionState-svelte.js";
-var ur = Ot('<div class="root" role="group"><!> <div role="status" aria-live="polite" class="implicit"> </div></div>');
-function Wr(Oe, i) {
+import Zt from "../components/NodeList/index-svelte.js";
+import { hasOwnProp as $t } from "../../utils/object.js";
+import { getDragTargetIndex as er, getDropTargetIndex as tr } from "../common/dragDrop.js";
+import { clamp as rr } from "../../utils/math.js";
+import { isActivationKeyboardEvent as we, isArrowKeyboardEvent as nr, getDirectionFromKeyboardEvent as ir, isTabKeyboardEvent as or, isCancelKeyboardEvent as ar } from "../../utils/keyboard.js";
+import { stringReplaceVariables as sr } from "../common/string.js";
+import { createMotionStateObserver as dr, shouldReduceMotion as ur } from "../common/motionState-svelte.js";
+var cr = Pt('<div class="root" role="group"><!> <div role="status" aria-live="polite" class="implicit"> </div></div>');
+function Xr(Oe, i) {
   Rt(i, !0);
-  let W = s(i, "disabled", 3, !1), X = s(i, "assets", 19, () => ({})), F = s(i, "locale", 19, () => ({})), Pe = s(i, "template", 19, () => []), re = s(i, "propResourceMap", 19, () => ({ title: "locale", label: "locale", icon: "assets" })), ne = s(i, "drag", 3, !0), _e = s(i, "dragGrabTimeout", 3, 100), Ne = s(i, "dragDetachMargin", 3, 40), ie = s(i, "dragSafetyMargin", 3, 80), oe = s(i, "drop", 3, !0), Fe = s(i, "dropRoot", 3, void 0), ae = s(i, "dropPadding", 3, 20), Ge = s(i, "entryAnimationOriginMap", 19, () => ({})), Ke = s(i, "entryAnimationProps", 19, () => ({})), se = s(i, "entryAnimationStaggerInterval", 3, 50), Be = s(i, "beforeRenderNode", 3, Vt), Le = s(i, "byteUnits", 3, void 0);
-  const de = sr(), z = l(() => dr(de.current, i.reducedMotionPreference)), Ue = 50;
+  let W = s(i, "disabled", 3, !1), X = s(i, "assets", 19, () => ({})), F = s(i, "locale", 19, () => ({})), Pe = s(i, "template", 19, () => []), re = s(i, "propResourceMap", 19, () => ({ title: "locale", label: "locale", icon: "assets" })), ne = s(i, "drag", 3, !0), _e = s(i, "dragGrabTimeout", 3, 100), Ne = s(i, "dragDetachMargin", 3, 40), ie = s(i, "dragSafetyMargin", 3, 80), oe = s(i, "drop", 3, !0), Fe = s(i, "dropRoot", 3, void 0), ae = s(i, "dropPadding", 3, 20), Ge = s(i, "entryAnimationOriginMap", 19, () => ({})), Ke = s(i, "entryAnimationProps", 19, () => ({})), se = s(i, "entryAnimationStaggerInterval", 3, 50), Be = s(i, "beforeRenderNode", 3, qt), Le = s(i, "byteUnits", 3, void 0);
+  const de = dr(), z = l(() => ur(de.current, i.reducedMotionPreference)), Ue = 50;
   let g = c(void 0), ue = c(void 0), J = c(void 0), p = c([]), h = c([]), f = c({}), ce = c(0), le = c(0);
   const ze = l(() => ({
     top: 0,
     right: t(ce),
     bottom: t(le),
     left: 0
-  })), o = Ft({
+  })), o = Gt({
     setEntries: fe,
     insertEntries: _,
     removeEntries: _,
@@ -121,7 +121,7 @@ function Wr(Oe, i) {
     n(h, t(h).filter(({ entry: r }) => r.id !== e));
   }
   const rt = l(() => Math.max(t(h).length, t(p).length));
-  k(() => {
+  T(() => {
     N(t(m), "entrieschange", { detail: t(rt) });
   });
   const ge = {};
@@ -141,12 +141,12 @@ function Wr(Oe, i) {
     }
     let A = !1, B = !1, C = 0;
     if (Me(R)) {
-      const E = ge[r] || 0, T = Date.now();
-      if (E + R > T) {
-        const L = T - E;
+      const E = ge[r] || 0, k = Date.now();
+      if (E + R > k) {
+        const L = k - E;
         C = R - L;
       }
-      ge[r] = T + C;
+      ge[r] = k + C;
     }
     let O;
     const D = {
@@ -185,7 +185,7 @@ function Wr(Oe, i) {
   function pe(e, r) {
     t(f)[e.id]?.animation === r && (delete t(f)[e.id], n(f, { ...t(f) }));
   }
-  Ht({
+  Wt({
     get reduceMotion() {
       return t(z);
     },
@@ -231,7 +231,7 @@ function Wr(Oe, i) {
   let m = c(void 0), a = c(void 0);
   const ye = l(oe), Ee = l(() => t(ye) ? Fe() ?? t(m) : void 0);
   let v = c(void 0);
-  k(() => {
+  T(() => {
     if (!t(a) || ie() === 1 / 0)
       return;
     const { viewPosition: e } = t(a);
@@ -241,7 +241,7 @@ function Wr(Oe, i) {
     te(r, e) ? t(v) && n(v, void 0) : t(v) || n(v, { remove: !0 });
   });
   let V, K, q, M = c(P);
-  k(() => {
+  T(() => {
     if (!t(g)) {
       n(M, P);
       return;
@@ -251,16 +251,16 @@ function Wr(Oe, i) {
       return;
     }
     const e = V ? $(V.x - t(g).x, V.y - t(g).y) : P;
-    if (K && Lt(e, K)) {
+    if (K && Ut(e, K)) {
       q = P;
       return;
     }
-    K && (q = Ut(e, K)), K = { ...e }, me(() => {
+    K && (q = zt(e, K)), K = { ...e }, me(() => {
       n(M, e);
     });
   });
   let ve = -1, u = c(void 0);
-  k(() => {
+  T(() => {
     if (!t(a)) {
       n(u, void 0);
       return;
@@ -286,7 +286,7 @@ function Wr(Oe, i) {
       const L = r.closest("ul").children, U = Array.from(L).indexOf(r);
       if (A !== "none") {
         let x = U;
-        A === "up" ? x-- : A === "down" && x++, x = tr(x, 0, L.length - 1), b(() => {
+        A === "up" ? x-- : A === "down" && x++, x = rr(x, 0, L.length - 1), b(() => {
           o.setEntries(Re([...t(p)], U, x));
         }), E = x, b(() => {
           n(I, {
@@ -295,6 +295,8 @@ function Wr(Oe, i) {
             position: x + 1,
             total: L.length
           });
+        }), Ct().then(() => {
+          r.isConnected && r.focus({ preventScroll: !0 });
         });
       } else
         E = U, b(() => {
@@ -310,11 +312,11 @@ function Wr(Oe, i) {
     const B = !te(ee(b(() => t(j) ?? t(g)), Ne()), w), C = t(M).x !== 0 || t(M).y !== 0, Y = {
       searchBounds: t(ze),
       cacheClientRectangles: C ? 0 : 250
-    }, O = zt(q, y), D = B ? ve : r ? $t(r, w, O, Y) : er(t(m), w, O, Y);
+    }, O = jt(q, y), D = B ? ve : r ? er(r, w, O, Y) : tr(t(m), w, O, Y);
     if (r && D > -1) {
-      const E = r.closest("ul"), T = Array.from(E.children).indexOf(r);
-      T !== D && b(() => {
-        o.setEntries(Re([...t(p)], T, D));
+      const E = r.closest("ul"), k = Array.from(E.children).indexOf(r);
+      k !== D && b(() => {
+        o.setEntries(Re([...t(p)], k, D));
       });
     }
     ve = D, n(u, {
@@ -328,7 +330,7 @@ function Wr(Oe, i) {
     });
   });
   const ot = l(() => t(u) ? t(u).id : void 0), H = l(() => t(u) ? t(u).index : void 0), be = l(() => t(u) ? t(u).element : void 0), at = l(() => !!(t(u) && !t(be) && t(H) !== void 0));
-  k(() => {
+  T(() => {
     if (!t(be)) {
       const r = nt("lift");
       r && G(r, "release");
@@ -367,11 +369,11 @@ function Wr(Oe, i) {
     if (N(t(m), "entrydragend"), !t(u))
       return;
     const { index: r } = t(u);
-    if (n(a, void 0), Zt(e, "dataTransfer")) {
+    if (n(a, void 0), $t(e, "dataTransfer")) {
       const d = e.dataTransfer;
       if (!d.types.includes("Files"))
         return;
-      o.insertEntries({ id: ke(), src: d, origin: "drop" }, r);
+      o.insertEntries({ id: Te(), src: d, origin: "drop" }, r);
       return;
     }
     if (t(v)?.remove) {
@@ -398,23 +400,23 @@ function Wr(Oe, i) {
       r = Ae(r, R, d);
     }), r;
   });
-  Wt({
+  Xt({
     get current() {
       return t(u);
     }
-  }), Xt({
+  }), Jt({
     get current() {
       return t(v);
     }
-  }), k(() => {
+  }), T(() => {
     if (!t(Ee))
       return;
-    const e = Te({ onmeasure: it })(t(Ee));
+    const e = ke({ onmeasure: it })(t(Ee));
     return () => {
       e();
     };
-  }), k(() => {
-    qt(t(m), "data-disabled", W());
+  }), T(() => {
+    Ht(t(m), "data-disabled", W());
   });
   const gt = {
     insertEntries: (e, r) => o.insertEntries(e, r),
@@ -425,9 +427,9 @@ function Wr(Oe, i) {
     }
   };
   function pt(e) {
-    n(g, Ce(e), !0), n(ue, jt(t(g)), !0), n(J, Qt(t(g)), !0);
+    n(g, Ce(e), !0), n(ue, Vt(t(g)), !0), n(J, Yt(t(g)), !0);
   }
-  Jt({
+  Qt({
     parent: null,
     get isReady() {
       return !0;
@@ -461,16 +463,16 @@ function Wr(Oe, i) {
     }), !0) : !1;
   }
   function Et(e) {
-    if (e.target.dataset.draggable === "" && we(e) && e.preventDefault(), t(a) && rr(e)) {
+    if (e.target.dataset.draggable === "" && we(e) && e.preventDefault(), t(a) && nr(e)) {
       n(a, {
         ...t(a),
-        direction: nr(e)
+        direction: ir(e)
       }), e.preventDefault();
       return;
     }
   }
   function vt(e) {
-    if (ir(e)) {
+    if (or(e)) {
       Q();
       return;
     }
@@ -478,10 +480,10 @@ function Wr(Oe, i) {
       const r = e.target;
       if (!(r?.dataset.draggable === "") || (e.preventDefault(), Q()))
         return;
-      n(a, { id: ke(), element: r, direction: "none" });
+      n(a, { id: Te(), element: r, direction: "none" });
       return;
     }
-    if (or(e) && Q()) {
+    if (ar(e) && Q()) {
       e.preventDefault();
       return;
     }
@@ -491,7 +493,7 @@ function Wr(Oe, i) {
     if (!t(I))
       return "";
     const { key: e, ...r } = t(I);
-    return ar(F()[e], r, F());
+    return sr(F()[e], r, F());
   });
   xt(() => {
     de.destroy();
@@ -508,8 +510,8 @@ function Wr(Oe, i) {
     onSetEntries: fe,
     onInsertEntry: Ye,
     onRemoveEntry: Ze
-  }, S = ur();
-  Nt("contextmenu", Ct, yt);
+  }, S = cr();
+  Ft("contextmenu", kt, yt);
   var De = Tt(S);
   {
     let e = l(() => ({ locale: F(), assets: X() })), r = l(() => ({ entries: t(mt) })), d = l(() => ({
@@ -518,7 +520,7 @@ function Wr(Oe, i) {
       reduceMotion: t(z),
       springOptions: i.springOptions
     }));
-    Yt(De, {
+    Zt(De, {
       get reduceMotion() {
         return t(z);
       },
@@ -545,8 +547,8 @@ function Wr(Oe, i) {
       }
     });
   }
-  var St = kt(De, 2), Dt = Mt(St, !0);
-  return Gt(S, (e) => n(m, e), () => t(m)), Z(S, () => Te({ onmeasure: pt })), Z(S, () => Kt({
+  var St = Mt(De, 2), Dt = wt(St, !0);
+  return Kt(S, (e) => n(m, e), () => t(m)), Z(S, () => ke({ onmeasure: pt })), Z(S, () => Bt({
     disabled: !ne() || W(),
     itemSelector: "[data-draggable]",
     grabTimeout: _e(),
@@ -554,7 +556,7 @@ function Wr(Oe, i) {
     onitemgrabcancel: dt,
     onitemdrag: he,
     onitemdrop: Se
-  })), Z(S, () => Bt({
+  })), Z(S, () => Lt({
     disabled: !oe() || W(),
     willAcceptDrop: ft,
     onitemdrag: he,
@@ -562,9 +564,9 @@ function Wr(Oe, i) {
     onitemdragout: ct,
     onitemdropcancel: lt,
     onitemdrop: Se
-  })), It(() => wt(Dt, t(bt))), Ie("innerWidth", (e) => n(ce, e, !0)), Ie("innerHeight", (e) => n(le, e, !0)), xe("keydown", S, Et), xe("keyup", S, vt), Pt(Oe, S), At(ht);
+  })), It(() => Ot(Dt, t(bt))), Ie("innerWidth", (e) => n(ce, e, !0)), Ie("innerHeight", (e) => n(le, e, !0)), xe("keydown", S, Et), xe("keyup", S, vt), _t(Oe, S), At(ht);
 }
-_t(["keydown", "keyup"]);
+Nt(["keydown", "keyup"]);
 export {
-  Wr as default
+  Xr as default
 };

@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.74
+* FilePond v5.0.0-beta.77
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -9,7 +9,7 @@ import { FilePondEntryListElement as E, getDefaultEntryAnimationOriginMap as A, 
 import { FilePondFrameElement as C } from "../FilePondFrame/index.js";
 import { FilePondDropIndicatorElement as D } from "../FilePondDropIndicator/index.js";
 import { FilePondSourceListElement as w } from "../FilePondSourceList/index.js";
-import { hasDefinedTag as _, defineCustomElements as O, defineCustomElement as k, setStringAttribute as x, setBooleanAttribute as p, h as c, addListener as d, dispatchCustomEvent as f } from "../../utils/dom.js";
+import { hasDefinedTag as O, defineCustomElements as _, defineCustomElement as k, setStringAttribute as x, setBooleanAttribute as p, h as c, addListener as d, dispatchCustomEvent as f } from "../../utils/dom.js";
 import { isBrowser as F, isBoolean as m, isString as l } from "../../utils/test.js";
 import { assets as g } from "../../assets/index.js";
 import M from "./index.css.js";
@@ -85,7 +85,7 @@ class j extends P {
     return this.#i;
   }
   #a() {
-    this.isConnected && (p(this, "nodrop", this.#i), this.#i ? this.#t.dropIndicator.remove() : this._root.prepend(this.#t.dropIndicator), Object.assign(this, {
+    this.isConnected && (p(this, "nodrop", this.#i), this.#i ? this.#t.dropIndicator.remove() : this.#t.frame.after(this.#t.dropIndicator), Object.assign(this, {
       EntryListView: {
         drop: !this.#i
       }
@@ -270,7 +270,7 @@ function U(s) {
   if (!F())
     return [];
   const t = "file-pond";
-  return u = s, _(t) || (O({
+  return u = s, O(t) || (_({
     [`${t}-source-list`]: w,
     [`${t}-entry-list`]: E,
     [`${t}-frame`]: C,

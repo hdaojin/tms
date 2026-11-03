@@ -3,19 +3,32 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 
-const source = readFileSync(new URL("../static/js/sidebar.js", import.meta.url), "utf8");
+const source = readFileSync(
+  new URL("../static/js/sidebar.js", import.meta.url),
+  "utf8",
+);
 
 function setup(stored = null, storageFails = false) {
   const events = {};
   const attributes = {};
   const dataset = {};
   const button = {
-    setAttribute: (key, value) => { attributes[key] = value; },
-    addEventListener: (name, handler) => { events[name] = handler; },
+    setAttribute: (key, value) => {
+      attributes[key] = value;
+    },
+    addEventListener: (name, handler) => {
+      events[name] = handler;
+    },
   };
   const storage = {
-    getItem() { if (storageFails) throw new Error("unavailable"); return stored; },
-    setItem(key, value) { if (storageFails) throw new Error("unavailable"); stored = value; },
+    getItem() {
+      if (storageFails) throw new Error("unavailable");
+      return stored;
+    },
+    setItem(key, value) {
+      if (storageFails) throw new Error("unavailable");
+      stored = value;
+    },
   };
   vm.runInNewContext(source, {
     window: { localStorage: storage },
@@ -23,11 +36,19 @@ function setup(stored = null, storageFails = false) {
       documentElement: { dataset },
       querySelectorAll: () => [button],
       getElementById: () => ({}),
-      addEventListener: (name, handler) => { events[name] = handler; },
+      addEventListener: (name, handler) => {
+        events[name] = handler;
+      },
     },
   });
   events.DOMContentLoaded();
-  return { dataset, attributes, button, click: () => events.click(), stored: () => stored };
+  return {
+    dataset,
+    attributes,
+    button,
+    click: () => events.click(),
+    stored: () => stored,
+  };
 }
 
 test("默认展开，切换后保存状态并在新页面恢复", () => {
