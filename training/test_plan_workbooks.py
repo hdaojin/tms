@@ -145,7 +145,16 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
             for slot in day.slots.exclude(pk=self.slot.pk).filter(is_configured=True):
                 slot.kind = "rest"
                 slot.save()
-        scheduling.publish_schedule(self.plan, self.admin)
+        self.client.force_login(self.admin)
+        publish_url = reverse("training:schedule_publish", args=[self.plan.pk])
+        detail = self.client.get(reverse("training:plan_detail", args=[self.plan.pk]))
+        self.assertContains(detail, f'action="{publish_url}"', html=False)
+        response = self.client.post(publish_url, follow=True)
+        self.assertContains(response, "排班已发布")
+        self.plan.refresh_from_db()
+        self.assertIsNotNone(self.plan.schedule_published_at)
+        task.refresh_from_db()
+        self.assertEqual(task.status, "draft")
         self.plan.participants.filter(user=self.student).update(is_active=False)
         task.refresh_from_db()
         scheduling.publish_slot_task(task, self.coach)

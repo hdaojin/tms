@@ -49,7 +49,7 @@ urlpatterns = [
     path("plans/<int:pk>/members/<int:member_pk>/remove/",
          plan_member_views.PlanMemberRemoveView.as_view(), name="plan_member_remove"),
     path("plans/<int:pk>/initialize/", schedule_views.initialize, name="schedule_initialize"),
-    path("plans/<int:pk>/publish/", schedule_views.publish, name="schedule_publish"),
+    path("plans/<int:pk>/schedule/publish/", schedule_views.publish, name="schedule_publish"),
     path("plans/<int:pk>/schedule/", schedule_views.edit_schedule, name="schedule_edit"),
     path("plans/<int:pk>/schedule/bulk/", schedule_views.schedule_bulk, name="schedule_bulk"),
     path("plans/<int:pk>/export/", schedule_views.export_plan, name="plan_export"),
