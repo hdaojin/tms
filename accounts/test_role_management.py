@@ -22,6 +22,19 @@ from standards.selectors import scoped_domains_for
 User = get_user_model()
 
 
+class RoleIdentityValidationTests(TestCase):
+    def test_save_rechecks_identity_after_preview(self):
+        actor = User.objects.create_superuser("identity-admin", password="test", last_name="管理", first_name="员")
+        member = User.objects.create_user("identity-first", last_name="张", first_name="三")
+        payload = {"name": "测试角色", "description": "", "bundles": [], "domains": [],
+                   "members": [member.pk], "explicit_permissions": []}
+        token = preview_role(actor=actor, group=None, payload=payload)["token"]
+        User.objects.create_user("identity-second", last_name="张", first_name="三")
+        with self.assertRaisesMessage(ValidationError, "区分备注"):
+            save_role(actor=actor, group=None, payload=payload, token=token)
+        self.assertFalse(Group.objects.filter(name="测试角色").exists())
+
+
 class DefaultRoleTests(TestCase):
     def test_feedback_impact_command_is_readonly(self):
         user = User.objects.create_user("impact-user")
@@ -183,7 +196,9 @@ class DefaultRoleTests(TestCase):
 class RoleManagementTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser("role-admin", "role@example.com", "test")
-        self.member = User.objects.create_user("role-member")
+        self.admin.first_name = "角色管理员"
+        self.admin.save(update_fields=["first_name"])
+        self.member = User.objects.create_user("role-member", first_name="角色成员")
         self.group = Group.objects.create(name="Linux教练")
         ensure_group_profile(self.group)
         project = SkillProject.objects.create(code="role_project", name="角色项目")

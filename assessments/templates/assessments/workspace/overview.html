@@ -31,7 +31,7 @@
           <div><dt class="text-base-content/60">系列</dt><dd>{{ assessment.series|default:"-" }}</dd></div>
           <div><dt class="text-base-content/60">级别</dt><dd>{{ assessment.level|default:"-" }}</dd></div>
           <div><dt class="text-base-content/60">地点</dt><dd class="break-words">{{ assessment.location|default:"-" }}</dd></div>
-          <div><dt class="text-base-content/60">创建人</dt><dd>{{ assessment.created_by|default:"-" }}</dd></div>
+          <div><dt class="text-base-content/60">创建人</dt><dd>{{ assessment.created_by.display_name|default:"-" }}</dd></div>
           <div><dt class="text-base-content/60">实际启动</dt><dd>{{ assessment.started_at|default:"-"|keep_date_parts }}</dd></div>
           <div><dt class="text-base-content/60">实际完成</dt><dd>{{ assessment.completed_at|default:"-"|keep_date_parts }}</dd></div>
         </dl>

@@ -4,7 +4,7 @@ from django.contrib.auth.models import Group, Permission
 
 from core.permissions import get_permission_bundle_choices
 from core.utils.forms import StyledFormMixin
-from accounts.services.users import get_user_full_info
+from accounts.services.users import annotate_identity_labels, get_user_full_info, require_distinguishable_users
 from accounts.selectors import permission_display_name
 from standards.models import TechnicalDomain
 
@@ -46,7 +46,12 @@ class RoleForm(StyledFormMixin, forms.Form):
         self.fields["bundles"].choices = get_permission_bundle_choices()
         self.fields["bundles"].widget.attrs["class"] = "checkbox checkbox-primary mt-1 shrink-0"
         self.fields["members"].widget.attrs["class"] = "checkbox checkbox-primary"
-        self.fields["members"].label_from_instance = get_user_full_info
+        self.fields["members"].queryset = annotate_identity_labels(
+            get_user_model().objects.order_by("last_name", "first_name", "pk")
+        )
+        self.fields["members"].label_from_instance = lambda person: (
+            get_user_full_info(person) + ("（同名备注未填写或重复）" if person.identity_invalid else "")
+        )
         self.fields["explicit_permissions"].widget.attrs["size"] = 10
         self.fields["explicit_permissions"].label_from_instance = lambda permission: (
             f"{permission_display_name(permission)}（{permission.content_type.app_label}.{permission.codename}）"
@@ -69,6 +74,13 @@ class RoleForm(StyledFormMixin, forms.Form):
         if existing.exists():
             raise forms.ValidationError("此角色名称已存在。")
         return name
+
+    def clean_members(self):
+        members = self.cleaned_data["members"]
+        existing = set(self.group.user_set.values_list("pk", flat=True)) if self.group else set()
+        require_distinguishable_users(get_user_model().objects.all(),
+                                     set(members.values_list("pk", flat=True)) - existing)
+        return members
 
     def payload(self):
         data = self.cleaned_data

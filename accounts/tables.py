@@ -24,9 +24,11 @@ class UserListTable(BaseTable):
     )
 
     def render_selection(self, record):
+        if getattr(record, "identity_invalid", False):
+            return format_html('<span title="同名备注未填写或重复">无法区分</span>')
         return format_html(
-            '<input type="checkbox" class="checkbox checkbox-sm" name="users" value="{}" aria-label="选择{}（{}）" data-row-selection>',
-            record.pk, get_user_display_name(record), record.username,
+            '<input type="checkbox" class="checkbox checkbox-sm" name="users" value="{}" aria-label="选择{}" data-row-selection>',
+            record.pk, getattr(record, "identity_label", "") or get_user_display_name(record),
         )
 
     # 序号列
@@ -38,13 +40,13 @@ class UserListTable(BaseTable):
     first_name = tables.Column(
         verbose_name="姓名",
         empty_values=(),
-        order_by=("last_name", "first_name", "username"),
+        order_by=("last_name", "first_name", "pk"),
         attrs={"td": {"class": "min-w-20 whitespace-nowrap text-center align-middle"}},
     )
     roles = tables.Column(
         verbose_name="角色",
         empty_values=(),
-        order_by=("role_sort", "username"),
+        order_by=("role_sort", "pk"),
         attrs={"td": {"class": "min-w-28 whitespace-nowrap text-center align-middle"}},
     )
 
@@ -99,7 +101,7 @@ class UserListTable(BaseTable):
         return start_index + bound_row.row_counter
 
     def render_first_name(self, record):
-        return get_user_display_name(record)
+        return getattr(record, "identity_label", "") or get_user_display_name(record)
 
     def render_roles(self, record):
         role_badges = get_user_role_badges(record, size="badge-sm")

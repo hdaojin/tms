@@ -1,17 +1,23 @@
 import django_tables2 as tables
+from django.utils import timezone
 from django.urls import reverse
 from django.utils.html import format_html
 
 from accounts.tables import UserListTable
+from core.tables import BaseDateColumn
 
 from .models import TrainingCycleMember
 
 
-class CycleCandidateTable(UserListTable):
-    username = tables.Column(verbose_name="账号")
+class AgeColumn(tables.Column):
+    def render(self, value):
+        today = timezone.localdate()
+        return today.year - value.year - ((today.month, today.day) < (value.month, value.day))
 
+
+class CycleCandidateTable(UserListTable):
     class Meta(UserListTable.Meta):
-        fields = ("selection", "first_name", "username", "roles", "join_date")
+        fields = ("selection", "first_name", "roles", "join_date")
         sequence = fields
         exclude = ("row_number", "gender", "birth_date", "phone_number", "school_dormitory",
                    "leave_date", "activation_status", "actions")
@@ -41,23 +47,35 @@ class CycleMemberTable(CycleCandidateTable):
         return format_html("{} {}", *(links + [""] * (2 - len(links))))
 
     class Meta(CycleCandidateTable.Meta):
-        fields = ("first_name", "username", "roles", "join_date", "member_role", "member_current", "member_actions")
+        fields = ("first_name", "roles", "join_date", "member_role", "member_current", "member_actions")
         sequence = fields
         exclude = (*CycleCandidateTable.Meta.exclude, "selection")
 
 
-class PlanMemberTable(CycleCandidateTable):
-    participating = tables.BooleanColumn(verbose_name="参与中", yesno=("是", "否"))
-    member_actions = tables.Column(verbose_name="操作", empty_values=(), orderable=False)
+class PlanCandidateTable(CycleCandidateTable):
+    birth_date = BaseDateColumn(verbose_name="出生日期", accessor="profile__birth_date", orderable=True)
+    age = AgeColumn(verbose_name="年龄", accessor="profile__birth_date", orderable=False)
 
-    def render_member_actions(self, record):
-        if not record.participating:
-            return "已退出"
-        url = reverse("training:plan_member_remove", args=[record.participant_plan_id, record.participant_id])
-        query = self.request.GET.urlencode()
-        return format_html('<a class="btn btn-outline btn-sm" href="{}{}">退出计划</a>', url, "?" + query if query else "")
+    def render_first_name(self, record):
+        return record.identity_label or super().render_first_name(record)
+
+    def render_selection(self, record):
+        if record.identity_invalid:
+            return format_html('<span title="同名备注未填写或重复">无法区分</span>')
+        return super().render_selection(record)
 
     class Meta(CycleCandidateTable.Meta):
-        fields = ("first_name", "username", "roles", "join_date", "participating", "member_actions")
+        fields = ("selection", "first_name", "roles", "birth_date", "age", "join_date")
         sequence = fields
-        exclude = (*CycleCandidateTable.Meta.exclude, "selection")
+        exclude = tuple(field for field in CycleCandidateTable.Meta.exclude if field != "birth_date")
+
+
+class PlanMemberTable(PlanCandidateTable):
+    participating = tables.BooleanColumn(verbose_name="参与中", yesno=("是", "否"))
+    member_actions = tables.TemplateColumn(template_name="training/partials/plan_member_action.html",
+                                           verbose_name="操作", orderable=False)
+
+    class Meta(PlanCandidateTable.Meta):
+        fields = ("first_name", "roles", "birth_date", "age", "join_date", "participating", "member_actions")
+        sequence = fields
+        exclude = (*PlanCandidateTable.Meta.exclude, "selection")

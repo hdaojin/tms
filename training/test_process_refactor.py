@@ -30,6 +30,8 @@ class ProcessFixture(TrainingFixtureMixin):
         self.cycle_obj = self.cycle()
         self.bind(self.cycle_obj)
         self.admin = User.objects.create_superuser("process-admin")
+        self.admin.first_name = "测试管理员"
+        self.admin.save(update_fields=["first_name"])
         self.coach = self.person("coach", "coach")
         self.other = self.person("other", "coach")
         self.student = self.person("student", "competitor")
@@ -45,6 +47,8 @@ class ProcessFixture(TrainingFixtureMixin):
             created_by=self.admin,
         )
         self.plan.schedulers.add(self.coach)
+        self.plan.responsible_coaches.add(self.coach, self.other)
+        self.plan.duty_personnel.add(self.coach, self.other)
         for user in (self.student, self.student2):
             TrainingPlanParticipant.objects.create(training_plan=self.plan, user=user, was_initial=True)
         scheduling.initialize_schedule(self.plan)
@@ -66,7 +70,7 @@ class ProcessFixture(TrainingFixtureMixin):
         self.slot = TrainingScheduleSlot.objects.select_related("day__training_plan").get(pk=self.slot.pk)
 
     def person(self, username, role):
-        user = User.objects.create_user(username)
+        user = User.objects.create_user(username, first_name=f"测试成员{User.objects.count() + 1}")
         user.user_permissions.add(*Permission.objects.filter(content_type__app_label="training"))
         TrainingCycleMember.objects.create(training_cycle=self.cycle_obj, user=user, role=role)
         return user

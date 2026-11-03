@@ -8,6 +8,21 @@ from .test_process_refactor import ProcessFixture
 
 
 class PlanClearTests(ProcessFixture, TestCase):
+    def test_actions_fragment_reflects_draft_tasks_and_permissions(self):
+        url = reverse("training:plan_detail", args=[self.plan.pk])
+        self.client.force_login(self.admin)
+        response = self.client.get(url, {"fragment": "actions"}, HTTP_HX_REQUEST="true")
+        self.assertContains(response, "没有待发布的任务草稿")
+        self.assertContains(response, "没有需要清空的任务")
+        self.assertNotContains(response, "<!DOCTYPE")
+        scheduling.save_slot_task(self.slot, self.coach, {"title": "待发布任务"})
+        response = self.client.get(url, {"fragment": "actions"}, HTTP_HX_REQUEST="true")
+        self.assertNotContains(response, "没有待发布的任务草稿")
+        self.assertContains(response, "请先清空全部任务")
+        self.client.force_login(self.student)
+        response = self.client.get(url, {"fragment": "actions"}, HTTP_HX_REQUEST="true")
+        self.assertNotContains(response, "清空全部任务")
+
     def test_whole_plan_workflow_preserves_history_and_times(self):
         task = self.task(title="已清空的特定任务")
         slot = self.slot

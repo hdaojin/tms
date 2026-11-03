@@ -1,0 +1,13 @@
+<section id="participants" class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body">
+  <div class="flex flex-wrap items-center gap-3">
+    <h2 class="card-title">{{ plan.title }} · 参与选手</h2>
+    {% if adding %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_members' plan.pk %}#participants" hx-get="{% url 'training:plan_members' plan.pk %}?section=participants" hx-push-url="{% url 'training:plan_members' plan.pk %}" hx-target="#participants" hx-swap="outerHTML">已有成员</a>
+    {% else %}<a class="btn btn-primary btn-sm" href="?mode=add#participants" hx-get="{% url 'training:plan_members' plan.pk %}?mode=add&amp;section=participants" hx-push-url="{% url 'training:plan_members' plan.pk %}?mode=add" hx-target="#participants" hx-swap="outerHTML">添加成员</a>{% endif %}
+    <a class="btn btn-ghost btn-sm" href="{% url 'training:plan_detail' plan.pk %}#plan-members">返回计划</a>
+  </div>
+  <p class="text-sm text-base-content/70">添加范围为所属周期中账号有效的选手。新增成员不自动获得已有任务，退出保留历史记录和执行。</p>
+  {% if participant_error %}<p class="alert alert-error" role="alert">{{ participant_error }}</p>{% endif %}
+  {% if participant_success %}<p class="alert alert-success" role="status">{{ participant_success }}</p>{% endif %}
+  {% include "components/list_filter_toolbar.html" %}
+  <div id="list-results" class="mt-4">{% include "training/partials/plan_participant_results.html" %}</div>
+</div></section>

@@ -52,8 +52,9 @@
 
     function syncCandidates() {
       results.querySelectorAll("button[data-person-id]").forEach((button) => {
-        button.disabled = state.has(button.dataset.personId);
-        button.textContent = button.dataset.label + (button.disabled ? "（已选）" : "");
+        const invalid = button.dataset.invalid === "true";
+        button.disabled = invalid || state.has(button.dataset.personId);
+        button.textContent = button.dataset.label + (invalid ? "（同名备注未填写或重复）" : button.disabled ? "（已选）" : "");
       });
     }
 
@@ -107,7 +108,7 @@
       cancelSearch();
       if (!text) {
         clearResults();
-        status.textContent = "请输入姓名或账号搜索人员。";
+        status.textContent = "请输入姓名或拼音搜索人员。";
         return;
       }
       const requestVersion = version;
@@ -133,6 +134,7 @@
           button.className = "btn btn-outline btn-sm h-auto max-w-full break-all whitespace-normal py-2";
           button.dataset.personId = String(person.id);
           button.dataset.label = person.label;
+          button.dataset.invalid = person.invalid ? "true" : "false";
           button.addEventListener("click", () => {
             state.add(person);
             renderSelected();
@@ -164,7 +166,7 @@
       cancelSearch();
       clearResults();
       if (!query.value.trim()) {
-        status.textContent = "请输入姓名或账号搜索人员。";
+        status.textContent = "请输入姓名或拼音搜索人员。";
         return;
       }
       timer = setTimeout(() => load(1), 300);
@@ -177,7 +179,7 @@
         cancelSearch();
         query.value = "";
         clearResults();
-        status.textContent = "请输入姓名或账号搜索人员。";
+        status.textContent = "请输入姓名或拼音搜索人员。";
       }
     });
     more.addEventListener("click", () => {

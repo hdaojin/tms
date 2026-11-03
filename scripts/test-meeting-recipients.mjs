@@ -165,6 +165,15 @@ test("empty search never fetches all users; requests include object scope and pa
   assert.equal(f.more.hidden, true);
 });
 
+test("同名备注无法区分时，候选保持禁用并显示提示", async () => {
+  const f = fixture();
+  f.enter("张三");
+  await f.respond(0, [{ id: 1, label: "张三", invalid: true }]);
+  assert.equal(f.results.children[0].disabled, true);
+  assert.match(f.results.children[0].textContent, /同名备注未填写或重复/);
+  assert.equal(f.selected.children.length, 0);
+});
+
 test("selections survive searches, deduplicate, remove and reset to original unavailable users", async () => {
   const f = fixture([{ id: 9, label: "原人员(original)", unavailable: true }]);
   f.enter("李");

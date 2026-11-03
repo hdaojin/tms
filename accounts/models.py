@@ -14,6 +14,8 @@ class UserProfile(models.Model):
     user = models.OneToOneField(get_user_model(), on_delete=models.CASCADE, related_name='profile')
     student_id = models.CharField('学号', max_length=50, null=True, blank=True, unique=True)
     name_pronunciation = models.CharField('姓名全拼', max_length=100, null=True, blank=True)
+    name_disambiguation = models.CharField('姓名区分备注', max_length=80, blank=True, default='',
+                                          help_text='同名时用于区分身份，可向有权查看姓名的用户显示。')
     gender = models.CharField('性别', max_length=1, choices=Gender.choices, null=True, blank=True)
     birth_date = models.DateField('出生日期', null=True, blank=True)
     phone_number = models.CharField('电话号码', max_length=20, null=True, blank=True)

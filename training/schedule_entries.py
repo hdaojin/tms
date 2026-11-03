@@ -38,7 +38,7 @@ class ScheduleDetailTable(BaseTable):
     coaches = tables.Column(
         empty_values=(), verbose_name="负责教练", orderable=False, attrs={"td": {"class": "min-w-40 text-center"}}
     )
-    duty = tables.Column(empty_values=(), verbose_name="值班教练", orderable=False)
+    duty = tables.Column(empty_values=(), verbose_name="值班人员", orderable=False)
     note = tables.Column(
         empty_values=(),
         verbose_name="备注",

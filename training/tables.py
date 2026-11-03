@@ -70,6 +70,9 @@ class TaskExecutionTable(BaseTable):
         "training:execution_detail", "training:execution_edit", edit_perm="training.change_taskexecution", edit_allowed_attr="can_edit"
     )
 
+    def render_user(self, value):
+        return get_user_display_name(value)
+
     class Meta(BaseTable.Meta):
         model = TaskExecution
         fields = ["training_task", "user", "status", "actual_minutes", "actions"]

@@ -161,6 +161,20 @@ test("image part wrapper forwards every FilePond props argument", () => {
   assert.equal(props.part, "entry-load-state image-entry-load-state");
 });
 
+test("file type icons cover common extensions and unknown files", () => {
+  for (const [name, expected] of [
+    ["report.PDF", "PDF"],
+    ["report.docx", "DOC"],
+    ["data.xlsx", "XLS"],
+    ["slides.pptx", "PPT"],
+    ["archive.7z", "ZIP"],
+    ["notes.md", "TXT"],
+    ["unknown.xyz", "FILE"],
+  ]) {
+    assert.equal(policy.fileTypeIcon(name).label, expected);
+  }
+});
+
 test("single-file add state reopens whenever the queue becomes empty", () => {
   const extensionNames = [
     "FileInputSource",
@@ -204,7 +218,6 @@ test("adapter keeps native browse UI and avoids internal input polling", async (
   assert.match(adapterSource, /workersURL/);
   assert.match(adapterSource, /part="browse-label"/);
   assert.match(adapterSource, /maximumPixels: 262144/);
-  assert.match(adapterSource, /"image-entry-media"/);
   assert.match(adapterSource, /configureSingleFileRecovery/);
   assert.match(adapterSource, /addEventListener\("entrieschange"/);
   assert.doesNotMatch(adapterSource, /pond\.browse\(\)/);
@@ -217,7 +230,10 @@ test("upload styles reuse form tokens and keep emphasis narrowly scoped", async 
   );
 
   assert.match(cssSource, /--default-border-radius: var\(--radius-field\)/);
-  assert.match(cssSource, /--default-border: var\(--border\) solid/);
+  assert.match(
+    cssSource,
+    /border: var\(--border\) solid var\(--tms-upload-border-color\)/,
+  );
   assert.match(cssSource, /::part\(browse-label\)/);
   assert.match(
     cssSource,
@@ -225,7 +241,7 @@ test("upload styles reuse form tokens and keep emphasis narrowly scoped", async 
   );
   assert.match(
     cssSource,
-    /::part\(image-entry-media\)[\s\S]*width: 4rem;[\s\S]*height: 4rem;/,
+    /::part\(entry-media\)[\s\S]*width: min\(100%, 5\.5rem\);[\s\S]*height: 5\.5rem;/,
   );
   assert.doesNotMatch(
     cssSource,

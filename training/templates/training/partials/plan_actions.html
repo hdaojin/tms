@@ -1,0 +1,17 @@
+{% if plan_actions %}
+<section id="plan-actions" class="mt-3 flex flex-wrap items-center gap-2" aria-label="快捷操作"
+         hx-get="{% url 'training:plan_detail' plan.pk %}{% querystring fragment='actions' %}"
+         hx-trigger="scheduleChanged from:body" hx-swap="outerHTML">
+  {% for action in plan_actions %}
+    <div class="tooltip" data-tip="{{ action.tooltip }}"{% if action.reason %} tabindex="0" aria-label="{{ action.label }}。{{ action.reason }}"{% endif %}>
+      {% if action.reason %}
+        <button type="button" class="btn btn-outline btn-sm" disabled>{{ action.label }}</button>
+      {% elif action.post %}
+        <form method="post" action="{{ action.url }}">{% csrf_token %}<button class="btn btn-primary btn-sm" aria-label="{{ action.label }}。{{ action.tooltip }}">{{ action.label }}</button></form>
+      {% else %}
+        <a class="btn btn-outline btn-sm" href="{{ action.url }}" aria-label="{{ action.label }}。{{ action.tooltip }}">{{ action.label }}</a>
+      {% endif %}
+    </div>
+  {% endfor %}
+</section>
+{% endif %}

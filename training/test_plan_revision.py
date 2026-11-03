@@ -16,7 +16,7 @@ from openpyxl import load_workbook
 from . import scheduling
 from .admin import TrainingPeriodConfigAdminForm
 from .forms import TrainingPlanForm
-from .models import TrainingPeriodConfig, TrainingPlan, TrainingScheduleSlot
+from .models import TrainingCycleMember, TrainingPeriodConfig, TrainingPlan, TrainingPlanParticipant, TrainingScheduleSlot
 from .plan_workbooks import build_plan_workbook, preview_import
 from .tests import TrainingFixtureMixin, User
 
@@ -74,6 +74,21 @@ class PlanRevisionTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(TrainingPeriodConfig.objects.get(period="early").start_time, time(7, 30))
         self.assertEqual(TrainingPeriodConfig.objects.get(period="evening").start_time, time(18, 30))
 
+    def test_roster_migration_preserves_existing_assignments(self):
+        plan = self.create_plan()
+        day = plan.schedule_days.first()
+        coach = User.objects.create_user("historic-coach")
+        duty = User.objects.create_user("historic-duty")
+        slot = day.slots.get(period="morning")
+        slot.coaches.add(coach)
+        day.duty_coaches.add(duty)
+        migration = import_module("training.migrations.0019_plan_rosters")
+        migration.populate_rosters(apps, SimpleNamespace(connection=SimpleNamespace(alias="default")))
+        self.assertEqual(list(plan.responsible_coaches.all()), [coach])
+        self.assertEqual(list(plan.duty_personnel.all()), [duty])
+        self.assertEqual(list(slot.coaches.all()), [coach])
+        self.assertEqual(list(day.duty_coaches.all()), [duty])
+
     def test_edit_preserves_historical_file_and_manager_relationship(self):
         plan = self.create_plan()
         old_manager = User.objects.create_user("historic-manager")
@@ -87,9 +102,9 @@ class PlanRevisionTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(plan.source_file.name, "historical/plan.xlsx")
         self.assertTrue(plan.task_managers.filter(pk=old_manager.pk).exists())
 
-    def test_empty_optional_periods_and_people_can_be_published(self):
-        plan = self.create_plan(early_start="", early_end="", evening_start="", evening_end="", action="publish")
-        self.assertIsNotNone(plan.published_at)
+    def test_empty_optional_periods_and_people_can_be_saved_as_draft(self):
+        plan = self.create_plan(early_start="", early_end="", evening_start="", evening_end="")
+        self.assertIsNone(plan.published_at)
         self.assertFalse(plan.schedulers.exists())
         self.assertFalse(plan.participants.exists())
         self.assertEqual(plan.schedule_days.count(), 2)
@@ -114,7 +129,7 @@ class PlanRevisionTests(TrainingFixtureMixin, TestCase):
         form = TrainingPlanForm(self.values(end_date=""))
         self.assertFalse(form.is_valid())
 
-    def test_future_disable_keeps_past_and_rejects_existing_schedule(self):
+    def test_empty_draft_time_change_updates_all_framework_days(self):
         plan = self.create_plan()
         with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 1, 4, tzinfo=dt_timezone.utc)):
             values = self.values(early_start="", early_end="")
@@ -123,11 +138,11 @@ class PlanRevisionTests(TrainingFixtureMixin, TestCase):
             scheduling.save_plan_definition(form, self.admin)
         old = plan.schedule_days.get(date=date(2026, 1, 1)).slots.get(period="early")
         future = plan.schedule_days.get(date=date(2026, 1, 2)).slots.get(period="early")
-        self.assertTrue(old.is_configured)
+        self.assertFalse(old.is_configured)
         self.assertFalse(future.is_configured)
         workbook = load_workbook(BytesIO(build_plan_workbook(plan)))
         labels = [workbook["训练计划"].cell(row, 3).value for row in range(3, workbook["训练计划"].max_row + 1)]
-        self.assertEqual(labels.count("早读"), 1)
+        self.assertEqual(labels.count("早读"), 0)
 
     def test_disable_does_not_remove_existing_future_arrangements(self):
         plan = self.create_plan()
@@ -136,23 +151,59 @@ class PlanRevisionTests(TrainingFixtureMixin, TestCase):
         future.save()
         form = TrainingPlanForm(self.values(early_start="", early_end=""), instance=plan)
         self.assertTrue(form.is_valid(), form.errors)
-        with self.assertRaises(ValidationError):
-            scheduling.save_plan_definition(form, self.admin)
+        self.assertTrue(form.fields["early_start"].disabled)
+        scheduling.save_plan_definition(form, self.admin)
         future.refresh_from_db()
         self.assertTrue(future.is_configured)
         self.assertEqual(future.kind, "rest")
 
-    def test_disable_unknown_future_does_not_rewrite_unknown_today(self):
+    def test_empty_draft_date_change_synchronizes_framework(self):
+        plan = self.create_plan()
+        form = TrainingPlanForm(self.values(start_date="2026-01-02"), instance=plan)
+        self.assertTrue(form.is_valid(), form.errors)
+        updated = scheduling.save_plan_definition(form, self.admin)
+        self.assertEqual(list(updated.schedule_days.values_list("date", flat=True)), [date(2026, 1, 2)])
+        self.assertEqual(updated.schedule_days.get().slots.count(), 4)
+
+    def test_structure_edit_preserves_cancelled_task_references(self):
+        plan = self.create_plan()
+        slot = plan.schedule_days.get(date=plan.start_date).slots.get(period="morning")
+        task = plan.tasks.create(
+            title="已取消任务", planned_date=plan.start_date, schedule_slot=slot,
+            status="cancelled", created_by=self.admin,
+        )
+        form = TrainingPlanForm(self.values(start_date="2026-01-02"), instance=plan)
+        self.assertFalse(form.is_valid())
+        self.assertIn("已有历史任务", str(form.errors))
+        plan.refresh_from_db()
+        form = TrainingPlanForm(self.values(morning_start="09:30"), instance=plan)
+        self.assertFalse(form.is_valid())
+        self.assertIn("已关联历史任务", str(form.errors))
+        plan.refresh_from_db()
+        form = TrainingPlanForm(self.values(afternoon_start="14:30"), instance=plan)
+        self.assertTrue(form.is_valid(), form.errors)
+        scheduling.save_plan_definition(form, self.admin)
+        task.refresh_from_db()
+        self.assertEqual(task.schedule_slot_id, slot.pk)
+        self.assertEqual(task.schedule_slot.starts_at, slot.starts_at)
+
+    def test_disable_unknown_times_in_empty_draft(self):
         plan = self.create_plan()
         TrainingScheduleSlot.objects.filter(day__training_plan=plan, period="early").update(starts_at=None, ends_at=None)
         form = TrainingPlanForm(self.values(early_start="", early_end=""), instance=plan)
         self.assertTrue(form.is_valid(), form.errors)
         scheduling.save_plan_definition(form, self.admin)
-        self.assertTrue(plan.schedule_days.get(date=date(2026, 1, 1)).slots.get(period="early").is_configured)
+        self.assertFalse(plan.schedule_days.get(date=date(2026, 1, 1)).slots.get(period="early").is_configured)
         self.assertFalse(plan.schedule_days.get(date=date(2026, 1, 2)).slots.get(period="early").is_configured)
 
     def test_workbooks_hide_disabled_periods_and_reject_filled_disabled_rows(self):
-        plan = self.create_plan(early_start="", early_end="", evening_start="", evening_end="", action="publish")
+        plan = self.create_plan(early_start="", early_end="", evening_start="", evening_end="")
+        TrainingCycleMember.objects.create(training_cycle=self.cycle_obj, user=self.admin, role="coach")
+        TrainingPlanParticipant.objects.create(training_plan=plan, user=User.objects.create_user("revision-athlete"))
+        plan.responsible_coaches.add(self.admin)
+        plan.duty_personnel.add(self.admin)
+        plan.published_at = timezone.now()
+        plan.save(update_fields=["published_at"])
         export = load_workbook(BytesIO(build_plan_workbook(plan)))
         labels = [export["训练计划"].cell(row, 3).value for row in range(3, export["训练计划"].max_row + 1)]
         self.assertEqual(labels, ["上午", "下午", "上午", "下午"])
@@ -184,8 +235,10 @@ class PlanRevisionTests(TrainingFixtureMixin, TestCase):
         slot.day.training_plan = plan
         self.assertTrue(scheduling.plan_manager(scheduler, plan))
         self.assertFalse(scheduling.can_fill(scheduler, slot, create=True))
-        from .models import TrainingCycleMember
         TrainingCycleMember.objects.create(training_cycle=plan.training_cycle, user=scheduler, role="coach")
+        plan.responsible_coaches.add(scheduler)
+        plan.duty_personnel.add(scheduler)
+        TrainingPlanParticipant.objects.create(training_plan=plan, user=User.objects.create_user("scheduler-athlete"))
         plan.published_at = timezone.now()
         plan.save()
         for day in plan.schedule_days.all():

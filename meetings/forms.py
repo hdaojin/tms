@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db.models import Q
 
-from accounts.services.users import get_user_full_info
+from accounts.services.users import annotate_identity_labels, get_user_full_info, require_distinguishable_users
 
 from .models import Meeting
 
@@ -25,7 +25,7 @@ class MeetingAudienceForm(StyledFormMixin, forms.ModelForm):
         queryset=get_user_model().objects.none(),
         required=False,
         widget=RecipientSelect,
-        help_text="按姓名或账号搜索，可多选。",
+        help_text="按姓名或拼音搜索，可多选。",
     )
 
     class Meta:
@@ -45,7 +45,8 @@ class MeetingAudienceForm(StyledFormMixin, forms.ModelForm):
         field = self.fields["visible_users"]
         selected_ids = self["visible_users"].value()
         selected_ids = [str(pk) for pk in (selected_ids or []) if str(pk).isdecimal()]
-        selected = list(field.queryset.filter(pk__in=selected_ids).order_by("last_name", "first_name", "username"))
+        selected = list(annotate_identity_labels(field.queryset).filter(pk__in=selected_ids)
+                        .order_by("last_name", "first_name", "pk"))
         allowed_ids = set(eligible.filter(pk__in=[user.pk for user in selected]).values_list("pk", flat=True))
         field.widget.selected = [
             {"id": user.pk, "label": get_user_full_info(user), "unavailable": user.pk not in allowed_ids}
@@ -60,6 +61,10 @@ class MeetingAudienceForm(StyledFormMixin, forms.ModelForm):
             cleaned["visible_users"] = get_user_model().objects.none()
         elif not self.errors and not cleaned.get("visible_groups") and not cleaned.get("visible_users"):
             raise forms.ValidationError("取消“所有人”后，请至少选择一个角色或指定人员。")
+        elif not self.errors and cleaned.get("visible_users") is not None:
+            existing = set(self.instance.visible_users.values_list("pk", flat=True)) if self.instance.pk else set()
+            added = set(cleaned["visible_users"].values_list("pk", flat=True)) - existing
+            require_distinguishable_users(self.fields["visible_users"].queryset, added)
         return cleaned
 
 

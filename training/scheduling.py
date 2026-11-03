@@ -11,6 +11,7 @@ from .models import (
     TaskExecution,
     TrainingChangeRecord,
     TrainingPlan,
+    TrainingPlanStaff,
     TrainingScheduleDay,
     TrainingScheduleSlot,
     TrainingTask,
@@ -66,11 +67,21 @@ def visible_plans(user):
         | Q(schedulers=user)
         | Q(approvers=user)
         | Q(schedule_days__slots__coaches=user)
+        | Q(staff_members__user=user, staff_members__role=TrainingPlanStaff.Role.COACH, staff_members__is_active=True)
         | Q(schedule_changes__confirmation_users=user)
         | (
             (Q(participants__user=user) | Q(tasks__executions__user=user) | Q(schedule_days__slots__coaches=user) | Q(schedule_days__duty_coaches=user))
             & Q(published_at__isnull=False)
         )
+    ).distinct()
+
+
+def my_plans(queryset, user):
+    return queryset.filter(
+        Q(participants__user=user, participants__is_active=True)
+        | Q(staff_members__user=user, staff_members__role=TrainingPlanStaff.Role.COACH, staff_members__is_active=True)
+        | Q(schedulers=user)
+        | Q(schedule_days__slots__coaches=user)
     ).distinct()
 
 
@@ -147,7 +158,61 @@ def task_snapshot(task):
 
 
 def coach_ids(plan):
-    return set(plan.training_cycle.members.filter(role="coach").values_list("user_id", flat=True))
+    return set(plan.responsible_coaches.values_list("pk", flat=True))
+
+
+def duty_ids(plan):
+    return set(plan.duty_personnel.values_list("pk", flat=True))
+
+
+def check_roster_removal(plan, role, removed):
+    if not removed:
+        return
+    now, today = timezone.now(), timezone.localdate()
+    slots = TrainingScheduleSlot.objects.filter(day__training_plan=plan, is_configured=True).filter(
+        Q(ends_at__gt=now) | Q(ends_at__isnull=True, day__date__gte=today)
+    )
+    if role == "responsible_coaches":
+        assigned = slots.filter(Q(coaches__pk__in=removed) | Q(coaches_all=True, coaches__isnull=True)).values_list("day__date", flat=True).first()
+    elif role == "duty_personnel":
+        assigned = plan.schedule_days.filter(
+            Q(duty_coaches__pk__in=removed) | Q(duty_all=True, duty_coaches__isnull=True),
+            date__gte=today,
+        ).values_list("date", flat=True).first()
+    else:
+        tasks = plan.tasks.exclude(status="cancelled").filter(
+            Q(status="draft") | Q(schedule_slot__in=slots) |
+            Q(schedule_slot__isnull=True, planned_date__gte=today)
+        )
+        assigned = tasks.filter(
+            Q(selected_competitors__pk__in=removed) | Q(status="draft", assign_all=True)
+        ).values_list("planned_date", flat=True).first()
+        if assigned is None:
+            assigned = TaskExecution.objects.filter(
+                training_task__in=tasks, user_id__in=removed, revoked_at__isnull=True
+            ).exclude(status="cancelled").values_list("training_task__planned_date", flat=True).first()
+    if assigned is not None:
+        raise ValidationError(f"请先处理 {assigned} 的相关排班或任务分配，再移除人员。")
+    keys = {
+        "responsible_coaches": ("coaches", "coaches_all"),
+        "duty_personnel": ("duty_coaches", "duty_all"),
+        "participants": ("competitors", "assign_all"),
+    }
+    people, everyone = keys[role]
+    for change in plan.schedule_changes.filter(status="pending"):
+        for item in change.payload:
+            for snapshot in (item.get("before"), item.get("after"), item.get("values")):
+                for values in snapshot if isinstance(snapshot, list) else [snapshot]:
+                    if isinstance(values, dict) and (
+                        values.get(everyone) or removed.intersection(values.get(people, ())) or
+                        role == "participants" and removed.intersection(values.get("selected_competitors", ()))
+                    ):
+                        raise ValidationError(f"请先处理待审批调整 #{change.pk}，再移除人员。")
+
+
+def require_rosters(plan):
+    if not coach_ids(plan) or not duty_ids(plan) or not plan.participants.filter(is_active=True).exists():
+        raise ValidationError("请先指定负责教练、参与选手和值班人员，每类至少一人。")
 
 
 @transaction.atomic
@@ -210,68 +275,96 @@ def plan_snapshot(plan):
         "创建时选手": sorted(plan.participants.filter(was_initial=True).values_list("user_id", flat=True)),
         **{
             label: sorted(getattr(plan, field).values_list("pk", flat=True))
-            for field, label in (("schedulers", "排班人员"), ("approvers", "审批人员"), ("task_managers", "任务管理员"))
+            for field, label in (("schedulers", "排班人员"), ("approvers", "审批人员"), ("task_managers", "任务管理员"),
+                                 ("responsible_coaches", "负责教练"), ("duty_personnel", "值班人员"))
         },
     }
 
 
+def check_plan_structure_edit(plan, start_date, end_date, *, changed_periods=()):
+    from .plan_clear import has_schedule_content
+
+    if plan.published_at or plan.schedule_published_at:
+        raise ValidationError("请先撤回计划发布，再修改日期范围或每日时段。")
+    if plan.tasks.exclude(status="cancelled").exists() or has_schedule_content(plan):
+        raise ValidationError("请先清空任务和排班，再修改日期范围或每日时段。")
+    if start_date and end_date and (
+        plan.tasks.filter(
+            Q(planned_date__lt=start_date) | Q(planned_date__gt=end_date) |
+            Q(schedule_slot__day__date__lt=start_date) | Q(schedule_slot__day__date__gt=end_date)
+        ).exists()
+        or plan.personal_tasks.exclude(date__range=(start_date, end_date)).exists()
+    ):
+        raise ValidationError("日期范围须保留已有历史任务的日期。")
+    if changed_periods and plan.tasks.filter(schedule_slot__period__in=changed_periods).exists():
+        raise ValidationError("每日时段已关联历史任务，不能修改时间快照。")
+
+
+def _sync_empty_framework(plan, previous):
+    plan.schedule_days.exclude(date__range=(plan.start_date, plan.end_date)).delete()
+    changed_periods = [
+        period for period in TrainingScheduleSlot.Period.values
+        if any(getattr(previous, f"{period}_{edge}") != getattr(plan, f"{period}_{edge}") for edge in ("start", "end"))
+    ]
+    for slot in TrainingScheduleSlot.objects.filter(day__training_plan=plan, period__in=changed_periods).select_related("day"):
+        start, end = (getattr(plan, f"{slot.period}_{edge}") for edge in ("start", "end"))
+        slot.is_configured = start is not None
+        slot.kind = "pending" if start else "unused"
+        slot.starts_at = timezone.make_aware(datetime.combine(slot.day.date, start)) if start else None
+        slot.ends_at = timezone.make_aware(datetime.combine(slot.day.date, end)) if end else None
+        slot.revision += 1
+        slot.save(update_fields=["is_configured", "kind", "starts_at", "ends_at", "revision", "updated_at"])
+    initialize_schedule(plan)
+
+
 @transaction.atomic
-def save_plan_definition(form, user, *, publish=False):
+def publish_plan(plan, user):
+    plan = TrainingPlan.objects.select_for_update().get(pk=plan.pk)
+    if not plan_manager(user, plan):
+        raise PermissionDenied
+    if plan.published_at:
+        raise ValidationError("计划已发布。")
+    require_rosters(plan)
+    plan.published_at = timezone.now()
+    plan.status = "published"
+    plan.save(update_fields=["published_at", "status", "updated_at"])
+    audit(plan, user, "发布计划")
+    return plan
+
+
+@transaction.atomic
+def save_plan_definition(form, user):
     before = {}
+    previous = None
+    structure_changed = False
     if form.instance.pk:
         previous = TrainingPlan.objects.select_for_update().get(pk=form.instance.pk)
         if not plan_manager(user, previous):
             raise PermissionDenied
-        if previous.schedule_published_at != form.instance.schedule_published_at:
-            raise ValidationError("排班状态已经变化，请刷新后重新提交。")
-        # 持锁后重新执行日期、状态与关闭规则校验，不能用旧表单覆盖新状态。
+        if (previous.published_at, previous.schedule_published_at) != (
+            form.instance.published_at, form.instance.schedule_published_at
+        ):
+            raise ValidationError("计划发布状态已经变化，请刷新后重新提交。")
         form.clean()
         if form.errors:
             raise ValidationError("计划已经变化，请根据表单提示重新提交。")
         before = plan_snapshot(previous)
+        structure_fields = ("start_date", "end_date", *TrainingPlan.TIME_FIELDS)
+        structure_changed = any(getattr(previous, name) != getattr(form.instance, name) for name in structure_fields)
     else:
         if not user.has_perm("training.add_trainingplan"):
             raise PermissionDenied
         form.instance.created_by = user
-    creating = not form.instance.pk
-    pending_times = None
-    if not creating and set(TrainingPlan.TIME_FIELDS).intersection(form.changed_data):
-        from .change_workflow import time_snapshot
-        for period in ("early", "evening"):
-            if form.cleaned_data.get(f"{period}_start") is None:
-                slots = TrainingScheduleSlot.objects.filter(
-                    day__training_plan=previous, period=period, is_configured=True, ends_at__gt=timezone.now()
-                )
-                if slots.exclude(kind__in=["pending", "unused"]).exists() or slots.filter(
-                    Q(domains__isnull=False) | Q(coaches__isnull=False)
-                ).exists() or TrainingTask.objects.filter(schedule_slot__in=slots).exclude(status="cancelled").exists():
-                    raise ValidationError("请先处理该时段已有的排班和任务，再停用时段。")
-        pending_times = {"type": "times", "id": previous.pk, "before": time_snapshot(previous),
-                         "after": {name: form.cleaned_data[name].isoformat() if form.cleaned_data[name] else None for name in TrainingPlan.TIME_FIELDS},
-                         "include_past": False}
-        if previous.schedule_published_at:
-            for name in TrainingPlan.TIME_FIELDS:
-                setattr(form.instance, name, getattr(previous, name))
     plan = form.save()
-    if pending_times:
-        from .change_workflow import create_change, apply_time_change
-        if previous.schedule_published_at:
-            create_change(plan, user, [pending_times], form.cleaned_data.get("reason", ""))
-            plan._time_change_requested = True
-        else:
-            apply_time_change(plan, pending_times, check_before=False)
-    if publish and not plan.published_at:
-        plan.published_at = timezone.now()
-        plan.status = "published"
-        plan.save(update_fields=["published_at", "status", "updated_at"])
-        audit(plan, user, "发布计划")
-    if creating:
+    if previous is None:
         initialize_schedule(plan)
+    elif structure_changed:
+        _sync_empty_framework(plan, previous)
     audit(plan, user, "保存计划及职责", before=before, after=plan_snapshot(plan))
     return plan
 
 
-def validate_day(plan, values):
+def validate_day(plan, values, *, previous_people=()):
     from datetime import date
 
     try:
@@ -280,13 +373,13 @@ def validate_day(plan, values):
         raise ValidationError("日期格式不正确。")
     if not plan.start_date <= when <= plan.end_date:
         raise ValidationError("安排日期必须位于计划范围内。")
-    if not set(values["duty_coaches"]).issubset(coach_ids(plan)):
-        raise ValidationError("值班人员必须是本周期教练。")
-    if values["duty_all"] and not coach_ids(plan):
-        raise ValidationError("本周期暂无教练，不能选择全体值班。")
+    if not set(values["duty_coaches"]).issubset(duty_ids(plan).union(previous_people)):
+        raise ValidationError("值班人员必须在本计划的值班名单内。")
+    if values["duty_all"] and not (values["duty_coaches"] or duty_ids(plan)):
+        raise ValidationError("本计划暂无值班人员，不能选择全体值班。")
 
 
-def validate_slot(plan, values, *, publishing=False):
+def validate_slot(plan, values, *, publishing=False, previous_people=()):
     if (
         values["period"] not in TrainingScheduleSlot.Period.values
         or values["kind"] not in TrainingScheduleSlot.Kind.values
@@ -304,8 +397,8 @@ def validate_slot(plan, values, *, publishing=False):
     if values["primary_domain"] and values["primary_domain"] not in domains:
         raise ValidationError("主要领域必须包含在所选领域中。")
     coaches = set(values["coaches"])
-    if not coaches.issubset(coach_ids(plan)):
-        raise ValidationError("负责人员必须是本周期教练。")
+    if not coaches.issubset(coach_ids(plan).union(previous_people)):
+        raise ValidationError("负责教练必须在本计划的负责教练名单内。")
     if publishing:
         if values["kind"] == "pending":
             raise ValidationError("发布前请完成所有待排班时段。")
@@ -373,11 +466,12 @@ def _apply_changes(plan, payload, actor=None, *, approved=False, draft_import=Fa
                 raise ValidationError("全体值班与具体名单不能同时选择。")
             if not approved and day_snapshot(obj) != values and any(slot.is_locked for slot in obj.slots.filter(is_configured=True)):
                 if any(day_snapshot(obj)[field] != values[field] for field in ("date", "duty_all", "duty_coaches")):
-                    raise ValidationError("当日已有锁定时段，不能修改日期或值班教练。")
+                    raise ValidationError("当日已有锁定时段，不能修改日期或值班人员。")
             if plan.schedule_published_at and values["duty_all"]:
                 if not change["before"]["duty_all"] or values["duty_coaches"] != change["before"]["duty_coaches"]:
-                    values["duty_coaches"] = sorted(coach_ids(plan))
-            validate_day(plan, values)
+                    values["duty_coaches"] = sorted(duty_ids(plan))
+            previous_people = change["before"]["duty_coaches"] if obj.date.isoformat() == values["date"] else ()
+            validate_day(plan, values, previous_people=previous_people)
             if obj.date.isoformat() != values["date"]:
                 if not approved and any(task.is_locked for task in TrainingTask.objects.filter(schedule_slot__day=obj)):
                     raise ValidationError("已有任务开始执行，不能移动日期。")
@@ -391,7 +485,10 @@ def _apply_changes(plan, payload, actor=None, *, approved=False, draft_import=Fa
             if plan.schedule_published_at and values["coaches_all"]:
                 if not change["before"]["coaches_all"] or values["coaches"] != change["before"]["coaches"]:
                     values["coaches"] = sorted(coach_ids(plan))
-            validate_slot(plan, values, publishing=not draft_import or bool(change.get("import_task")))
+            validate_slot(
+                plan, values, publishing=not draft_import or bool(change.get("import_task")),
+                previous_people=change["before"]["coaches"] if obj.is_locked else (),
+            )
             before = slot_snapshot(obj)
             tasks = list(obj.tasks.select_for_update().exclude(status="cancelled"))
             if change.get("import_task") and tasks:
@@ -416,7 +513,6 @@ def _apply_changes(plan, payload, actor=None, *, approved=False, draft_import=Fa
             )
         if change["type"] == "slot" and slots[change["id"]].period != change["after"]["period"]:
             TrainingScheduleSlot.objects.filter(pk=change["id"]).update(period=f"tmp{change['id']}")
-    all_coaches = coach_ids(plan)
     for change in payload:
         values = change["after"]
         obj = (days if change["type"] == "day" else slots)[change["id"]]
@@ -444,15 +540,11 @@ def _apply_changes(plan, payload, actor=None, *, approved=False, draft_import=Fa
                     if slot.starts_at and slot.ends_at:
                         slot.starts_at, slot.ends_at = time_by_date[(obj.date, slot.period)]
                         slot.save(update_fields=["starts_at", "ends_at", "updated_at"])
-            previous_all = change["before"]["duty_all"]
-            snapshot = values["duty_coaches"] if previous_all else all_coaches
-            obj.duty_coaches.set(snapshot if obj.duty_all and plan.schedule_published_at else values["duty_coaches"])
+            obj.duty_coaches.set(values["duty_coaches"])
             obj.slots.update(revision=F("revision") + 1, updated_at=timezone.now())
         else:
             obj.domains.set(values["domains"])
-            previous_all = change["before"]["coaches_all"]
-            snapshot = values["coaches"] if previous_all else all_coaches
-            obj.coaches.set(snapshot if obj.coaches_all and plan.schedule_published_at else values["coaches"])
+            obj.coaches.set(values["coaches"])
     # 最终结构检查在事务内完成，避免互换时产生半完成状态。
     for day in days.values():
         periods = list(day.slots.values_list("period", flat=True))
@@ -478,12 +570,14 @@ def _apply_changes(plan, payload, actor=None, *, approved=False, draft_import=Fa
                 save_slot_task(slot, actor, {"title": text.splitlines()[0][:180], "description": text if "\n" in text or len(text) > 180 else "", "assign_all": False, "competitors": list(plan.participants.filter(is_active=True).values_list("user_id", flat=True))}, _importing=True, _approved=approved)
 
 
-def slot_complete(slot):
+def slot_complete(slot, *, has_plan_coaches=None):
     if not slot.is_configured or slot.kind == "pending":
         return False
     if slot.kind in {"rest", "unused"}:
         return True
-    has_coaches = bool(list(slot.coaches.all())) or (slot.coaches_all and bool(coach_ids(slot.day.training_plan)))
+    if slot.coaches_all and has_plan_coaches is None:
+        has_plan_coaches = bool(coach_ids(slot.day.training_plan))
+    has_coaches = bool(list(slot.coaches.all())) or (slot.coaches_all and has_plan_coaches)
     return bool(has_coaches and (slot.kind == "general" or slot.primary_domain_id))
 
 
@@ -505,6 +599,7 @@ def save_schedule(plan, user, payload, reason=""):
         raise ValidationError("Excel 任务须通过空计划导入入口保存。")
     if not plan.published_at:
         raise ValidationError("请先发布计划，再填写排班。")
+    require_rosters(plan)
     if not payload:
         raise ValidationError("没有需要保存的调整。")
     initial = True
@@ -537,21 +632,29 @@ def publish_schedule(plan, user):
     expected = (plan.end_date - plan.start_date).days + 1
     if plan.schedule_days.count() != expected:
         raise ValidationError("日期框架不完整，请先初始化排班。")
+    require_rosters(plan)
     all_coaches = coach_ids(plan)
+    all_duty = duty_ids(plan)
     for day in plan.schedule_days.select_for_update():
-        validate_day(plan, day_snapshot(day))
+        day_values = day_snapshot(day)
         active_slots = [slot for slot in day.slots.all() if slot.is_configured]
+        day_ended = day.date < timezone.localdate() and all(slot.is_locked for slot in active_slots)
+        validate_day(plan, day_values, previous_people=day_values["duty_coaches"] if day_ended else ())
         duty_optional = bool(active_slots) and all(slot.kind in {"rest", "unused"} for slot in active_slots)
-        if not duty_optional and not (day.duty_all and all_coaches or day.duty_coaches.exists()):
-            raise ValidationError(f"{day.date} 尚未安排值班教练。")
+        if not duty_optional and not (day.duty_all and all_duty or day.duty_coaches.exists()):
+            raise ValidationError(f"{day.date} 尚未安排值班人员。")
         if day.slots.count() != 4:
             raise ValidationError("时段框架不完整。")
-        if day.duty_all:
-            day.duty_coaches.set(all_coaches)
+        if day.duty_all and not day_values["duty_coaches"]:
+            day.duty_coaches.set(all_duty)
         for slot in day.slots.all():
+            values = slot_snapshot(slot)
             if slot.is_configured:
-                validate_slot(plan, slot_snapshot(slot), publishing=True)
-            if slot.coaches_all:
+                validate_slot(
+                    plan, values, publishing=True,
+                    previous_people=values["coaches"] if slot.is_locked else (),
+                )
+            if slot.coaches_all and not values["coaches"]:
                 slot.coaches.set(all_coaches)
             for task in slot.tasks.exclude(status="cancelled"):
                 _sync_task(task, slot, approved=True)
@@ -599,8 +702,14 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
     )
     if not can_fill(user, slot, create=task is None) and not import_allowed:
         raise PermissionDenied
-    validate_slot(plan, slot_snapshot(slot), publishing=True)
     creating = task is None
+    snapshot = slot_snapshot(slot)
+    validate_slot(
+        plan, snapshot, publishing=True,
+        previous_people=snapshot["coaches"] if slot.is_locked and not creating and not publish else (),
+    )
+    if creating or publish:
+        require_rosters(plan)
     if task:
         task = TrainingTask.objects.select_for_update().get(pk=task.pk, schedule_slot=slot)
         if task.status == "cancelled":
@@ -625,6 +734,13 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
     ) | set(task.executions.filter(user_id__in=selected).values_list("user_id", flat=True))
     if selected != valid:
         raise ValidationError("只能选择本计划参与中的选手。")
+    if not _importing and not task.assign_all:
+        from accounts.services.users import require_distinguishable_users
+        from django.contrib.auth import get_user_model
+
+        newly_selected = selected - set(before.get("selected_competitors", []))
+        scope = get_user_model().objects.filter(pk__in=plan.participants.filter(is_active=True).values("user_id"))
+        require_distinguishable_users(scope, newly_selected)
     task.selected_competitors.set(selected)
     _set_skills(task, values.get("skills", before.get("skills", [])))
     if publish and task.status == "draft":
@@ -748,6 +864,7 @@ def publish_slot_task(task, user, *, _approved=False):
         return task
     if task.status != "draft":
         raise ValidationError("只能发布草稿任务。")
+    require_rosters(plan)
     validate_slot(plan, slot_snapshot(task.schedule_slot), publishing=True)
     # 撤回后再次发布保留首次分配，不能因全体成员变化扩大名单。
     previously_published = task.executions.exists()

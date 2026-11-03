@@ -1,4 +1,5 @@
 from core.tables import ActionsColumn, BaseDateTimeColumn, BaseTable
+from accounts.services.users import get_user_display_name
 
 from .models import GlossaryEntry, GlossaryEntryProposal, GlossaryImport, ProfessionalGlossary, StudySession
 
@@ -31,6 +32,9 @@ class ProposalTable(BaseTable):
     created_at = BaseDateTimeColumn()
     actions = ActionsColumn(view_url="glossary:proposal_detail")
 
+    def render_submitted_by(self, value):
+        return get_user_display_name(value)
+
     class Meta(BaseTable.Meta):
         model = GlossaryEntryProposal
         fields = ("english_term", "glossary", "submitted_by", "status", "created_at", "actions")
@@ -40,6 +44,9 @@ class GlossaryImportTable(BaseTable):
     created_at = BaseDateTimeColumn()
     actions = ActionsColumn(view_url="glossary:import_detail")
 
+    def render_imported_by(self, value):
+        return get_user_display_name(value)
+
     class Meta(BaseTable.Meta):
         model = GlossaryImport
         fields = ("original_filename", "glossary", "imported_by", "status", "created_at", "actions")
@@ -48,6 +55,9 @@ class GlossaryImportTable(BaseTable):
 class StudySessionTable(BaseTable):
     started_at = BaseDateTimeColumn()
     actions = ActionsColumn(view_url="glossary:session_summary", view_label="统计")
+
+    def render_user(self, value):
+        return get_user_display_name(value)
 
     class Meta(BaseTable.Meta):
         model = StudySession

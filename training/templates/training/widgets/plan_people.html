@@ -3,7 +3,7 @@
     {% for person in widget.selected %}
       <span data-person-id="{{ person.id }}" data-person-label="{{ person.label }}" data-unavailable="{{ person.unavailable|yesno:'true,false' }}" class="badge badge-outline h-auto">
         <input type="hidden" name="{{ widget.name }}" value="{{ person.id }}">
-        {{ person.label }}{% if person.unavailable %}（账号停用或缺少权限）{% endif %}
+        {{ person.label }}{% if person.unavailable %}（当前不符合候选条件）{% endif %}
       </span>
     {% endfor %}
   </div>
@@ -14,7 +14,7 @@
       <h3 class="text-lg font-bold">选择{{ widget.picker_title }}</h3>
       <div class="space-y-4">
       <label class="fieldset">
-        <span class="fieldset-legend">搜索姓名或账号</span>
+        <span class="fieldset-legend">搜索姓名或拼音</span>
         <input type="search" data-plan-query class="input w-full" autocomplete="off">
       </label>
       <p data-plan-status role="status" aria-live="polite"></p>

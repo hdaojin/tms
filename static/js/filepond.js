@@ -15,12 +15,13 @@ import {
   claimInitialization,
   dataTransferHasFiles,
   eventPathHasInteractiveElement,
+  fileTypeIcon,
   isPasteEnabled,
   nextDragDepth,
   shouldHandleFilePaste,
   syncSingleFileAddEntryState,
   withImageEntryPart,
-} from "./filepond-policy.js";
+} from "./filepond-policy.js?v=upload-cards-1";
 
 const filePondSelector = "file-pond[data-tms-file-upload]";
 const wrapperSelector = "[data-tms-file-upload-wrapper]";
@@ -48,16 +49,63 @@ function addImagePart(template, nodeKey, partName) {
 }
 
 for (const [nodeKey, partName] of [
+  ["entry-list-item", "image-entry-list-item"],
   ["entry", "image-entry"],
   ["entry-load-state", "image-entry-load-state"],
   ["entry-info", "image-entry-info"],
   ["entry-store-state", "image-entry-store-state"],
   ["entry-status", "image-entry-status"],
-  ["entry-image-spring", "image-entry-media"],
 ]) {
   addImagePart(previewTemplate, nodeKey, partName);
 }
 const plainTemplate = createFilePondEntryList();
+
+function configureCardTemplate(template, showImagePreview) {
+  withNodeTree(template).update("entry-list-item", (node) => {
+    const originalProps = node.props;
+    node.props = (...args) => {
+      const props = originalProps(...args);
+      const invalid = Object.values(args[0]?.entry?.extensionState || {}).some(
+        (state) => state?.status?.type === "error",
+      );
+      return {
+        ...props,
+        part: [props.part, invalid && "invalid-entry-list-item"]
+          .filter(Boolean)
+          .join(" "),
+      };
+    };
+  });
+  withNodeTree(template).update("entry", (node) => {
+    const originalProps = node.props;
+    node.props = (...args) => ({
+      ...originalProps(...args),
+      title: args[0]?.entry?.name || "",
+    });
+  });
+  withNodeTree(template)
+    .find("entry")
+    .prepend({
+      if: {
+        test: ({ entry }) =>
+          Boolean(entry?.file) &&
+          !(showImagePreview && entry.file.type?.startsWith("image/")),
+        then: {
+          key: "tms-file-icon",
+          tag: "span",
+          data: ({ entry }) => fileTypeIcon(entry.name),
+          attrs: ({ color }) => ({
+            part: "file-type-icon",
+            "aria-hidden": "true",
+            style: `--tms-file-icon-color: ${color}`,
+          }),
+          children: "{{label}}",
+        },
+      },
+    });
+}
+configureCardTemplate(previewTemplate, true);
+configureCardTemplate(plainTemplate, false);
 const tmsLocale = {
   ...locale,
   descriptionBrowse: `[${browseLabel}]`,

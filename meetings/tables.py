@@ -65,7 +65,7 @@ class MeetingTable(BaseTable):
         verbose_name="上传者",
         accessor="uploaded_by__display_name",
         orderable=True,
-        order_by=("uploaded_by__last_name", "uploaded_by__first_name", "uploaded_by__username"),
+        order_by=("uploaded_by__last_name", "uploaded_by__first_name", "uploaded_by__pk"),
     )
     uploaded_at = BaseDateTimeColumn(verbose_name="上传时间", accessor="uploaded_at")
     is_public = tables.BooleanColumn(verbose_name="可见范围", yesno="所有人可见,限定人员可见", orderable=False)

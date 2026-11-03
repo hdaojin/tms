@@ -15,7 +15,7 @@ from accounts.services.users import get_user_display_name
 from . import entry_operations as operations
 from . import scheduling
 from .models import TrainingScheduleSlot
-from .schedule_forms import cycle_coaches
+from .schedule_forms import plan_coaches
 from .schedule_views import get_plan, render
 
 
@@ -85,7 +85,7 @@ class EntryOperationForm(StyledFormMixin, forms.Form):
         ],
         required=False,
     )
-    include_duty = forms.BooleanField(label="同时复制值班教练", required=False)
+    include_duty = forms.BooleanField(label="同时复制值班人员", required=False)
     include_note = forms.BooleanField(label="同时复制日备注", required=False)
     overwrite = forms.BooleanField(label="覆盖已有安排（保留任务，须通过兼容校验）", required=False)
     state = forms.ChoiceField(
@@ -111,7 +111,7 @@ class EntryOperationForm(StyledFormMixin, forms.Form):
         for name in ("days", "source", "first", "second"):
             self.fields[name].label_from_instance = lambda day: day.date.isoformat()
         self.fields["slots"].queryset = TrainingScheduleSlot.objects.filter(day__training_plan=plan)
-        self.fields["coaches"].queryset = cycle_coaches(plan)
+        self.fields["coaches"].queryset = plan_coaches(plan)
         self.fields["coaches"].label_from_instance = get_user_display_name
         links = plan.training_cycle.skill_tree_version_links.select_related("technical_domain")
         self.fields["domain"].choices = [

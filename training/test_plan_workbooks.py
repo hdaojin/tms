@@ -9,7 +9,7 @@ from django.urls import reverse
 from openpyxl import load_workbook
 
 from . import scheduling
-from .plan_workbooks import TEMPLATE, build_plan_workbook, confirm_import, preview_import
+from .plan_workbooks import TEMPLATE, build_plan_workbook, confirm_import, import_rosters, preview_import
 from .test_process_refactor import ProcessFixture
 
 
@@ -20,7 +20,7 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
         url = reverse("training:plan_import", args=[self.plan.pk])
         detail_url = reverse("training:plan_detail", args=[self.plan.pk])
         detail = self.client.get(detail_url)
-        self.assertContains(detail, f'href="{url}">导入 Excel</a>', html=False)
+        self.assertContains(detail, f'href="{url}" aria-label="导入 Excel。预览并导入排班和任务草稿。">导入 Excel</a>', html=False)
         page = self.client.get(url)
         self.assertContains(page, f'href="{detail_url}">取消</a>', html=False)
         self.assertNotContains(page, 'hx-post=')
@@ -31,7 +31,7 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
         preview = self.client.post(url, {"file": upload})
         self.assertContains(preview, "确认导入")
         self.assertContains(preview, "任务分配选手（2 人）")
-        self.assertContains(preview, self.student.username)
+        self.assertNotContains(preview, self.student.username)
         self.assertNotContains(preview, 'hx-post=')
         response = self.client.post(url, {"token": preview.context["token"]})
         self.assertRedirects(response, detail_url)
@@ -231,6 +231,15 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
         self.assertEqual(records[0]["status"], "错误")
         self.assertIn("当前参与选手", records[0]["message"])
         self.assertFalse(payload)
+
+    def test_confirm_rechecks_duty_roster_changes(self):
+        self.empty_plan()
+        rosters = import_rosters(self.plan)
+        _, payload = preview_import(self.plan, self.admin, self.workbook())
+        self.plan.duty_personnel.add(self.student)
+        with self.assertRaisesMessage(ValidationError, "值班人员已经变化"):
+            confirm_import(self.plan, self.admin, payload, self.members(), rosters)
+        self.assertFalse(self.plan.tasks.exists())
 
     def test_confirm_rechecks_initial_competitors_and_permission(self):
         self.empty_plan()

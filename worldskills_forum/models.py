@@ -290,7 +290,7 @@ class ForumTopicReadState(models.Model):
         verbose_name_plural = "论坛主题阅读状态"
 
     def __str__(self):
-        return f"{self.user} - {self.topic}"
+        return f"{self.user.display_name} - {self.topic}"
 
 
 register_file_cleanup_signals(ForumPostAttachment, file_field="file")

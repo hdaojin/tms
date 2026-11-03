@@ -40,14 +40,14 @@
     function renderStaged() {
       staged.replaceChildren(...[...people.values()].map(person => badge(person, true)));
       for (const button of results.querySelectorAll('[data-result-id]')) {
-        button.disabled = people.has(button.dataset.resultId);
+        button.disabled = button.dataset.invalid === 'true' || people.has(button.dataset.resultId);
       }
     }
     async function search(next = false) {
       const term = query.value.trim();
       const current = ++version;
       if (!next) { page = 0; results.replaceChildren(); }
-      if (!term) { status.textContent = '输入姓名或账号开始搜索。'; more.hidden = true; return; }
+      if (!term) { status.textContent = '输入姓名或拼音开始搜索。'; more.hidden = true; return; }
       const url = new URL(root.dataset.searchUrl, window.location.origin);
       url.searchParams.set('q', term);
       url.searchParams.set('page', String(page + 1));
@@ -64,7 +64,8 @@
           button.type = 'button';
           button.className = 'btn btn-outline btn-sm';
           button.dataset.resultId = person.id;
-          button.textContent = person.label;
+          button.dataset.invalid = item.invalid ? 'true' : 'false';
+          button.textContent = person.label + (item.invalid ? '（同名备注未填写或重复）' : '');
           button.addEventListener('click', () => { people.set(person.id, person); renderStaged(); });
           results.append(button);
         }
@@ -84,7 +85,7 @@
       query.value = '';
       results.replaceChildren();
       more.hidden = true;
-      status.textContent = '输入姓名或账号开始搜索。';
+      status.textContent = '输入姓名或拼音开始搜索。';
       renderStaged();
       dialog.showModal();
       query.focus();

@@ -17,8 +17,10 @@ class UserManagementTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.admin = User.objects.create_superuser("manager", "manager@example.com", "password")
+        cls.admin.last_name, cls.admin.first_name = "管理", "员"
+        cls.admin.save(update_fields=["last_name", "first_name"])
         cls.user = User.objects.create_user("student", last_name="张", first_name="三")
-        cls.other = User.objects.create_user("other", is_active=False)
+        cls.other = User.objects.create_user("other", first_name="其他人员", is_active=False)
         cls.role = Group.objects.create(name="选手")
         cls.existing = Group.objects.create(name="现有角色")
         cls.permission = Permission.objects.get(codename="view_user", content_type__app_label="auth")
@@ -204,9 +206,10 @@ class UserManagementTests(TestCase):
         self.user.groups.add(self.role)
         UserProfile.objects.create(user=self.user, student_id="S123")
         url = reverse("accounts:user_list")
-        for query in ("张三", "student", "S123"):
+        for query in ("张三", "zhangsan", "zs", "S123"):
             response = self.client.get(url, {"q": query, "active": "1", "role": self.role.pk})
             self.assertEqual(list(response.context["object_list"]), [self.user])
+        self.assertFalse(self.client.get(url, {"q": "student"}).context["object_list"].exists())
         response = self.client.get(url, {"role": "none", "active": "0"})
         self.assertEqual(list(response.context["object_list"]), [self.other])
         response = self.client.get(url, {"q": "张三"}, HTTP_HX_REQUEST="true")
@@ -219,7 +222,7 @@ class UserManagementTests(TestCase):
         self.assertIsNotNone(soup.select_one('[data-select-all]'))
 
     def test_all_matching_freezes_targets_and_not_new_matches(self):
-        users = [User.objects.create_user(f"batch-{index}") for index in range(25)]
+        users = [User.objects.create_user(f"batch-{index}", first_name=f"batch-{index}") for index in range(25)]
         response = self.client.post(self.url, {"selection": "all", "q": "batch-", "operation": "deactivate"})
         self.assertEqual(response.context["preview"]["count"], 25)
         token = response.context["preview"]["token"]
@@ -288,7 +291,7 @@ class UserManagementTests(TestCase):
             self.url,
             {
                 "selection": "all",
-                "q": "student",
+                "q": "zhangsan",
                 "operation": "add_roles",
                 "return_query": "q=student&sort=-first_name&page=1",
             },
@@ -443,7 +446,7 @@ class UserManagementTests(TestCase):
         self.assertRedirects(response, expected)
 
     def test_save_clamps_page_when_action_shrinks_filtered_results(self):
-        users = [User.objects.create_user(f"paged-{index}") for index in range(21)]
+        users = [User.objects.create_user(f"paged-{index}", first_name=f"paged-{index}") for index in range(21)]
         response = self.client.post(
             self.url,
             {

@@ -17,9 +17,9 @@
 {% for period in disabled_periods %}<div class="border border-base-300 rounded p-3 text-base-content/50">{{ period }} · 未启用</div>{% endfor %}
 </section>
 {% for form in day_forms %}{{ form.non_field_errors }}{% for field in form.hidden_fields %}{{ field }}{% endfor %}
-<fieldset class="border border-base-300 rounded p-3 space-y-3"><legend>值班</legend>{% include 'components/field.html' with field=form.duty_all %}{% include 'components/field.html' with field=form.duty_coaches %}<p class="text-sm text-base-content/60">全部已启用时段均为休息或不安排时，值班教练可不选。</p></fieldset>
+<fieldset class="border border-base-300 rounded p-3 space-y-3"><legend>值班</legend>{% include 'components/field.html' with field=form.duty_all %}{% include 'components/field.html' with field=form.duty_coaches %}<p class="text-sm text-base-content/60">全部已启用时段均为休息或不安排时，值班人员可不选。</p></fieldset>
 <fieldset class="border border-base-300 rounded p-3"><legend>备注</legend>{% include 'components/field.html' with field=form.note %}</fieldset>
 {% endfor %}
-{% if show_reason %}<label class="block">调整原因（修改时必填）<textarea class="textarea w-full" name="reason">{{ reason }}</textarea></label><p class="text-sm">修改已发布排班时由涉及教练依次确认后终审；过期修改直接终审。</p>{% endif %}
+{% if show_reason %}<label class="block">调整原因（修改时必填）<textarea class="textarea w-full" name="reason">{{ reason }}</textarea></label><p class="text-sm">修改已发布排班时由涉及教练和值班人员依次确认后终审；过期修改直接终审。</p>{% endif %}
 <div class="flex flex-wrap items-center gap-3"><button type="button" class="btn btn-outline" data-schedule-reset hx-get="{% url 'training:schedule_edit' plan.pk %}?{{ reset_query }}{{ editor_suffix }}" hx-target="#schedule-editor">重置</button><button class="btn btn-primary" name="action" value="save">{% if plan.schedule_published_at %}提交审批{% else %}保存{% endif %}</button><a class="btn btn-ghost" href="{% url 'training:plan_detail' plan.pk %}">返回计划</a></div>
 </form>{% if not is_fragment %}</div>{% endif %}{% endblock %}

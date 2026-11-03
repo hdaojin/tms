@@ -166,7 +166,7 @@ class TrainingCycleMembersView(FilterableListMixin, TitleMixin, PermissionRequir
 
     def get_list_filter_specs(self):
         specs = [ListFilterSpec("mode", "成员列表", "select", choices=[("add", "添加成员")], empty_label="已有成员"),
-                 ListFilterSpec("q", "搜索用户", "search", placeholder="账号、完整姓名或学号"),
+                 ListFilterSpec("q", "搜索用户", "search", placeholder="姓名、拼音或学号"),
                  ListFilterSpec("role", "用户角色", "select", choices=UserFilterForm().fields["role"].choices[1:],
                                 empty_label="全部用户角色")]
         if not self.request.user.has_perm("training.add_trainingcyclemember"):
@@ -467,6 +467,27 @@ class TrainingPlanListView(FilterableListMixin, ListPageMixin, TitleMixin, Permi
         return queryset
 
 
+class MyTrainingPlanListView(TrainingPlanListView):
+    title = "我的计划"
+    create_url_name = None
+    status_filter = ListFilterSpec(
+        "status", "状态", "select",
+        choices=TrainingPlanListView.status_filter.choices,
+        empty_label="进行中及即将开始",
+    )
+    list_filter_specs = (TrainingPlanListView.list_filter_specs[0], status_filter)
+
+    def get_base_queryset(self):
+        from .scheduling import my_plans
+
+        return my_plans(super().get_base_queryset(), self.request.user)
+
+    def apply_custom_filters(self, queryset):
+        if not self.get_filter_value(self.status_filter):
+            return queryset.filter(end_date__gte=timezone.localdate())
+        return super().apply_custom_filters(queryset)
+
+
 class TrainingPlanDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = TrainingPlan
     template_name = "training/plan_detail.html"
@@ -508,11 +529,11 @@ class TrainingPlanCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     def form_valid(self, form):
         from .scheduling import save_plan_definition
         try:
-            self.object = save_plan_definition(form, self.request.user, publish=self.request.POST.get("action") == "publish")
+            self.object = save_plan_definition(form, self.request.user)
         except ValidationError as exc:
             form.add_error(None, exc)
             return self.form_invalid(form)
-        messages.success(self.request, "计划已保存；时间调整已提交审批，批准前保留原时间。" if getattr(self.object, "_time_change_requested", False) else "计划已保存并发布。" if self.request.POST.get("action") == "publish" else "计划已保存。")
+        messages.success(self.request, "计划已保存。")
         return redirect(self.get_success_url())
 
     def get_success_url(self):
@@ -786,7 +807,7 @@ class TrainingLogListView(FilterableListMixin, ListPageMixin, TitleMixin, Permis
 
     def get_list_filter_specs(self):
         return (
-            ListFilterSpec("q", "搜索日志", "search", placeholder="姓名、账号、学号、主题、摘要或文件名"),
+            ListFilterSpec("q", "搜索日志", "search", placeholder="姓名、拼音、学号、主题、摘要或文件名"),
             ListFilterSpec("cycle", "训练周期", "select",
                            choices=[(cycle.pk, cycle.name) for cycle in self.filter_form.fields["cycle"].queryset],
                            empty_label="全部训练周期"),

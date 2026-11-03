@@ -9,13 +9,14 @@ from django.contrib.auth.models import Group, Permission
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import CharField, Q
-from django.db.models.functions import Concat
+from django.db.models import Q
 
 from accounts.models import GroupProfile, UserProfile
 from accounts.selectors import permission_display_name
 from accounts.services.roles import _user_roles_state
-from accounts.services.users import get_user_display_name
+from accounts.services.users import (
+    annotate_identity_labels, get_user_display_name, require_distinguishable_users, user_name_search_ids,
+)
 from accounts.user_management_forms import UserManagementForm
 
 User = get_user_model()
@@ -53,12 +54,13 @@ def load_user_action(*, actor, token):
     return {**data, "token": token, "users": _users(data["ids"])}
 
 
-def filter_users(queryset, filters):
+def filter_users(queryset, filters, *, annotate_identity=True):
+    if annotate_identity:
+        queryset = annotate_identity_labels(queryset)
     query = filters.get("q", "")
     if query:
-        queryset = queryset.alias(full_name=Concat("last_name", "first_name", output_field=CharField()))
         queryset = queryset.filter(
-            Q(username__icontains=query) | Q(full_name__icontains=query) | Q(profile__student_id__icontains=query)
+            Q(pk__in=user_name_search_ids(queryset, query)) | Q(profile__student_id__icontains=query)
         )
     if filters.get("active"):
         queryset = queryset.filter(is_active=filters["active"] == "1")
@@ -87,6 +89,7 @@ def normalize_ids(values):
 
 
 def _users(ids):
+    require_distinguishable_users(User.objects.all(), ids)
     users = list(
         User.objects.filter(pk__in=ids)
         .select_related("profile")
@@ -146,7 +149,7 @@ def _changes(users, payload):
     role_names = dict(Group.objects.filter(pk__in=payload["roles"]).values_list("pk", "name"))
     rows, errors = [], []
     for user in users:
-        name = f"{get_user_display_name(user)}（{user.username}）"
+        name = get_user_display_name(user)
         if user.is_superuser and operation in ("deactivate", "add_roles", "remove_roles"):
             errors.append(f"{name}：超级管理员账号受保护，不能执行此操作。")
             continue
@@ -173,7 +176,6 @@ def _changes(users, payload):
         rows.append(
             {
                 "name": get_user_display_name(user),
-                "username": user.username,
                 "before": before,
                 "after": after,
                 "changed": before != after,

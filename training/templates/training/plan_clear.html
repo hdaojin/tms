@@ -5,7 +5,7 @@
   {% if error %}<p class="alert alert-error">{{ error }}</p>{% endif %}
   {% if preview %}
     {% if action == 'clear_schedule' %}
-      <p>将清空全部排班、每天的值班教练和备注，保留日期和时段时间。未启用时段保持未启用。</p>
+      <p>将清空全部排班、每天的值班人员和备注，保留日期和时段时间。未启用时段保持未启用。</p>
       {% for day in preview.days %}<p>{{ day.date|date:'Y-m-d' }} · 值班：{% for coach in day.duty_coaches.all %}{{ coach.display_name }} {% empty %}{% if day.duty_all %}全体{% else %}无{% endif %}{% endfor %} · 备注：{{ day.note|default:'无' }}</p>{% endfor %}
       {% for slot in preview.slots %}<p>{{ slot }} · {{ slot.get_kind_display }} · 领域：{% for domain in slot.domains.all %}{{ domain.name }} {% empty %}无{% endfor %} · 教练：{% for coach in slot.coaches.all %}{{ coach.display_name }} {% empty %}{% if slot.coaches_all %}全体{% else %}无{% endif %}{% endfor %}</p>{% endfor %}
     {% else %}

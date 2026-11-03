@@ -84,6 +84,25 @@ export function withImageEntryPart(originalProps, partName) {
   };
 }
 
+export function fileTypeIcon(name) {
+  const extension = String(name || "")
+    .split(".")
+    .pop()
+    .toLowerCase();
+  const groups = [
+    [["pdf"], "PDF", "#d94a3a"],
+    [["doc", "docx", "odt"], "DOC", "#3478d4"],
+    [["xls", "xlsx", "csv", "ods"], "XLS", "#228450"],
+    [["ppt", "pptx", "odp"], "PPT", "#d6673e"],
+    [["zip", "rar", "7z", "tar", "gz", "bz2"], "ZIP", "#a8782b"],
+    [["txt", "md", "json", "yaml", "yml", "log", "conf"], "TXT", "#637589"],
+  ];
+  const group = groups.find(([extensions]) => extensions.includes(extension));
+  return group
+    ? { label: group[1], color: group[2] }
+    : { label: "FILE", color: "#637589" };
+}
+
 export function singleFilePreventAddEntries(maxFiles, entryCount) {
   if (Number(maxFiles) !== 1) return null;
   return Number(entryCount) >= 1;

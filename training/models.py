@@ -341,6 +341,8 @@ class TrainingPlan(models.Model):
     start_date = models.DateField("开始日期")
     end_date = models.DateField("结束日期")
     objective = models.TextField("训练目标")
+    responsible_coaches = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='+', verbose_name='负责教练')
+    duty_personnel = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='+', verbose_name='值班人员')
     schedulers = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="scheduled_training_plans", verbose_name="排班人员")
     approvers = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="approved_training_plans", verbose_name="审批人员")
     task_managers = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="managed_training_plans", verbose_name="任务管理员")
@@ -393,8 +395,18 @@ class TrainingPlan(models.Model):
             previous_end = end
         if self.pk:
             original = type(self).objects.get(pk=self.pk)
-            if any(getattr(original, name) != getattr(self, name) for name in ("training_cycle_id", "start_date", "end_date")):
-                raise ValidationError("计划创建后不能修改周期和日期范围，请另建计划。")
+            if original.training_cycle_id != self.training_cycle_id:
+                raise ValidationError("计划创建后不能修改训练周期，请另建计划。")
+            fields = ("start_date", "end_date", *self.TIME_FIELDS)
+            if any(getattr(original, name) != getattr(self, name) for name in fields):
+                from .scheduling import check_plan_structure_edit
+                check_plan_structure_edit(
+                    original, self.start_date, self.end_date,
+                    changed_periods={
+                        name.rsplit("_", 1)[0] for name in self.TIME_FIELDS
+                        if getattr(original, name) != getattr(self, name)
+                    },
+                )
         if self.end_date and self.start_date and self.end_date < self.start_date:
             raise ValidationError({"end_date": "结束日期不能早于开始日期。"})
         if self.training_cycle_id and self.start_date and self.end_date:
@@ -415,6 +427,16 @@ class TrainingPlan(models.Model):
         if self.end_date < timezone.localdate():
             return "已完成"
         return "已发布" if self.published_at else "未发布"
+
+
+class TrainingPlanDutyOrder(TimestampedModel):
+    training_plan = models.ForeignKey(TrainingPlan, on_delete=models.CASCADE, related_name="duty_orders")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    order = models.PositiveIntegerField("排序", default=0)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "计划值班顺序"
+        constraints = [models.UniqueConstraint(fields=("training_plan", "user"), name="training_plan_duty_order_unique")]
 
 
 class TrainingScheduleDay(TimestampedModel):
@@ -843,7 +865,7 @@ class TaskExecution(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.training_task} / {self.user}"
+        return f"{self.training_task} / {self.user.display_name}"
 
 
 class TaskExecutionAttachment(models.Model):
@@ -921,7 +943,7 @@ class TrainingLog(TimestampedModel):
         ]
 
     def __str__(self):
-        return f"{self.training_date:%Y-%m-%d} / {self.author} / {self.topic}"
+        return f"{self.training_date:%Y-%m-%d} / {self.author.display_name} / {self.topic}"
 
     def clean(self):
         super().clean()
@@ -951,6 +973,23 @@ class TrainingPlanParticipant(TimestampedModel):
     class Meta:
         verbose_name = verbose_name_plural = "计划参与选手"
         constraints = [models.UniqueConstraint(fields=["training_plan", "user"], name="uniq_training_plan_participant")]
+
+
+class TrainingPlanStaff(TimestampedModel):
+    class Role(models.TextChoices):
+        COACH = "coach", "负责教练"
+        DUTY = "duty", "值班人员"
+
+    training_plan = models.ForeignKey(TrainingPlan, on_delete=models.PROTECT, related_name="staff_members")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="training_plan_staff")
+    role = models.CharField("职责", max_length=10, choices=Role.choices)
+    is_active = models.BooleanField("参与中", default=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "计划工作人员"
+        constraints = [
+            models.UniqueConstraint(fields=["training_plan", "user", "role"], name="uniq_training_plan_staff_role"),
+        ]
 
 
 class TrainingAssignmentCoach(TimestampedModel):

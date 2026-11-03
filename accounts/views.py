@@ -56,6 +56,9 @@ def account_signup(request):
                 # 新注册用户默认不激活（例如等待邮件激活）
                 user.is_active = False
                 user.save()
+                UserProfile.objects.get_or_create(user=user, defaults={
+                    "name_disambiguation": form.cleaned_data["name_disambiguation"],
+                })
                 apply_default_registration_group(user)
             # 此处可添加发送激活邮件逻辑
             return render(request, 'accounts/signup_done.html', {
@@ -140,7 +143,7 @@ class UserListView(FilterableListMixin, TitleMixin, LoginRequiredMixin, Permissi
     def get_list_filter_specs(self):
         filters = UserFilterForm()
         return (
-            ListFilterSpec("q", "搜索用户", "search", placeholder="账号、完整姓名或学号"),
+            ListFilterSpec("q", "搜索用户", "search", placeholder="姓名、拼音或学号"),
             ListFilterSpec("active", "激活状态", "select", choices=filters.fields["active"].choices[1:], empty_label="全部状态"),
             ListFilterSpec("role", "角色", "select", choices=filters.fields["role"].choices[1:], empty_label="全部角色"),
         )

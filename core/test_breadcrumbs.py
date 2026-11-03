@@ -34,7 +34,7 @@ class BreadcrumbTests(SimpleTestCase):
     def test_section_uses_only_visible_navigation(self):
         request = self.request(['training.view_trainingplan'])
         crumbs = build_breadcrumbs(request, '我的计划')
-        self.assertEqual(crumbs[1].url, reverse('training:plan_list'))
+        self.assertEqual(crumbs[1].url, reverse('training:my_plans'))
         self.assertEqual([c.label for c in build_breadcrumbs(self.request(), '页面')], ['首页', '页面'])
         request.user = AnonymousUser()
         self.assertEqual([c.label for c in build_breadcrumbs(request, '页面')], ['首页', '页面'])

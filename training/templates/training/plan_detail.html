@@ -2,34 +2,58 @@
 {% load static %}
 {% block list_filters %}
 <section class="card border border-base-300 bg-base-100 shadow-sm mb-4"><div class="card-body">
-  <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="card-title">{{ plan.title }}</h2>{% if can_manage %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_edit' plan.pk %}">编辑计划</a>{% endif %}</div>
+  <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="card-title">{{ plan.title }}</h2><div class="flex flex-wrap gap-2">
+    {% if can_manage %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_edit' plan.pk %}">编辑计划</a>{% endif %}
+    {% if can_manage and not plan.published_at %}
+      {% if publish_plan_reason %}
+        <div class="tooltip" data-tip="{{ publish_plan_reason }}" tabindex="0" aria-label="{{ publish_plan_reason }}"><button type="button" class="btn btn-primary btn-sm" disabled>发布计划</button></div>
+      {% else %}
+        <form method="post" action="{% url 'training:plan_publish' plan.pk %}">{% csrf_token %}<button class="btn btn-primary btn-sm">发布计划</button></form>
+      {% endif %}
+    {% endif %}
+    {% if can_withdraw_plan %}
+      {% if withdraw_plan_reason %}
+        <div class="tooltip" data-tip="{{ withdraw_plan_reason }}" tabindex="0" aria-label="{{ withdraw_plan_reason }}"><button type="button" class="btn btn-outline btn-sm" disabled>撤回计划</button></div>
+      {% else %}
+        <a class="btn btn-outline btn-sm" href="{% url 'training:withdraw_publication' plan.pk 'plan' %}?return_query={{ request.GET.urlencode|urlencode }}">撤回计划</a>
+      {% endif %}
+    {% endif %}
+  </div></div>
   <p>{{ plan.start_date|date:'Y-m-d' }} 至 {{ plan.end_date|date:'Y-m-d' }} · {{ plan.display_status }} · {% if plan.published_at %}计划已发布{% else %}计划未发布{% endif %} · {% if plan.schedule_published_at %}排班已发布{% else %}排班未发布{% endif %}</p><p class="whitespace-pre-line">{{ plan.objective }}</p>
-  {% if can_see_management %}<p>排班人员：{% for person in plan.schedulers.all %}{{ person.display_name }} {% empty %}待指定{% endfor %}；审批人员：{% for person in plan.approvers.all %}{{ person.display_name }} {% empty %}待指定{% endfor %}</p>{% endif %}
-  <div class="flex flex-wrap gap-2">{% if can_schedule and plan.published_at and not plan.schedule_published_at %}
-    <form method="post" action="{% url 'training:schedule_publish' plan.pk %}">{% csrf_token %}<button class="btn btn-primary btn-sm">统一发布排班</button></form>
-  {% endif %}{% if can_schedule and plan.published_at %}<button type="button" class="btn btn-outline btn-sm" disabled title="本版本暂不开放">快捷调班</button>{% if plan.schedule_published_at and perms.training.change_trainingtask %}<a class="btn btn-primary btn-sm" href="{% url 'training:publish_all_tasks' plan.pk %}">统一发布全部任务</a>{% endif %}{% if perms.training.add_trainingtask %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_import' plan.pk %}">导入 Excel</a>{% endif %}{% endif %}{% if plan.schedule_published_at and perms.training.view_trainingtask %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_export' plan.pk %}">导出 Excel</a>{% endif %}</div>
-</div>{% if can_add_personal %}<a class="btn btn-outline btn-sm" href="{% url 'training:personal_create' plan.pk %}">添加自主任务</a>{% endif %}</section>
+  {% if can_see_management %}
+  <dl class="flex flex-wrap gap-x-6 gap-y-1">
+    {% for label, people in plan_roles %}
+      <div class="flex flex-wrap items-baseline gap-x-2">
+        <dt class="font-semibold">{{ label }}：</dt>
+        <dd class="flex flex-wrap gap-x-3 gap-y-1">
+          {% for person in people %}<span class="min-w-0 wrap-anywhere">{{ person.display_name }}</span>{% empty %}<span>待指定</span>{% endfor %}
+        </dd>
+      </div>
+    {% endfor %}
+  </dl>
+  {% endif %}
+</div></section>
 {% if can_see_management %}
 <section id="plan-members" class="card border border-base-300 bg-base-100 shadow-sm mb-4"><div class="card-body">
   <div class="flex flex-wrap items-center justify-between gap-2">
-    <h2 class="card-title">参与选手</h2>
-    {% if can_manage %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_members' plan.pk %}">编辑成员</a>{% endif %}
+    <h2 class="card-title">参与人员</h2>
+    {% if can_manage %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_members' plan.pk %}">人员管理</a>{% endif %}
   </div>
-  <p>共 {{ members_page.paginator.count }} 位参与中的选手。</p>
-  <div class="overflow-x-auto"><table class="table">
-    <thead><tr><th>姓名</th><th>账号</th></tr></thead>
-    <tbody>{% for member in members_page %}<tr><td>{{ member.user.display_name }}</td><td>{{ member.user.username }}</td></tr>{% empty %}<tr><td colspan="2">暂无参与选手。{% if can_manage %}请通过“编辑成员”添加。{% endif %}</td></tr>{% endfor %}</tbody>
-  </table></div>
-  {% if members_page.has_other_pages %}<nav class="flex flex-wrap items-center gap-3" aria-label="参与选手分页">
-    {% if members_page.has_previous %}<a class="btn btn-ghost btn-sm" href="{% querystring members_page=members_page.previous_page_number %}#plan-members">上一页</a>{% endif %}
-    <span>第 {{ members_page.number }} / {{ members_page.paginator.num_pages }} 页</span>
-    {% if members_page.has_next %}<a class="btn btn-ghost btn-sm" href="{% querystring members_page=members_page.next_page_number %}#plan-members">下一页</a>{% endif %}
-  </nav>{% endif %}
+  <dl>
+    {% for label, people in participant_groups %}
+      <div class="flex flex-wrap items-baseline gap-x-2 py-1">
+        <dt class="font-semibold">{{ label }}：</dt>
+        <dd class="flex flex-wrap gap-x-3 gap-y-1">
+          {% for person in people %}<span class="min-w-0 wrap-anywhere">{{ person.display_name }}</span>{% empty %}<span>待指定</span>{% endfor %}
+        </dd>
+      </div>
+    {% endfor %}
+  </dl>
 </div></section>
 {% endif %}
 <nav class="tabs tabs-border mb-4" aria-label="计划视图"><a class="tab{% if not task_tab %} tab-active{% endif %}"{% if not task_tab %} aria-current="page"{% endif %} href="{% querystring tab='schedule' page=None %}">日视图</a><a class="tab{% if task_tab %} tab-active{% endif %}"{% if task_tab %} aria-current="page"{% endif %} href="{% querystring tab='details' page=None %}">明细视图</a></nav>
 {% include 'components/list_filter_toolbar.html' %}
-<div class="mt-3 flex flex-wrap gap-2">{% if can_schedule %}<button type="button" class="btn btn-outline btn-sm" disabled title="本版本暂不开放">快速 / 批量排班</button><button type="button" class="btn btn-outline btn-sm" disabled title="本版本暂不开放">复制排班</button>{% if perms.training.change_trainingtask %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_clear' plan.pk 'clear_tasks' %}">清空全部任务</a>{% endif %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_clear' plan.pk 'clear_schedule' %}">清空全部排班</a>{% endif %}{% if perms.training.add_trainingtask %}<button type="button" class="btn btn-outline btn-sm" disabled title="本版本暂不开放">批量填写任务</button>{% endif %}{% if user.is_superuser %}<a class="btn btn-ghost btn-sm" href="{% url 'training:plan_clear' plan.pk 'withdraw_tasks' %}">撤回全部任务发布</a>{% if plan.published_at %}<a class="btn btn-ghost btn-sm" href="{% url 'training:withdraw_publication' plan.pk 'plan' %}?return_query={{ request.GET.urlencode|urlencode }}">撤回计划发布</a>{% endif %}{% if plan.schedule_published_at %}<a class="btn btn-ghost btn-sm" href="{% url 'training:withdraw_publication' plan.pk 'schedule' %}?return_query={{ request.GET.urlencode|urlencode }}">撤回排班发布</a>{% endif %}{% endif %}</div>
+{% include "training/partials/plan_actions.html" %}
 <dialog id="schedule-dialog" aria-label="编辑排班" class="modal items-stretch justify-end"><div class="modal-box h-full max-h-full w-full max-w-3xl rounded-none ml-auto"><form method="dialog"><button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2" aria-label="关闭">×</button></form><div id="schedule-editor"></div></div><form method="dialog" class="modal-backdrop"><button>关闭</button></form></dialog>
 <dialog id="task-dialog" aria-label="填写训练任务" class="modal"><div class="modal-box w-11/12 max-w-5xl"><form method="dialog"><button class="btn btn-circle btn-ghost btn-sm absolute right-2 top-2" aria-label="关闭">×</button></form><div id="task-editor"></div></div><form method="dialog" class="modal-backdrop"><button>关闭</button></form></dialog>
 {% endblock %}

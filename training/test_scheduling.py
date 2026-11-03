@@ -55,6 +55,9 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         )
         self.plan.schedulers.add(self.scheduler)
         self.plan.approvers.add(self.approver)
+        people = [self.coach, self.collaborator, self.scheduler, self.approver]
+        self.plan.responsible_coaches.add(*people)
+        self.plan.duty_personnel.add(*people)
         from .models import TrainingPlanParticipant
         for student in (self.student, self.student2):
             TrainingPlanParticipant.objects.create(training_plan=self.plan, user=student, was_initial=True)
@@ -88,6 +91,7 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         if not general:
             self.slot.domains.add(self.linux)
         self.day.duty_all = True
+        self.day.duty_coaches.clear()
         self.day.save()
         if publish:
             service.publish_schedule(self.plan, self.scheduler)
@@ -388,7 +392,7 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         sheet = load_workbook(BytesIO(build_plan_workbook(self.plan)))["训练计划"]
         self.assertEqual(
             [sheet.cell(2, col).value for col in range(1, 9)],
-            ["日期", "星期", "时间", "领域", "训练任务", "负责教练", "值班教练", "备注"],
+            ["日期", "星期", "时间", "领域", "训练任务", "负责教练", "值班人员", "备注"],
         )
         self.assertIn("第二任务", sheet["E4"].value)
         self.assertNotIn("机密草稿", str(list(sheet.values)))

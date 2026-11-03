@@ -1,0 +1,12 @@
+{% if adding %}
+<form method="post" action="{{ participant_action_url }}" hx-post="{{ participant_action_url }}" hx-target="#participants" hx-swap="outerHTML" data-bulk-list data-matching-count="{{ table.paginator.count }}" data-selection-label="位选手" novalidate>
+  {% csrf_token %}<input type="hidden" name="stage" value="select"><input type="hidden" name="operation" value="add" data-bulk-operation><input type="hidden" name="selection" value="selected" data-selection-mode>
+  <div class="flex flex-wrap items-center gap-3 rounded-box border border-base-300 bg-base-100 p-3 mb-4">
+    <button class="btn btn-sm btn-primary" type="submit"{% if not table.paginator.count %} disabled{% endif %}>添加所选成员</button>
+    <span class="text-sm" role="status" data-selection-status>已选择 0 位选手</span>
+    <button type="button" class="link text-sm" data-clear-selection hidden>清空选择</button>
+    <span class="text-sm text-error" role="alert" data-selection-error hidden></span>
+  </div>
+{% endif %}
+{% include "components/table_wrapper.html" with table=table %}
+{% if adding %}</form>{% endif %}

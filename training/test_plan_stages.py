@@ -12,7 +12,7 @@ from django.utils import timezone
 from . import scheduling
 from .change_workflow import review, swap_schedule
 from .forms import TrainingPlanForm
-from .models import TrainingPlan, TrainingScheduleChange, TrainingScheduleSlot
+from .models import TrainingPlan, TrainingScheduleChange
 from .process import change_state, visible_target
 from .selectors import visible_training_tasks_for
 from .test_process_refactor import ProcessFixture
@@ -31,6 +31,8 @@ class PlanStagesTests(ProcessFixture, TestCase):
                 "start_date": self.plan.start_date.isoformat(), "end_date": self.plan.end_date.isoformat(),
                 "objective": self.plan.objective, "schedulers": [self.coach.pk],
                 "competitors": [self.student.pk, self.student2.pk],
+                "responsible_coaches": list(self.plan.responsible_coaches.values_list("pk", flat=True)),
+                "duty_personnel": list(self.plan.duty_personnel.values_list("pk", flat=True)),
                 **{name: getattr(self.plan, name).isoformat() for name in TrainingPlan.TIME_FIELDS}, **overrides}
 
     def test_task_publication_is_individual_and_all_three_gates_apply(self):
@@ -52,23 +54,65 @@ class PlanStagesTests(ProcessFixture, TestCase):
         self.client.force_login(self.admin)
         response = self.client.get(reverse("training:plan_edit", args=[self.plan.pk]))
         self.assertNotIn("status", response.context["form"].fields)
-        self.assertContains(response, 'name="action" value="publish"')
+        self.assertNotIn("responsible_coaches", response.context["form"].fields)
+        self.assertNotIn("duty_personnel", response.context["form"].fields)
+        self.assertTrue(response.context["form"].fields["morning_start"].disabled)
         self.assertContains(response, 'grid gap-4 md:grid-cols-2')
         self.assertFalse(response.context["form"].fields["early_start"].required)
-        self.assertTrue(response.context["form"].fields["morning_start"].required)
-        form = TrainingPlanForm(self.values(morning_end="08:00"), instance=self.plan)
+        self.assertFalse(response.context["form"].fields["morning_start"].required)
+        form = TrainingPlanForm(self.values(morning_end="08:00"))
         self.assertFalse(form.is_valid())
 
+    def test_published_plan_ignores_forged_structure_changes(self):
+        self.client.force_login(self.admin)
+        url = reverse("training:plan_edit", args=[self.plan.pk])
+        response = self.client.post(url, self.values(title="允许编辑", morning_start="09:30", start_date="2026-01-02"))
+        self.assertEqual(response.status_code, 302)
+        self.plan.refresh_from_db()
+        self.assertEqual(self.plan.title, "允许编辑")
+        self.assertEqual(self.plan.morning_start.strftime("%H:%M"), "09:00")
+        self.assertEqual(self.plan.start_date.isoformat(), "2026-01-01")
+        self.assertFalse(self.plan.schedule_changes.exists())
+
     def test_plan_publication_does_not_publish_schedule_and_dates_stay_fixed(self):
-        self.plan.schedule_published_at = None
+        self.plan.published_at = self.plan.schedule_published_at = None
         self.plan.save()
         form = TrainingPlanForm(self.values(), instance=self.plan)
         self.assertTrue(form.is_valid(), form.errors)
-        plan = scheduling.save_plan_definition(form, self.admin, publish=True)
+        plan = scheduling.publish_plan(self.plan, self.admin)
         self.assertIsNotNone(plan.published_at)
         self.assertIsNone(plan.schedule_published_at)
         form = TrainingPlanForm(self.values(start_date="2026-01-02"), instance=plan)
-        self.assertFalse(form.is_valid())
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["start_date"].isoformat(), "2026-01-01")
+
+    def test_plan_requires_three_rosters_and_duty_is_cycle_coach(self):
+        self.plan.published_at = self.plan.schedule_published_at = None
+        self.plan.save()
+        self.plan.duty_personnel.clear()
+        form = TrainingPlanForm(self.values(), instance=self.plan)
+        self.assertTrue(form.is_valid(), form.errors)
+        with self.assertRaisesMessage(ValidationError, "每类至少一人"):
+            scheduling.publish_plan(self.plan, self.admin)
+        self.plan.refresh_from_db()
+        self.assertIsNone(self.plan.published_at)
+        from .plan_members import save_roster
+        with self.assertRaises(ValidationError):
+            save_roster(self.admin, self.plan, "duty_personnel", {self.coach.pk, self.student.pk})
+        save_roster(self.admin, self.plan, "duty_personnel", {self.coach.pk})
+        form = TrainingPlanForm(self.values(), instance=self.plan)
+        self.assertTrue(form.is_valid(), form.errors)
+        plan = scheduling.publish_plan(self.plan, self.admin)
+        self.assertEqual(scheduling.duty_ids(plan), {self.coach.pk})
+        self.assertFalse(scheduling.can_schedule(self.student, plan))
+        day = plan.schedule_days.first()
+        values = scheduling.day_snapshot(day)
+        with self.assertRaisesMessage(ValidationError, "值班名单"):
+            scheduling.validate_day(plan, values | {"duty_coaches": [self.student.pk]})
+        with self.assertRaisesMessage(ValidationError, "值班名单"):
+            scheduling.validate_day(plan, values | {"duty_coaches": [self.other.pk]})
+        with self.assertRaisesMessage(ValidationError, "相关排班"):
+            scheduling.check_roster_removal(plan, "duty_personnel", {self.coach.pk})
 
     def test_draft_schedule_blocks_task_filling(self):
         self.plan.schedule_published_at = None
@@ -123,6 +167,20 @@ class PlanStagesTests(ProcessFixture, TestCase):
         with self.assertRaises(ValidationError):
             review(change, self.other, approve=True)
 
+    def test_all_duty_approval_rechecks_roster(self):
+        day = self.slot.day
+        before = scheduling.day_snapshot(day)
+        change = scheduling.save_schedule(self.plan, self.admin, [{
+            "type": "day", "id": day.pk, "revision": day.revision, "before": before,
+            "after": before | {"duty_all": True, "duty_coaches": []},
+        }], "安排全员值班")
+        self.confirm_change_coaches(change)
+        self.plan.duty_personnel.add(self.student)
+        with self.assertRaisesMessage(ValidationError, "计划人员名单已变化"):
+            review(change, self.admin, approve=True)
+        day.refresh_from_db()
+        self.assertEqual(scheduling.day_snapshot(day), before)
+
     def test_expired_swap_is_temporarily_disabled(self):
         with self.assertRaises(ValidationError):
             swap_schedule(self.plan, self.coach, self.slot.day_id, self.plan.schedule_days.last().pk, ["morning"], True, "调班")
@@ -136,24 +194,12 @@ class PlanStagesTests(ProcessFixture, TestCase):
             with self.assertRaises(ValidationError):
                 review(second, self.admin, approve=True)
 
-    def test_future_times_require_coach_confirmation_and_preserve_history(self):
-        with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 1, 6, tzinfo=dt_timezone.utc)):
-            form = TrainingPlanForm(self.values(morning_start="09:30", reason="调整未来作息"), instance=self.plan)
-            self.assertTrue(form.is_valid(), form.errors)
-            scheduling.save_plan_definition(form, self.admin)
-            change = self.plan.schedule_changes.latest("pk")
-            while True:
-                change.refresh_from_db()
-                pending = next((step for step in change.confirmations if not step["decision"]), None)
-                if not pending:
-                    break
-                from django.contrib.auth import get_user_model
-                review(change, get_user_model().objects.get(pk=pending["user_id"]), approve=True)
-            review(change, self.admin, approve=True)
-            self.slot.refresh_from_db()
-            future = TrainingScheduleSlot.objects.get(day__training_plan=self.plan, day__date="2026-01-02", period="morning")
-            self.assertEqual(timezone.localtime(self.slot.starts_at).strftime("%H:%M"), "09:00")
-            self.assertEqual(timezone.localtime(future.starts_at).strftime("%H:%M"), "09:30")
+    def test_published_time_change_cannot_bypass_form(self):
+        from datetime import time
+
+        self.plan.morning_start = time(9, 30)
+        with self.assertRaisesMessage(ValidationError, "请先撤回计划发布"):
+            self.plan.save(update_fields=["morning_start"])
 
     def test_rejected_change_never_updates_original_content(self):
         before = scheduling.slot_snapshot(self.slot)
@@ -238,18 +284,24 @@ class PlanStagesTests(ProcessFixture, TestCase):
             self.assertEqual(change.status, "draft")
             self.assertFalse(self.plan.schedule_changes.exists())
 
-    def test_explicit_time_configuration_fills_unknown_future_slots_only(self):
-        self.plan.schedule_published_at = None
+    def test_publish_from_detail_requires_rosters_and_keeps_schedule_unpublished(self):
+        self.plan.published_at = self.plan.schedule_published_at = None
         self.plan.save()
-        TrainingScheduleSlot.objects.filter(day__training_plan=self.plan).update(starts_at=None, ends_at=None)
-        with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 1, 6, tzinfo=dt_timezone.utc)):
-            form = TrainingPlanForm(self.values(morning_start="09:30"), instance=self.plan)
-            self.assertTrue(form.is_valid(), form.errors)
-            scheduling.save_plan_definition(form, self.admin)
-            self.slot.refresh_from_db()
-            future = TrainingScheduleSlot.objects.get(day__training_plan=self.plan, day__date="2026-01-02", period="morning")
-            self.assertIsNone(self.slot.ends_at)
-            self.assertEqual(timezone.localtime(future.starts_at).strftime("%H:%M"), "09:30")
+        self.client.force_login(self.admin)
+        detail = reverse("training:plan_detail", args=[self.plan.pk])
+        publish = reverse("training:plan_publish", args=[self.plan.pk])
+        self.assertContains(self.client.get(detail), "发布计划")
+        self.assertEqual(self.client.get(publish).status_code, 405)
+        self.plan.duty_personnel.clear()
+        self.client.post(publish)
+        self.plan.refresh_from_db()
+        self.assertIsNone(self.plan.published_at)
+        self.plan.duty_personnel.add(self.coach)
+        self.assertRedirects(self.client.post(publish), detail)
+        self.plan.refresh_from_db()
+        self.assertIsNotNone(self.plan.published_at)
+        self.assertIsNone(self.plan.schedule_published_at)
+        self.assertContains(self.client.get(detail), "撤回计划")
 
     def test_designated_ordinary_approver_can_review_expired_task(self):
         self.plan.approvers.add(self.other)

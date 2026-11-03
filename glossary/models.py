@@ -277,7 +277,7 @@ class StudySession(models.Model):
         return self.attempts.filter(answered_at__isnull=False).count()
 
     def __str__(self):
-        return f"{self.user} / {self.glossary} / {self.started_at:%Y-%m-%d %H:%M}"
+        return f"{self.user.display_name} / {self.glossary} / {self.started_at:%Y-%m-%d %H:%M}"
 
 
 class StudyAttempt(models.Model):

@@ -9,7 +9,7 @@ from meetings.widgets import RecipientSelect
 from standards.models import Skill, TechnicalDomain
 
 from .models import TrainingTask, TrainingScheduleSlot
-from accounts.services.users import get_user_full_info
+from accounts.services.users import annotate_identity_labels, get_user_full_info
 
 
 class TrainingRecipientSelect(RecipientSelect):
@@ -20,10 +20,8 @@ class TrainingRecipientSelect(RecipientSelect):
         return context
 
 
-def cycle_coaches(plan):
-    return get_user_model().objects.filter(
-        training_cycle_memberships__training_cycle=plan.training_cycle, training_cycle_memberships__role="coach"
-    )
+def plan_coaches(plan):
+    return plan.responsible_coaches.all()
 
 
 class DayScheduleForm(StyledFormMixin, forms.Form):
@@ -34,13 +32,14 @@ class DayScheduleForm(StyledFormMixin, forms.Form):
     )
     duty_all = forms.BooleanField(label="全体值班", required=False)
     duty_coaches = forms.ModelMultipleChoiceField(
-        label="值班教练", queryset=get_user_model().objects.none(), required=False
+        label="值班人员", queryset=get_user_model().objects.none(), required=False
     )
     note = forms.CharField(label="备注", required=False, widget=forms.Textarea(attrs={"rows": 2}))
 
     def __init__(self, *args, plan, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["duty_coaches"].queryset = cycle_coaches(plan)
+        from .plan_members import ordered_duty
+        self.fields["duty_coaches"].queryset = annotate_identity_labels(ordered_duty(plan))
         self.fields["date"].disabled = True
         self.fields["duty_coaches"].label_from_instance = get_user_full_info
 
@@ -63,7 +62,7 @@ class SlotScheduleForm(StyledFormMixin, forms.Form):
         super().__init__(*args, **kwargs)
         self.domain_queryset = TechnicalDomain.objects.filter(pk__in=plan.training_cycle.skill_tree_version_links.values("technical_domain_id"))
         self.fields["domain_choice"].choices = [("", "请选择领域"), *[(str(obj.pk), obj.name) for obj in self.domain_queryset], ("other", "其他"), ("rest", "休息"), ("unused", "不安排")]
-        self.fields["coaches"].queryset = cycle_coaches(plan)
+        self.fields["coaches"].queryset = annotate_identity_labels(plan_coaches(plan))
         self.fields["coaches"].label_from_instance = get_user_full_info
         kind = self.initial.get("kind", "pending")
         self.initial["domain_choice"] = str(self.initial["primary_domain"]) if self.initial.get("primary_domain") else {"general": "other", "rest": "rest", "unused": "unused"}.get(kind, "")
@@ -120,11 +119,9 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
             self.initial["skills"] = list(self.instance.skill_links.values_list("skill_id", flat=True))
             self.initial["competitors"] = list(self.instance.selected_competitors.values_list("pk", flat=True))
         ids = self.data.getlist("competitors") if self.is_bound else self.initial.get("competitors", [])
-        from accounts.services.users import get_user_display_name
-
         widget.selected = [
-            {"id": user.pk, "label": get_user_display_name(user)}
-            for user in self.fields["competitors"].queryset.filter(
+            {"id": user.pk, "label": get_user_full_info(user)}
+            for user in annotate_identity_labels(self.fields["competitors"].queryset).filter(
                 pk__in=[value for value in ids if str(value).isdigit()]
             )
         ]
@@ -137,6 +134,18 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if cleaned.get("competitors") is not None and not cleaned.get("assign_all"):
+            from accounts.services.users import require_distinguishable_users
+            from django.contrib.auth import get_user_model
+
+            previous = set(self.instance.selected_competitors.values_list("pk", flat=True)) if self.instance.pk else set()
+            selected = set(cleaned["competitors"].values_list("pk", flat=True)) - previous
+            plan = self.slot.day.training_plan
+            scope = get_user_model().objects.filter(pk__in=plan.participants.filter(is_active=True).values("user_id"))
+            try:
+                require_distinguishable_users(scope, selected)
+            except forms.ValidationError as exc:
+                self.add_error("competitors", exc)
         cleaned["priority"] = cleaned.get("priority") or TrainingTask.Priority.NORMAL
         cleaned["order"] = cleaned.get("order") or 0
         if not cleaned.get("assignment_configured"):

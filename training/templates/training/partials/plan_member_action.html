@@ -1,0 +1,16 @@
+{% if record.participating %}
+  <button type="button" class="btn btn-outline btn-sm" data-modal-target="remove-member-{{ record.participant_id }}">退出计划</button>
+  <dialog id="remove-member-{{ record.participant_id }}" class="modal">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold">退出计划</h3>
+      <p class="py-4">确定让 {{ record.identity_label|default:record.display_name }}退出计划？历史成员记录、任务分配和执行将保留。</p>
+      <div class="modal-action">
+        <form method="post" action="{% url 'training:plan_member_remove' record.participant_plan_id record.participant_id %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" hx-post="{% url 'training:plan_member_remove' record.participant_plan_id record.participant_id %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" hx-target="#participants" hx-swap="outerHTML">
+          {% csrf_token %}<button class="btn btn-error" type="submit">确认退出</button>
+        </form>
+        <button type="button" class="btn" data-modal-close="remove-member-{{ record.participant_id }}">取消</button>
+      </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>关闭</button></form>
+  </dialog>
+{% else %}已退出{% endif %}

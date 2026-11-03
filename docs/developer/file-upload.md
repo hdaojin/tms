@@ -365,7 +365,7 @@ FilePond v5 使用 Web Component / Shadow DOM。TMS 不试图向 Shadow DOM 内�
 
 让上传区域与 TMS 的 `base-*`、`primary`、`error`、圆角和明暗主题保持一致。
 
-保留 FilePond 原生上传区域和内置“浏览文件”入口，不在外部重复增加按钮。上传区域的边框、圆角和焦点态复用 DaisyUI 表单字段 token；说明文字保持正文样式，仅通过 locale 中的 `browse-label` part 为“浏览文件”提供主色及悬停强调。图片队列使用固定小缩略图，`<file-pond noattribution>` 关闭默认品牌标识。
+保留 FilePond 原生上传区域和内置“浏览文件”入口，不在外部重复增加按钮。上传区域的边框、圆角和焦点态复用 DaisyUI 表单字段 token；说明文字保持正文样式，仅通过 locale 中的 `browse-label` part 为“浏览文件”提供主色及悬停强调。待上传文件以横向换行卡片显示，常见文件类型使用图标，图片使用方形缩略图；聚焦或悬停时可查看名称和删除入口，触屏设备保留删除入口。校验错误在卡片内显示。`<file-pond noattribution>` 关闭默认品牌标识。
 
 样式集中放在 `static/css/main.css` 的明确 FilePond 区域，不由各 APP 覆盖。
 

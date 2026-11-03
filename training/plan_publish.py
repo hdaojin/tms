@@ -39,7 +39,7 @@ def preview(plan, user):
                 with transaction.atomic():
                     published = scheduling.publish_slot_task(task, user)
                     executions = published.executions.filter(revoked_at__isnull=True).exclude(status="cancelled").select_related("user").order_by("user_id")
-                    row["people"] = [(entry.user_id, get_user_display_name(entry.user), entry.user.username) for entry in executions]
+                    row["people"] = [(entry.user_id, get_user_display_name(entry.user)) for entry in executions]
                     transaction.set_rollback(True)
             except PermissionDenied:
                 row["error"] = "时段未完成排班或没有权限发布该任务。"

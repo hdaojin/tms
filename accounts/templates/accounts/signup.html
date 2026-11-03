@@ -55,6 +55,7 @@
         </div>
         <p class="text-info text-xs mt-1">必填，请分别填写真实的姓和名</p>
       </fieldset>
+      {% include 'components/field.html' with field=form.name_disambiguation %}
       
       {# 邀请码字段 #}
       {% include 'components/field.html' with field=form.invitation_code %}

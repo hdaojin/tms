@@ -18,7 +18,7 @@
         <article class="rounded-box border border-base-300 bg-base-100 p-5 shadow-sm">
             <h2 class="text-xl font-semibold"><a href="{% url 'articles:detail' article.slug %}">{{ article.title }}</a></h2>
             <div class="article-meta mt-2 flex flex-wrap gap-4 text-sm text-base-content/70">
-                <span>作者: {{ article.author }}</span>
+                <span>作者: {{ article.author.display_name }}</span>
                 <span>发布时间: {{ article.publish_date|date:"Y-m-d H:i" }}</span>
             </div>
             <div class="article-excerpt mt-3 text-base-content/80">

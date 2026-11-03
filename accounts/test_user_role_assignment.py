@@ -50,7 +50,9 @@ class BasicAccountTests(TestCase):
 class UserRoleAssignmentTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser("assignment-admin", "admin@example.invalid", None)
-        self.user = User.objects.create_user("assignment-target")
+        self.admin.first_name = "授权管理员"
+        self.admin.save(update_fields=["first_name"])
+        self.user = User.objects.create_user("assignment-target", first_name="授权对象")
         self.group = Group.objects.create(name="训练角色")
         sync_group_permission_assignments(self.group, ["training.maintain_own_logs"])
         self.url = reverse("accounts:user_roles", args=[self.user.pk])

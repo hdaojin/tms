@@ -150,8 +150,6 @@ def plan_context(view, context):
         legacy_tasks=tasks.filter(schedule_slot__isnull=True),
         can_attach=scheduling.task_manager(user, plan) and user.has_perm("training.change_trainingtask"),
         personal_tasks=personal_tasks_for(user).filter(training_plan=plan),
-        can_add_personal=user.has_perm("training.add_personaltrainingtask")
-        and plan.participants.filter(user=user, is_active=True).exists(),
     )
     from django.urls import reverse
     from core.utils.listing import FilterableListMixin

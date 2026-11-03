@@ -7,7 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from . import scheduling as service
-from .models import TrainingCycleMember, TrainingPlan, TrainingScheduleSlot, TrainingTaskCoach
+from .models import TrainingCycleMember, TrainingPlan, TrainingPlanParticipant, TrainingScheduleSlot, TrainingTaskCoach
 from .schedule_forms import DayScheduleForm, SlotScheduleForm
 from .tests import TrainingFixtureMixin, User, configure_test_periods
 
@@ -32,6 +32,9 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
             end_date=date(2026, 1, 2),
             created_by=self.admin,
         )
+        self.plan.responsible_coaches.add(self.coach)
+        self.plan.duty_personnel.add(self.coach)
+        TrainingPlanParticipant.objects.create(training_plan=self.plan, user=User.objects.create_user("entry-athlete"))
         service.initialize_schedule(self.plan)
         self.plan.refresh_from_db()
         self.day = self.plan.schedule_days.first()
@@ -295,9 +298,10 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
         from .entry_navigation import next_entry
         long_cycle = self.cycle("LONG", end_date=date(2026, 3, 1))
         self.bind(long_cycle)
-        self.plan = TrainingPlan.objects.create(training_cycle=long_cycle, title="跨页计划", objective="测试筛选", start_date=date(2026, 1, 1), end_date=date(2026, 3, 1), created_by=self.admin, published_at=timezone.now())
+        self.plan = TrainingPlan.objects.create(training_cycle=long_cycle, title="跨页计划", objective="测试筛选", start_date=date(2026, 1, 1), end_date=date(2026, 3, 1), created_by=self.admin)
         service.initialize_schedule(self.plan)
         self.plan.refresh_from_db()
+        self.publish_plan()
         # 从31个匹配日期之后继续，不能只查询第一页。
         params = QueryDict("weekday=0&weekday=1&weekday=2&weekday=3&weekday=4&weekday=5&weekday=6&period=afternoon&date_from=2026-01-01")
         request = SimpleNamespace(user=self.admin, method="GET", GET=params)

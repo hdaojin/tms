@@ -15,7 +15,7 @@ from . import scheduling
 from .models import TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot, TrainingTask
 
 TEMPLATE = Path(__file__).parent / "resources" / "templates" / "training_plan.xlsx"
-HEADERS = ["日期", "星期", "时间", "领域", "训练任务", "负责教练", "值班教练", "备注"]
+HEADERS = ["日期", "星期", "时间", "领域", "训练任务", "负责教练", "值班人员", "备注"]
 PERIODS = dict((label, value) for value, label in TrainingScheduleSlot.Period.choices)
 ROUNDTRIP_NOTICE = "同一时段多个独立任务导出为单元格内换行；再次导入时整个单元格会成为一个任务，不按换行拆分。"
 
@@ -45,6 +45,7 @@ def build_plan_workbook(plan, user=None, *, import_template=False):
             del sheet.column_dimensions[key]
     sheet["A1"] = plan.title
     sheet["A1"].data_type = "s"
+    sheet["G2"] = HEADERS[6]
     from django.db.models import Prefetch
     from .models import TrainingTask
     from .selectors import visible_training_tasks_for
@@ -111,7 +112,7 @@ def build_plan_workbook(plan, user=None, *, import_template=False):
         instructions = workbook.create_sheet("填写说明", 0)
         instructions["A1"] = "训练计划导入说明"
         instructions["A2"] = "模板每天保留四个时段。未设置的时段请将领域、训练任务和负责教练留空。"
-        instructions["A3"] = "日期、星期、时段及表头保持不变；值班教练和备注按日期填写。"
+        instructions["A3"] = "日期、星期、时段及表头保持不变；值班人员和备注按日期填写。"
         instructions.column_dimensions["A"].width = 100
         from openpyxl.comments import Comment
         for day_index, day in enumerate(days):
@@ -125,22 +126,22 @@ def build_plan_workbook(plan, user=None, *, import_template=False):
     return output.getvalue()
 
 
-def _person_ids(text, coaches, *, require_primary=True):
+def _person_ids(text, candidates):
     labels = [line.strip() for line in str(text).splitlines() if line.strip()]
     if "全体" in labels:
         if labels != ["全体"]:
-            raise ValidationError("全体必须独占负责教练或值班教练单元格。")
-        return True, [], None
+            raise ValidationError("全体必须独占负责教练或值班人员单元格。")
+        return True, []
     ids = []
     for label in labels:
         name = label.removesuffix("（主）").removesuffix("(主)").strip()
-        matches = [user.pk for user in coaches if get_user_display_name(user) == name or user.username == name]
+        matches = [user.pk for user in candidates if get_user_display_name(user) == name or user.username == name]
         if len(matches) != 1:
-            raise ValidationError(f"教练“{name}”不存在、重名或不属于本周期。")
+            raise ValidationError("人员不存在、重名或不在计划对应名单中，请检查人员填写。")
         if matches[0] in ids:
-            raise ValidationError("教练名单重复。")
+            raise ValidationError("人员名单重复。")
         ids.append(matches[0])
-    return False, sorted(ids), None
+    return False, sorted(ids)
 
 
 def check_empty_plan(plan, user):
@@ -164,16 +165,23 @@ def check_empty_plan(plan, user):
         raise ValidationError("计划已有排班，请先清空全部排班。")
 
 
+def import_rosters(plan):
+    return [sorted(scheduling.coach_ids(plan)), sorted(scheduling.duty_ids(plan))]
+
+
 @transaction.atomic
-def confirm_import(plan, user, payload, members):
+def confirm_import(plan, user, payload, members, rosters=None):
     plan = TrainingPlan.objects.select_for_update().get(pk=plan.pk)
     list(TrainingScheduleDay.objects.select_for_update().filter(training_plan=plan))
     list(TrainingScheduleSlot.objects.select_for_update().filter(day__training_plan=plan))
     list(TrainingTask.objects.select_for_update().filter(training_plan=plan))
     check_empty_plan(plan, user)
     current_members = list(plan.participants.filter(is_active=True).order_by("user_id").values_list("user_id", flat=True))
+    if rosters is not None and rosters != import_rosters(plan):
+        raise ValidationError("计划负责教练或值班人员已经变化，请重新预览。")
     if members != current_members:
         raise ValidationError("计划参与选手已经变化，请重新预览。")
+    scheduling.require_rosters(plan)
     if not payload:
         raise ValidationError("没有可导入的内容。")
     scheduling._apply_changes(plan, payload, user, approved=True, draft_import=True)
@@ -189,7 +197,10 @@ def preview_import(plan, user, file):
     if "训练计划" not in workbook.sheetnames:
         raise ValidationError("缺少训练计划工作表。")
     sheet = workbook["训练计划"]
-    if [str(sheet.cell(2, col).value or "").strip() for col in range(1, 9)] != HEADERS:
+    headers = [str(sheet.cell(2, col).value or "").strip() for col in range(1, 9)]
+    if headers[6] == "值班教练":
+        headers[6] = HEADERS[6]
+    if headers != HEADERS:
         raise ValidationError("表头必须保持原模板八列及顺序。")
     if sheet.max_row > 10000:
         raise ValidationError("训练计划表数据行数过多。")
@@ -198,8 +209,9 @@ def preview_import(plan, user, file):
         if area.min_col == area.max_col and area.min_col in {1, 2, 7, 8}:
             for row in range(area.min_row, area.max_row + 1):
                 merged[row, area.min_col] = sheet.cell(area.min_row, area.min_col)
-    coaches = list(plan.training_cycle.members.filter(role="coach").select_related("user"))
-    coaches = [member.user for member in coaches]
+    coaches = list(plan.responsible_coaches.all())
+    duty_personnel = list(plan.duty_personnel.all())
+    has_participants = plan.participants.filter(is_active=True).exists()
     domains = list(plan.training_cycle.skill_tree_version_links.select_related("technical_domain"))
     slots = {
         (slot.day.date, slot.period): slot
@@ -269,7 +281,7 @@ def preview_import(plan, user, file):
                         raise ValidationError(f"训练领域“{domain_text}”不存在或不属于该周期。")
                     after.update(kind="technical", domains=matches, primary_domain=matches[0])
             if coach_text:
-                all_coaches, ids, primary = _person_ids(coach_text, coaches)
+                all_coaches, ids = _person_ids(coach_text, coaches)
                 after.update(coaches_all=all_coaches, coaches=ids)
             for field in ("domains", "coaches", "primary_domain"):
                 if before[field] and before[field] != after[field]:
@@ -288,8 +300,10 @@ def preview_import(plan, user, file):
                     not user.has_perm("training.add_trainingtask")
                 ):
                     raise ValidationError("无权编制该时段任务。")
-                if task_text and not plan.participants.filter(is_active=True).exists():
-                    raise ValidationError("计划没有当前参与选手，请先通过计划详情页的“编辑成员”添加选手。")
+                if task_text and not has_participants:
+                    raise ValidationError("计划没有当前参与选手，请先通过计划详情页的“人员管理”添加选手。")
+            if not (coaches and duty_personnel and has_participants):
+                raise ValidationError("请先指定负责教练、参与选手和值班人员，每类至少一人。")
             if slot.is_configured:
                 scheduling.validate_slot(plan, after, publishing=bool(task_text))
             candidate = dict(changes)
@@ -317,11 +331,11 @@ def preview_import(plan, user, file):
                 )
             )
             if duty_text:
-                duty_all, duty_ids, _ = _person_ids(duty_text, coaches, require_primary=False)
+                duty_all, duty_ids = _person_ids(duty_text, duty_personnel)
                 if day_change["after"]["duty_coaches"] and day_change["after"]["duty_coaches"] != duty_ids:
-                    raise ValidationError("同一日期的导入值班教练相互冲突。")
+                    raise ValidationError("同一日期的导入值班人员相互冲突。")
                 if day_before["duty_coaches"] and day_before["duty_coaches"] != duty_ids:
-                    raise ValidationError("目标日期已有冲突值班教练。")
+                    raise ValidationError("目标日期已有冲突值班人员。")
                 day_change["after"].update(duty_all=duty_all, duty_coaches=duty_ids)
             if note:
                 if day_change["after"]["note"] and day_change["after"]["note"] != note:

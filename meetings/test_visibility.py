@@ -135,7 +135,8 @@ class MeetingVisibilityTests(TestCase):
             ({"q": "王小明"}, 2),
             ({"q": "secret.pdf"}, 1),
             ({"date_from": "2026-01-04", "date_to": "2026-01-04"}, 1),
-            ({"q": "owner", "date_to": "2026-01-03"}, 1),
+            ({"q": "owner", "date_to": "2026-01-03"}, 0),
+            ({"q": "wangxiaoming", "date_to": "2026-01-03"}, 1),
         ):
             response = self.client.get(url, params)
             self.assertEqual(response.context["table"].paginator.count, expected)
@@ -153,16 +154,18 @@ class MeetingVisibilityTests(TestCase):
         url = reverse("meetings:recipient_search")
         self.login(self.other)
         self.assertEqual(self.client.get(url, {"q": "王"}).status_code, 403)
+
         self.login(self.owner)
         self.assertEqual(self.client.get(url).json(), {"results": [], "has_more": False})
         result = self.client.get(url, {"q": "王小明"}).json()["results"]
-        self.assertEqual(result, [{"id": self.owner.pk, "label": "王小明(owner)"}])
+        self.assertEqual(result, [{"id": self.owner.pk, "label": "王小明"}])
+        self.assertEqual(self.client.get(url, {"q": "owner"}).json()["results"], [])
         for index in range(22):
-            self.user(f"candidate-{index:02}", "view")
+            self.user(f"candidate-{index:02}", "view", last_name="候选", first_name=str(index))
         self.user("candidate-no-permission")
         self.user("candidate-inactive", "view", is_active=False)
-        first = self.client.get(url, {"q": "candidate"})
-        second = self.client.get(url, {"q": "candidate", "page": 2}).json()
+        first = self.client.get(url, {"q": "候选"})
+        second = self.client.get(url, {"q": "候选", "page": 2}).json()
         self.assertEqual(len(first.json()["results"]), 20)
         self.assertTrue(first.json()["has_more"])
         self.assertEqual(len(second["results"]), 2)
@@ -173,6 +176,23 @@ class MeetingVisibilityTests(TestCase):
         self.login(self.manager)
         self.assertEqual(self.client.get(url, {"q": "王", "meeting_id": self.secret.pk}).status_code, 404)
         self.assertEqual(self.client.get(url, {"q": "王"}).status_code, 403)
+
+    def test_duplicate_recipient_is_disabled_until_notes_distinguish_names(self):
+        from accounts.models import UserProfile
+
+        duplicate = self.user("duplicate-private", "view", last_name="王", first_name="小明")
+        self.login(self.owner)
+        url = reverse("meetings:recipient_search")
+        results = self.client.get(url, {"q": "王小明"}).json()["results"]
+        self.assertEqual(len(results), 2)
+        self.assertTrue(all(item["invalid"] for item in results))
+        form = MeetingAudienceForm(data={"visible_users": [duplicate.pk]}, instance=self.secret)
+        self.assertFalse(form.is_valid())
+        UserProfile.objects.create(user=self.owner, name_disambiguation="甲组")
+        UserProfile.objects.create(user=duplicate, name_disambiguation="乙组")
+        results = self.client.get(url, {"q": "王小明"}).json()["results"]
+        self.assertEqual({item["label"] for item in results}, {"王小明（甲组）", "王小明（乙组）"})
+        self.assertTrue(all("invalid" not in item for item in results))
 
     def test_settings_preserve_record_and_list_return_and_clear_public_selections(self):
         self.login(self.owner)
@@ -221,18 +241,19 @@ class MeetingVisibilityTests(TestCase):
         html = self.client.get(reverse("meetings:meeting_detail", args=[self.secret.pk]))
         self.assertContains(html, "限定人员可见")
         self.assertNotContains(html, self.role.name)
-        self.assertNotContains(html, "李小红(viewer)")
+        self.assertNotContains(html, "指定人员")
         self.login(self.owner)
         html = self.client.get(reverse("meetings:meeting_detail", args=[self.secret.pk]))
         self.assertContains(html, self.role.name)
-        self.assertContains(html, "李小红(viewer)")
+        self.assertContains(html, "李小红")
+        self.assertNotContains(html, "viewer")
         self.viewer.is_staff = True
         self.viewer.save(update_fields=["is_staff"])
         self.login(self.viewer)
         html = self.client.get(f"/admin/meetings/meeting/{self.secret.pk}/change/")
         self.assertEqual(html.status_code, 200)
         self.assertNotContains(html, self.role.name)
-        self.assertNotContains(html, "李小红(viewer)")
+        self.assertNotContains(html, "指定人员")
 
     def test_upload_has_no_full_user_list_and_add_only_success_returns_to_upload(self):
         self.login(self.no_view)
@@ -278,6 +299,8 @@ class MeetingVisibilityTests(TestCase):
         self.assertIn("q%3D", setting["href"])
 
     def test_service_rolls_back_relations_and_rechecks_actor_scope(self):
+        self.other.first_name = "受众测试人员"
+        self.other.save(update_fields=["first_name"])
         with self.assertRaises(Http404):
             save_meeting(
                 meeting=self.secret,
@@ -351,6 +374,8 @@ class MeetingVisibilityTests(TestCase):
                 group_ids=[],
                 user_ids=[],
             )
+        self.other.last_name, self.other.first_name = "测试", "成员"
+        self.other.save(update_fields=["last_name", "first_name"])
         form = MeetingAudienceForm(data={"visible_users": [self.other.pk]}, instance=self.secret)
         self.assertTrue(form.is_valid(), form.errors)
         self.other.user_permissions.clear()

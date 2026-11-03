@@ -5,7 +5,7 @@ from django.utils.translation import gettext_lazy as _
 
 from core.utils.admin_deletion import discard_registered_delete_permissions
 from standards.models import TechnicalDomainGroupScope
-from .admin_forms import GroupPermissionBundleAdminForm, UserPermissionBundleAdminForm
+from .admin_forms import GroupPermissionBundleAdminForm, NamedUserCreationForm, UserPermissionBundleAdminForm
 from .models import UserProfile, GroupProfile
 from .services.permission_assignments import (
     sync_group_permission_assignments,
@@ -26,6 +26,8 @@ class CustomUserAdmin(DefaultUserAdmin):
     list_display = ('username', 'full_name', 'groups_name', 'is_staff', 'is_active', 'date_joined')
     inlines =[UserProfileInline]
     form = UserPermissionBundleAdminForm
+    add_form = NamedUserCreationForm
+    add_fieldsets = ((None, {'classes': ('wide',), 'fields': ('username', 'last_name', 'first_name', 'password1', 'password2')}),)
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         (_('Personal info'), {'fields': ('first_name', 'last_name', 'email')}),

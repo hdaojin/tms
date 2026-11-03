@@ -260,6 +260,9 @@ class StatisticsFilterForm(StyledFormMixin, forms.Form):
         if not include_user:
             self.fields.pop("user")
         else:
-            self.fields["user"].queryset = get_user_model().objects.filter(is_active=True).order_by("username")
+            from accounts.services.users import annotate_identity_labels, get_user_full_info
+            self.fields["user"].queryset = annotate_identity_labels(
+                get_user_model().objects.filter(is_active=True).order_by("last_name", "first_name", "pk"))
+            self.fields["user"].label_from_instance = get_user_full_info
         self.fields["skill_project"].queryset = SkillProject.objects.filter(is_active=True)
         self.fields["glossary"].queryset = ProfessionalGlossary.objects.select_related("skill_project")

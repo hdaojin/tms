@@ -6,6 +6,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from accounts.services.users import require_distinguishable_users
 
 from .models import Meeting
 from .permissions import can_change_meeting_admin, can_upload_meeting
@@ -38,6 +39,9 @@ def validate_audience(*, is_public, group_ids, user_ids, existing_user_ids=()):
     newly_selected = user_ids - set(existing_user_ids)
     if set(recipient_queryset().filter(pk__in=newly_selected).values_list("pk", flat=True)) != newly_selected:
         raise ValidationError("指定人员已停用或没有会议查看权限，请重新选择。")
+    visible = get_user_model().objects.filter(pk__in=recipient_queryset().values("pk") | get_user_model().objects.filter(
+        pk__in=existing_user_ids).values("pk"))
+    require_distinguishable_users(visible, newly_selected)
     return group_ids, user_ids
 
 

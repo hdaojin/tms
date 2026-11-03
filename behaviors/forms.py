@@ -97,11 +97,15 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # 限定学生选择范围，使用 display_name 显示
-        self.fields['student'].queryset = get_users_with_explicit_permission(
+        from accounts.services.users import annotate_identity_labels, get_user_full_info
+
+        self.fields['student'].queryset = annotate_identity_labels(get_users_with_explicit_permission(
             "behaviors.be_conduct_subject",
             User.objects.filter(is_active=True),
-        ).order_by('username')
-        self.fields['student'].label_from_instance = lambda obj: obj.display_name
+        ).order_by('last_name', 'first_name', 'pk'))
+        self.fields['student'].label_from_instance = lambda person: (
+            get_user_full_info(person) + ('（同名备注未填写或重复）' if person.identity_invalid else '')
+        )
 
         # HTMX: 选择性质后动态更新事项选项
         self.fields['nature'].widget.attrs['hx-get'] = reverse('behaviors:item_choices')
@@ -160,3 +164,11 @@ class ConductRecordForm(StyledFormMixin, forms.ModelForm):
             today = timezone.localdate()
             self.fields['occurred_date'].initial = today.strftime('%Y-%m-%d')
             self.fields['occurred_date'].widget.attrs['value'] = today.strftime('%Y-%m-%d')
+
+    def clean_student(self):
+        from accounts.services.users import require_distinguishable_users
+
+        student = self.cleaned_data['student']
+        if student and student.pk != self.instance.student_id:
+            require_distinguishable_users(self.fields['student'].queryset, [student.pk])
+        return student

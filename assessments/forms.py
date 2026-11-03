@@ -168,6 +168,10 @@ class AssessmentModuleForm(ImmutableCodeFormMixin, StyledFormMixin, forms.ModelF
 
     def __init__(self, *args, user=None, permission="assessments.change_assessmentmodule", **kwargs):
         super().__init__(*args, **kwargs)
+        from accounts.services.users import get_user_display_name
+
+        self.fields["coaches"].label_from_instance = get_user_display_name
+        self.fields["primary_coach"].label_from_instance = get_user_display_name
         self.user = user
         self.permission = permission
         assessment_queryset = Assessment.objects.all()
@@ -260,6 +264,12 @@ class AssessmentParticipantForm(StyledFormMixin, forms.ModelForm):
 
     def __init__(self, *args, user=None, permission="assessments.add_assessmentparticipant", **kwargs):
         super().__init__(*args, **kwargs)
+        from accounts.services.users import annotate_identity_labels, get_user_full_info
+
+        self.fields["user"].queryset = annotate_identity_labels(self.fields["user"].queryset)
+        self.fields["user"].label_from_instance = lambda person: (
+            get_user_full_info(person) + ("（同名备注未填写或重复）" if person.identity_invalid else "")
+        )
         if user is not None:
             self.fields["assessment"].queryset = assessments_in_scope_for(user, permission)
         self.fields["display_name"].required = False
@@ -275,6 +285,9 @@ class AssessmentParticipantForm(StyledFormMixin, forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         user = cleaned.get("user")
+        if user and user.pk != self.instance.user_id:
+            from accounts.services.users import require_distinguishable_users
+            require_distinguishable_users(self.fields["user"].queryset, [user.pk])
         competition_person = cleaned.get("competition_person")
         if user and competition_person:
             raise forms.ValidationError("参与人员不能同时关联系统用户和长期赛事人员。")

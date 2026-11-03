@@ -1,6 +1,7 @@
 from io import BytesIO
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse
@@ -10,7 +11,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 from core.uploads import SCORING_WORKBOOK_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
 from . import scheduling
-from .plan_workbooks import build_plan_workbook, confirm_import, preview_import, ROUNDTRIP_NOTICE
+from .plan_workbooks import build_plan_workbook, confirm_import, import_rosters, preview_import, ROUNDTRIP_NOTICE
 from .schedule_views import get_plan, render, _success
 
 
@@ -48,12 +49,31 @@ def import_plan(request, pk):
                 data = signing.loads(request.POST["token"], salt="training.import", max_age=600)
                 if data["user"] != request.user.pk or data["plan"] != plan.pk:
                     raise PermissionDenied
-                confirm_import(plan, request.user, data["payload"], data["members"])
+                confirm_import(plan, request.user, data["payload"], data["members"], data.get("rosters", []))
                 return _success(request, plan, "排班和任务草稿已导入，请分别发布。")
             if form.is_valid():
                 file = form.cleaned_data["file"]
                 SCORING_WORKBOOK_UPLOAD_SPEC.validate_file(file)
+                rosters = import_rosters(plan)
                 records, payload = preview_import(plan, request.user, BytesIO(file.read()))
+                accounts = {username: (last + first).strip() or "未填写姓名" for username, last, first in
+                            get_user_model().objects.values_list("username", "last_name", "first_name")}
+
+                for record in records:
+                    for index in (5, 6):
+                        cell = record["values"][index]
+                        if cell is not None:
+                            lines = str(cell).splitlines()
+                            sanitized = []
+                            for line in lines:
+                                raw = line.strip()
+                                suffix = "（主）" if raw.endswith("（主）") else "(主)" if raw.endswith("(主)") else ""
+                                key = raw.removesuffix(suffix).strip() if suffix else raw
+                                if key in accounts:
+                                    sanitized.append(accounts[key] + suffix)
+                                else:
+                                    sanitized.append(line)
+                            record["values"][index] = "\n".join(sanitized)
                 if payload:
                     participants = list(plan.participants.filter(is_active=True).select_related("user").order_by("user_id"))
                     token = signing.dumps(
@@ -61,6 +81,7 @@ def import_plan(request, pk):
                             "user": request.user.pk,
                             "plan": plan.pk,
                             "payload": payload,
+                            "rosters": rosters,
                             "members": [participant.user_id for participant in participants],
                         },
                         salt="training.import",

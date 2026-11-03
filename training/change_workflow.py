@@ -1,19 +1,15 @@
 """排班、时间和过期任务调整：预演、教练依次确认、终审和原子应用。"""
 
-from datetime import datetime, time
+from copy import deepcopy
 from pathlib import Path
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Prefetch, Q
+from django.db.models import Q
 from django.utils import timezone
 
 from . import scheduling as service
 from .models import TrainingPlan, TrainingScheduleChange, TrainingScheduleSlot, TrainingTask
-
-
-def time_snapshot(plan):
-    return {name: getattr(plan, name).isoformat() if getattr(plan, name) else None for name in TrainingPlan.TIME_FIELDS}
 
 
 def payload_expired(plan, payload):
@@ -40,43 +36,6 @@ def payload_expired(plan, payload):
     ).exists()
 
 
-def apply_time_change(plan, item, *, check_before=True):
-    if check_before and time_snapshot(plan) != item["before"]:
-        raise ValidationError("计划时段时间已经变化，请重新申请。")
-    for name in TrainingPlan.TIME_FIELDS:
-        value = item["after"][name]
-        setattr(plan, name, time.fromisoformat(value) if value else None)
-    plan.full_clean()
-    plan.save(update_fields=[*TrainingPlan.TIME_FIELDS, "updated_at"])
-    slots = TrainingScheduleSlot.objects.select_for_update().filter(day__training_plan=plan).select_related("day").prefetch_related(
-        "domains", "coaches", Prefetch("tasks", queryset=TrainingTask.objects.exclude(status="cancelled"), to_attr="active_time_tasks")
-    )
-    for slot in slots:
-        start = getattr(plan, f"{slot.period}_start")
-        end = getattr(plan, f"{slot.period}_end")
-        proposed_start = timezone.make_aware(datetime.combine(slot.day.date, start)) if start else None
-        proposed_end = timezone.make_aware(datetime.combine(slot.day.date, end)) if end else None
-        if slot.ends_at:
-            expired = slot.is_locked
-        elif proposed_end:
-            expired = proposed_end <= timezone.now()
-        else:
-            # 旧快照没有时间时，仅能确定明天及以后的日期尚未结束。
-            expired = slot.day.date <= timezone.localdate()
-        if expired and not item.get("include_past"):
-            continue
-        if not start and slot.is_configured:
-            if slot.kind not in {"pending", "unused"} or slot.active_time_tasks or slot.domains.all() or slot.coaches.all():
-                raise ValidationError("请先处理该时段已有的排班和任务，再停用时段。")
-            slot.kind = "unused"
-        elif start and not slot.is_configured:
-            slot.kind = "pending"
-        slot.is_configured = bool(start)
-        slot.starts_at, slot.ends_at = proposed_start, proposed_end
-        slot.revision += 1
-        slot.save(update_fields=["starts_at", "ends_at", "is_configured", "kind", "revision", "updated_at"])
-
-
 def apply_payload(plan, payload, actor):
     from .entry_operations import check_guard
     for item in payload:
@@ -88,7 +47,7 @@ def apply_payload(plan, payload, actor):
         if item["type"] == "swap":
             apply_swap(plan, item)
         elif item["type"] == "times":
-            apply_time_change(plan, item)
+            raise ValidationError("旧时段时间调整申请已停止生效，可驳回后按当前规则编辑计划。")
         elif item["type"] == "task":
             slot = TrainingScheduleSlot.objects.select_related("day__training_plan").get(pk=item["slot"], day__training_plan=plan)
             if slot.revision != item["revision"]:
@@ -114,12 +73,18 @@ def confirmation_ids(plan, payload):
             original.extend(TrainingScheduleSlot.objects.filter(pk__in=item["slots"]).order_by("day__date", "pk").values_list("coaches__pk", flat=True))
         elif item["type"] == "slot":
             original.extend(item["before"]["coaches"])
-            replacement.extend(service.coach_ids(plan) if item["after"]["coaches_all"] else item["after"]["coaches"])
+            replacement.extend(
+                service.coach_ids(plan) if item["after"]["coaches_all"] and not item["before"]["coaches_all"]
+                else item["after"]["coaches"]
+            )
         elif item["type"] == "day":
             if item["before"]["date"] != item["after"]["date"]:
                 original.extend(TrainingScheduleSlot.objects.filter(day_id=item["id"]).values_list("coaches__pk", flat=True))
             duty.extend(item["before"]["duty_coaches"])
-            duty.extend(service.coach_ids(plan) if item["after"]["duty_all"] else item["after"]["duty_coaches"])
+            duty.extend(
+                service.duty_ids(plan) if item["after"]["duty_all"] and not item["before"]["duty_all"]
+                else item["after"]["duty_coaches"]
+            )
         elif item["type"] == "times":
             slots = TrainingScheduleSlot.objects.filter(day__training_plan=plan, ends_at__gt=timezone.now())
             original.extend(slots.values_list("coaches__pk", flat=True))
@@ -137,11 +102,18 @@ def create_change(plan, user, payload, reason):
 
     try:
         with transaction.atomic():
-            apply_payload(plan, payload, user)
+            apply_payload(plan, deepcopy(payload), user)
             raise PreviewRollback
     except PreviewRollback:
         pass
     plan.refresh_from_db()
+    for item in payload:
+        if item["type"] == "slot" and item["after"]["coaches_all"] and not item["before"]["coaches_all"]:
+            item["roster"] = sorted(service.coach_ids(plan))
+        if item["type"] == "day" and item["after"]["duty_all"] and not item["before"]["duty_all"]:
+            item["roster"] = sorted(service.duty_ids(plan))
+        if item["type"] == "task" and item["after"].get("assign_all"):
+            item["roster"] = list(plan.participants.filter(is_active=True).order_by("user_id").values_list("user_id", flat=True))
     ids = [] if payload_expired(plan, payload) else confirmation_ids(plan, payload)
     confirmations = [{"user_id": pk, "decision": "approve" if pk == user.pk else "", "note": "申请人提交时同意" if pk == user.pk else "", "at": timezone.now().isoformat() if pk == user.pk else None} for pk in ids]
     change = TrainingScheduleChange.objects.create(training_plan=plan, requested_by=user, reason=reason, payload=payload, confirmations=confirmations)
@@ -211,6 +183,13 @@ def _review(change, user, *, approve, note, written_files):
     elif approve:
         for item in change.payload:
             kind = item["type"]
+            if "roster" in item:
+                if kind == "task":
+                    roster = set(plan.participants.filter(is_active=True).values_list("user_id", flat=True))
+                else:
+                    roster = service.duty_ids(plan) if kind == "day" else service.coach_ids(plan)
+                if set(item["roster"]) != roster:
+                    raise ValidationError("计划人员名单已变化，请重新提交调整申请。")
             if kind in {"day", "slot", "swap"} and not service.can_schedule(change.requested_by, plan):
                 raise ValidationError("申请人已无排班权限，请重新申请。")
             if kind == "times" and not service.plan_manager(change.requested_by, plan):

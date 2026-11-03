@@ -69,11 +69,11 @@
       {% if perms.training.view_trainingcyclemember %}
         <p>共 {{ members_page.paginator.count }} 位成员。</p>
         <div class="overflow-x-auto"><table class="table table-sm">
-          <thead><tr><th>姓名</th><th>账号</th><th>周期身份</th><th>当前周期</th></tr></thead>
+          <thead><tr><th>姓名</th><th>周期身份</th><th>当前周期</th></tr></thead>
           <tbody>
             {% for member in members_page %}
-              <tr><td>{{ member.user.display_name }}</td><td>{{ member.user.username }}</td><td>{{ member.get_role_display }}</td><td>{{ member.is_current|yesno:"是,否" }}</td></tr>
-            {% empty %}<tr><td colspan="4">暂无周期成员。</td></tr>{% endfor %}
+              <tr><td>{{ member.user.display_name }}</td><td>{{ member.get_role_display }}</td><td>{{ member.is_current|yesno:"是,否" }}</td></tr>
+            {% empty %}<tr><td colspan="3">暂无周期成员。</td></tr>{% endfor %}
           </tbody>
         </table></div>
         {% if members_page.has_other_pages %}

@@ -6,7 +6,7 @@
   {% if result %}
     <p>共 {{ result.rows|length }} 项草稿任务。已发布和已取消的任务不在本次范围内。</p>
     <div class="overflow-x-auto"><table class="table"><thead><tr><th>日期</th><th>时段</th><th>任务</th><th>分配选手</th><th>结果</th></tr></thead><tbody>
-      {% for row in result.rows %}<tr><td>{{ row.task.planned_date|date:'Y-m-d' }}</td><td>{% if row.task.schedule_slot %}{{ row.task.schedule_slot.get_period_display }}{% else %}未分时段{% endif %}</td><td>{{ row.task.title }}</td><td>{% for id, name, username in row.people %}{{ name }}（{{ username }}）{% if not forloop.last %}、{% endif %}{% empty %}—{% endfor %}</td><td>{% if row.error %}{{ row.error }}{% else %}可发布{% endif %}</td></tr>{% endfor %}
+      {% for row in result.rows %}<tr><td>{{ row.task.planned_date|date:'Y-m-d' }}</td><td>{% if row.task.schedule_slot %}{{ row.task.schedule_slot.get_period_display }}{% else %}未分时段{% endif %}</td><td>{{ row.task.title }}</td><td>{% for id, name in row.people %}{{ name }}{% if not forloop.last %}、{% endif %}{% empty %}—{% endfor %}</td><td>{% if row.error %}{{ row.error }}{% else %}可发布{% endif %}</td></tr>{% endfor %}
     </tbody></table></div>
     {% if token %}<form method="post">{% csrf_token %}<input type="hidden" name="token" value="{{ token }}"><button class="btn btn-primary">确认发布全部任务</button></form>{% else %}<p>请先处理所有无法发布的任务，再重新预览。</p>{% endif %}
   {% endif %}

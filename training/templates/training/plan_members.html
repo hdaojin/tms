@@ -1,29 +1,14 @@
-{% extends "common/table_page.html" %}
+{% extends "layouts/app.html" %}
 {% load static %}
-{% block list_filters %}
-  <section class="card border border-base-300 bg-base-100 shadow-sm mb-4"><div class="card-body">
-    <div class="flex flex-wrap items-center gap-3">
-      <h2 class="card-title">{{ plan.title }} · 参与选手</h2>
-      {% if adding %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_members' plan.pk %}">已有成员</a>
-      {% else %}<a class="btn btn-primary btn-sm" href="?mode=add">添加成员</a>{% endif %}
-      <a class="btn btn-ghost btn-sm" href="{% url 'training:plan_detail' plan.pk %}#plan-members">返回计划</a>
-    </div>
-    <p>添加范围为所属周期中账号有效、当前在训的选手。新增成员不自动获得已有任务，退出保留历史记录和执行。</p>
-  </div></section>
-  {{ block.super }}
+{% block container_class %}tms-container-full{% endblock %}
+{% block content %}
+  {% include "training/partials/plan_staff_section.html" with plan=plan role=coach_section.role current=coach_section.current candidates=coach_section.candidates role_options=coach_section.role_options is_duty=False error=coach_section.error %}
+  {% include "training/partials/plan_staff_section.html" with plan=plan role=duty_section.role current=duty_section.current candidates=duty_section.candidates role_options=duty_section.role_options is_duty=True error=duty_section.error %}
+  {% include "training/partials/plan_participant_section.html" %}
 {% endblock %}
-{% block list_results %}
-  {% partialdef results inline %}
-    {% if adding %}
-    <form method="post" action="{{ request.get_full_path }}" data-bulk-list data-matching-count="{{ table.paginator.count }}" data-selection-label="位选手" novalidate>
-      {% csrf_token %}<input type="hidden" name="stage" value="select">
-      {% include "components/list_bulk_actions.html" with operation_field=action_form.operation matching_count=table.paginator.count selection_label="位选手" %}
-    {% endif %}
-    {% include "components/table_wrapper.html" with table=table %}
-    {% if adding %}</form>{% endif %}
-  {% endpartialdef %}
-{% endblock %}
+{% partialdef results %}{% include "training/partials/plan_participant_results.html" %}{% endpartialdef %}
 {% block extra_js %}
   {{ block.super }}
   <script src="{% static 'js/list-bulk-actions.js' %}" defer></script>
+  <script src="{% static 'js/plan-staff.js' %}" defer></script>
 {% endblock %}

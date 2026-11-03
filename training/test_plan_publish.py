@@ -99,7 +99,7 @@ class PlanPublishTests(ProcessFixture, TestCase):
         self.plan.participants.update(is_active=False)
         result = plan_publish.preview(self.plan, self.coach)
         self.assertFalse(result["can_confirm"])
-        self.assertIn("至少选择一名选手", result["rows"][0]["error"])
+        self.assertIn("参与选手", result["rows"][0]["error"])
 
     def test_new_draft_invalidates_preview(self):
         self.draft("原任务")

@@ -20,7 +20,7 @@ class AccountsConfig(AppConfig):
             def display_name(self):
                 """
                 用户显示名称
-                组合 last_name（姓）+ first_name（名），无则使用 username
+                组合 last_name（姓）+ first_name（名），无姓名时显示提示。
                 """
                 return get_user_display_name(self)
             
@@ -30,8 +30,7 @@ class AccountsConfig(AppConfig):
             @property
             def full_info(self):
                 """
-                用户完整信息: 姓名(用户名)
-                如: 张三(student001)
+                用户显示名称，不包含登录账号。
                 """
                 return get_user_full_info(self)
             

@@ -18,7 +18,7 @@ LABELS = {
     "times": "计划作息",
     **{f"{period}_{edge}": f"{label}{edge_label}时间" for period, label in [("early", "早读"), ("morning", "上午"), ("afternoon", "下午"), ("evening", "晚上")] for edge, edge_label in [("start", "开始"), ("end", "结束")]},
     "duty_all": "全体值班",
-    "duty_coaches": "值班教练",
+    "duty_coaches": "值班人员",
     "note": "日备注",
     "period": "时段",
     "kind": "类型",

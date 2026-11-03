@@ -5,13 +5,25 @@ import json
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from . import entry_operations, scheduling
 from .models import TaskExecution, TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot, TrainingTask
 
 
-def state(plan, user, action):
+def has_schedule_content(plan):
+    if plan.schedule_days.filter(Q(duty_all=True) | Q(duty_coaches__isnull=False) | ~Q(note="")).exists():
+        return True
+    return TrainingScheduleSlot.objects.filter(day__training_plan=plan).filter(
+        (Q(is_configured=True) & ~Q(kind="pending")) |
+        (Q(is_configured=False) & ~Q(kind="unused")) |
+        Q(primary_domain__isnull=False) | Q(coaches_all=True) |
+        Q(domains__isnull=False) | Q(coaches__isnull=False)
+    ).exists()
+
+
+def state(plan, user, action, *, preview=True):
     if action not in {"withdraw_tasks", "clear_tasks", "clear_schedule"}:
         raise PermissionDenied
     if action == "withdraw_tasks":
@@ -50,6 +62,10 @@ def state(plan, user, action):
             raise ValidationError("请先撤回排班发布。")
         if entry_operations.has_execution_facts(plan.tasks.all()):
             raise ValidationError("计划中存在任务执行或进度事实，不能清空排班。")
+        if not has_schedule_content(plan):
+            raise ValidationError("没有需要清空的排班。")
+    if not preview:
+        return
     days = list(plan.schedule_days.prefetch_related("duty_coaches").order_by("date"))
     slots = list(TrainingScheduleSlot.objects.filter(day__training_plan=plan).select_related("day").prefetch_related("domains", "coaches").order_by("day__date", "pk"))
     slot_ids = [slot.pk for slot in slots]

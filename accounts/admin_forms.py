@@ -3,7 +3,7 @@ from __future__ import annotations
 from django import forms
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import UserChangeForm
+from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from django.contrib.auth.models import Group, Permission
 
 from accounts.services.permission_assignments import (
@@ -69,6 +69,8 @@ class UserPermissionBundleAdminForm(UserChangeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["last_name"].required = True
+        self.fields["first_name"].required = True
         self.fields.pop("user_permissions", None)
         self.fields["selected_permission_bundles"].help_text = (
             "需要技术领域范围的写权限必须由同一个用户组同时提供权限与技术领域范围；"
@@ -81,3 +83,12 @@ class UserPermissionBundleAdminForm(UserChangeForm):
         if self.instance.pk:
             self.initial["selected_permission_bundles"] = get_user_permission_bundle_codes(self.instance)
             self.initial["explicit_permissions"] = get_user_explicit_permissions(self.instance)
+
+
+class NamedUserCreationForm(UserCreationForm):
+    last_name = forms.CharField(label="姓", max_length=150, required=True)
+    first_name = forms.CharField(label="名", max_length=150, required=True)
+
+    class Meta(UserCreationForm.Meta):
+        model = get_user_model()
+        fields = ("username", "last_name", "first_name")

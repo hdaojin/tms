@@ -13,7 +13,7 @@ from django.views.decorators.http import require_GET
 from django.views.decorators.vary import vary_on_headers
 from django_tables2 import SingleTableView
 
-from accounts.services.users import get_user_display_name, get_user_full_info
+from accounts.services.users import annotate_identity_labels, get_user_display_name, get_user_full_info
 from core.file_preview import (
     FilePreviewMetadata,
     build_download_response,
@@ -80,7 +80,7 @@ class MeetingListView(FilterableListMixin, PermissionRequiredMixin, TitleMixin, 
     title_icon = "icon-[tabler--calendar-event]"
     permission_required = "meetings.view_meeting"
     list_filter_specs = (
-        ListFilterSpec("q", "搜索会议", "search", placeholder="搜索会议名称、文件名、上传者姓名或账号"),
+        ListFilterSpec("q", "搜索会议", "search", placeholder="搜索会议名称、文件名、上传者姓名或拼音"),
         ListFilterSpec("date_from", "会议起日", "date"),
         ListFilterSpec("date_to", "会议止日", "date"),
     )
@@ -167,7 +167,8 @@ class MeetingDetailView(TitleMixin, MeetingAccessMixin, DetailView):
                         "可见角色", "、".join(meeting.visible_groups.values_list("name", flat=True)) or "—"
                     ),
                     FilePreviewMetadata(
-                        "指定人员", "、".join(get_user_full_info(user) for user in meeting.visible_users.all()) or "—"
+                        "指定人员", "、".join(get_user_full_info(user) for user in
+                                            annotate_identity_labels(meeting.visible_users.all())) or "—"
                     ),
                 ]
             )
@@ -257,7 +258,8 @@ def recipient_search(request):
     users = list(search_recipients(recipient_queryset(), query)[(page - 1) * 20 : page * 20 + 1]) if query else []
     response = JsonResponse(
         {
-            "results": [{"id": user.pk, "label": get_user_full_info(user)} for user in users[:20]],
+            "results": [{"id": user.pk, "label": get_user_full_info(user),
+                         **({"invalid": True} if user.identity_invalid else {})} for user in users[:20]],
             "has_more": len(users) > 20,
         }
     )

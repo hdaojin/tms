@@ -8,7 +8,7 @@ from accounts.models import GroupProfile
 from accounts.selectors import permission_display_name
 from accounts.services.groups import ensure_group_profile
 from accounts.services.permission_assignments import sync_group_permission_assignments
-from accounts.services.users import get_user_display_name
+from accounts.services.users import annotate_identity_labels, get_user_full_info, require_distinguishable_users
 from core.permissions import get_permission_bundle_spec_map
 from standards.models import TechnicalDomain, TechnicalDomainGroupScope
 
@@ -48,6 +48,8 @@ def preview_role(*, actor, group, payload):
     if not actor.is_active or not actor.is_superuser:
         raise PermissionDenied
     state = role_state(group)
+    existing = set(state["members"]) if state else set()
+    require_distinguishable_users(get_user_model().objects.all(), set(payload["members"]) - existing)
     token = signing.dumps({"state": state, "payload": payload}, salt="accounts.role-preview", compress=True)
     before = state or {
         "members": [],
@@ -79,8 +81,9 @@ def preview_role(*, actor, group, payload):
             ).select_related("skill_project")
         },
         "成员编号": {
-            user.pk: f"{get_user_display_name(user)}（{user.username}）"
-            for user in get_user_model().objects.filter(pk__in=set(before["members"]) | set(payload["members"]))
+            user.pk: get_user_full_info(user)
+            for user in annotate_identity_labels(get_user_model().objects.filter(
+                pk__in=set(before["members"]) | set(payload["members"])))
         },
         "额外权限编号": {
             permission.pk: permission_display_name(permission)
@@ -112,6 +115,8 @@ def save_role(*, actor, group, payload, token):
         list(GroupProfile.objects.select_for_update().filter(group=group))
     if preview != {"state": role_state(group), "payload": payload}:
         raise ValidationError("表单或现有授权在预览后发生变化，请重新预览。")
+    existing = set(group.user_set.values_list("pk", flat=True)) if group else set()
+    require_distinguishable_users(get_user_model().objects.all(), set(payload["members"]) - existing)
     if group is None:
         group = Group.objects.create(name=payload["name"])
     else:

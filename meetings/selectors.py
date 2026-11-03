@@ -3,6 +3,7 @@
 from django.contrib.auth import get_user_model
 from django.db.models import Exists, OuterRef, Q, Value
 from django.db.models.functions import Concat
+from accounts.services.users import annotate_identity_labels, user_name_search_ids
 
 from .models import Meeting
 from .permissions import VIEW_MEETING_PERMISSION, can_view_meeting
@@ -29,9 +30,8 @@ def recipient_queryset():
 
 def search_recipients(queryset, query):
     return (
-        queryset.annotate(_full_name=Concat("last_name", "first_name"))
-        .filter(Q(username__icontains=query) | Q(_full_name__icontains=query))
-        .order_by("last_name", "first_name", "username", "pk")
+        annotate_identity_labels(queryset).filter(pk__in=user_name_search_ids(queryset, query))
+        .order_by("last_name", "first_name", "pk")
     )
 
 
@@ -41,6 +41,6 @@ def search_meetings(queryset, query):
     return queryset.alias(_uploader_name=Concat("uploaded_by__last_name", "uploaded_by__first_name", Value(""))).filter(
         Q(title__icontains=query)
         | Q(file__icontains=query)
-        | Q(uploaded_by__username__icontains=query)
+        | Q(uploaded_by_id__in=user_name_search_ids(get_user_model().objects.all(), query))
         | Q(_uploader_name__icontains=query)
     )

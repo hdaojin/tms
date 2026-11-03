@@ -2,13 +2,12 @@ from django import forms
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError
-from django.db.models import Case, IntegerField, Prefetch, Q, When
+from django.db.models import Case, IntegerField, Prefetch, When
 from django.forms import formset_factory
 from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render as django_render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from accounts.services.users import get_user_display_name
 from . import scheduling as service
 from .models import TrainingScheduleSlot, TrainingScheduleChange
 from .schedule_forms import DayScheduleForm, SlotScheduleForm, SlotTaskForm, SkillCorrectionForm
@@ -121,26 +120,72 @@ class PlanDetailView(TrainingPlanDetailView):
     def get_queryset(self):
         return (
             service.visible_plans(self.request.user)
-            .select_related("training_cycle")
+            .select_related("training_cycle", "created_by")
             .prefetch_related("schedulers", "approvers", "task_managers")
         )
 
     def get_template_names(self):
-        if self.request.htmx and self.request.GET.get("fragment") == "results":
-            return ["training/schedule_results.html"]
+        if self.request.htmx:
+            fragment = self.request.GET.get("fragment")
+            if fragment == "results":
+                return ["training/schedule_results.html"]
+            if fragment == "actions":
+                return ["training/partials/plan_actions.html"]
         return super().get_template_names()
 
     def get_context_data(self, **kwargs):
+        from .plan_actions import plan_actions
+        from .plan_members import ordered_duty
         from .schedule_display import plan_context
-        from django.core.paginator import Paginator
 
-        context = plan_context(self, super().get_context_data(**kwargs))
-        if context["can_see_management"]:
-            members = self.object.participants.filter(is_active=True).select_related("user").order_by(
-                "user__last_name", "user__first_name", "pk",
+        context = super().get_context_data(**kwargs)
+        fragment = self.request.GET.get("fragment") if self.request.htmx else None
+        if fragment != "results":
+            query = self.request.GET.copy()
+            query.pop("fragment", None)
+            context["plan_actions"] = plan_actions(self.object, self.request.user, query.urlencode())
+        if fragment == "actions":
+            return context
+        context = plan_context(self, context)
+        from .entry_operations import withdrawal_state
+        from .plan_actions import _reason
+
+        if self.object.published_at and service.privileged(self.request.user):
+            context["can_withdraw_plan"] = True
+            context["withdraw_plan_reason"] = _reason(
+                withdrawal_state, self.object, self.request.user, "plan", preview=False
             )
-            context["members_page"] = Paginator(members, 25).get_page(self.request.GET.get("members_page"))
+        elif not self.object.published_at and context["can_manage"]:
+            context["publish_plan_reason"] = _reason(service.require_rosters, self.object)
+        if context["can_see_management"]:
+            from accounts.services.users import annotate_identity_labels
+            from django.contrib.auth import get_user_model
+
+            plan = self.object
+            members = get_user_model().objects.filter(
+                pk__in=plan.participants.filter(is_active=True).values("user_id")
+            ).order_by("last_name", "first_name", "pk")
+            context["participant_groups"] = [
+                ("负责教练", annotate_identity_labels(plan.responsible_coaches.order_by("last_name", "first_name", "pk"))),
+                ("参与选手", list(annotate_identity_labels(members))),
+                ("值班人员", annotate_identity_labels(ordered_duty(plan))),
+            ]
+            context["plan_roles"] = [
+                ("创建人员", [plan.created_by] if plan.created_by else []),
+                ("排班人员", plan.schedulers.all()),
+                ("审批人员", plan.approvers.all()),
+            ]
         return context
+
+
+@require_POST
+def publish_plan(request, pk):
+    plan = get_plan(request.user, pk)
+    try:
+        service.publish_plan(plan, request.user)
+    except ValidationError as exc:
+        return _error(request, plan, exc)
+    return _success(request, plan, "计划已发布。")
 
 
 def _success(request, plan, text):
@@ -545,15 +590,25 @@ def task_competitor_search(request, pk):
         .order_by("user__last_name", "user__first_name", "user_id")
     )
     if q:
-        users = users.filter(
-            Q(user__username__icontains=q) | Q(user__first_name__icontains=q) | Q(user__last_name__icontains=q)
-        )
+        from accounts.services.users import user_name_search_ids
+        from django.contrib.auth import get_user_model
+
+        candidates = get_user_model().objects.filter(pk__in=users.values("user_id"))
+        users = users.filter(user_id__in=user_name_search_ids(candidates, q))
     else:
         users = users.none()
     rows = list(users[(page - 1) * 20 : page * 20 + 1])
+    from accounts.services.users import annotate_identity_labels, get_user_full_info
+    from django.contrib.auth import get_user_model
+
+    visible = get_user_model().objects.filter(pk__in=slot.day.training_plan.participants.filter(
+        is_active=True).values("user_id"))
+    labels = {person.pk: person for person in annotate_identity_labels(visible)}
     return JsonResponse(
         {
-            "results": [{"id": member.user_id, "label": get_user_display_name(member.user)} for member in rows[:20]],
+            "results": [{"id": member.user_id, "label": get_user_full_info(labels[member.user_id]),
+                         **({"invalid": True} if labels[member.user_id].identity_invalid else {})}
+                        for member in rows[:20]],
             "has_more": len(rows) > 20,
         }
     )

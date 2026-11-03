@@ -76,6 +76,11 @@ class CycleMemberAddForm(StyledFormMixin, forms.Form):
     is_current = forms.BooleanField(label="设为当前周期", required=False,
                                    help_text="将替换所选用户原来的当前周期。")
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from accounts.services.users import get_user_display_name
+        self.fields["users"].label_from_instance = get_user_display_name
+
 
 class CycleMemberEditForm(StyledFormMixin, forms.Form):
     role = forms.ChoiceField(label="周期身份", choices=TrainingCycleMember.Role.choices)
@@ -202,7 +207,6 @@ class TrainingCycleTreeVersionsForm(StyledFormMixin, forms.Form):
 
 
 class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
-    reason = forms.CharField(label="时段时间调整原因", required=False, widget=forms.Textarea(attrs={"rows": 2}))
     class Meta:
         model = TrainingPlan
         fields = ["training_cycle", "title", "start_date", "end_date", *TrainingPlan.TIME_FIELDS, "objective", "schedulers", "approvers"]
@@ -227,45 +231,58 @@ class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
             self.fields[name].required = name.startswith(("morning_", "afternoon_"))
             self.fields[name].widget = forms.TimeInput(format="%H:%M", attrs={"type": "time", "class": "input w-full"})
             if self.instance.pk and getattr(self.instance, name) is None and name.rsplit("_", 1)[0] in unknown_periods:
-                self.fields[name].help_text = "历史时间缺失或不一致，请核对后填写；普通保存不改变已结束快照。"
+                self.fields[name].help_text = "历史时间缺失或不一致。符合结构修改条件时可填写。"
         if not self.instance.pk:
-            self.fields.pop("reason")
             from .models import TrainingPeriodConfig
             for config in TrainingPeriodConfig.objects.all():
                 self.initial.setdefault(f"{config.period}_start", config.start_time)
                 self.initial.setdefault(f"{config.period}_end", config.end_time)
         else:
-            for name in ("training_cycle", "start_date", "end_date"):
-                self.fields[name].help_text = "首次保存后固定；需要改变请另建计划。"
-            for name in ("start_date", "end_date"):
-                self.fields[name].widget.attrs["readonly"] = True
-        from accounts.services.users import get_user_full_info
+            from .scheduling import check_plan_structure_edit
+
+            self.fields["training_cycle"].disabled = True
+            self.fields["training_cycle"].help_text = "首次保存后固定；需要改变请另建计划。"
+            try:
+                check_plan_structure_edit(self.instance, self.instance.start_date, self.instance.end_date)
+            except forms.ValidationError as exc:
+                self.structure_locked = exc.messages[0]
+                for name in ("start_date", "end_date", *TrainingPlan.TIME_FIELDS):
+                    self.fields[name].disabled = True
+                    self.fields[name].required = False
+        from accounts.services.users import annotate_identity_labels, get_user_full_info
         for name in ("schedulers", "approvers"):
+            if name not in self.fields:
+                continue
             field = self.fields[name]
             field.widget.plan_id = self.instance.pk
             ids = [str(pk) for pk in (self[name].value() or []) if str(pk).isdecimal()]
-            eligible_ids = set(eligible_staff(name).filter(pk__in=ids).values_list("pk", flat=True))
+            eligible = eligible_staff(name, self.instance)
+            eligible_ids = set(eligible.filter(pk__in=ids).values_list("pk", flat=True))
+            visible = field.queryset.filter(models.Q(pk__in=eligible.values("pk")) | models.Q(pk__in=ids))
             field.widget.selected = [
                 {"id": person.pk, "label": get_user_full_info(person),
                  "unavailable": person.pk not in eligible_ids}
-                for person in field.queryset.filter(pk__in=ids).order_by("last_name", "first_name", "username", "pk")
+                for person in annotate_identity_labels(visible).filter(pk__in=ids)
+                .order_by("last_name", "first_name", "pk")
             ]
 
     def clean(self):
         cleaned = super().clean()
-        if self.instance.pk:
-            previous = TrainingPlan.objects.get(pk=self.instance.pk)
-            if {"training_cycle", "start_date", "end_date"}.intersection(self.changed_data):
-                raise forms.ValidationError("计划创建后不能修改周期和日期范围，请另建计划。")
-            if set(TrainingPlan.TIME_FIELDS).intersection(self.changed_data) and previous.schedule_published_at and not cleaned.get("reason", "").strip():
-                self.add_error("reason", "已发布排班的时间调整须填写原因并提交审批。")
         for name in ("schedulers", "approvers"):
+            if name not in self.fields:
+                continue
             previous_ids = set(getattr(self.instance, name).values_list("pk", flat=True)) if self.instance.pk else set()
             selected_ids = {person.pk for person in cleaned.get(name, ())}
             new_ids = selected_ids - previous_ids
-            eligible_ids = set(eligible_staff(name).filter(pk__in=new_ids).values_list("pk", flat=True))
+            eligible_ids = set(eligible_staff(name, self.instance).filter(pk__in=new_ids).values_list("pk", flat=True))
             if new_ids - eligible_ids:
-                self.add_error(name, "新指定的人员必须账号有效且具有对应权限。")
+                self.add_error(name, "新指定的人员必须账号有效且符合该职责的候选条件。")
+            elif new_ids:
+                from accounts.services.users import require_distinguishable_users
+                try:
+                    require_distinguishable_users(eligible_staff(name, self.instance), new_ids)
+                except forms.ValidationError as exc:
+                    self.add_error(name, exc)
         return cleaned
 
 
@@ -309,6 +326,9 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.request_user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
+        from accounts.services.users import get_user_display_name
+        self.fields["coaches"].label_from_instance = get_user_display_name
+        self.fields["competitors"].label_from_instance = get_user_display_name
         plan = (
             self.instance.training_plan
             if self.instance.pk

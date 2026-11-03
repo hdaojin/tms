@@ -55,7 +55,7 @@
               <dt class="text-base-content/60">负责教练</dt>
               <dd class="flex flex-wrap gap-1">
                 {% for assignment in module.coach_assignments.all %}
-                  <span class="badge badge-outline h-auto whitespace-normal">{{ assignment.user }} · {{ assignment.get_role_display }}</span>
+                  <span class="badge badge-outline h-auto whitespace-normal">{{ assignment.user.display_name }} · {{ assignment.get_role_display }}</span>
                 {% empty %}
                   -
                 {% endfor %}

@@ -9,8 +9,7 @@ from django.contrib.auth import get_user_model
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import CharField, OuterRef, Q, Subquery
-from django.db.models.functions import Concat
+from django.db.models import OuterRef, Q, Subquery
 from django.http import QueryDict
 from django.urls import reverse
 
@@ -27,7 +26,7 @@ RETURN_PARAMS = {"q", "cycle", "date_from", "date_to", "member_role", "sort", "p
 
 class LogFilterForm(StyledFormMixin, forms.Form):
     q = forms.CharField(label="搜索日志", required=False, widget=forms.TextInput(attrs={
-        "type": "search", "placeholder": "姓名、账号、学号、主题、摘要或文件名",
+        "type": "search", "placeholder": "姓名、拼音、学号、主题、摘要或文件名",
     }))
     cycle = forms.ModelChoiceField(label="训练周期", required=False, queryset=TrainingCycle.objects.none(),
                                    empty_label="全部训练周期")
@@ -74,10 +73,13 @@ def filter_training_logs(actor, data):
     queryset = queryset.annotate(member_role=Subquery(membership.values("role")[:1]))
     values = form.cleaned_data
     if values["q"]:
-        queryset = queryset.alias(author_full_name=Concat("author__last_name", "author__first_name", output_field=CharField()))
+        from accounts.services.users import user_name_search_ids
+        from django.contrib.auth import get_user_model
+
         query = values["q"]
+        authors = get_user_model().objects.filter(pk__in=queryset.values("author_id"))
         queryset = queryset.filter(
-            Q(author_full_name__icontains=query) | Q(author__username__icontains=query)
+            Q(author_id__in=user_name_search_ids(authors, query))
             | Q(author__profile__student_id__icontains=query) | Q(topic__icontains=query)
             | Q(summary__icontains=query) | Q(document__icontains=query)
         )
@@ -141,7 +143,7 @@ def preview_log_deletion(*, actor, ids, return_query=""):
     token = signing.dumps({"actor": actor.pk, "ids": ids, "digest": _digest(logs),
                            "return_query": return_query}, salt=SALT, compress=True)
     return {"token": token, "count": len(logs), "return_query": return_query,
-            "rows": [{"author": get_user_display_name(log.author), "username": log.author.username,
+            "rows": [{"author": get_user_display_name(log.author),
                       "date": log.training_date, "cycle": log.training_cycle.name,
                       "filename": Path(log.document.name).name if log.document else "未附文件"}
                      for log in logs]}

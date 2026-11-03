@@ -13,7 +13,7 @@ class ScheduleTable(BaseTable):
         template_name="training/schedule_coaches.html", verbose_name="负责教练", orderable=False
     )
     duty = tables.TemplateColumn(
-        template_name="training/schedule_duty.html", verbose_name="值班教练 / 日备注", orderable=False
+        template_name="training/schedule_duty.html", verbose_name="值班人员 / 日备注", orderable=False
     )
     tasks = tables.TemplateColumn(
         template_name="training/schedule_tasks.html", verbose_name="训练任务", orderable=False

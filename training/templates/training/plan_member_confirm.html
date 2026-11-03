@@ -5,8 +5,8 @@
   <p>{% if operation == 'add' %}向“{{ plan.title }}”添加 {{ rows|length }} 位选手。{% else %}以下选手将退出“{{ plan.title }}”。{% endif %}</p>
   <p>新增成员不自动获得已有任务；退出只停止参与，保留历史成员记录、任务分配和执行。重新添加恢复参与。</p>
   <div class="overflow-x-auto"><table class="table">
-    <thead><tr><th>姓名</th><th>账号</th></tr></thead>
-    <tbody>{% for row in rows %}<tr><td>{{ row.name }}</td><td>{{ row.username }}</td></tr>{% endfor %}</tbody>
+    <thead><tr><th>姓名</th></tr></thead>
+    <tbody>{% for row in rows %}<tr><td>{{ row.name }}</td></tr>{% endfor %}</tbody>
   </table></div>
   <form method="post" action="{% url 'training:plan_members' plan.pk %}">
     {% csrf_token %}<input type="hidden" name="stage" value="confirm"><input type="hidden" name="token" value="{{ token }}">

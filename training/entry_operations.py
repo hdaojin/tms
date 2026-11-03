@@ -396,7 +396,7 @@ def preview_swap(plan, user, command):
     }
 
 
-def withdrawal_state(plan, user, level, task_id=None):
+def withdrawal_state(plan, user, level, task_id=None, *, preview=True):
     task = plan.tasks.select_related("schedule_slot__day__training_plan").get(pk=task_id) if level == "task" else None
     if not service.privileged(user) or level not in {"task", "schedule", "plan"}:
         raise PermissionDenied
@@ -411,6 +411,8 @@ def withdrawal_state(plan, user, level, task_id=None):
     tasks = plan.tasks.filter(pk=task.pk) if task else plan.tasks.all()
     if has_execution_facts(tasks):
         raise ValidationError("受影响任务已有执行或进度，不能撤回发布。")
+    if not preview:
+        return
     ids = list(tasks.exclude(schedule_slot=None).values_list("schedule_slot_id", flat=True))
     return task, {"slots": ids, "days": [], "fingerprint": fingerprint(plan, ids, [])}
 

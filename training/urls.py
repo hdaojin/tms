@@ -10,6 +10,7 @@ from . import plan_member_views
 
 app_name = "training"
 urlpatterns = [
+    path("plans/<int:pk>/publish/", schedule_views.publish_plan, name="plan_publish"),
     path("plans/<int:pk>/publish-tasks/", entry_views.publish_all_tasks, name="publish_all_tasks"),
     path("plans/<int:pk>/clear/<str:action>/", entry_views.clear_plan, name="plan_clear"),
     path("plans/<int:pk>/entries/", entry_views.entry_operation, name="entry_operation"),
@@ -38,11 +39,13 @@ urlpatterns = [
     path("cycles/<int:pk>/members/<int:member_pk>/delete/",
          views.TrainingCycleMemberDeleteView.as_view(), name="member_delete"),
     path("plans/", views.TrainingPlanListView.as_view(), name="plan_list"),
+    path("my-plans/", views.MyTrainingPlanListView.as_view(), name="my_plans"),
     path("plans/create/", views.TrainingPlanCreateView.as_view(), name="plan_create"),
     path("plans/staff-search/", plan_people.plan_staff_search, name="plan_staff_search"),
     path("plans/<int:pk>/", schedule_views.PlanDetailView.as_view(), name="plan_detail"),
     path("plans/<int:pk>/edit/", views.TrainingPlanUpdateView.as_view(), name="plan_edit"),
     path("plans/<int:pk>/members/", plan_member_views.PlanMembersView.as_view(), name="plan_members"),
+    path("plans/<int:pk>/members/staff/<str:role>/", plan_member_views.staff_action, name="plan_staff_action"),
     path("plans/<int:pk>/members/<int:member_pk>/remove/",
          plan_member_views.PlanMemberRemoveView.as_view(), name="plan_member_remove"),
     path("plans/<int:pk>/initialize/", schedule_views.initialize, name="schedule_initialize"),

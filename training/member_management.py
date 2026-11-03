@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 
 from accounts.services.user_management import normalize_ids
-from accounts.services.users import get_user_display_name
+from accounts.services.users import get_user_display_name, require_distinguishable_users
 from core.utils.forms import StyledFormMixin
 
 from .models import TrainingCycle, TrainingCycleMember
@@ -37,6 +37,7 @@ def _state(cycle, ids):
     users = list(User.objects.filter(pk__in=ids).order_by("pk"))
     if len(users) != len(ids) or any(not user.is_active for user in users):
         raise ValidationError("部分用户已不存在或已停用，请重新选择。")
+    require_distinguishable_users(User.objects.filter(is_active=True), ids)
     memberships = list(TrainingCycleMember.objects.filter(user_id__in=ids).order_by("pk").values_list(
         "pk", "user_id", "training_cycle_id", "role", "is_current",
     ))
@@ -44,7 +45,7 @@ def _state(cycle, ids):
         raise ValidationError("部分用户已加入本周期，请重新选择。")
     return users, {
         "cycle": [cycle.status, cycle.start_date.isoformat(), cycle.end_date.isoformat() if cycle.end_date else None],
-        "users": [[user.pk, user.username, user.last_name, user.first_name] for user in users],
+        "users": [[user.pk, user.last_name, user.first_name] for user in users],
         "memberships": [list(row) for row in memberships],
     }
 
@@ -85,7 +86,7 @@ def preview_member_add(*, actor, cycle, token, role, is_current):
     for user in users:
         member = TrainingCycleMember(training_cycle=cycle, user=user, role=role, is_current=is_current)
         member.clean()
-        rows.append({"name": get_user_display_name(user), "username": user.username,
+        rows.append({"name": get_user_display_name(user),
                      "before": current_names.get(user.pk, "未设置"),
                      "after": cycle.name if is_current else current_names.get(user.pk, "未设置")})
     data.update(stage="confirm", role=role, is_current=is_current)

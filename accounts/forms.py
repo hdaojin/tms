@@ -51,6 +51,10 @@ class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
             'placeholder': '名',
         })
     )
+    name_disambiguation = forms.CharField(
+        label="姓名区分备注", max_length=80, required=False,
+        help_text="同名时用于区分身份，可由能查看姓名的用户看到。",
+    )
     invitation_code = forms.CharField(
         max_length=100, 
         required=True, 
@@ -97,6 +101,7 @@ class ProfileForm(StyledFormMixin, forms.ModelForm):
         fields = [
             "student_id",
             "name_pronunciation",
+            "name_disambiguation",
             "gender",
             "birth_date",
             "phone_number",
