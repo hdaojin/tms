@@ -577,39 +577,6 @@ class TrainingTaskListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, S
         )
 
 
-class MyTrainingView(TrainingTaskListView):
-    template_name = "training/my_training.html"
-    title = "我的训练"
-    create_url_name = None
-
-    def get_queryset(self):
-        queryset = (
-            super().get_queryset().filter(executions__user=self.request.user, executions__revoked_at__isnull=True).exclude(status="cancelled").distinct()
-        )
-        if value := self.request.GET.get("date"):
-            from datetime import date
-            try:
-                queryset = queryset.filter(planned_date=date.fromisoformat(value))
-            except ValueError:
-                return queryset.none()
-        return queryset
-
-    def get_context_data(self, **kwargs):
-        from .process import personal_tasks_for
-        from .scheduling import visible_plans
-        context = super().get_context_data(**kwargs)
-        personal = personal_tasks_for(self.request.user).filter(user=self.request.user)
-        when = self.request.GET.get("date", "")
-        if when:
-            try:
-                from datetime import date
-                personal = personal.filter(date=date.fromisoformat(when))
-            except ValueError:
-                personal = personal.none()
-        context.update(personal_tasks=personal, personal_plans=visible_plans(self.request.user).filter(participants__user=self.request.user, participants__is_active=True))
-        return context
-
-
 class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = TrainingTask
     template_name = "training/task_detail.html"

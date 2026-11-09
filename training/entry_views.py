@@ -345,6 +345,7 @@ def withdraw_publication(request, pk, level, task_id=None):
             "plan": plan,
             "task": task,
             "level": {"plan": "计划", "schedule": "排班", "task": "任务"}[level],
+            "withdraws_board": level == "plan",
             "form": form,
             "token": token,
             "error": error,

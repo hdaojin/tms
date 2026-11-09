@@ -10,7 +10,7 @@ from django.db import transaction
 from django.db.models import Q
 
 from . import scheduling as service
-from .models import TaskExecution, TrainingPlan, TrainingScheduleSlot, TrainingTask
+from .models import TaskExecution, TrainingBoardPlan, TrainingPlan, TrainingScheduleSlot, TrainingTask
 
 
 def execution_facts(tasks):
@@ -437,6 +437,7 @@ def withdraw(plan, user, token):
         setattr(plan, field, None)
         if data["level"] == "plan":
             plan.status = "draft"
+            TrainingBoardPlan.objects.filter(training_plan=plan).delete()
         plan.save(update_fields=[field, "status", "updated_at"])
     service.audit(
         plan, user, "撤回发布", before=before, after={"层级": data["level"]}, reason=data["reason"], task=task

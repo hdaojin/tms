@@ -32,6 +32,21 @@
     {% endfor %}
   </dl>
   {% endif %}
+  {% if can_manage_board %}
+    <div class="flex flex-wrap items-center gap-2">
+      <span>训练大屏 · {% if board_listed %}已加入{% else %}未加入{% endif %}</span>
+      <form method="post" action="{% url 'training:plan_board_listing' plan.pk %}">
+        {% csrf_token %}
+        {% if board_listed %}
+          <button class="btn btn-outline btn-sm" type="submit" name="action" value="remove">移出大屏</button>
+        {% else %}
+          <button class="btn btn-outline btn-sm" type="submit" name="action" value="add">加入大屏</button>
+        {% endif %}
+      </form>
+      <a class="btn btn-ghost btn-sm" href="{% url 'training:board' %}">打开大屏</a>
+    </div>
+    <p class="text-sm text-base-content/70">加入后，任何能打开大屏的人都可查看计划名称及当天已发布任务的时段、领域和标题。撤回计划发布时会自动移出大屏。</p>
+  {% endif %}
 </div></section>
 {% if can_see_management %}
 <section id="plan-members" class="card border border-base-300 bg-base-100 shadow-sm mb-4"><div class="card-body">

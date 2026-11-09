@@ -1158,3 +1158,15 @@ class TrainingLogExecution(models.Model):
     def save(self, *args, **kwargs):
         self.clean()
         super().save(*args, **kwargs)
+
+class TrainingBoardPlan(TimestampedModel):
+    training_plan = models.OneToOneField(
+        TrainingPlan, on_delete=models.CASCADE, related_name="screen_listing", verbose_name="训练计划",
+        help_text="计划名称、训练时段、技术领域和已发布任务标题将通过免登录训练大屏公开展示。",
+    )
+
+    class Meta:
+        verbose_name = verbose_name_plural = "训练大屏展示计划"
+
+    def __str__(self):
+        return self.training_plan.title

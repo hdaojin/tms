@@ -125,10 +125,12 @@ sections:
     label: 训练
     description: 训练周期、计划、任务、执行与日志
     icon_class: icon-[tabler--run] size-5 text-success
+    login_required: false
     items:
       - key: training_group
         label: 训练管理
         icon_class: icon-[tabler--run] size-5 text-success
+        login_required: false
         children:
           - key: my_training_plans
             label: 我的计划
@@ -150,6 +152,11 @@ sections:
             url_name: training:my_training
             icon_class: icon-[tabler--run] size-5 text-success
             permissions: [training.view_trainingtask]
+          - key: training_board
+            label: 训练大屏
+            url_name: training:board
+            icon_class: icon-[tabler--calendar-stats] size-5 text-success
+            login_required: false
           - key: training_logs
             label: 训练日志
             url_name: training:log_list

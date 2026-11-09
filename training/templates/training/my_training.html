@@ -1,1 +1,91 @@
-{% extends "common/table_page.html" %}{% block list_filters %}<form method="get" class="flex flex-wrap items-end gap-3"><label>日期<input class="input" type="date" name="date" value="{{ request.GET.date }}"></label><button class="btn btn-primary">筛选</button><a class="btn btn-ghost" href="{% url 'training:my_training' %}">全部日期</a></form>{% endblock %}{% block list_results %}<h2 class="text-xl font-bold">教练安排</h2>{% include 'components/table_wrapper.html' with table=table %}<h2 class="text-xl font-bold mt-4">自主添加（单独统计）</h2>{% for task in personal_tasks %}<p><a class="link" href="{% url 'training:personal_detail' task.pk %}">{{ task.date|date:'Y-m-d' }} · {{ task.title }} · {{ task.get_status_display }}</a></p>{% empty %}<p>暂无自主任务。</p>{% endfor %}{% if perms.training.add_personaltrainingtask %}{% for plan in personal_plans %}<a class="btn btn-outline btn-sm" href="{% url 'training:personal_create' plan.pk %}">{{ plan.title }}：添加自主任务</a>{% endfor %}{% endif %}{% endblock %}
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <section class="card card-border bg-base-100 shadow-sm">
+    <div class="card-body gap-3">
+      <div class="text-sm font-semibold text-primary">{% if coach_view %}教练视图{% else %}选手视图{% endif %}</div>
+      <h2 class="text-2xl font-bold">{% if all_dates %}全部任务{% else %}{{ day|date:"Y年n月j日 · l" }}{% endif %}</h2>
+      <nav class="flex flex-wrap items-end gap-2" aria-label="训练日期">
+        <a class="btn btn-sm" href="?date={{ previous_day|date:'Y-m-d' }}">上一天</a>
+        <a class="btn btn-sm" href="{% url 'training:my_training' %}">今天</a>
+        <a class="btn btn-sm" href="?date={{ next_day|date:'Y-m-d' }}">下一天</a>
+        {% if not all_dates %}<a class="btn btn-sm" href="?scope=all&amp;date={{ day|date:'Y-m-d' }}">全部任务</a>{% endif %}
+        <form method="get" class="flex flex-wrap items-center gap-2">
+          <input class="input input-sm w-40" aria-label="训练日期" type="date" name="date" required value="{{ day|date:'Y-m-d' }}">
+          <button class="btn btn-sm" type="submit">查看日期</button>
+        </form>
+      </nav>
+    </div>
+  </section>
+
+  <section class="space-y-3">
+    <h2 class="text-xl font-bold">{% if coach_view %}我负责的任务{% else %}分配给我的官方任务{% endif %}</h2>
+    {% regroup tasks by planned_date as date_groups %}
+    {% for date_group in date_groups %}
+      {% if all_dates %}<h3 class="font-semibold">{{ date_group.grouper|date:"Y年n月j日 · l" }}</h3>{% endif %}
+      {% regroup date_group.list by schedule_slot.period as period_groups %}
+      {% for period in period_groups %}
+        <div class="space-y-2">
+          <h3 class="font-semibold">{{ period.list.0.schedule_slot.get_period_display|default:"未标注时段" }}</h3>
+          {% for task in period.list %}
+            <article class="card card-border card-sm bg-base-100 shadow-sm">
+              <div class="card-body">
+                <div class="text-sm text-base-content/70">
+                  {{ task.training_plan.title }}
+                  {% if task.schedule_slot.starts_at %} · {{ task.schedule_slot.starts_at|date:"H:i" }}–{{ task.schedule_slot.ends_at|date:"H:i" }}{% endif %}
+                </div>
+                <h4 class="card-title wrap-anywhere">{{ task.title }}</h4>
+                {% if task.domain_links.all %}
+                  <div class="text-sm">{% for link in task.domain_links.all %}{{ link.technical_domain.name }}{% if not forloop.last %}、{% endif %}{% endfor %}</div>
+                {% endif %}
+                {% if coach_view and perms.training.view_taskexecution %}
+                  <div class="text-sm">
+                    {% for label, count in task.board_statuses %}{{ label }} {{ count }} 人{% if not forloop.last %} · {% endif %}
+                    {% empty %}暂无可查看的执行分配{% endfor %}
+                  </div>
+                {% elif task.board_execution %}
+                  <div class="text-sm">执行状态 · {{ task.board_execution.get_status_display }}</div>
+                {% endif %}
+                <div class="card-actions">
+                  {% if task.board_execution %}
+                    <a class="btn btn-sm btn-primary" href="{% url 'training:execution_detail' task.board_execution.pk %}">进入执行</a>
+                  {% else %}
+                    <a class="btn btn-sm" href="{% url 'training:task_detail' task.pk %}">查看任务</a>
+                  {% endif %}
+                </div>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    {% empty %}
+      <p class="rounded-box border border-base-300 p-4 text-base-content/70">
+        {% if coach_view %}{{ all_dates|yesno:"暂无你负责的已发布任务,当天没有你负责的已发布任务" }}{% else %}{{ all_dates|yesno:"暂无分配给你的官方任务,当天没有分配给你的官方任务" }}{% endif %}
+      </p>
+    {% endfor %}
+  </section>
+
+  {% if not coach_view %}
+    {% if perms.training.view_personaltrainingtask or perms.training.add_personaltrainingtask %}
+      <section class="card card-border bg-base-100 shadow-sm">
+        <div class="card-body">
+          <h2 class="card-title">自主训练</h2>
+          {% if perms.training.view_personaltrainingtask %}
+            <ul class="space-y-2">
+              {% for task in personal_tasks %}
+                <li><a class="link" href="{% url 'training:personal_detail' task.pk %}">{{ task.date|date:"Y-m-d" }} · {{ task.title }} · {{ task.get_status_display }}</a></li>
+              {% empty %}<li>暂无自主任务。</li>{% endfor %}
+            </ul>
+          {% endif %}
+          {% if perms.training.add_personaltrainingtask %}
+            <div class="card-actions">
+              {% for plan in personal_plans %}
+                <a class="btn btn-sm" href="{% url 'training:personal_create' plan.pk %}">{{ plan.title }}：添加自主任务</a>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      </section>
+    {% endif %}
+  {% endif %}
+{% endblock %}

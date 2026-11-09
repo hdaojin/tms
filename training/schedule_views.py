@@ -9,7 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render as django_rende
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import scheduling as service
-from .models import TrainingScheduleSlot, TrainingScheduleChange
+from .models import TrainingBoardPlan, TrainingScheduleSlot, TrainingScheduleChange
 from .schedule_forms import DayScheduleForm, SlotScheduleForm, SlotTaskForm, SkillCorrectionForm
 from .entry_navigation import filters_for, editor_suffix, next_entry
 from .selectors import visible_training_tasks_for
@@ -152,6 +152,8 @@ class PlanDetailView(TrainingPlanDetailView):
 
         if self.object.published_at and service.privileged(self.request.user):
             context["can_withdraw_plan"] = True
+            context["can_manage_board"] = True
+            context["board_listed"] = TrainingBoardPlan.objects.filter(training_plan=self.object).exists()
             context["withdraw_plan_reason"] = _reason(
                 withdrawal_state, self.object, self.request.user, "plan", preview=False
             )
@@ -176,6 +178,21 @@ class PlanDetailView(TrainingPlanDetailView):
                 ("审批人员", plan.approvers.all()),
             ]
         return context
+
+
+@require_POST
+def set_board_listing(request, pk):
+    if not service.privileged(request.user):
+        raise PermissionDenied
+    plan = get_plan(request.user, pk)
+    action = request.POST.get("action")
+    if action not in {"add", "remove"}:
+        return _error(request, plan, ValidationError("请选择有效的上屏操作。"))
+    try:
+        service.set_board_listing(plan, request.user, enabled=action == "add")
+    except ValidationError as exc:
+        return _error(request, plan, exc)
+    return _success(request, plan, "已加入训练大屏。" if action == "add" else "已移出训练大屏。")
 
 
 @require_POST

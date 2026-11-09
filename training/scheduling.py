@@ -4,11 +4,12 @@ from datetime import datetime, timedelta
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q, F
+from django.db.models import Exists, F, OuterRef, Q
 from django.utils import timezone
 
 from .models import (
     TaskExecution,
+    TrainingBoardPlan,
     TrainingChangeRecord,
     TrainingPlan,
     TrainingPlanStaff,
@@ -66,6 +67,11 @@ def task_manager(user, plan):
     return can_schedule(user, plan)
 
 
+def _plan_has_relation(**filters):
+    # 独立检查每个关系，避免多个一对多关系在同一查询中相乘。
+    return Exists(TrainingPlan.objects.filter(pk=OuterRef("pk"), **filters))
+
+
 def visible_plans(user):
     if not user.has_perm("training.view_trainingplan"):
         return TrainingPlan.objects.none()
@@ -73,25 +79,33 @@ def visible_plans(user):
         return TrainingPlan.objects.all()
     return TrainingPlan.objects.filter(
         Q(created_by=user)
-        | Q(schedulers=user)
-        | Q(approvers=user)
-        | Q(schedule_days__slots__coaches=user)
-        | Q(staff_members__user=user, staff_members__role=TrainingPlanStaff.Role.COACH, staff_members__is_active=True)
-        | Q(schedule_changes__confirmation_users=user)
+        | _plan_has_relation(schedulers=user)
+        | _plan_has_relation(approvers=user)
+        | _plan_has_relation(schedule_days__slots__coaches=user)
+        | _plan_has_relation(
+            staff_members__user=user, staff_members__role=TrainingPlanStaff.Role.COACH, staff_members__is_active=True,
+        )
+        | _plan_has_relation(schedule_changes__confirmation_users=user)
         | (
-            (Q(participants__user=user) | Q(tasks__executions__user=user) | Q(schedule_days__slots__coaches=user) | Q(schedule_days__duty_coaches=user))
+            (
+                _plan_has_relation(participants__user=user)
+                | _plan_has_relation(tasks__executions__user=user)
+                | _plan_has_relation(schedule_days__duty_coaches=user)
+            )
             & Q(published_at__isnull=False)
         )
-    ).distinct()
+    )
 
 
 def my_plans(queryset, user):
     return queryset.filter(
-        Q(participants__user=user, participants__is_active=True)
-        | Q(staff_members__user=user, staff_members__role=TrainingPlanStaff.Role.COACH, staff_members__is_active=True)
-        | Q(schedulers=user)
-        | Q(schedule_days__slots__coaches=user)
-    ).distinct()
+        _plan_has_relation(participants__user=user, participants__is_active=True)
+        | _plan_has_relation(
+            staff_members__user=user, staff_members__role=TrainingPlanStaff.Role.COACH, staff_members__is_active=True,
+        )
+        | _plan_has_relation(schedulers=user)
+        | _plan_has_relation(schedule_days__slots__coaches=user)
+    )
 
 
 def staff(user, plan):
@@ -339,6 +353,21 @@ def publish_plan(plan, user):
     plan.save(update_fields=["published_at", "status", "updated_at"])
     audit(plan, user, "发布计划")
     return plan
+
+
+@transaction.atomic
+def set_board_listing(plan, user, *, enabled):
+    if not privileged(user):
+        raise PermissionDenied
+    plan = TrainingPlan.objects.select_for_update().get(pk=plan.pk)
+    if not plan.published_at:
+        raise ValidationError("只有已发布的训练计划可设置上屏。")
+    if enabled:
+        _, changed = TrainingBoardPlan.objects.get_or_create(training_plan=plan)
+    else:
+        changed, _ = TrainingBoardPlan.objects.filter(training_plan=plan).delete()
+    if changed:
+        audit(plan, user, "加入训练大屏" if enabled else "移出训练大屏")
 
 
 @transaction.atomic

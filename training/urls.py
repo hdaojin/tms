@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import board_views, views
 from . import log_template_views as template_views
 from . import schedule_views
 from . import plan_people
@@ -11,6 +11,7 @@ from . import plan_member_views
 app_name = "training"
 urlpatterns = [
     path("plans/<int:pk>/publish/", schedule_views.publish_plan, name="plan_publish"),
+    path("plans/<int:pk>/board/", schedule_views.set_board_listing, name="plan_board_listing"),
     path("plans/<int:pk>/publish-tasks/", entry_views.publish_all_tasks, name="publish_all_tasks"),
     path("plans/<int:pk>/clear/<str:action>/", entry_views.clear_plan, name="plan_clear"),
     path("plans/<int:pk>/entries/", entry_views.entry_operation, name="entry_operation"),
@@ -66,7 +67,8 @@ urlpatterns = [
     path("tasks/<int:pk>/action/", schedule_views.task_action, name="task_action"),
     path("tasks/<int:pk>/skills/", schedule_views.task_skills, name="task_skills"),
     path("tasks/<int:pk>/attach/", schedule_views.legacy_attach, name="legacy_attach"),
-    path("my/", views.MyTrainingView.as_view(), name="my_training"),
+    path("my/", board_views.MyTrainingView.as_view(), name="my_training"),
+    path("board/", board_views.training_board, name="board"),
     path("executions/", views.TaskExecutionListView.as_view(), name="execution_list"),
     path("executions/<int:pk>/", process_views.target_detail, name="execution_detail"),
     path("executions/<int:pk>/edit/", views.TaskExecutionUpdateView.as_view(), name="execution_edit"),

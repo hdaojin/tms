@@ -1,0 +1,57 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block body %}
+  <main class="mx-auto flex h-dvh w-full max-w-[120rem] flex-col gap-4 p-4 lg:p-8" data-training-screen>
+    <header class="flex flex-wrap items-baseline justify-between gap-2 border-b border-base-300 pb-4">
+      <h1 class="text-3xl font-bold tracking-tight lg:text-5xl">今日训练任务</h1>
+      <p class="text-lg font-semibold lg:text-2xl" data-screen-date>{{ today|date:"Y年n月j日 · l" }}</p>
+    </header>
+
+    <div class="min-h-0 flex-1 overflow-auto" data-screen-viewport>
+      <div class="grid items-start gap-4 lg:grid-cols-2" data-screen-grid>
+        {% partial screen_content %}
+      </div>
+    </div>
+
+    <footer class="flex flex-wrap items-center justify-end gap-2 border-t border-base-300 pt-3" data-screen-controls hidden>
+      <button class="btn btn-sm" type="button" data-screen-previous>上一页</button>
+      <span class="px-2 text-sm" data-screen-page></span>
+      <button class="btn btn-sm" type="button" data-screen-next>下一页</button>
+      <button class="btn btn-sm" type="button" data-screen-pause>暂停轮播</button>
+    </footer>
+    <p data-screen-error role="status" hidden>暂时无法更新，正在重试。</p>
+  </main>
+{% endblock %}
+
+{% block extra_js %}
+  <script type="module" src="{% static 'js/training-board.js' %}"></script>
+{% endblock %}
+
+{% partialdef screen_content %}
+  <template data-screen-date-value>{{ today|date:"Y年n月j日 · l" }}</template>
+  {% for plan in plans %}
+    <article class="card card-border bg-base-200 shadow-sm lg:only:col-span-2" data-screen-plan>
+      <div class="card-body gap-3 p-4 lg:p-5" data-screen-plan-body>
+        <h2 class="card-title text-xl wrap-anywhere lg:text-3xl">{{ plan.title }}</h2>
+        {% for slot in plan.slots.values %}
+          <section class="space-y-2 border-t border-base-300 pt-2" data-screen-slot>
+            <h3 class="font-semibold text-primary lg:text-xl">
+              {{ slot.label }}{% if slot.start %} · {{ slot.start|date:"H:i" }}–{{ slot.end|date:"H:i" }}{% endif %}
+            </h3>
+            <ul class="space-y-2" data-screen-tasks>
+              {% for task in slot.tasks %}
+                <li class="rounded-box bg-base-100 px-3 py-2">
+                  <p class="font-semibold wrap-anywhere lg:text-2xl">{{ task.title }}</p>
+                  {% if task.domains %}<p class="text-sm wrap-anywhere text-base-content/70 lg:text-base">{{ task.domains|join:"、" }}</p>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          </section>
+        {% endfor %}
+      </div>
+    </article>
+  {% empty %}
+    <p class="rounded-box border border-base-300 p-6 text-xl lg:col-span-2">今日暂无公开训练任务。</p>
+  {% endfor %}
+{% endpartialdef %}
