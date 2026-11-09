@@ -140,7 +140,9 @@ def entry_context(view, day_table, *, matching_only=False):
             if slot.primary_domain_id:
                 slot.domain_label = str(slot.primary_domain)
             slot.coach_label = (
-                format_html_join(
+                "全体"
+                if slot.coaches_all
+                else format_html_join(
                     "、",
                     '<span class="whitespace-nowrap">{}</span>',
                     (

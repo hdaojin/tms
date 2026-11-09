@@ -117,7 +117,14 @@ def decorate_history(records=(), changes=()):
 
     def readable(value, key=""):
         if isinstance(value, dict):
-            return {LABELS.get(name, name): readable(item, name) for name, item in value.items() if name != "entry_guard"}
+            display = {
+                LABELS.get(name, name): readable(item, name)
+                for name, item in value.items() if name != "entry_guard"
+            }
+            for all_flag, people in (("coaches_all", "coaches"), ("duty_all", "duty_coaches")):
+                if value.get(all_flag) and people in value:
+                    display[LABELS[people]] = "全体"
+            return display
         if isinstance(value, list):
             return [readable(item, key) for item in value]
         if isinstance(value, bool):

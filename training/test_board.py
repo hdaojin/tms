@@ -91,6 +91,9 @@ class TrainingBoardTests(ProcessFixture, TestCase):
 
     def test_public_screen_requires_explicit_listing_and_current_publication(self):
         task = self.task(title="公开任务标题", description="内部任务正文")
+        self.slot.day.duty_coaches.set([self.other])
+        self.coach.username = "private-board-coach-account"
+        self.coach.save(update_fields=["username"])
         url = reverse("training:board")
         self.assertContains(self.client.get(url), "今日暂无公开训练任务")
         listing = TrainingBoardPlan.objects.create(training_plan=self.plan)
@@ -101,7 +104,7 @@ class TrainingBoardTests(ProcessFixture, TestCase):
         )
         TrainingBoardPlan.objects.create(training_plan=other_plan)
         other_day = other_plan.schedule_days.create(date=task.planned_date)
-        other_slot = other_day.slots.create(period="afternoon")
+        other_slot = other_day.slots.create(period="afternoon", kind="comprehensive")
         TrainingTask.objects.create(
             training_plan=other_plan, schedule_slot=other_slot, planned_date=task.planned_date,
             status="published", title="第二份计划任务", created_by=self.admin,
@@ -110,13 +113,24 @@ class TrainingBoardTests(ProcessFixture, TestCase):
             response = self.client.get(url, params)
             self.assertContains(response, task.title)
             self.assertContains(response, "第二份计划任务")
+            self.assertContains(response, "专业领域")
+            self.assertContains(response, self.linux.name)
+            self.assertContains(response, "综合")
+            self.assertContains(response, "负责教练")
+            self.assertContains(response, self.coach.first_name)
+            self.assertContains(response, "值班教练")
+            self.assertContains(response, self.other.first_name)
+            self.assertNotContains(response, self.coach.username)
             self.assertNotContains(response, "内部任务正文")
             self.assertNotContains(response, self.student.first_name)
             self.assertNotContains(response, reverse("training:task_detail", args=[task.pk]))
             self.assertIn("no-store", response.headers["Cache-Control"])
 
         TrainingTask.objects.filter(pk=task.pk).update(status="draft")
-        self.assertNotContains(self.client.get(url), task.title)
+        response = self.client.get(url)
+        self.assertNotContains(response, task.title)
+        self.assertNotContains(response, self.coach.first_name)
+        self.assertNotContains(response, self.other.first_name)
         TrainingTask.objects.filter(pk=task.pk).update(status="published")
         type(self.plan).objects.filter(pk=self.plan.pk).update(schedule_published_at=None)
         self.assertNotContains(self.client.get(url), task.title)
@@ -126,6 +140,27 @@ class TrainingBoardTests(ProcessFixture, TestCase):
             self.assertNotContains(self.client.get(url), task.title)
         listing.delete()
         self.assertNotContains(self.client.get(url), task.title)
+
+    def test_all_coaches_are_displayed_without_expanding_the_roster(self):
+        task = self.task(title="全体教练负责的任务")
+        self.slot.coaches_all = True
+        self.slot.save(update_fields=["coaches_all"])
+        day = self.slot.day
+        day.duty_all = True
+        day.save(update_fields=["duty_all"])
+        day.duty_coaches.set([self.other])
+        TrainingBoardPlan.objects.create(training_plan=self.plan)
+
+        response = self.client.get(reverse("training:board"), {"fragment": "1"})
+        self.assertContains(response, "· 全体", count=2)
+        self.assertNotContains(response, self.coach.first_name)
+        self.assertNotContains(response, self.other.first_name)
+
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("training:plan_detail", args=[self.plan.pk]))
+        self.assertContains(response, '<p class="text-sm">全体</p>', html=True)
+        response = self.client.get(reverse("training:task_detail", args=[task.pk]))
+        self.assertContains(response, '<h3 class="card-title">教练</h3><span>全体</span>', html=True)
 
     def test_board_listing_uses_published_plan_detail_and_superuser_permission(self):
         detail = reverse("training:plan_detail", args=[self.plan.pk])

@@ -34,11 +34,24 @@
     <article class="card card-border bg-base-200 shadow-sm lg:only:col-span-2" data-screen-plan>
       <div class="card-body gap-3 p-4 lg:p-5" data-screen-plan-body>
         <h2 class="card-title text-xl wrap-anywhere lg:text-3xl">{{ plan.title }}</h2>
+        <p class="rounded-box bg-info/10 px-3 py-2 text-lg font-semibold wrap-anywhere lg:text-xl">
+          <span class="text-primary">值班教练</span> · {{ plan.duty_coaches|join:"、"|default:"未安排" }}
+        </p>
         {% for slot in plan.slots.values %}
           <section class="space-y-2 border-t border-base-300 pt-2" data-screen-slot>
             <h3 class="font-semibold text-primary lg:text-xl">
               {{ slot.label }}{% if slot.start %} · {{ slot.start|date:"H:i" }}–{{ slot.end|date:"H:i" }}{% endif %}
             </h3>
+            <dl class="flex flex-wrap gap-x-5 gap-y-2 text-lg font-semibold wrap-anywhere lg:text-xl">
+              <div class="rounded-box bg-primary/10 px-3 py-1">
+                <dt class="inline text-primary">专业领域</dt>
+                <dd class="inline"> · {{ slot.domains|join:"、"|default:"未设置" }}</dd>
+              </div>
+              <div class="rounded-box bg-accent/15 px-3 py-1">
+                <dt class="inline">负责教练</dt>
+                <dd class="inline"> · {{ slot.coaches|join:"、"|default:"未安排" }}</dd>
+              </div>
+            </dl>
             <ul class="space-y-2" data-screen-tasks>
               {% for task in slot.tasks %}
                 <li class="rounded-box bg-base-100 px-3 py-2">
