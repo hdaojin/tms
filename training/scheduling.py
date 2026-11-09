@@ -815,7 +815,7 @@ def _set_skills(task, skill_ids):
 @transaction.atomic
 def set_task_skills(task, user, skill_ids, *, reason=""):
     plan = TrainingPlan.objects.select_for_update().get(pk=task.training_plan_id)
-    task = TrainingTask.objects.select_for_update().select_related("schedule_slot__day__training_plan").get(pk=task.pk)
+    task = TrainingTask.objects.select_for_update(of=("self",)).select_related("schedule_slot__day__training_plan").get(pk=task.pk)
     allowed = (
         can_fill(user, task.schedule_slot, skills_only=True)
         if task.schedule_slot_id
@@ -837,7 +837,7 @@ def set_task_skills(task, user, skill_ids, *, reason=""):
 def assign_competitors(task, user, *, selected=None, _publishing=False, reason="", _importing=False, _approved=False):
     from .models import TrainingAssignmentCoach
     plan = TrainingPlan.objects.select_for_update().get(pk=task.training_plan_id)
-    task = TrainingTask.objects.select_for_update().select_related("schedule_slot__day__training_plan").get(pk=task.pk)
+    task = TrainingTask.objects.select_for_update(of=("self",)).select_related("schedule_slot__day__training_plan").get(pk=task.pk)
     import_allowed = _importing and bool(plan.published_at and plan.schedule_published_at) and can_schedule(user, plan) and not task.schedule_slot.is_locked and (privileged(user) or any(coach.pk == user.pk for coach in task.schedule_slot.coaches.all()) or task.schedule_slot.coaches_all)
     if not task.schedule_slot_id or (not can_fill(user, task.schedule_slot) and not import_allowed):
         raise PermissionDenied
@@ -892,7 +892,7 @@ def assignment_snapshot(task):
 @transaction.atomic
 def publish_slot_task(task, user, *, _approved=False):
     plan = TrainingPlan.objects.select_for_update().get(pk=task.training_plan_id)
-    task = TrainingTask.objects.select_for_update().select_related("schedule_slot__day__training_plan").get(pk=task.pk)
+    task = TrainingTask.objects.select_for_update(of=("self",)).select_related("schedule_slot__day__training_plan").get(pk=task.pk)
     if not task.schedule_slot_id or not can_fill(user, task.schedule_slot):
         raise PermissionDenied
     _approved = _approved or task.status == "draft"
@@ -925,7 +925,7 @@ def publish_slot_task(task, user, *, _approved=False):
 @transaction.atomic
 def cancel_task(task, user, reason, *, _approved=False):
     plan = TrainingPlan.objects.select_for_update().get(pk=task.training_plan_id)
-    task = TrainingTask.objects.select_for_update().select_related("schedule_slot__day__training_plan").get(pk=task.pk)
+    task = TrainingTask.objects.select_for_update(of=("self",)).select_related("schedule_slot__day__training_plan").get(pk=task.pk)
     if not task.schedule_slot_id or not can_fill(user, task.schedule_slot):
         raise PermissionDenied
     if not reason.strip():
