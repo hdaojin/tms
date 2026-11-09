@@ -58,6 +58,39 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
         self.assertIn("只给选手二", second["E4"].value)
         self.assertNotIn("只给选手一", str(list(second.values)))
 
+    def test_special_domains_import_and_export_with_distinct_labels(self):
+        for entered, kind, exported in (
+            ("综合", "comprehensive", "综合"),
+            ("其他", "general", "其他"),
+        ):
+            with self.subTest(entered=entered):
+                self.empty_plan()
+                workbook = load_workbook(self.workbook(task=""))
+                workbook["训练计划"]["D4"] = entered
+                upload = BytesIO()
+                workbook.save(upload)
+
+                records, payload = preview_import(self.plan, self.admin, upload)
+                self.assertEqual([record["status"] for record in records], ["成功"])
+                confirm_import(self.plan, self.admin, payload, self.members())
+                self.slot.refresh_from_db()
+                self.assertEqual(self.slot.kind, kind)
+                self.assertIsNone(self.slot.primary_domain_id)
+                self.assertTrue(scheduling.slot_complete(self.slot))
+                sheet = load_workbook(BytesIO(build_plan_workbook(self.plan)))["训练计划"]
+                self.assertEqual(sheet["D4"].value, exported)
+
+    def test_import_rejects_obsolete_special_domain_label(self):
+        self.empty_plan()
+        workbook = load_workbook(self.workbook(task=""))
+        workbook["训练计划"]["D4"] = "综合活动"
+        upload = BytesIO()
+        workbook.save(upload)
+
+        records, _ = preview_import(self.plan, self.admin, upload)
+        self.assertEqual([record["status"] for record in records], ["错误"])
+        self.assertIn("不存在或不属于该周期", records[0]["message"])
+
     def test_import_confirmation_rechecks_tasks_created_after_preview(self):
         self.empty_plan()
         _, payload = preview_import(self.plan, self.admin, self.workbook())

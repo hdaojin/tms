@@ -21,7 +21,16 @@ from .models import (
 )
 
 
-ACTIVE_KINDS = {"technical", "general"}
+SLOT_KIND = TrainingScheduleSlot.Kind
+SPECIAL_DOMAIN_KINDS = {
+    "comprehensive": SLOT_KIND.COMPREHENSIVE,
+    "other": SLOT_KIND.GENERAL,
+    "rest": SLOT_KIND.REST,
+    "unused": SLOT_KIND.UNUSED,
+}
+SPECIAL_DOMAIN_CHOICES = [(choice, kind.label) for choice, kind in SPECIAL_DOMAIN_KINDS.items()]
+SPECIAL_DOMAIN_BY_KIND = {kind: choice for choice, kind in SPECIAL_DOMAIN_KINDS.items()}
+ACTIVE_KINDS = {SLOT_KIND.TECHNICAL, SLOT_KIND.GENERAL, SLOT_KIND.COMPREHENSIVE}
 
 
 def privileged(user):
@@ -578,7 +587,9 @@ def slot_complete(slot, *, has_plan_coaches=None):
     if slot.coaches_all and has_plan_coaches is None:
         has_plan_coaches = bool(coach_ids(slot.day.training_plan))
     has_coaches = bool(list(slot.coaches.all())) or (slot.coaches_all and has_plan_coaches)
-    return bool(has_coaches and (slot.kind == "general" or slot.primary_domain_id))
+    return bool(has_coaches and (
+        slot.kind in {SLOT_KIND.GENERAL, SLOT_KIND.COMPREHENSIVE} or slot.primary_domain_id
+    ))
 
 
 def was_filled(obj):

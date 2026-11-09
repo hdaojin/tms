@@ -566,10 +566,11 @@ class TrainingTaskListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, S
 
     def get_queryset(self):
         from django.db.models import Exists, OuterRef
+        from .scheduling import ACTIVE_KINDS
         return visible_training_tasks_for(self.request.user).annotate(
             can_edit=Exists(manageable_training_tasks_for(self.request.user).filter(
                 pk=OuterRef("pk"), schedule_slot__isnull=False,
-                schedule_slot__kind__in=["technical", "general"],
+                schedule_slot__kind__in=ACTIVE_KINDS,
             ).exclude(status="cancelled"))
         ).select_related(
             "training_plan", "training_plan__training_cycle"

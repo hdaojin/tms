@@ -210,7 +210,7 @@ class PlanRevisionTests(TrainingFixtureMixin, TestCase):
         template = load_workbook(BytesIO(build_plan_workbook(plan, import_template=True)))
         self.assertEqual(template["训练计划"].max_row, 10)
         self.assertIn("未设置", template["填写说明"]["A2"].value)
-        template["训练计划"]["D3"] = "综合活动"
+        template["训练计划"]["D3"] = "综合"
         output = BytesIO()
         template.save(output)
         records, _ = preview_import(plan, self.admin, BytesIO(output.getvalue()))

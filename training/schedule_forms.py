@@ -8,6 +8,7 @@ from core.uploads import TRAINING_ATTACHMENT_UPLOAD_SPEC
 from meetings.widgets import RecipientSelect
 from standards.models import Skill, TechnicalDomain
 
+from . import scheduling
 from .models import TrainingTask, TrainingScheduleSlot
 from accounts.services.users import annotate_identity_labels, get_user_full_info
 
@@ -61,11 +62,11 @@ class SlotScheduleForm(StyledFormMixin, forms.Form):
     def __init__(self, *args, plan, **kwargs):
         super().__init__(*args, **kwargs)
         self.domain_queryset = TechnicalDomain.objects.filter(pk__in=plan.training_cycle.skill_tree_version_links.values("technical_domain_id"))
-        self.fields["domain_choice"].choices = [("", "请选择领域"), *[(str(obj.pk), obj.name) for obj in self.domain_queryset], ("other", "其他"), ("rest", "休息"), ("unused", "不安排")]
+        self.fields["domain_choice"].choices = [("", "请选择领域"), *[(str(obj.pk), obj.name) for obj in self.domain_queryset], *scheduling.SPECIAL_DOMAIN_CHOICES]
         self.fields["coaches"].queryset = annotate_identity_labels(plan_coaches(plan))
         self.fields["coaches"].label_from_instance = get_user_full_info
         kind = self.initial.get("kind", "pending")
-        self.initial["domain_choice"] = str(self.initial["primary_domain"]) if self.initial.get("primary_domain") else {"general": "other", "rest": "rest", "unused": "unused"}.get(kind, "")
+        self.initial["domain_choice"] = str(self.initial["primary_domain"]) if self.initial.get("primary_domain") else scheduling.SPECIAL_DOMAIN_BY_KIND.get(kind, "")
         selected = self.data.get(self.add_prefix("domain_choice"), "") if self.is_bound else self.initial["domain_choice"]
         all_selected = self.data.get(self.add_prefix("coaches_all")) if self.is_bound else self.initial.get("coaches_all")
         self.fields["coaches"].required = selected not in {"rest", "unused"} and not all_selected
@@ -73,7 +74,7 @@ class SlotScheduleForm(StyledFormMixin, forms.Form):
     def clean(self):
         data = super().clean()
         domain = data.get("domain_choice", "")
-        data["kind"] = {"other": "general", "rest": "rest", "unused": "unused"}.get(domain, "technical")
+        data["kind"] = scheduling.SPECIAL_DOMAIN_KINDS.get(domain, "technical")
         data["domains"] = self.domain_queryset.filter(pk=domain) if domain.isdecimal() else self.domain_queryset.none()
         data["primary_domain"] = data["domains"].first()
         if data.get("coaches_all") and data.get("coaches"):

@@ -117,7 +117,10 @@ class EntryOperationForm(StyledFormMixin, forms.Form):
         self.fields["domain"].choices = [
             ("", "请选择领域"),
             *[(str(link.technical_domain_id), str(link.technical_domain)) for link in links],
-            ("other", "其他"),
+            *(
+                (choice, kind.label) for choice, kind in scheduling.SPECIAL_DOMAIN_KINDS.items()
+                if kind in scheduling.ACTIVE_KINDS
+            ),
         ]
         if not scheduling.can_schedule(user, plan):
             self.fields["operation"].choices = [("tasks", "批量填写任务")]
@@ -154,7 +157,7 @@ class EntryOperationForm(StyledFormMixin, forms.Form):
                 self.add_error("domain", "请选择领域。")
             coaches = list(data.get("coaches", []))
             values = {
-                "kind": ("general" if domain == "other" else "technical") if state == "scheduled" else state,
+                "kind": scheduling.SPECIAL_DOMAIN_KINDS.get(domain, "technical") if state == "scheduled" else state,
                 "domains": [int(domain)] if domain and domain.isdecimal() else [],
                 "primary_domain": None,
                 "coaches_all": False,

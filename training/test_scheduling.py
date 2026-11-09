@@ -681,15 +681,20 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
                 withdrawal_state(self.plan, user, level, task_id)
 
 
-    def test_entries_single_domain_other_and_secondary_coach_form(self):
+    def test_entries_special_active_domains_and_secondary_coach_form(self):
         from .schedule_forms import SlotScheduleForm
-        form = SlotScheduleForm({"object_id": self.slot.pk, "revision": self.slot.revision,
-            "period": "morning", "state": "scheduled", "domain_choice": "other",
-            "coaches": [self.coach.pk, self.collaborator.pk]}, plan=self.plan, initial={"period": "morning"})
-        self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(form.cleaned_data["kind"], "general")
-        self.assertFalse(form.cleaned_data["domains"].exists())
-        self.assertIsNone(form.cleaned_data["primary_domain"])
+        for choice, kind in (("other", "general"), ("comprehensive", "comprehensive")):
+            with self.subTest(choice=choice):
+                form = SlotScheduleForm(
+                    {"object_id": self.slot.pk, "revision": self.slot.revision,
+                     "domain_choice": choice, "coaches": [self.coach.pk, self.collaborator.pk]},
+                    plan=self.plan, initial={"period": "morning", "kind": kind},
+                )
+                self.assertEqual(form.initial["domain_choice"], choice)
+                self.assertTrue(form.is_valid(), form.errors)
+                self.assertEqual(form.cleaned_data["kind"], kind)
+                self.assertFalse(form.cleaned_data["domains"].exists())
+                self.assertIsNone(form.cleaned_data["primary_domain"])
 
 
 

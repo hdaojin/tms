@@ -95,7 +95,9 @@ def plan_context(view, context):
     ):
         value = filters.get(param, "")
         if value:
-            if param in {"domain", "coach"} and not value.isdecimal():
+            if param == "domain" and value in scheduling.SPECIAL_DOMAIN_KINDS:
+                tasks = tasks.filter(schedule_slot__kind=scheduling.SPECIAL_DOMAIN_KINDS[value])
+            elif param in {"domain", "coach"} and not value.isdecimal():
                 tasks = tasks.none()
             elif param == "date":
                 from datetime import date
@@ -155,7 +157,7 @@ def plan_context(view, context):
     from core.utils.listing import FilterableListMixin
 
     filter_url = reverse("training:plan_detail", args=[plan.pk])
-    domains = [(link.technical_domain_id, link.technical_domain) for link in context["filter_domains"]] + [("other", "其他"), ("rest", "休息"), ("unused", "不安排")]
+    domains = [(link.technical_domain_id, link.technical_domain) for link in context["filter_domains"]] + scheduling.SPECIAL_DOMAIN_CHOICES
     coaches = [(member.user_id, get_user_full_info(member.user)) for member in context["filter_coaches"]]
     specs = [
         ("q", "搜索任务或日备注", "search", [], "搜索任务或日备注"),

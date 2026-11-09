@@ -86,6 +86,7 @@ def visible_training_tasks_for(user, queryset=None):
 
 
 def manageable_training_tasks_for(user, queryset=None):
+    from .scheduling import ACTIVE_KINDS
     queryset = queryset if queryset is not None else TrainingTask.objects.all()
     if not user.has_perm("training.change_trainingtask"):
         return queryset.none()
@@ -95,7 +96,7 @@ def manageable_training_tasks_for(user, queryset=None):
     if user.has_perm("training.schedule_trainingplan"):
         role |= Q(training_plan__schedulers=user)
     scheduled = queryset.filter(role, schedule_slot__isnull=False,
-                                schedule_slot__kind__in=["technical", "general"]).exclude(status="cancelled")
+                                schedule_slot__kind__in=ACTIVE_KINDS).exclude(status="cancelled")
     queryset = queryset.filter(schedule_slot__isnull=True)
     domains = scoped_domains_for(user, "training.change_trainingtask")
     single_domain = queryset.annotate(domain_count=Count("domain_links", distinct=True)).filter(

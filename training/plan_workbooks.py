@@ -14,6 +14,10 @@ from accounts.services.users import get_user_display_name
 from . import scheduling
 from .models import TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot, TrainingTask
 
+
+IMPORT_SLOT_KINDS = {kind.label: kind for kind in scheduling.SPECIAL_DOMAIN_KINDS.values()}
+IMPORT_SLOT_KINDS["待排班"] = TrainingScheduleSlot.Kind.PENDING
+
 TEMPLATE = Path(__file__).parent / "resources" / "templates" / "training_plan.xlsx"
 HEADERS = ["日期", "星期", "时间", "领域", "训练任务", "负责教练", "值班人员", "备注"]
 PERIODS = dict((label, value) for value, label in TrainingScheduleSlot.Period.choices)
@@ -113,6 +117,7 @@ def build_plan_workbook(plan, user=None, *, import_template=False):
         instructions["A1"] = "训练计划导入说明"
         instructions["A2"] = "模板每天保留四个时段。未设置的时段请将领域、训练任务和负责教练留空。"
         instructions["A3"] = "日期、星期、时段及表头保持不变；值班人员和备注按日期填写。"
+        instructions["A4"] = "领域填写技术领域名称，或选择固定选项：综合、其他、休息、不安排。"
         instructions.column_dimensions["A"].width = 100
         from openpyxl.comments import Comment
         for day_index, day in enumerate(days):
@@ -263,14 +268,8 @@ def preview_import(plan, user, file):
             if not slot.is_configured and (domain_text or task_text or coach_text):
                 raise ValidationError("该时段未设置，领域、训练任务和负责教练须留空。")
             if domain_text:
-                if domain_text in {"休息", "不安排", "待排班", "综合", "综合活动"}:
-                    after["kind"] = {
-                        "休息": "rest",
-                        "不安排": "unused",
-                        "待排班": "pending",
-                        "综合": "general",
-                        "综合活动": "general",
-                    }[domain_text]
+                if domain_text in IMPORT_SLOT_KINDS:
+                    after["kind"] = IMPORT_SLOT_KINDS[domain_text]
                 else:
                     matches = [
                         link.technical_domain.pk
@@ -295,7 +294,7 @@ def preview_import(plan, user, file):
                     if task_text == "休息" and after["kind"] == "rest":
                         task_text = ""
                     else:
-                        raise ValidationError("导入任务需要有效训练领域或综合活动排班。")
+                        raise ValidationError("导入任务需要技术领域、综合或其他排班。")
                 if task_text and (
                     not user.has_perm("training.add_trainingtask")
                 ):

@@ -469,13 +469,14 @@ class TrainingScheduleSlot(TimestampedModel):
     class Kind(models.TextChoices):
         PENDING = "pending", "待排班"
         TECHNICAL = "technical", "技术训练"
-        GENERAL = "general", "综合活动"
+        GENERAL = "general", "其他"
+        COMPREHENSIVE = "comprehensive", "综合"
         REST = "rest", "休息"
         UNUSED = "unused", "不安排"
 
     day = models.ForeignKey(TrainingScheduleDay, on_delete=models.CASCADE, related_name="slots", verbose_name="每日安排")
     period = models.CharField("时段", max_length=12, choices=Period.choices)
-    kind = models.CharField("类型", max_length=12, choices=Kind.choices, default=Kind.PENDING)
+    kind = models.CharField("类型", max_length=13, choices=Kind.choices, default=Kind.PENDING)
     domains = models.ManyToManyField("standards.TechnicalDomain", blank=True, verbose_name="技术领域")
     primary_domain = models.ForeignKey("standards.TechnicalDomain", on_delete=models.PROTECT, null=True, blank=True, related_name="primary_training_slots", verbose_name="主要领域")
     coaches_all = models.BooleanField("全体负责", default=False)

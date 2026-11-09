@@ -135,8 +135,10 @@ def entry_context(view, day_table, *, matching_only=False):
                 internal or user.pk in coach_ids or bool(plan.schedule_published_at and slot.visible_tasks)
             )
             slot.domain_label = (
-                str(slot.primary_domain) if slot.primary_domain_id else {"general": "其他", "rest": "休息", "unused": "不安排"}.get(slot.kind, "—")
+                slot.get_kind_display() if slot.kind in scheduling.SPECIAL_DOMAIN_BY_KIND else "—"
             )
+            if slot.primary_domain_id:
+                slot.domain_label = str(slot.primary_domain)
             slot.coach_label = (
                 format_html_join(
                     "、",
@@ -161,7 +163,7 @@ def entry_context(view, day_table, *, matching_only=False):
                     "domain",
                     str(slot.primary_domain_id)
                     if slot.primary_domain_id
-                    else {"general": "other", "rest": "rest", "unused": "unused"}.get(slot.kind, ""),
+                    else scheduling.SPECIAL_DOMAIN_BY_KIND.get(slot.kind, ""),
                 ),
             ):
                 if params.get(key) and params[key] != value:
