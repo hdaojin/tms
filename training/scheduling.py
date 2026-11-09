@@ -942,7 +942,7 @@ def cancel_task(task, user, reason, *, _approved=False):
     task.status = "cancelled"
     task.cancelled_at, task.cancelled_by, task.cancel_reason = timezone.now(), user, reason
     task.save(update_fields=["status", "cancelled_at", "cancelled_by", "cancel_reason", "updated_at"])
-    for execution in task.executions.select_for_update().filter(status="assigned", started_at__isnull=True, progress_records__isnull=True):
+    for execution in task.executions.select_for_update(of=("self",)).filter(status="assigned", started_at__isnull=True, progress_records__isnull=True):
         execution.revoked_at, execution.revoked_by, execution.revoke_reason = timezone.now(), user, reason
         execution.save(update_fields=["revoked_at", "revoked_by", "revoke_reason", "updated_at"])
     audit(plan, user, "取消任务", task=task, before=before, after=task_snapshot(task), reason=reason)
