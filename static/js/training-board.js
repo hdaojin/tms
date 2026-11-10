@@ -1,143 +1,209 @@
+function fitTaskBox(box) {
+  const tasks = Array.from(box.querySelector("[data-screen-tasks]").children);
+  const candidates = tasks.slice(0, 3);
+  const more = box.querySelector("[data-screen-more]");
+  for (const [index, task] of tasks.entries()) {
+    task.hidden = index >= candidates.length;
+  }
+  more.hidden = true;
+
+  const bottom =
+    box.getBoundingClientRect().bottom -
+    parseFloat(getComputedStyle(box).borderBottomWidth) -
+    parseFloat(getComputedStyle(box).paddingBottom);
+  if (
+    tasks.length === candidates.length &&
+    candidates.at(-1).getBoundingClientRect().bottom <= bottom
+  )
+    return;
+
+  more.textContent = `… 还有 ${tasks.length} 项任务`;
+  more.hidden = false;
+  const hintHeight =
+    more.getBoundingClientRect().height +
+    parseFloat(getComputedStyle(more).marginTop);
+  const firstHidden = candidates.findIndex(
+    (task) => task.getBoundingClientRect().bottom > bottom - hintHeight,
+  );
+  const visible = firstHidden === -1 ? candidates.length : firstHidden;
+  for (const task of candidates.slice(visible)) task.hidden = true;
+  more.textContent = `… 还有 ${tasks.length - visible} 项任务`;
+}
+
 const screen = document.querySelector("[data-training-screen]");
-const viewport = screen.querySelector("[data-screen-viewport]");
-const grid = screen.querySelector("[data-screen-grid]");
-const controls = screen.querySelector("[data-screen-controls]");
-const pauseButton = screen.querySelector("[data-screen-pause]");
+const content = screen.querySelector("[data-screen-content]");
 const error = screen.querySelector("[data-screen-error]");
-const screenDate = screen.querySelector("[data-screen-date]");
+const screenDate = screen.querySelector("[data-screen-date-text]");
+const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
 const fragmentUrl = new URL(window.location.pathname, window.location.origin);
 fragmentUrl.searchParams.set("fragment", "1");
 
-let source = grid.innerHTML.trim();
-let pages = [];
+let source = content.innerHTML;
+let plans = [];
 let page = 0;
-let paused = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+let selectedId;
+let paused = motion.matches;
 let refreshing = false;
 let rotation;
+let layoutFrame;
+let boxes = [];
 
-function showPage(index) {
-    window.clearTimeout(rotation);
-    if (!pages.length) return;
-
-    page = (index + pages.length) % pages.length;
-    grid.replaceChildren(...pages[page]);
-    viewport.scrollTop = 0;
-    screen.querySelector("[data-screen-page]").textContent = `${page + 1} / ${pages.length}`;
-    pauseButton.textContent = paused ? "继续轮播" : "暂停轮播";
-    if (!paused && pages.length > 1) {
-        rotation = window.setTimeout(() => showPage(page + 1), 15000);
-    }
+function fitTasks() {
+  window.cancelAnimationFrame(layoutFrame);
+  layoutFrame = window.requestAnimationFrame(() => boxes.forEach(fitTaskBox));
 }
 
-function paginate(reset = false) {
-    window.clearTimeout(rotation);
-    pages = [];
-    grid.innerHTML = source;
-    const dateValue = grid.querySelector("[data-screen-date-value]");
-    if (dateValue) screenDate.textContent = dateValue.content.textContent.trim();
-    const plans = Array.from(grid.querySelectorAll("[data-screen-plan]"));
-    controls.hidden = !plans.length;
-    if (!plans.length) return;
+const observer = new ResizeObserver(fitTasks);
 
-    grid.replaceChildren();
-    const fits = () => grid.offsetHeight <= viewport.clientHeight;
-    const finishPage = () => {
-        if (!grid.children.length) return;
-        pages.push(Array.from(grid.children));
-        grid.replaceChildren();
-    };
+function showPlan(index, focusAction) {
+  window.clearTimeout(rotation);
+  observer.disconnect();
+  boxes = [];
+  if (!plans.length) return;
 
-    for (const plan of plans) {
-        grid.append(plan);
-        if (fits()) continue;
-        plan.remove();
-        finishPage();
-        grid.append(plan);
-        if (fits()) continue;
-        plan.remove();
+  page = (index + plans.length) % plans.length;
+  const active = plans[page];
+  selectedId = active.dataset.planId;
+  for (const plan of plans) plan.hidden = plan !== active;
 
-        let currentPlan;
-        let currentSlot;
-        const startPlan = () => {
-            currentPlan = plan.cloneNode(true);
-            currentPlan.querySelectorAll("[data-screen-slot]").forEach((slot) => slot.remove());
-            grid.append(currentPlan);
-        };
-        const startSlot = (slot) => {
-            currentSlot = slot.cloneNode(true);
-            currentSlot.querySelector("[data-screen-tasks]").replaceChildren();
-            currentPlan.querySelector("[data-screen-plan-body]").append(currentSlot);
-        };
-
-        startPlan();
-        for (const slot of plan.querySelectorAll("[data-screen-slot]")) {
-            startSlot(slot);
-            for (const task of slot.querySelector("[data-screen-tasks]").children) {
-                const row = task.cloneNode(true);
-                currentSlot.querySelector("[data-screen-tasks]").append(row);
-                if (fits() || currentPlan.querySelectorAll("[data-screen-tasks] li").length === 1) continue;
-
-                row.remove();
-                if (!currentSlot.querySelector("li")) currentSlot.remove();
-                finishPage();
-                startPlan();
-                startSlot(slot);
-                currentSlot.querySelector("[data-screen-tasks]").append(row);
-            }
-        }
+  const controls = active.querySelector("[data-screen-controls]");
+  controls.hidden = plans.length < 2;
+  if (!controls.hidden) {
+    controls.querySelector("[data-screen-page]").textContent =
+      `${page + 1} / ${plans.length}`;
+    controls.querySelector("[data-screen-pause-label]").textContent = paused
+      ? "继续轮播"
+      : "15s 自动切换";
+    const pause = controls.querySelector('[data-screen-action="pause"]');
+    pause.setAttribute(
+      "aria-label",
+      paused ? "继续轮播" : "暂停轮播，当前每 15 秒自动切换",
+    );
+    const dots = controls.querySelector("[data-screen-dots]");
+    if (dots.children.length !== plans.length) {
+      dots.replaceChildren(
+        ...plans.map((plan, position) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "btn btn-ghost btn-sm btn-circle";
+          button.dataset.screenAction = String(position);
+          button.setAttribute("aria-label", `显示第 ${position + 1} 份计划`);
+          return button;
+        }),
+      );
     }
-    finishPage();
-    controls.hidden = pages.length < 2;
-    showPage(reset ? 0 : Math.min(page, pages.length - 1));
+    for (const [position, button] of Array.from(dots.children).entries()) {
+      button.setAttribute("aria-current", String(position === page));
+    }
+    if (focusAction)
+      controls.querySelector(`[data-screen-action="${focusAction}"]`)?.focus();
+  }
+
+  boxes = Array.from(active.querySelectorAll("[data-screen-task-box]"));
+  for (const box of boxes) observer.observe(box);
+  fitTasks();
+  if (!paused && !document.hidden && plans.length > 1) {
+    rotation = window.setTimeout(() => {
+      showPlan(
+        page + 1,
+        active.contains(document.activeElement)
+          ? document.activeElement.dataset.screenAction
+          : null,
+      );
+    }, 15000);
+  }
+}
+
+function readPlans(focusAction) {
+  screenDate.textContent =
+    content
+      .querySelector("[data-screen-date-value]")
+      ?.content.textContent.trim() ?? "";
+  plans = Array.from(content.querySelectorAll("[data-plan-id]"));
+  for (const plan of plans) {
+    const progress = plan.querySelector("[data-completion]");
+    progress.style.setProperty(
+      "--completion",
+      `${progress.dataset.completion}%`,
+    );
+    const ring = plan.querySelector("[data-domain-ring]");
+    if (ring) {
+      const segments = Array.from(
+        plan.querySelectorAll("[data-domain-hue]"),
+        (item) => {
+          const { domainHue, domainStart, domainEnd } = item.dataset;
+          item.style.setProperty("--domain-hue", domainHue);
+          return `hsl(${domainHue} 90% 65%) ${domainStart / 100}% ${domainEnd / 100}%`;
+        },
+      );
+      ring.style.setProperty(
+        "--domain-chart",
+        `conic-gradient(${segments.join(", ")})`,
+      );
+    }
+  }
+  showPlan(
+    Math.max(
+      0,
+      plans.findIndex((plan) => plan.dataset.planId === selectedId),
+    ),
+    focusAction,
+  );
 }
 
 async function refresh() {
-    if (refreshing) return;
-    refreshing = true;
-    try {
-        const response = await fetch(fragmentUrl, {
-            cache: "no-store",
-            redirect: "error",
-            signal: AbortSignal.timeout(10000),
-        });
-        if (!response.ok) throw new Error("刷新失败");
-        const content = (await response.text()).trim();
-        if (content !== source || !error.hidden) {
-            source = content;
-            error.hidden = true;
-            paginate(true);
-        }
-    } catch {
-        source = "";
-        screenDate.textContent = "";
-        error.hidden = false;
-        paginate(true);
-    } finally {
-        refreshing = false;
+  if (refreshing) return;
+  refreshing = true;
+  try {
+    const response = await fetch(fragmentUrl, {
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) throw new Error("刷新失败");
+    const next = await response.text();
+    if (!next.includes("data-screen-date-value"))
+      throw new Error("刷新响应无效");
+    if (next.trim() !== source.trim() || !error.hidden) {
+      const focusAction = content.contains(document.activeElement)
+        ? document.activeElement.dataset.screenAction
+        : null;
+      source = next;
+      content.innerHTML = source;
+      error.hidden = true;
+      readPlans(focusAction);
     }
+  } catch {
+    source = "";
+    content.replaceChildren();
+    error.hidden = false;
+    readPlans();
+  } finally {
+    refreshing = false;
+  }
 }
 
-function refreshAtMidnight() {
-    const dayLength = 86400000;
-    const shanghaiOffset = 8 * 60 * 60 * 1000;
-    const untilMidnight = dayLength - (Date.now() + shanghaiOffset) % dayLength;
-    window.setTimeout(() => {
-        refresh();
-        refreshAtMidnight();
-    }, untilMidnight + 250);
-}
-
-screen.querySelector("[data-screen-previous]").addEventListener("click", () => showPage(page - 1));
-screen.querySelector("[data-screen-next]").addEventListener("click", () => showPage(page + 1));
-pauseButton.addEventListener("click", () => {
+content.addEventListener("click", (event) => {
+  const action = event.target.closest("[data-screen-action]")?.dataset
+    .screenAction;
+  if (!action) return;
+  if (action === "pause") {
     paused = !paused;
-    showPage(page);
+    showPlan(page, action);
+  } else if (action === "previous" || action === "next") {
+    showPlan(page + (action === "next" ? 1 : -1), action);
+  } else {
+    showPlan(Number(action), action);
+  }
 });
-let resize;
-window.addEventListener("resize", () => {
-    window.clearTimeout(resize);
-    resize = window.setTimeout(() => paginate(), 150);
+
+motion.addEventListener("change", () => {
+  paused = motion.matches;
+  showPlan(page);
 });
-paginate();
+document.addEventListener("visibilitychange", () => showPlan(page));
+window.addEventListener("resize", fitTasks);
+document.fonts.ready.then(fitTasks);
+
+readPlans();
 window.setInterval(refresh, 60000);
-refreshAtMidnight();

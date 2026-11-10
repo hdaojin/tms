@@ -8,7 +8,10 @@ from django.utils import timezone
 
 from core.navigation import get_section_items
 
-from .models import PersonalTrainingTask, TaskExecution, TrainingBoardPlan, TrainingTask, TrainingTaskCoach
+from .models import (
+    PersonalTrainingTask, TaskExecution, TrainingBoardPlan, TrainingTask, TrainingTaskAttachment, TrainingTaskCoach,
+    TrainingTaskDomain,
+)
 from .test_process_refactor import ProcessFixture
 
 
@@ -91,6 +94,9 @@ class TrainingBoardTests(ProcessFixture, TestCase):
 
     def test_public_screen_requires_explicit_listing_and_current_publication(self):
         task = self.task(title="公开任务标题", description="内部任务正文")
+        TrainingTaskAttachment.objects.create(
+            training_task=task, title="内部任务附件", file="test/private-board-attachment.pdf", uploaded_by=self.coach,
+        )
         self.slot.day.duty_coaches.set([self.other])
         self.coach.username = "private-board-coach-account"
         self.coach.save(update_fields=["username"])
@@ -122,24 +128,110 @@ class TrainingBoardTests(ProcessFixture, TestCase):
             self.assertContains(response, self.other.first_name)
             self.assertNotContains(response, self.coach.username)
             self.assertNotContains(response, "内部任务正文")
+            self.assertNotContains(response, "内部任务附件")
+            self.assertNotContains(response, "private-board-attachment.pdf")
             self.assertNotContains(response, self.student.first_name)
             self.assertNotContains(response, reverse("training:task_detail", args=[task.pk]))
             self.assertIn("no-store", response.headers["Cache-Control"])
+            plans = response.context["plans"]
+            self.assertEqual([plan["id"] for plan in plans], [other_plan.pk, self.plan.pk])
+            self.assertEqual([plan["statistics"]["execution_total"] for plan in plans], [0, 2])
+            for plan in plans:
+                self.assertEqual([slot["period"] for slot in plan["slots"]], ["early", "morning", "afternoon", "evening"])
+            self.assertContains(response, "暂无执行数据", count=1)
+            self.assertContains(response, f'data-plan-id="{self.plan.pk}" hidden')
 
         TrainingTask.objects.filter(pk=task.pk).update(status="draft")
         response = self.client.get(url)
         self.assertNotContains(response, task.title)
-        self.assertNotContains(response, self.coach.first_name)
-        self.assertNotContains(response, self.other.first_name)
+        self.assertContains(response, self.coach.first_name)
+        self.assertContains(response, self.other.first_name)
+        self.assertEqual(response.context["plans"][1]["statistics"]["task_total"], 0)
         TrainingTask.objects.filter(pk=task.pk).update(status="published")
         type(self.plan).objects.filter(pk=self.plan.pk).update(schedule_published_at=None)
         self.assertNotContains(self.client.get(url), task.title)
         type(self.plan).objects.filter(pk=self.plan.pk).update(schedule_published_at=timezone.now())
+        type(self.plan).objects.filter(pk=self.plan.pk).update(published_at=None)
+        self.assertNotContains(self.client.get(url), self.plan.title)
+        type(self.plan).objects.filter(pk=self.plan.pk).update(published_at=timezone.now())
         with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 1, 16, tzinfo=utc.utc)):
             self.assertContains(self.client.get(url, {"fragment": "1"}), "2026年1月2日")
             self.assertNotContains(self.client.get(url), task.title)
         listing.delete()
         self.assertNotContains(self.client.get(url), task.title)
+
+    def test_board_aggregates_only_eligible_tasks_and_effective_executions(self):
+        TrainingBoardPlan.objects.create(training_plan=self.plan)
+        day = self.slot.day
+        statuses = TaskExecution.Status
+        published = []
+        for index, (first, second) in enumerate([
+            (statuses.COMPLETED, statuses.IN_PROGRESS),
+            (statuses.ASSIGNED, statuses.PARTIALLY_COMPLETED),
+            (statuses.BLOCKED, statuses.UNFINISHED),
+            (statuses.COMPLETED, statuses.CANCELLED),
+        ]):
+            task = self.task(title=f"公开任务 {index}", order=3 - index)
+            published.append(task)
+            task.executions.filter(user=self.student).update(status=first, completion_note="保密进度")
+            task.executions.filter(user=self.student2).update(status=second, coach_feedback="保密反馈")
+        published[-1].executions.filter(user=self.student).update(revoked_at=timezone.now())
+        other_domain = self.windows
+        self.bind(self.cycle_obj, other_domain, self.windows_tree)
+        published[0].domain_links.all().delete()
+        TrainingTaskDomain.objects.create(training_task=published[0], technical_domain=other_domain, role="primary")
+        TrainingTaskDomain.objects.create(training_task=published[0], technical_domain=self.linux, role="related")
+
+        tomorrow_slot = self.plan.schedule_days.get(date=self.plan.end_date).slots.get(period="morning")
+        tomorrow_slot.kind = "technical"
+        tomorrow_slot.save(update_fields=["kind", "updated_at"])
+        for state, planned_date, slot in [
+            ("draft", day.date, self.slot),
+            ("cancelled", day.date, self.slot),
+            ("published", self.plan.end_date, tomorrow_slot),
+            ("published", day.date, None),
+        ]:
+            hidden = TrainingTask.objects.create(
+                training_plan=self.plan, planned_date=planned_date, schedule_slot=slot,
+                title="隐藏任务", status=state, created_by=self.admin,
+            )
+            TaskExecution.objects.create(training_task=hidden, user=self.student, status=statuses.COMPLETED)
+        PersonalTrainingTask.objects.create(
+            training_plan=self.plan, user=self.student, date=day.date, title="隐藏自主任务",
+        )
+
+        response = self.client.get(reverse("training:board"))
+        plan = response.context["plans"][0]
+        stats = plan["statistics"]
+        self.assertEqual(
+            [stats[key] for key in ("task_total", "execution_total", "completed", "in_progress", "assigned", "other", "completion_rate")],
+            [4, 6, 1, 1, 1, 3, 17],
+        )
+        self.assertEqual(
+            {item["name"]: (item["count"], item["percent"]) for item in stats["distribution"]},
+            {self.linux.name: (3, 75), other_domain.name: (1, 25)},
+        )
+        self.assertEqual(plan["slots"][1]["tasks"], [task.title for task in reversed(published)])
+        for value in ("隐藏任务", "隐藏自主任务", "保密进度", "保密反馈", self.student.first_name, self.student2.username):
+            self.assertNotContains(response, value)
+
+    def test_board_uses_snapshot_boundaries_and_keeps_empty_slots(self):
+        TrainingBoardPlan.objects.create(training_plan=self.plan)
+        day = self.slot.day
+        day.slots.filter(period="afternoon").update(kind="rest")
+        day.slots.filter(period="evening").update(starts_at=None, ends_at=None, is_configured=False)
+        for now, state in [(self.slot.starts_at, "active"), (self.slot.ends_at, "completed")]:
+            with patch("django.utils.timezone.now", return_value=now):
+                response = self.client.get(reverse("training:board"))
+            plan = response.context["plans"][0]
+            slots = plan["slots"]
+            self.assertEqual(slots[1]["state"], state)
+            self.assertEqual(slots[1]["empty_label"], "暂无任务")
+            self.assertEqual(slots[2]["empty_label"], "休息")
+            self.assertEqual(slots[3]["empty_label"], "不安排")
+            self.assertEqual(slots[3]["state"], "unknown")
+            self.assertIsNone(plan["statistics"]["completion_rate"])
+            self.assertContains(response, "暂无执行数据")
 
     def test_all_coaches_are_displayed_without_expanding_the_roster(self):
         task = self.task(title="全体教练负责的任务")
@@ -152,7 +244,8 @@ class TrainingBoardTests(ProcessFixture, TestCase):
         TrainingBoardPlan.objects.create(training_plan=self.plan)
 
         response = self.client.get(reverse("training:board"), {"fragment": "1"})
-        self.assertContains(response, "· 全体", count=2)
+        self.assertContains(response, "· <strong>全体</strong>")
+        self.assertContains(response, "<dd>全体</dd>")
         self.assertNotContains(response, self.coach.first_name)
         self.assertNotContains(response, self.other.first_name)
 

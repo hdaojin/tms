@@ -1,70 +1,157 @@
-{% extends "layouts/base.html" %}
-{% load static %}
-
-{% block body %}
-  <main class="mx-auto flex h-dvh w-full max-w-[120rem] flex-col gap-4 p-4 lg:p-8" data-training-screen>
-    <header class="flex flex-wrap items-baseline justify-between gap-2 border-b border-base-300 pb-4">
-      <h1 class="text-3xl font-bold tracking-tight lg:text-5xl">今日训练任务</h1>
-      <p class="text-lg font-semibold lg:text-2xl" data-screen-date>{{ today|date:"Y年n月j日 · l" }}</p>
+{% load static tz %}
+<!doctype html>
+<html lang="zh-hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>{{ title }} | {{ site_info.site_short_name }}</title>
+  <link rel="icon" type="image/png" href="{% static 'images/logo.png' %}">
+  <link rel="stylesheet" href="{% static 'css/output.css' %}?v=training-board-3">
+  <script type="module" src="{% static 'js/training-board.js' %}?v=plan-carousel"></script>
+</head>
+<body>
+  <main class="tms-training-board" data-theme="night" data-training-screen>
+    <header class="training-board-header">
+      <span class="training-board-mark" aria-hidden="true"></span>
+      <h1>今日训练任务</h1>
+      <p data-screen-date><span class="icon-[tabler--calendar]" aria-hidden="true"></span> <span data-screen-date-text>{{ today|date:"Y年n月j日 · l" }}</span></p>
     </header>
-
-    <div class="min-h-0 flex-1 overflow-auto" data-screen-viewport>
-      <div class="grid items-start gap-4 lg:grid-cols-2" data-screen-grid>
-        {% partial screen_content %}
-      </div>
+    <div class="training-board-content" data-screen-content>
+      {% partial screen_content %}
     </div>
-
-    <footer class="flex flex-wrap items-center justify-end gap-2 border-t border-base-300 pt-3" data-screen-controls hidden>
-      <button class="btn btn-sm" type="button" data-screen-previous>上一页</button>
-      <span class="px-2 text-sm" data-screen-page></span>
-      <button class="btn btn-sm" type="button" data-screen-next>下一页</button>
-      <button class="btn btn-sm" type="button" data-screen-pause>暂停轮播</button>
-    </footer>
-    <p data-screen-error role="status" hidden>暂时无法更新，正在重试。</p>
+    <p class="training-board-message" data-screen-error role="status" hidden>暂时无法更新，正在重试。</p>
   </main>
-{% endblock %}
-
-{% block extra_js %}
-  <script type="module" src="{% static 'js/training-board.js' %}"></script>
-{% endblock %}
+</body>
+</html>
 
 {% partialdef screen_content %}
   <template data-screen-date-value>{{ today|date:"Y年n月j日 · l" }}</template>
   {% for plan in plans %}
-    <article class="card card-border bg-base-200 shadow-sm lg:only:col-span-2" data-screen-plan>
-      <div class="card-body gap-3 p-4 lg:p-5" data-screen-plan-body>
-        <h2 class="card-title text-xl wrap-anywhere lg:text-3xl">{{ plan.title }}</h2>
-        <p class="rounded-box bg-info/10 px-3 py-2 text-lg font-semibold wrap-anywhere lg:text-xl">
-          <span class="text-primary">值班教练</span> · {{ plan.duty_coaches|join:"、"|default:"未安排" }}
-        </p>
-        {% for slot in plan.slots.values %}
-          <section class="space-y-2 border-t border-base-300 pt-2" data-screen-slot>
-            <h3 class="font-semibold text-primary lg:text-xl">
-              {{ slot.label }}{% if slot.start %} · {{ slot.start|date:"H:i" }}–{{ slot.end|date:"H:i" }}{% endif %}
-            </h3>
-            <dl class="flex flex-wrap gap-x-5 gap-y-2 text-lg font-semibold wrap-anywhere lg:text-xl">
-              <div class="rounded-box bg-primary/10 px-3 py-1">
-                <dt class="inline text-primary">专业领域</dt>
-                <dd class="inline"> · {{ slot.domains|join:"、"|default:"未设置" }}</dd>
-              </div>
-              <div class="rounded-box bg-accent/15 px-3 py-1">
-                <dt class="inline">负责教练</dt>
-                <dd class="inline"> · {{ slot.coaches|join:"、"|default:"未安排" }}</dd>
-              </div>
-            </dl>
-            <ul class="space-y-2" data-screen-tasks>
-              {% for task in slot.tasks %}
-                <li class="rounded-box bg-base-100 px-3 py-2">
-                  <p class="font-semibold wrap-anywhere lg:text-2xl">{{ task.title }}</p>
-                  {% if task.domains %}<p class="text-sm wrap-anywhere text-base-content/70 lg:text-base">{{ task.domains|join:"、" }}</p>{% endif %}
-                </li>
-              {% endfor %}
-            </ul>
-          </section>
-        {% endfor %}
+    <article class="training-board-plan" data-plan-id="{{ plan.id }}"{% if not forloop.first %} hidden{% endif %}>
+      <div class="training-board-plan-bar">
+        <h2><span class="icon-[tabler--stack-2]" aria-hidden="true"></span>{{ plan.title }}</h2>
+        <p class="training-board-duty"><span class="icon-[tabler--user]" aria-hidden="true"></span><span>值班教练 · <strong>{{ plan.duty_coaches|join:"、"|default:"未安排" }}</strong></span></p>
+        <div class="training-board-controls" data-screen-controls role="group" aria-label="训练计划轮播" hidden>
+          <button class="btn btn-ghost btn-sm btn-circle" type="button" data-screen-action="previous" aria-label="上一份计划"><span class="icon-[tabler--chevron-left]" aria-hidden="true"></span></button>
+          <span class="training-board-page" data-screen-page aria-live="polite"></span>
+          <button class="btn btn-ghost btn-sm btn-circle" type="button" data-screen-action="next" aria-label="下一份计划"><span class="icon-[tabler--chevron-right]" aria-hidden="true"></span></button>
+          <div class="training-board-dots" data-screen-dots></div>
+          <button class="btn btn-ghost btn-sm training-board-pause" type="button" data-screen-action="pause">
+            <span class="icon-[tabler--clock]" aria-hidden="true"></span>
+            <span data-screen-pause-label>15s 自动切换</span>
+          </button>
+        </div>
       </div>
+
+      <div class="training-board-slots">
+        {% timezone "Asia/Shanghai" %}
+          {% for slot in plan.slots %}
+            <section class="card training-board-slot" data-state="{{ slot.state }}" data-period="{{ slot.period }}">
+              <div class="training-board-slot-header">
+                <h3>
+                  {% if slot.period == "early" %}<span class="icon-[tabler--book]" aria-hidden="true"></span>
+                  {% elif slot.period == "morning" %}<span class="icon-[tabler--device-laptop]" aria-hidden="true"></span>
+                  {% elif slot.period == "afternoon" %}<span class="icon-[tabler--router]" aria-hidden="true"></span>
+                  {% else %}<span class="icon-[tabler--clipboard-list]" aria-hidden="true"></span>{% endif %}
+                  {{ slot.label }}
+                </h3>
+                <p>
+                  <span><span class="icon-[tabler--clock]" aria-hidden="true"></span> {% partial slot_time %}</span>
+                  {% if slot.state != "active" %}<small>{{ slot.state_label }}</small>{% endif %}
+                </p>
+                {% if slot.state == "active" %}<span class="training-board-current">{{ slot.state_label }}</span>{% endif %}
+              </div>
+              <div class="card-body training-board-slot-body">
+                <dl class="training-board-slot-meta">
+                  <div>
+                    <dt><span class="icon-[tabler--stack-2]" aria-hidden="true"></span>专业领域</dt>
+                    <dd>{% for domain in slot.domains %}<span class="training-board-domain">{{ domain }}</span>{% empty %}—{% endfor %}</dd>
+                  </div>
+                  <div>
+                    <dt><span class="icon-[tabler--user]" aria-hidden="true"></span>负责教练</dt>
+                    <dd>{{ slot.coaches|join:"、"|default:"—" }}</dd>
+                  </div>
+                </dl>
+                <h4><span class="icon-[tabler--target-arrow]" aria-hidden="true"></span>训练任务</h4>
+                {% if slot.tasks %}
+                  <div class="training-board-task-box" data-screen-task-box>
+                    <ul data-screen-tasks>
+                      {% for title in slot.tasks %}<li><span>{{ title }}</span></li>{% endfor %}
+                    </ul>
+                    <p class="training-board-more" data-screen-more hidden></p>
+                  </div>
+                {% else %}
+                  <p class="training-board-task-box training-board-no-tasks">{{ slot.empty_label }}</p>
+                {% endif %}
+              </div>
+            </section>
+          {% endfor %}
+        {% endtimezone %}
+      </div>
+
+      {% with stats=plan.statistics %}
+        <div class="training-board-stats" aria-label="今日训练统计">
+          <section class="training-board-completion">
+            <div class="training-board-ring training-board-progress" data-completion="{{ stats.completion_rate|default_if_none:0 }}" aria-hidden="true">
+              <strong>{{ stats.completion_rate|default_if_none:"—" }}{% if stats.execution_total %}<small>%</small>{% endif %}</strong>
+            </div>
+            <div>
+              <h3>选手任务完成率</h3>
+              {% if stats.execution_total %}
+                <p class="sr-only">完成率 {{ stats.completion_rate }}%</p>
+                <dl>
+                  <div><dt>已完成</dt><dd>{{ stats.completed }} / {{ stats.execution_total }}</dd></div>
+                  <div><dt>进行中</dt><dd>{{ stats.in_progress }}</dd><dt>未开始</dt><dd>{{ stats.assigned }}</dd></div>
+                  {% if stats.other %}<div><dt>其他状态</dt><dd>{{ stats.other }}</dd></div>{% endif %}
+                </dl>
+              {% else %}
+                <p class="training-board-muted">暂无执行数据</p>
+              {% endif %}
+            </div>
+          </section>
+          <section class="training-board-total">
+            <h3><span class="icon-[tabler--clipboard-list]" aria-hidden="true"></span>今日任务总数</h3>
+            <p><strong>{{ stats.task_total }}</strong> 项</p>
+          </section>
+          <section class="training-board-distribution">
+            <h3><span class="icon-[tabler--chart-bar]" aria-hidden="true"></span>训练领域分布</h3>
+            {% if stats.distribution %}
+              <div class="training-board-domain-chart">
+                <div class="training-board-ring training-board-domain-ring" data-domain-ring aria-hidden="true">
+                  <span><strong>{{ stats.distribution|length }}</strong><small>领域</small></span>
+                </div>
+                <ul>
+                  {% for item in stats.distribution %}
+                    <li data-domain-hue="{{ item.hue }}" data-domain-start="{{ item.start }}" data-domain-end="{{ item.end }}"><span>{{ item.name }}</span><span>{{ item.count }} 项（{{ item.percent }}%）</span></li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% else %}
+              <p class="training-board-muted">暂无领域数据</p>
+            {% endif %}
+          </section>
+          <section class="training-board-timeline">
+            <h3><span class="icon-[tabler--calendar]" aria-hidden="true"></span>全天时间轴</h3>
+            <ol>
+              {% timezone "Asia/Shanghai" %}
+                {% for slot in plan.slots %}
+                  <li data-state="{{ slot.state }}"{% if slot.state == "active" %} aria-current="time"{% endif %}>
+                    <span class="training-board-timeline-marker" aria-hidden="true"></span>
+                    <strong>{{ slot.label }}</strong>
+                    <span class="training-board-timeline-time">{% partial slot_time %}</span>
+                    <span class="training-board-timeline-state">{{ slot.state_label }}</span>
+                  </li>
+                {% endfor %}
+              {% endtimezone %}
+            </ol>
+          </section>
+        </div>
+      {% endwith %}
     </article>
   {% empty %}
-    <p class="rounded-box border border-base-300 p-6 text-xl lg:col-span-2">今日暂无公开训练任务。</p>
+    <p class="training-board-message">今日暂无公开训练任务。</p>
   {% endfor %}
 {% endpartialdef %}
+
+{% partialdef slot_time %}{% if slot.start and slot.end %}{{ slot.start|date:"H:i" }}–{{ slot.end|date:"H:i" }}{% else %}—{% endif %}{% endpartialdef %}

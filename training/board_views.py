@@ -3,8 +3,7 @@ from datetime import date, timedelta
 
 from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.contrib.auth import get_user_model
-from django.db.models import F, Prefetch, Q
+from django.db.models import Prefetch, Q
 from django.http import Http404
 from django.shortcuts import render
 from django.utils import timezone
@@ -12,9 +11,9 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_safe
 from django.views.generic import TemplateView
 
-from accounts.services.users import get_user_display_name
 from core.utils.mixins import TitleMixin
 
+from .board_selectors import public_board_plans
 from .models import TaskExecution, TrainingPlanStaff, TrainingScheduleSlot, TrainingTask
 from .process import personal_tasks_for
 from .scheduling import visible_plans
@@ -112,64 +111,11 @@ class MyTrainingView(TitleMixin, PermissionRequiredMixin, TemplateView):
 @never_cache
 @require_safe
 def training_board(request):
-    today = timezone.localdate()
-    coach_names = get_user_model().objects.only("first_name", "last_name").order_by("last_name", "first_name", "pk")
-    tasks = TrainingTask.objects.filter(
-        PUBLISHED_SCHEDULE,
-        training_plan__screen_listing__isnull=False,
-        training_plan__start_date__lte=today,
-        training_plan__end_date__gte=today,
-        status=TrainingTask.Status.PUBLISHED,
-        planned_date=today,
-        schedule_slot__day__date=today,
-        schedule_slot__is_configured=True,
-        schedule_slot__day__training_plan_id=F("training_plan_id"),
-    ).select_related("training_plan", "schedule_slot__day", "schedule_slot__primary_domain").only(
-        "title", "planned_date", "training_plan__title",
-        "schedule_slot__period", "schedule_slot__kind", "schedule_slot__starts_at", "schedule_slot__ends_at",
-        "schedule_slot__coaches_all", "schedule_slot__day__duty_all", "schedule_slot__primary_domain__name",
-    ).prefetch_related(
-        "domain_links__technical_domain",
-        "schedule_slot__domains",
-        Prefetch("schedule_slot__coaches", queryset=coach_names),
-        Prefetch("schedule_slot__day__duty_coaches", queryset=coach_names),
-    ).order_by(
-        "training_plan__title", "training_plan_id", "schedule_slot__starts_at", "order", "pk",
-    )
-    plans = {}
-    for task in sorted(tasks, key=lambda task: (task.training_plan.title, task.training_plan_id, period_order(task))):
-        schedule_slot = task.schedule_slot
-        if task.training_plan_id not in plans:
-            plans[task.training_plan_id] = {
-                "title": task.training_plan.title,
-                "duty_coaches": ["全体"] if schedule_slot.day.duty_all else [
-                    get_user_display_name(coach) for coach in schedule_slot.day.duty_coaches.all()
-                ],
-                "slots": {},
-            }
-        slots = plans[task.training_plan_id]["slots"]
-        if task.schedule_slot_id not in slots:
-            domains = [domain.name for domain in schedule_slot.domains.all()]
-            if not domains and schedule_slot.primary_domain:
-                domains = [schedule_slot.primary_domain.name]
-            elif not domains and schedule_slot.kind in {TrainingScheduleSlot.Kind.GENERAL, TrainingScheduleSlot.Kind.COMPREHENSIVE}:
-                domains = [schedule_slot.get_kind_display()]
-            slots[task.schedule_slot_id] = {
-                "label": schedule_slot.get_period_display(),
-                "start": schedule_slot.starts_at,
-                "end": schedule_slot.ends_at,
-                "domains": domains,
-                "coaches": ["全体"] if schedule_slot.coaches_all else [
-                    get_user_display_name(coach) for coach in schedule_slot.coaches.all()
-                ],
-                "tasks": [],
-            }
-        slot = slots[task.schedule_slot_id]
-        slot["tasks"].append({
-            "title": task.title,
-            "domains": [link.technical_domain.name for link in task.domain_links.all()],
-        })
+    now = timezone.now()
+    today = timezone.localdate(now, timezone.get_default_timezone())
     template = "training/training_board.html"
     if request.GET.get("fragment") == "1":
         template += "#screen_content"
-    return render(request, template, {"today": today, "plans": plans.values(), "title": "今日训练任务"})
+    return render(request, template, {
+        "today": today, "plans": public_board_plans(today=today, now=now), "title": "今日训练任务",
+    })

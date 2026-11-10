@@ -1162,7 +1162,7 @@ class TrainingLogExecution(models.Model):
 class TrainingBoardPlan(TimestampedModel):
     training_plan = models.OneToOneField(
         TrainingPlan, on_delete=models.CASCADE, related_name="screen_listing", verbose_name="训练计划",
-        help_text="计划名称、训练时段、技术领域和已发布任务标题将通过免登录训练大屏公开展示。",
+        help_text="免登录训练大屏公开计划名称、当天排班、教练姓名、已发布任务标题和选手任务执行的匿名汇总。",
     )
 
     class Meta:
