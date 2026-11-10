@@ -56,18 +56,22 @@ class TrainingLogTemplateForm(StyledFormMixin, forms.ModelForm):
         return exclusions
 
 
-class TrainingLogStatisticsForm(StyledFormMixin, forms.Form):
-    cycle = forms.ModelChoiceField(label="训练周期", queryset=TrainingCycle.objects.none())
-    year = forms.IntegerField(label="年份", min_value=1, max_value=9999)
-    month = forms.TypedChoiceField(label="月份", coerce=int, choices=[(i, f"{i}月") for i in range(1, 13)])
-    role = forms.ChoiceField(label="成员身份", required=False,
-                             choices=[("", "全部"), *TrainingCycleMember.Role.choices])
+class TrainingLogStatisticsForm(forms.Form):
+    plan = forms.ModelChoiceField(label="训练计划", queryset=TrainingPlan.objects.none(), required=False)
+    q = forms.CharField(label="搜索人员", max_length=100, required=False)
+    date_from = forms.DateField(label="训练日期从", required=False)
+    date_to = forms.DateField(label="训练日期至", required=False)
 
-    def __init__(self, *args, user, **kwargs):
-        from .selectors import training_log_statistics_cycles_for
-
+    def __init__(self, *args, plans, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["cycle"].queryset = training_log_statistics_cycles_for(user)
+        self.fields["plan"].queryset = plans
+
+    def clean(self):
+        cleaned = super().clean()
+        start, end = cleaned.get("date_from"), cleaned.get("date_to")
+        if start and end and start > end:
+            self.add_error("date_to", "结束日期不能早于开始日期。")
+        return cleaned
 
 
 class CycleMemberAddForm(StyledFormMixin, forms.Form):

@@ -1,0 +1,1 @@
+{% for person in submitted %}{% if can_view_log %}<a class="link" href="{% url 'training:log_detail' person.log_id %}">{{ person.name }}</a>{% else %}{{ person.name }}{% endif %}{% if not forloop.last %}、{% endif %}{% empty %}无{% endfor %}

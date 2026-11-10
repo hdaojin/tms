@@ -1,68 +1,139 @@
 from __future__ import annotations
 
-from calendar import monthrange
-from datetime import date, timedelta
+from collections import defaultdict
 
+from django.contrib.auth import get_user_model
 from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 
-from accounts.services.users import get_user_display_name
+from accounts.services.users import annotate_identity_labels, get_user_display_name, user_name_search_ids
 from standards.selectors import scoped_domains_for
 
-from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingTask
+from .models import TaskExecution, TrainingLog, TrainingPlan, TrainingScheduleSlot, TrainingTask
 
 
-def training_log_statistics_cycles_for(user):
+def training_log_statistics_plans_for(user):
+    from .scheduling import ACTIVE_KINDS
+
     if not user.has_perm("training.view_traininglog_statistics"):
-        return TrainingCycle.objects.none()
-    cycles = TrainingCycle.objects.select_related("skill_project")
+        return TrainingPlan.objects.none()
+    plans = TrainingPlan.objects.filter(
+        published_at__isnull=False,
+        schedule_published_at__isnull=False,
+        start_date__lte=timezone.localdate(),
+    ).select_related("training_cycle")
     if user.is_superuser or user.has_perm("training.view_all_traininglog"):
-        return cycles
-    return cycles.filter(members__user=user)
-
-
-def training_log_submission_statistics(user, *, cycle, year, month, role=""):
-    """以周期现有成员为对照，汇总训练日期上的提交事实。"""
-    empty = {"rows": [], "people": [], "range_start": None, "range_end": None}
-    if not training_log_statistics_cycles_for(user).filter(pk=cycle.pk).exists():
-        return empty
-    start = max(date(year, month, 1), cycle.start_date)
-    end = min(date(year, month, monthrange(year, month)[1]), timezone.localdate())
-    if cycle.end_date:
-        end = min(end, cycle.end_date)
-    if start > end:
-        return empty
-    members = TrainingCycleMember.objects.filter(training_cycle=cycle).select_related("user")
-    if not (user.is_superuser or user.has_perm("training.view_all_traininglog")):
-        members = members.filter(user=user)
-    if role:
-        members = members.filter(role=role)
-    people = sorted(
-        ({"user_id": member.user_id, "name": get_user_display_name(member.user),
-          "role": member.get_role_display(), "count": 0} for member in members),
-        key=lambda person: (person["name"], person["user_id"]),
+        return plans
+    participant = plans.filter(pk=OuterRef("pk"), participants__user=user)
+    coach = TrainingScheduleSlot.objects.filter(
+        day__training_plan_id=OuterRef("pk"), coaches=user, is_configured=True, kind__in=ACTIVE_KINDS,
     )
-    logs = training_logs_visible_to(user).filter(
-        training_cycle=cycle, training_date__range=(start, end),
-        author_id__in=[person["user_id"] for person in people],
-    ).values_list("training_date", "author_id", "pk")
-    by_day = {}
-    for day, author_id, pk in logs:
-        by_day.setdefault(day, {})[author_id] = pk
+    return plans.filter(Exists(participant) | Exists(coach))
+
+
+def _daily_competitors(plan, dates):
+    """按变更当天的最后一份名单统计，缺少完整记录时保留可核实的分配。"""
+    participants = list(plan.participants.values_list("user_id", "is_active", "was_initial"))
+    current = {pk for pk, active, _ in participants if active}
+    initial = {pk for pk, _, was_initial in participants if was_initial}
+    records = [
+        (timezone.localdate(created), before.get("参与选手"), set(after["参与选手"]))
+        for created, before, after in plan.change_records.filter(
+            after__has_key="参与选手",
+        ).order_by("created_at", "pk").values_list("created_at", "before", "after")
+    ]
+    if records:
+        # 首份变更前的完整名单只在有创建快照时有明确起点。
+        known_initial = initial & set(records[0][1] if records[0][1] is not None else records[0][2])
+    else:
+        known_initial = initial & current
+
+    rosters = {}
+    index = 0
+    roster = known_initial
+    for day in dates:
+        while index < len(records) and records[index][0] <= day:
+            roster = records[index][2]
+            index += 1
+        next_before = records[index][1] if index < len(records) else current
+        complete = index > 0 and next_before is not None and roster == set(next_before)
+        # 有断档时，旧快照里的名单不能用来判断该日缺交。
+        rosters[day] = (roster if complete or index == 0 else set(), complete)
+
+    incomplete_days = [day for day, (_, complete) in rosters.items() if not complete]
+    if incomplete_days:
+        assignments = TaskExecution.objects.filter(
+            training_task__training_plan=plan,
+            training_task__status=TrainingTask.Status.PUBLISHED,
+            training_task__schedule_slot__day__date__in=incomplete_days,
+        ).exclude(status=TaskExecution.Status.CANCELLED).values_list(
+            "training_task__schedule_slot__day__date", "user_id", "revoked_at",
+        )
+        assigned = defaultdict(set)
+        for day, user_id, revoked in assignments:
+            if revoked is None or timezone.localdate(revoked) > day:
+                assigned[day].add(user_id)
+        for day in incomplete_days:
+            rosters[day] = (rosters[day][0] | assigned[day], False)
+    return rosters
+
+
+def training_log_submission_statistics(user, *, plan, q="", date_from=None, date_to=None):
+    from .scheduling import ACTIVE_KINDS
+
+    if not training_log_statistics_plans_for(user).filter(pk=plan.pk).exists():
+        return {}
+    start = max(plan.start_date, date_from or plan.start_date)
+    end = min(plan.end_date, date_to or plan.end_date, timezone.localdate())
+    slots = TrainingScheduleSlot.objects.filter(
+        day__training_plan=plan, day__date__range=(start, end), kind__in=ACTIVE_KINDS, is_configured=True,
+    ).values_list("day__date", "coaches")
+    coaches = defaultdict(set)
+    for day, coach in slots:
+        day_coaches = coaches[day]
+        if coach is not None:
+            day_coaches.add(coach)
+    dates = sorted(coaches)
+    competitors = _daily_competitors(plan, dates) if dates else {}
+    user_ids = set()
+    for day in dates:
+        user_ids.update(coaches[day], competitors[day][0])
+    if not (user.is_superuser or user.has_perm("training.view_all_traininglog")):
+        user_ids.intersection_update({user.pk})
+
+    users = get_user_model().objects.filter(pk__in=user_ids)
+    if q:
+        users = users.filter(pk__in=user_name_search_ids(users, q))
+    people = {
+        person.pk: {"name": get_user_display_name(person), "count": 0, "user_id": person.pk}
+        for person in annotate_identity_labels(users)
+    }
+    logs = {
+        (day, pk): log_id
+        for day, pk, log_id in training_logs_visible_to(user).filter(
+            training_cycle_id=plan.training_cycle_id, training_date__in=dates, author_id__in=people,
+        ).values_list("training_date", "author_id", "pk")
+    }
     rows = []
-    day = start
-    while day <= end:
-        submitted, unsubmitted = [], []
-        for person in people:
-            log_id = by_day.get(day, {}).get(person["user_id"])
-            if log_id is not None:
-                submitted.append({"name": person["name"], "log_id": log_id})
-                person["count"] += 1
-            else:
-                unsubmitted.append(person["name"])
-        rows.append({"date": day, "submitted": submitted, "unsubmitted": unsubmitted})
-        day += timedelta(days=1)
-    return {"rows": rows, "people": people, "range_start": start, "range_end": end}
+    for day in dates:
+        roster, complete = competitors[day]
+        submitted = {
+            pk: {"name": people[pk]["name"], "log_id": logs[day, pk]}
+            for pk in (roster | coaches[day]) & people.keys()
+            if (day, pk) in logs
+        }
+        for pk in submitted:
+            people[pk]["count"] += 1
+        rows.append({
+            "date": day,
+            "submitted_competitors": sorted((submitted[pk] for pk in roster & submitted.keys()), key=lambda p: p["name"]),
+            "submitted_coaches": sorted((submitted[pk] for pk in coaches[day] & submitted.keys()), key=lambda p: p["name"]),
+            "unsubmitted_competitors": sorted(people[pk]["name"] for pk in (roster & people.keys()) - submitted.keys())
+            if complete else [],
+            "roster_complete": complete,
+        })
+    ranked = sorted(people.values(), key=lambda p: (-p["count"], p["name"], p["user_id"]))
+    return {"rows": rows, "people": ranked, "chart_max": max(1, ranked[0]["count"]) if ranked else 1}
 
 
 def visible_training_tasks_for(user, queryset=None):

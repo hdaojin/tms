@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime, timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission
@@ -8,152 +8,188 @@ from django.utils import timezone
 
 from core.navigation import get_section_items
 
-from .forms import TrainingLogStatisticsForm
-from .models import TrainingCycleMember, TrainingLog
-from .selectors import training_log_submission_statistics, training_log_statistics_cycles_for
+from .models import TrainingChangeRecord, TrainingLog, TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot
+from .selectors import training_log_submission_statistics
 from .tests import TrainingFixtureMixin, User
 
 
 class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
     def setUp(self):
         super().setUp()
-        self.user = User.objects.create_user('viewer', last_name='张', first_name='三')
-        self.other = User.objects.create_user('coach', last_name='李', first_name='四', is_active=False)
-        self.period = self.cycle(start_date=date(2024, 2, 2), end_date=date(2024, 2, 29))
-        self.member(self.user)
-        self.member(self.other, role='coach')
-        self.grant('view_traininglog_statistics')
+        self.today = timezone.localdate()
+        self.first = self.today - timedelta(days=4)
+        self.second = self.first + timedelta(days=1)
+        self.third = self.second + timedelta(days=1)
+        self.user = User.objects.create_user("viewer", last_name="张", first_name="三")
+        self.coach = User.objects.create_user("coach", last_name="李", first_name="四", is_active=False)
+        self.student = User.objects.create_user("student", last_name="王", first_name="五")
+        self.cycle_obj = self.cycle(start_date=self.first, end_date=self.today + timedelta(days=10))
+        self.plan = self.make_plan("当前计划")
+        for person in (self.user, self.student):
+            self.plan.participants.create(user=person, was_initial=True)
+        self.snapshot(self.first, [], [self.user, self.student])
+        self.day(self.first, self.coach)
+        self.day(self.second, self.coach)
+        self.day(self.third, kind=TrainingScheduleSlot.Kind.REST)
+        self.day(self.today + timedelta(days=1), self.coach)
+        self.grant("view_traininglog_statistics")
         self.client.force_login(self.user)
-        self.url = reverse('training:monthly_stats')
-        self.params = {'cycle': self.period.pk, 'year': 2024, 'month': 2}
+        self.url = reverse("training:monthly_stats")
 
-    def member(self, user, **kwargs):
-        return TrainingCycleMember.objects.create(training_cycle=self.period, user=user,
-                                                  **({'role': 'competitor'} | kwargs))
+    def make_plan(self, title, **kwargs):
+        defaults = {
+            "start_date": self.first, "end_date": self.today + timedelta(days=1),
+            "published_at": timezone.now(), "schedule_published_at": timezone.now(),
+        }
+        return TrainingPlan.objects.create(
+            training_cycle=self.cycle_obj, title=title, created_by=self.user, **(defaults | kwargs),
+        )
+
+    def snapshot(self, day, before, after):
+        when = timezone.make_aware(datetime.combine(day, datetime.min.time()))
+        with patch("django.utils.timezone.now", return_value=when):
+            TrainingChangeRecord.objects.create(
+                training_plan=self.plan, actor=self.user, action="保存名单",
+                before={"参与选手": [user.pk for user in before]} if before else {},
+                after={"参与选手": [user.pk for user in after]},
+            )
+
+    def day(self, date, *coaches, kind=TrainingScheduleSlot.Kind.GENERAL, period=TrainingScheduleSlot.Period.MORNING):
+        schedule, _ = TrainingScheduleDay.objects.get_or_create(training_plan=self.plan, date=date)
+        slot = schedule.slots.create(period=period, kind=kind)
+        slot.coaches.set(coaches)
+        return slot
 
     def grant(self, *codes):
-        self.user.user_permissions.add(*Permission.objects.filter(content_type__app_label='training', codename__in=codes))
-        for key in ('_perm_cache', '_user_perm_cache', '_group_perm_cache'):
+        self.user.user_permissions.add(*Permission.objects.filter(content_type__app_label="training", codename__in=codes))
+        for key in ("_perm_cache", "_user_perm_cache", "_group_perm_cache"):
             self.user.__dict__.pop(key, None)
 
-    def log(self, user=None, day=3, cycle=None):
-        return TrainingLog.objects.create(training_cycle=cycle or self.period, author=user or self.user,
-                                          training_date=date(2024, 2, day), topic='训练日志')
+    def log(self, user, day, **kwargs):
+        return TrainingLog.objects.create(training_cycle=self.cycle_obj, author=user, training_date=day, **kwargs)
 
     def stats(self, **kwargs):
-        return training_log_submission_statistics(self.user, **({'cycle': self.period, 'year': 2024, 'month': 2} | kwargs))
+        return training_log_submission_statistics(self.user, plan=self.plan, **kwargs)
 
-    def test_permission_required_and_initial_prompt(self):
+    def test_default_current_plan_and_history(self):
+        self.grant("view_all_traininglog")
+        recent = self.make_plan("最近开始的计划", start_date=self.second)
+        history = self.make_plan("历史计划", end_date=self.third)
+        self.make_plan("未发布排班", schedule_published_at=None)
+        self.make_plan("未来计划", start_date=self.today + timedelta(days=1))
         response = self.client.get(self.url)
-        self.assertContains(response, '请选择训练周期')
-        self.assertEqual(response.context['form'].initial['month'], timezone.localdate().month)
-        self.user.user_permissions.clear()
-        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(response.context["selected_plan"], recent)
+        self.assertNotContains(response, "未发布排班")
+        self.assertNotContains(response, "未来计划")
+        response = self.client.get(self.url, {"plan": history.pk})
+        self.assertEqual(response.context["selected_plan"], history)
+        self.assertContains(response, "个人日志提交份数")
 
-    def test_personal_scope_and_forged_cycle(self):
-        self.log()
-        self.log(self.other)
-        other_cycle = self.cycle(code='PRIVATE')
-        response = self.client.get(self.url, self.params)
-        self.assertContains(response, '张三')
-        self.assertNotContains(response, '李四')
-        self.assertNotContains(response, 'PRIVATE')
-        self.assertEqual([p['count'] for p in response.context['people']], [1])
-        response = self.client.get(self.url, self.params | {'cycle': other_cycle.pk})
-        self.assertTrue(response.context['form'].errors)
-        self.assertNotIn('rows', response.context)
-        self.assertEqual(self.stats(cycle=other_cycle)['people'], [])
+    def test_personal_scope_and_forged_plan(self):
+        self.log(self.user, self.first)
+        self.log(self.coach, self.first)
+        private = self.make_plan("其他人员的计划")
+        response = self.client.get(self.url)
+        self.assertContains(response, "张三")
+        self.assertNotContains(response, "李四")
+        self.assertNotContains(response, "王五")
+        self.assertNotContains(response, private.title)
+        response = self.client.get(self.url, {"plan": private.pk})
+        self.assertTrue(response.context["form"].errors)
+        self.assertNotIn("rows", response.context)
 
-    def test_global_scope_roles_inactive_zero_and_backfill(self):
-        self.grant('view_all_traininglog')
-        zero = User.objects.create_user('zero')
-        self.member(zero)
-        self.log(self.other)
-        other_cycle = self.cycle(code='SECOND')
-        self.log(cycle=other_cycle)
+    def test_daily_roles_rest_future_and_backfill(self):
+        self.grant("view_all_traininglog")
+        self.day(self.first, self.coach, period=TrainingScheduleSlot.Period.AFTERNOON)
+        TrainingScheduleDay.objects.get(training_plan=self.plan, date=self.first).duty_coaches.add(self.student)
+        self.log(self.user, self.first, is_backfill=True)
+        self.log(self.coach, self.first)
+        self.log(self.student, self.third)
         result = self.stats()
-        self.assertEqual({p['user_id']: p['count'] for p in result['people']},
-                         {self.user.pk: 0, self.other.pk: 1, zero.pk: 0})
-        self.log(day=2)
+        self.assertEqual([row["date"] for row in result["rows"]], [self.first, self.second])
+        first = result["rows"][0]
+        self.assertEqual([person["name"] for person in first["submitted_competitors"]], ["张三"])
+        self.assertEqual([person["name"] for person in first["submitted_coaches"]], ["李四"])
+        self.assertEqual(first["unsubmitted_competitors"], ["王五"])
+        self.assertEqual({p["name"]: p["count"] for p in result["people"]}, {"张三": 1, "李四": 1, "王五": 0})
+
+    def test_membership_changes_apply_on_local_date_and_last_change_wins(self):
+        self.grant("view_all_traininglog")
+        self.snapshot(self.second, [self.user, self.student], [self.student])
+        self.snapshot(self.second, [self.student], [self.user, self.student])
+        self.snapshot(self.second, [self.user, self.student], [self.student])
+        self.plan.participants.filter(user=self.user).update(is_active=False)
+        self.log(self.user, self.second)
+        first, second = self.stats()["rows"]
+        self.assertEqual(first["unsubmitted_competitors"], ["张三", "王五"])
+        self.assertEqual(second["unsubmitted_competitors"], ["王五"])
+        self.assertEqual(second["submitted_competitors"], [])
+
+    def test_missing_roster_is_reported_without_guessing_absences(self):
+        self.grant("view_all_traininglog")
+        legacy = self.make_plan("历史缺少名单的计划", end_date=self.second)
+        legacy.participants.create(user=self.user, was_initial=True)
+        schedule = legacy.schedule_days.create(date=self.first)
+        slot = schedule.slots.create(period="morning", kind="general")
+        slot.coaches.add(self.coach)
+        self.log(self.user, self.first)
+        response = self.client.get(self.url, {"plan": legacy.pk})
+        self.assertContains(response, "名单不完整，无法核定")
+        row = response.context["rows"][0]
+        self.assertEqual([p["name"] for p in row["submitted_competitors"]], ["张三"])
+        self.assertEqual(row["unsubmitted_competitors"], [])
+
+    def test_same_log_counts_once_per_plan_even_with_both_roles(self):
+        self.grant("view_all_traininglog")
+        self.day(self.first, self.user, period=TrainingScheduleSlot.Period.AFTERNOON)
+        overlap = self.make_plan("重叠计划")
+        overlap.participants.create(user=self.user, was_initial=True)
+        overlap.schedule_days.create(date=self.first).slots.create(period="morning", kind="general")
+        log = self.log(self.user, self.first)
+        other_cycle = self.cycle(code="OTHER", start_date=self.first, end_date=self.today)
+        TrainingLog.objects.create(training_cycle=other_cycle, author=self.student, training_date=self.first)
+
         result = self.stats()
-        self.assertEqual(len(result['rows']), 28)
-        self.assertEqual(result['rows'][0]['submitted'][0]['name'], '张三')
-        self.assertEqual([p['name'] for p in self.stats(role='coach')['people']], ['李四'])
-        self.assertEqual(len(self.stats(role='competitor')['people']), 2)
+        first = result["rows"][0]
+        self.assertEqual(first["submitted_competitors"][0]["log_id"], log.pk)
+        self.assertEqual(first["submitted_coaches"][0]["log_id"], log.pk)
+        self.assertEqual(first["unsubmitted_competitors"], ["王五"])
+        self.assertEqual(result["people"][0]["count"], 1)
+        self.assertEqual(training_log_submission_statistics(self.user, plan=overlap)["people"][0]["count"], 1)
 
-    def test_today_cycle_boundaries_and_future(self):
-        self.period.end_date = None
-        self.period.save()
-        with patch('training.selectors.timezone.localdate', return_value=date(2024, 2, 10)):
-            result = self.stats()
-            self.assertEqual((result['range_start'], result['range_end']), (date(2024, 2, 2), date(2024, 2, 10)))
-            self.assertEqual(self.stats(month=3)['rows'], [])
-            self.assertEqual(self.stats(month=1)['rows'], [])
-        self.period.end_date = date(2024, 2, 5)
-        self.period.save()
-        self.assertEqual(self.stats()['range_end'], date(2024, 2, 5))
+    def test_filters_share_scope_in_chart_and_daily_table(self):
+        self.grant("view_all_traininglog")
+        self.log(self.user, self.second)
+        response = self.client.get(
+            self.url, {"q": "zs", "date_from": self.second.isoformat()}, headers={"HX-Request": "true"},
+        )
+        self.assertContains(response, "张三")
+        self.assertNotContains(response, "王五")
+        self.assertNotContains(response, "list-filter-search")
+        self.assertEqual([row["date"] for row in response.context["rows"]], [self.second])
+        self.assertEqual([p["count"] for p in response.context["people"]], [1])
+        for params in (
+            {"date_from": "not a date"}, {"date_from": self.second, "date_to": self.first}, {"plan": "invalid"},
+        ):
+            with self.subTest(params=params):
+                response = self.client.get(self.url, params)
+                self.assertTrue(response.context["form"].errors)
+                self.assertNotIn("rows", response.context)
 
-    def test_invalid_filters_never_return_statistics(self):
-        for changes in ({'year': 'x'}, {'year': 0}, {'year': 10000}, {'month': 13},
-                        {'month': ''}, {'role': 'admin'}, {'cycle': 'x'}):
-            with self.subTest(changes=changes):
-                response = self.client.get(self.url, self.params | changes)
-                self.assertTrue(response.context['form'].errors)
-                self.assertNotIn('rows', response.context)
+    def test_permission_navigation_and_detail_links(self):
+        detail = reverse("training:log_detail", args=[self.log(self.user, self.first).pk])
+        self.assertNotContains(self.client.get(self.url), f'href="{detail}"')
+        self.grant("view_traininglog")
+        self.assertContains(self.client.get(self.url), f'href="{detail}"')
 
-    def test_detail_links_require_view_permission_and_preserve_filters(self):
-        log = self.log()
-        detail = reverse('training:log_detail', args=[log.pk])
-        self.assertNotContains(self.client.get(self.url, self.params), f'href="{detail}"')
-        self.grant('view_traininglog')
-        response = self.client.get(self.url, self.params)
-        self.assertContains(response, f'href="{detail}"')
-        self.assertEqual(response.context['form']['cycle'].value(), str(self.period.pk))
-        self.assertContains(self.client.get(detail), '训练日志')
-
-    def test_superuser_and_statistics_permission_scope(self):
-        self.user.user_permissions.clear()
-        self.assertFalse(training_log_statistics_cycles_for(self.user).exists())
-        self.user = User.objects.get(pk=self.user.pk)
-        self.user.is_superuser = True
-        self.user.save()
-        self.assertEqual(len(self.stats()['people']), 2)
-        self.assertEqual(self.client.get(self.url, self.params).status_code, 200)
-
-    def test_selector_queries_do_not_grow_with_members_or_days(self):
-        self.grant('view_all_traininglog')
-        self.log()
-        self.user.get_all_permissions()
-        with self.assertNumQueries(3):
-            self.stats()
-        for index in range(8):
-            self.member(User.objects.create_user(f'member{index}'))
-        self.log(day=4)
-        with self.assertNumQueries(3):
-            result = self.stats()
-        self.assertEqual(len(result['people']), 10)
-
-    def test_form_defaults_and_role_validation(self):
-        form = TrainingLogStatisticsForm(self.params | {'role': 'coach'}, user=self.user)
-        self.assertTrue(form.is_valid(), form.errors)
-        self.assertEqual(form.cleaned_data['month'], 2)
-
-    def test_navigation_follows_statistics_permission(self):
         def statistics_entries():
-            return [child for group in get_section_items('training', self.user)
-                    for child in group.children if child.url_name == 'training:monthly_stats']
+            return [
+                child for group in get_section_items("training", self.user)
+                for child in group.children if child.url_name == "training:monthly_stats"
+            ]
 
-        entries = statistics_entries()
-        self.assertEqual(len(entries), 1)
-        self.assertEqual(entries[0].resolved_url, self.url)
+        self.assertEqual([entry.resolved_url for entry in statistics_entries()], [self.url])
         self.user.user_permissions.clear()
         self.user = User.objects.get(pk=self.user.pk)
         self.assertEqual(statistics_entries(), [])
-
-    def test_no_members_and_default_month_parameters(self):
-        response = self.client.get(self.url, {'cycle': self.period.pk})
-        self.assertFalse(response.context['form'].errors)
-        self.assertEqual(response.context['form'].cleaned_data['month'], timezone.localdate().month)
-        result = self.stats(role='coach')
-        self.assertEqual(result['people'], [])
-        self.assertTrue(all(not row['submitted'] and not row['unsubmitted'] for row in result['rows']))
+        self.assertEqual(self.client.get(self.url).status_code, 403)

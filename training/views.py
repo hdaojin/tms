@@ -11,6 +11,8 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
 from django.views.decorators.http import require_GET
+from django.views.decorators.vary import vary_on_headers
+from django.utils.decorators import method_decorator
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
 from django.http import QueryDict
@@ -52,6 +54,7 @@ from .selectors import (
     training_logs_deletable_by,
     training_logs_visible_to,
     training_log_submission_statistics,
+    training_log_statistics_plans_for,
     visible_task_executions_for,
     visible_training_tasks_for,
 )
@@ -736,24 +739,48 @@ class CoachFeedbackView(TitleMixin, PermissionRequiredMixin, FormView):
         return reverse("training:execution_detail", args=[self.kwargs["pk"]])
 
 
-class TrainingLogMonthlyStatView(TitleMixin, PermissionRequiredMixin, TemplateView):
+@method_decorator(vary_on_headers("HX-Request"), name="dispatch")
+class TrainingLogMonthlyStatView(FilterableListMixin, TitleMixin, PermissionRequiredMixin, TemplateView):
     template_name = "training/monthly_stats.html"
     title = "训练日志提交统计"
     title_icon = "icon-[tabler--chart-bar]"
     permission_required = "training.view_traininglog_statistics"
+    list_filter_compact = True
+
+    @cached_property
+    def plans(self):
+        return training_log_statistics_plans_for(self.request.user).order_by("-start_date", "-pk")
+
+    def get_list_filter_specs(self):
+        today = timezone.localdate()
+        return (
+            ListFilterSpec("q", "搜索人员", "search", placeholder="姓名、全拼或首字母"),
+            ListFilterSpec(
+                "plan", "训练计划", "select", empty_label="自动选择进行中的计划",
+                choices=[
+                    (plan.pk, f"{plan.title}（{'进行中' if plan.end_date >= today else '已完成'}，{plan.start_date:%Y-%m-%d}）")
+                    for plan in self.plans
+                ],
+            ),
+            ListFilterSpec("date_from", "训练日期从", "date", placeholder="从"),
+            ListFilterSpec("date_to", "训练日期至", "date", placeholder="至"),
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        today = timezone.localdate()
-        data = self.request.GET.copy()
-        data.setdefault("year", str(today.year))
-        data.setdefault("month", str(today.month))
-        form = TrainingLogStatisticsForm(data if self.request.GET else None, user=self.request.user,
-                                         initial={"year": today.year, "month": today.month})
-        context.update(form=form, can_view_log=self.request.user.has_perm("training.view_traininglog"))
-        if form.is_bound and form.is_valid():
-            context.update(training_log_submission_statistics(self.request.user, **form.cleaned_data))
-            context["selected_cycle"] = form.cleaned_data["cycle"]
+        user = self.request.user
+        form = TrainingLogStatisticsForm(self.request.GET, plans=self.plans)
+        context.update(form=form, has_plans=bool(self.plans), can_view_log=user.has_perm("training.view_traininglog"))
+        if form.is_valid():
+            filters = form.cleaned_data
+            selected = filters["plan"] or next(
+                (plan for plan in self.plans if plan.end_date >= timezone.localdate()), None,
+            )
+            if selected:
+                context.update(
+                    training_log_submission_statistics(user, **{**filters, "plan": selected}),
+                    selected_plan=selected,
+                )
         return context
 
 
