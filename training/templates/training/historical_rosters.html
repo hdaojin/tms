@@ -1,0 +1,58 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">{{ plan.title }}</h2>
+      {% for error in errors %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endfor %}
+      {% if snapshot %}
+        <h3 class="font-semibold">确认历史应交名单</h3>
+        <p>补录区间 {{ snapshot.start }} 至 {{ snapshot.end }}</p>
+        <p>生效训练日（{{ snapshot.dates|length }} 天）{{ snapshot.dates|join:"、" }}</p>
+        <p>完整名单（{{ snapshot.names|length }} 人）{{ snapshot.names|join:"、"|default:"无人应交" }}</p>
+        <p>名单依据 {{ reason|linebreaksbr }}</p>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="stage" value="confirm">
+          <input type="hidden" name="token" value="{{ token }}">
+          <button class="btn btn-primary" type="submit">确认补录</button>
+          <a class="btn btn-ghost" href="{% url 'training:historical_rosters' plan.pk %}">取消</a>
+        </form>
+      {% elif can_backfill %}
+        <p>依据原始记录填写日期和完整名单。补录只适用于今天以前、统计无法核定应交名单的训练日。</p>
+        {% include "components/form.html" with submit_label="预览补录" %}
+      {% else %}
+        <p>计划和排班均发布后才能补录历史名单。</p>
+      {% endif %}
+      <a class="btn btn-ghost" href="{{ members_url }}#participants">返回计划人员管理</a>
+    </div>
+  </section>
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">补录记录</h2>
+      {% for record, revoked in history %}
+        <article class="border-b border-base-300 pb-4">
+          <h3 class="font-semibold">{{ record.after.start }} 至 {{ record.after.end }}{% if revoked %}（已撤销）{% endif %}</h3>
+          <p>生效训练日 {{ record.after.dates|join:"、" }}</p>
+          <p>完整名单 {{ record.after.names|join:"、"|default:"无人应交" }}</p>
+          <p>名单依据 {{ record.reason|linebreaksbr }}</p>
+          <p>确认 {{ record.actor.display_name }} · {{ record.created_at|date:"Y-m-d H:i:s" }}</p>
+          {% if revoked %}
+            <p>撤销 {{ revoked.actor.display_name }} · {{ revoked.created_at|date:"Y-m-d H:i:s" }}</p>
+            <p>撤销原因 {{ revoked.reason|linebreaksbr }}</p>
+          {% else %}
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="stage" value="revoke">
+              <input type="hidden" name="record_id" value="{{ record.pk }}">
+              <label for="revoke-reason-{{ record.pk }}">撤销原因</label>
+              <textarea class="textarea" id="revoke-reason-{{ record.pk }}" name="reason" rows="2" maxlength="2000" required></textarea>
+              <button class="btn btn-outline" type="submit">撤销本笔补录</button>
+            </form>
+          {% endif %}
+        </article>
+      {% empty %}
+        <p>暂无补录记录。</p>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

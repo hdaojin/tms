@@ -7,6 +7,7 @@ from . import process_views
 from . import workbook_views
 from . import entry_views
 from . import plan_member_views
+from . import historical_roster_views
 
 app_name = "training"
 urlpatterns = [
@@ -46,6 +47,7 @@ urlpatterns = [
     path("plans/<int:pk>/", schedule_views.PlanDetailView.as_view(), name="plan_detail"),
     path("plans/<int:pk>/edit/", views.TrainingPlanUpdateView.as_view(), name="plan_edit"),
     path("plans/<int:pk>/members/", plan_member_views.PlanMembersView.as_view(), name="plan_members"),
+    path("plans/<int:pk>/members/history/", historical_roster_views.historical_rosters, name="historical_rosters"),
     path("plans/<int:pk>/members/staff/<str:role>/", plan_member_views.staff_action, name="plan_staff_action"),
     path("plans/<int:pk>/members/<int:member_pk>/remove/",
          plan_member_views.PlanMemberRemoveView.as_view(), name="plan_member_remove"),

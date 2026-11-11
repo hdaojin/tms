@@ -3,6 +3,7 @@
     <h2 class="card-title">{{ plan.title }} · 参与选手</h2>
     {% if adding %}<a class="btn btn-outline btn-sm" href="{% url 'training:plan_members' plan.pk %}#participants" hx-get="{% url 'training:plan_members' plan.pk %}?section=participants" hx-push-url="{% url 'training:plan_members' plan.pk %}" hx-target="#participants" hx-swap="outerHTML">已有成员</a>
     {% else %}<a class="btn btn-primary btn-sm" href="?mode=add#participants" hx-get="{% url 'training:plan_members' plan.pk %}?mode=add&amp;section=participants" hx-push-url="{% url 'training:plan_members' plan.pk %}?mode=add" hx-target="#participants" hx-swap="outerHTML">添加成员</a>{% endif %}
+    <a class="btn btn-outline btn-sm" href="{% url 'training:historical_rosters' plan.pk %}">历史应交名单</a>
     <a class="btn btn-ghost btn-sm" href="{% url 'training:plan_detail' plan.pk %}#plan-members">返回计划</a>
   </div>
   <p class="text-sm text-base-content/70">添加范围为所属周期中账号有效的选手。新增成员不自动获得已有任务，退出保留历史记录和执行。</p>

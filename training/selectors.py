@@ -31,7 +31,7 @@ def training_log_statistics_plans_for(user):
     return plans.filter(Exists(participant) | Exists(coach))
 
 
-def _daily_competitors(plan, dates):
+def _daily_competitors(plan, dates, *, include_backfill=True):
     """按变更当天的最后一份名单统计，缺少完整记录时保留可核实的分配。"""
     participants = list(plan.participants.values_list("user_id", "is_active", "was_initial"))
     current = {pk for pk, active, _ in participants if active}
@@ -60,6 +60,16 @@ def _daily_competitors(plan, dates):
         # 有断档时，旧快照里的名单不能用来判断该日缺交。
         rosters[day] = (roster if complete or index == 0 else set(), complete)
 
+    if not include_backfill:
+        return rosters
+
+    if any(not complete for _, complete in rosters.values()):
+        from .historical_rosters import confirmed_rosters
+
+        for day, roster in confirmed_rosters(plan).items():
+            if day in rosters and not rosters[day][1]:
+                rosters[day] = (roster, True)
+
     incomplete_days = [day for day, (_, complete) in rosters.items() if not complete]
     if incomplete_days:
         assignments = TaskExecution.objects.filter(
@@ -78,16 +88,20 @@ def _daily_competitors(plan, dates):
     return rosters
 
 
-def training_log_submission_statistics(user, *, plan, q="", date_from=None, date_to=None):
+def training_log_stat_slots(plan, start, end):
     from .scheduling import ACTIVE_KINDS
 
+    return TrainingScheduleSlot.objects.filter(
+        day__training_plan=plan, day__date__range=(start, end), kind__in=ACTIVE_KINDS, is_configured=True,
+    )
+
+
+def training_log_submission_statistics(user, *, plan, q="", date_from=None, date_to=None):
     if not training_log_statistics_plans_for(user).filter(pk=plan.pk).exists():
         return {}
     start = max(plan.start_date, date_from or plan.start_date)
     end = min(plan.end_date, date_to or plan.end_date, timezone.localdate())
-    slots = TrainingScheduleSlot.objects.filter(
-        day__training_plan=plan, day__date__range=(start, end), kind__in=ACTIVE_KINDS, is_configured=True,
-    ).values_list("day__date", "coaches")
+    slots = training_log_stat_slots(plan, start, end).values_list("day__date", "coaches")
     coaches = defaultdict(set)
     for day, coach in slots:
         day_coaches = coaches[day]
@@ -105,7 +119,7 @@ def training_log_submission_statistics(user, *, plan, q="", date_from=None, date
     if q:
         users = users.filter(pk__in=user_name_search_ids(users, q))
     people = {
-        person.pk: {"name": get_user_display_name(person), "count": 0, "user_id": person.pk}
+        person.pk: {"name": get_user_display_name(person), "count": 0, "expected": 0, "user_id": person.pk}
         for person in annotate_identity_labels(users)
     }
     logs = {
@@ -114,24 +128,42 @@ def training_log_submission_statistics(user, *, plan, q="", date_from=None, date
             training_cycle_id=plan.training_cycle_id, training_date__in=dates, author_id__in=people,
         ).values_list("training_date", "author_id", "pk")
     }
+    possible_competitors = set()
+    if people and any(not complete for _, complete in competitors.values()):
+        from .historical_rosters import historical_candidates
+
+        possible_competitors.update(historical_candidates(plan).filter(pk__in=people).values_list("pk", flat=True))
+        for roster, _ in competitors.values():
+            possible_competitors.update(roster & people.keys())
+    uncertain = set()
     rows = []
     for day in dates:
         roster, complete = competitors[day]
+        daily_competitors = roster & people.keys()
+        daily_coaches = coaches[day] & people.keys()
         submitted = {
             pk: {"name": people[pk]["name"], "log_id": logs[day, pk]}
-            for pk in (roster | coaches[day]) & people.keys()
+            for pk in daily_competitors | daily_coaches
             if (day, pk) in logs
         }
-        for pk in submitted:
-            people[pk]["count"] += 1
+        for role in (daily_competitors, daily_coaches):
+            for pk in role:
+                people[pk]["expected"] += 1
+            for pk in role & submitted.keys():
+                people[pk]["count"] += 1
+        if not complete:
+            uncertain.update(possible_competitors - daily_competitors)
         rows.append({
             "date": day,
             "submitted_competitors": sorted((submitted[pk] for pk in roster & submitted.keys()), key=lambda p: p["name"]),
             "submitted_coaches": sorted((submitted[pk] for pk in coaches[day] & submitted.keys()), key=lambda p: p["name"]),
-            "unsubmitted_competitors": sorted(people[pk]["name"] for pk in (roster & people.keys()) - submitted.keys())
+            "unsubmitted_competitors": sorted(people[pk]["name"] for pk in daily_competitors - submitted.keys())
             if complete else [],
+            "unsubmitted_coaches": sorted(people[pk]["name"] for pk in daily_coaches - submitted.keys()),
             "roster_complete": complete,
         })
+    for pk in uncertain:
+        people[pk]["expected"] = None
     ranked = sorted(people.values(), key=lambda p: (-p["count"], p["name"], p["user_id"]))
     return {"rows": rows, "people": ranked, "chart_max": max(1, ranked[0]["count"]) if ranked else 1}
 

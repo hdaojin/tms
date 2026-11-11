@@ -8,7 +8,8 @@ from django.utils import timezone
 
 from core.navigation import get_section_items
 
-from .models import TrainingChangeRecord, TrainingLog, TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot
+from .historical_rosters import CONFIRMED, REVOKED
+from .models import TrainingChangeRecord, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot
 from .selectors import training_log_submission_statistics
 from .tests import TrainingFixtureMixin, User
 
@@ -111,6 +112,9 @@ class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
         self.assertEqual([person["name"] for person in first["submitted_competitors"]], ["张三"])
         self.assertEqual([person["name"] for person in first["submitted_coaches"]], ["李四"])
         self.assertEqual(first["unsubmitted_competitors"], ["王五"])
+        self.assertEqual(first["unsubmitted_coaches"], [])
+        self.assertEqual(result["rows"][1]["unsubmitted_coaches"], ["李四"])
+        self.assertEqual({p["name"]: p["expected"] for p in result["people"]}, {"张三": 2, "李四": 2, "王五": 2})
         self.assertEqual({p["name"]: p["count"] for p in result["people"]}, {"张三": 1, "李四": 1, "王五": 0})
 
     def test_membership_changes_apply_on_local_date_and_last_change_wins(self):
@@ -138,10 +142,90 @@ class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
         row = response.context["rows"][0]
         self.assertEqual([p["name"] for p in row["submitted_competitors"]], ["张三"])
         self.assertEqual(row["unsubmitted_competitors"], [])
+        self.assertEqual(row["unsubmitted_coaches"], ["李四"])
 
-    def test_same_log_counts_once_per_plan_even_with_both_roles(self):
+    def test_incomplete_roster_only_marks_affected_expected_counts_as_unknown(self):
         self.grant("view_all_traininglog")
-        self.day(self.first, self.user, period=TrainingScheduleSlot.Period.AFTERNOON)
+        TrainingCycleMember.objects.create(training_cycle=self.cycle_obj, user=self.student, role="competitor")
+        legacy = self.make_plan("历史缺少名单的计划")
+        slot = legacy.schedule_days.create(date=self.first).slots.create(period="morning", kind="general")
+        slot.coaches.add(self.coach, self.student)
+        response = self.client.get(self.url, {"plan": legacy.pk})
+        self.assertContains(response, "已交 0 份 / 应交待核定")
+        self.assertContains(response, "已交 0 份 / 应交 1 份")
+        self.assertEqual({p["name"]: p["expected"] for p in response.context["people"]}, {"李四": 1, "王五": None})
+        self.assertEqual(response.context["rows"][0]["unsubmitted_coaches"], ["李四", "王五"])
+
+    def test_historical_roster_confirmation_revocation_and_empty_roster(self):
+        self.grant("view_trainingplan", "change_trainingplan", "view_all_traininglog")
+        self.student.is_active = False
+        self.student.save(update_fields=["is_active"])
+        TrainingCycleMember.objects.create(training_cycle=self.cycle_obj, user=self.student, role="competitor")
+        legacy = self.make_plan("后补计划")
+        legacy.participants.create(user=self.user, was_initial=True)
+        for day, kind in [(self.first, "general"), (self.second, "rest"), (self.today, "general")]:
+            legacy.schedule_days.create(date=day).slots.create(period="morning", kind=kind)
+        url = reverse("training:historical_rosters", args=[legacy.pk])
+        self.assertContains(self.client.get(url), "王五（已停用）")
+        data = {"start": self.first, "end": self.second, "users": [self.student.pk], "reason": "训练签到表"}
+        preview = self.client.post(url, data)
+        self.assertEqual(preview.context["snapshot"]["dates"], [self.first.isoformat()])
+        token = preview.context["token"]
+        self.assertFalse(legacy.change_records.exists())
+        self.assertRedirects(self.client.post(url, {"stage": "confirm", "token": token}), url)
+
+        def row():
+            return self.client.get(self.url, {"plan": legacy.pk}).context["rows"][0]
+
+        self.assertEqual(row()["unsubmitted_competitors"], ["王五"])
+        self.log(self.student, self.first)
+        self.assertEqual([person["name"] for person in row()["submitted_competitors"]], ["王五"])
+        self.assertEqual(row()["unsubmitted_competitors"], [])
+        self.assertContains(self.client.post(url, data), "已补录的训练日")
+        self.assertContains(self.client.post(url, data | {"end": self.today}), "早于今天")
+        record = legacy.change_records.get(action=CONFIRMED)
+        revoke = {"stage": "revoke", "record_id": record.pk, "reason": "依据有误"}
+        self.assertRedirects(self.client.post(url, revoke), url)
+        self.assertFalse(row()["roster_complete"])
+        self.assertContains(self.client.post(url, {"stage": "confirm", "token": token}), "重新预览")
+        self.assertEqual(legacy.change_records.filter(action=REVOKED).count(), 1)
+
+        data["users"] = []
+        self.assertContains(self.client.post(url, data), "请选择完整名单")
+        empty_token = self.client.post(url, data | {"empty": "on"}).context["token"]
+        self.assertRedirects(self.client.post(url, {"stage": "confirm", "token": empty_token}), url)
+        self.assertTrue(row()["roster_complete"])
+        self.assertEqual(row()["unsubmitted_competitors"], [])
+        self.assertEqual(list(legacy.participants.values_list("user_id", flat=True)), [self.user.pk])
+
+    def test_historical_roster_uses_existing_permission_and_cannot_replace_known_roster(self):
+        self.grant("view_trainingplan", "view_all_traininglog")
+        url = reverse("training:historical_rosters", args=[self.plan.pk])
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.grant("change_trainingplan")
+        response = self.client.post(url, {
+            "start": self.first, "end": self.second, "empty": "on", "reason": "测试",
+        })
+        self.assertContains(response, "没有需要补录名单的训练日")
+        self.assertFalse(self.plan.change_records.filter(action=CONFIRMED).exists())
+
+    def test_historical_roster_rechecks_training_days_after_preview(self):
+        self.grant("view_trainingplan", "change_trainingplan")
+        legacy = self.make_plan("后补计划")
+        slot = legacy.schedule_days.create(date=self.first).slots.create(period="morning", kind="general")
+        url = reverse("training:historical_rosters", args=[legacy.pk])
+        preview = self.client.post(url, {
+            "start": self.first, "end": self.first, "empty": "on", "reason": "训练签到表",
+        })
+        slot.kind = "rest"
+        slot.save(update_fields=["kind"])
+        response = self.client.post(url, {"stage": "confirm", "token": preview.context["token"]})
+        self.assertContains(response, "没有需要补录名单的训练日")
+        self.assertFalse(legacy.change_records.filter(action=CONFIRMED).exists())
+
+    def test_same_log_counts_for_each_role_and_each_matching_plan(self):
+        self.grant("view_all_traininglog")
+        self.day(self.first, self.user, self.coach, period=TrainingScheduleSlot.Period.AFTERNOON)
         overlap = self.make_plan("重叠计划")
         overlap.participants.create(user=self.user, was_initial=True)
         overlap.schedule_days.create(date=self.first).slots.create(period="morning", kind="general")
@@ -154,7 +238,9 @@ class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(first["submitted_competitors"][0]["log_id"], log.pk)
         self.assertEqual(first["submitted_coaches"][0]["log_id"], log.pk)
         self.assertEqual(first["unsubmitted_competitors"], ["王五"])
-        self.assertEqual(result["people"][0]["count"], 1)
+        self.assertEqual(first["unsubmitted_coaches"], ["李四"])
+        self.assertEqual(result["people"][0]["count"], 2)
+        self.assertEqual(result["people"][0]["expected"], 3)
         self.assertEqual(training_log_submission_statistics(self.user, plan=overlap)["people"][0]["count"], 1)
 
     def test_filters_share_scope_in_chart_and_daily_table(self):
@@ -164,10 +250,14 @@ class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
             self.url, {"q": "zs", "date_from": self.second.isoformat()}, headers={"HX-Request": "true"},
         )
         self.assertContains(response, "张三")
+        self.assertContains(response, "已交 1 份 / 应交 1 份")
+        self.assertContains(response, "未提交教练")
+        self.assertNotContains(response, "重叠计划可各自计入同一份日志")
         self.assertNotContains(response, "王五")
         self.assertNotContains(response, "list-filter-search")
         self.assertEqual([row["date"] for row in response.context["rows"]], [self.second])
         self.assertEqual([p["count"] for p in response.context["people"]], [1])
+        self.assertEqual(response.context["rows"][0]["unsubmitted_coaches"], [])
         for params in (
             {"date_from": "not a date"}, {"date_from": self.second, "date_to": self.first}, {"plan": "invalid"},
         ):
