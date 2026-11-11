@@ -1,0 +1,82 @@
+{% extends "layouts/app.html" %}
+{% load date_display tz %}
+
+{% block content %}
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">{{ model.name }}</h2>
+      <dl class="grid grid-cols-1 gap-3 text-sm md:grid-cols-2">
+        <div><dt class="text-base-content/60">模型提供商</dt><dd>{{ model.provider_label }}</dd></div>
+        <div><dt class="text-base-content/60">模型 ID</dt><dd class="break-words">{{ model.model_id }}</dd></div>
+        <div><dt class="text-base-content/60">API 地址</dt><dd class="break-words">{{ model.base_url }}</dd></div>
+        <div><dt class="text-base-content/60">API 密钥</dt><dd>{{ model.api_key_preview }}</dd></div>
+        <div>
+          <dt class="text-base-content/60">思考模式</dt>
+          <dd>{{ model.get_thinking_display }}{% if model.reasoning_effort %} · 强度{{ model.get_reasoning_effort_display }}{% endif %}</dd>
+        </div>
+        {% include "components/record_timestamps.html" with created_at=model.created_at updated_at=model.updated_at timestamp_wrapper_class="min-w-0" timestamp_value_class="break-words" only %}
+      </dl>
+      <div class="flex flex-wrap gap-3">
+        <a class="btn" href="{% url 'ai_models:edit' model.pk %}">编辑</a>
+        <a class="btn btn-ghost" href="{% url 'ai_models:delete' model.pk %}">删除</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">连接测试</h2>
+      <p>测试会向所选模型发送固定短句，并可能产生少量 API 费用。</p>
+      {% if model.tested_at %}
+        <p>
+          最近测试：{{ model.tested_at|localtime|date:"Y-m-d H:i:s"|keep_date_parts }} · {{ model.test_duration_ms }} 毫秒
+          · {% if model.test_error %}失败{% else %}成功{% endif %}
+        </p>
+        {% if model.test_error %}<p class="text-error">{{ model.test_error }}</p>{% endif %}
+        {% if model.test_request %}
+          <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div class="min-w-0 rounded-box border border-base-300 p-3">
+              <h3 class="font-medium">发送内容</h3>
+              <p class="text-sm text-base-content/70 break-words">
+                {{ model.test_request.model }} · 思考{{ model.get_thinking_display }}
+                {% if model.test_request.reasoning_effort %} · 强度{{ model.get_reasoning_effort_display }}{% endif %}
+                · 输出上限 {{ model.test_request.max_tokens }} tokens
+              </p>
+              <p class="whitespace-pre-wrap break-words">{{ model.test_request.messages.0.content }}</p>
+            </div>
+            {% if model.test_reply %}
+              <div class="min-w-0 rounded-box border border-base-300 p-3">
+                <h3 class="font-medium">模型回复</h3>
+                <p class="whitespace-pre-wrap break-words">{{ model.test_reply }}</p>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% else %}
+        <p>当前配置暂无已完成的测试。</p>
+      {% endif %}
+      <form method="post" action="{% url 'ai_models:test' model.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary" type="submit">发起测试</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">共享设置</h2>
+      {% if model.is_delisted %}
+        <p class="text-warning">管理员已下架此模型。解除下架后可重新开启共享。</p>
+      {% elif not model.verified %}
+        <p>当前配置手动测试成功后可开启共享。</p>
+      {% endif %}
+      <form method="post" action="{% url 'ai_models:share' model.pk %}" class="space-y-3">
+        {% csrf_token %}
+        <fieldset class="space-y-3" {% if not model.verified or model.is_delisted %}disabled{% endif %}>
+          {% include "components/field.html" with field=share_form.is_shared %}
+          <button type="submit" class="btn">保存共享设置</button>
+        </fieldset>
+      </form>
+    </div>
+  </section>
+{% endblock %}

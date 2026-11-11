@@ -495,6 +495,11 @@ SAMBA_ASYNC_OPERATIONS_ENABLED=False
 生产首次只使用 `tms_migrator` 执行迁移，运行期 `tms_app` 只有 schema usage、表 DML 与序列权限。
 `bootstrap_tms` 在首次部署时显式 dry-run 后执行，提供选手、教练、班务默认 Group 及权限组合；成员、教练技术领域和注册默认组仍由管理员显式配置。升级不会自动替换现有角色授权，详见用户与权限手册。
 
+使用「我的 AI 模型」前，在开发环境的 `.env` 或生产的 `/etc/tms/tms.env` 中配置独立的 `AI_MODEL_ENCRYPTION_KEY`。
+可用 `uv run python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` 生成 Fernet 密钥，按部署凭据保管。恢复 AI 模型配置时需要与数据库备份对应的加密密钥。
+超级管理员可设置 DeepSeek 的默认 API 基址、模型选项及思考参数。管理员未填写默认地址时，表单使用 `https://api.deepseek.com`。用户可直接填写运行 TMS 的服务器能够访问的 HTTP 或 HTTPS 基址，包括中转站、内网和本机服务。管理自己模型的权限允许账号从 TMS 服务器发起这些测试请求，凭据和消息会发往所填地址。
+管理员按角色授予「管理自己的模型」和「使用公共模型」权限包。参见 [AI 模型用户手册](docs/user-manual/ai_models/overview.md)。
+
 Caddy 只直接提供：
 
 - `/static/` → 当前 release 的 `staticfiles/`

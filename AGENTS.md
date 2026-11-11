@@ -22,7 +22,7 @@ TMS 是基于 Django 6 / Python 3.13 的单体应用。主要前端与交互技�
 
 - 平台基础：`core`、`accounts`、`samba`。
 - 领域主链路：`standards`、`assessments`、`scoring`、`evidence`、`training`。
-- 业务扩展：`glossary`、`worldskills_forum`、`feedback`、`notes`、`meetings`、`notices`、`behaviors`、`event_countdown`。
+- 业务扩展：`glossary`、`worldskills_forum`、`feedback`、`notes`、`meetings`、`notices`、`behaviors`、`event_countdown`、`ai_models`。
 - `demo` 仅在 `DEBUG=True` 时加载。
 
 领域主链路应保持为：
@@ -47,7 +47,7 @@ TMS 是基于 Django 6 / Python 3.13 的单体应用。主要前端与交互技�
 - 除非用户明确要求 review、审计或全面优化，不主动把局部修改升级为全仓 review。
 - 输出说明与任务规模匹配。小修改用简洁结果说明，不重复复述整套架构、测试体系或项目规范。
 
-`.codex/skills/` 仅用于真正独立、重复且多步骤的专用工作流。普通 TMS 编码、修 bug、模板调整、字段修改和常规 CRUD 不需要额外 skill；遵循本文件即可。
+`.codex/skills/` 仅用于真正独立、重复且多步骤的专用工作流。普通 TMS 编码、修 bug、模板调整、字段修改和常规 CRUD 默认遵循本文件；涉及前端页面样式时按下文自动使用 `daisyui` 技能。
 
 ## 开始修改前
 
@@ -191,6 +191,8 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - HTMX 只是传输与局部刷新机制；权限、校验和业务不变量必须在服务器端同样执行。
 
 ## Tailwind CSS / DaisyUI / Alpine.js / Iconify
+
+AI 编码涉及新增或修改前端页面样式时，必须在修改前自动使用全局安装的 `daisyui` 技能，无需用户显式点名。适用范围包括模板中的组件样式、布局、响应式样式、颜色、主题及 CSS 源码。先阅读全局技能入口 `~/.agents/skills/daisyui/SKILL.md`，按本次改动查阅其用法、组件、颜色或配置指南，并遵循 `docs/developer/ui.md` 和项目现有主题约定。
 
 当前项目使用 Tailwind CSS 4 的 CSS-first 配置，入口为 `static/css/main.css`：
 

@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     # Local apps
     'core',
     'accounts',
+    'ai_models.apps.AIModelsConfig',
     'samba',
     'standards.apps.StandardsConfig',
     'assessments.apps.AssessmentsConfig',
@@ -249,3 +250,4 @@ SAMBA_ASYNC_OPERATIONS_ENABLED = env.bool('SAMBA_ASYNC_OPERATIONS_ENABLED', defa
 SAMBA_COMMAND_TIMEOUT_SECONDS = env.int('SAMBA_COMMAND_TIMEOUT_SECONDS', default=15)  # type: ignore
 SAMBA_OPERATION_STALE_MINUTES = env.int('SAMBA_OPERATION_STALE_MINUTES', default=30)  # type: ignore
 SAMBA_TASK_ENCRYPTION_KEY = env('SAMBA_TASK_ENCRYPTION_KEY', default='')  # type: ignore
+AI_MODEL_ENCRYPTION_KEY = env('AI_MODEL_ENCRYPTION_KEY', default='')  # type: ignore

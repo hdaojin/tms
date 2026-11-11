@@ -373,6 +373,11 @@ sections:
             url_name: samba:accounts
             icon_class: icon-[tabler--server] size-5 text-info
             permissions: [samba.add_sambaoperation]
+          - key: ai_models
+            label: 我的 AI 模型
+            url_name: ai_models:list
+            icon_class: icon-[tabler--settings] size-5 text-primary
+            permissions: [ai_models.view_aimodel]
       - key: account_admin
         label: 系统管理
         icon_class: icon-[tabler--settings] size-5 text-neutral
@@ -397,6 +402,16 @@ sections:
             url_name: admin:index
             icon_class: icon-[tabler--settings] size-5 text-neutral
             staff_required: true
+          - key: ai_models_moderation
+            label: 公共 AI 模型管理
+            url_name: ai_models:moderation
+            icon_class: icon-[tabler--settings] size-5 text-neutral
+            superuser_required: true
+          - key: ai_model_providers
+            label: AI 模型提供商
+            url_name: ai_models:providers
+            icon_class: icon-[tabler--settings] size-5 text-neutral
+            superuser_required: true
 
   - key: about
     label: 关于

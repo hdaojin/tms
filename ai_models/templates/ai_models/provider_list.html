@@ -1,0 +1,29 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <ul class="divide-y divide-base-300">
+        {% for code, label, provider in providers %}
+          <li class="py-3">
+            <a class="link link-hover font-medium" href="{% url 'ai_models:provider' code %}">{{ label }}</a>
+            <dl class="mt-2 grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
+              <div class="min-w-0">
+                <dt class="text-base-content/60">默认 API 地址</dt>
+                <dd class="break-words">{{ provider.default }}</dd>
+              </div>
+              <div class="min-w-0">
+                <dt class="text-base-content/60">默认模型</dt>
+                <dd class="break-words">{{ provider.default_model|default:"未指定" }}</dd>
+              </div>
+              <div>
+                <dt class="text-base-content/60">可选模型</dt>
+                <dd>{{ provider.models|length }} 个</dd>
+              </div>
+            </dl>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+{% endblock %}
