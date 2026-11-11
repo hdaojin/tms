@@ -549,7 +549,11 @@ class TrainingChangeRecordQuerySet(models.QuerySet):
 
 class TrainingChangeRecord(TimestampedModel):
     objects = TrainingChangeRecordQuerySet.as_manager()
-    training_plan = models.ForeignKey(TrainingPlan, on_delete=models.PROTECT, related_name="change_records", verbose_name="训练计划")
+    training_plan = models.ForeignKey(
+        TrainingPlan, on_delete=models.PROTECT, related_name="change_records", verbose_name="训练计划",
+        null=True, blank=True,
+    )
+    deleted_plan = models.JSONField("已删除计划快照", null=True, blank=True)
     task = models.ForeignKey("TrainingTask", on_delete=models.PROTECT, null=True, blank=True, related_name="change_records", verbose_name="训练任务")
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="操作者")
     action = models.CharField("动作", max_length=80)
@@ -560,6 +564,15 @@ class TrainingChangeRecord(TimestampedModel):
     class Meta:
         verbose_name = verbose_name_plural = "训练计划变更记录"
         ordering = ["-created_at", "-pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(training_plan__isnull=False, deleted_plan__isnull=True)
+                    | Q(training_plan__isnull=True, deleted_plan__isnull=False, task__isnull=True)
+                ),
+                name="training_change_record_plan_or_snapshot",
+            ),
+        ]
 
     def save(self, *args, **kwargs):
         if self.pk:

@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from . import scheduling
-from .models import TrainingPlan, TrainingTask, TrainingTaskAttachment
+from .models import TrainingChangeRecord, TrainingPlan, TrainingTask, TrainingTaskAttachment
 from .tests import TrainingFixtureMixin
 
 
@@ -69,17 +69,45 @@ class PlanDeleteTests(TrainingFixtureMixin, TestCase):
         self.assertContains(response, "计划内容已变化")
         self.assertTrue(TrainingPlan.objects.filter(pk=self.plan.pk).exists())
 
-    def test_publication_after_preview_and_withdrawal_both_block_delete(self):
+    def test_current_publication_blocks_delete_but_withdrawn_plan_can_be_deleted(self):
         token = self.client.get(self.url).context["token"]
         self.plan.published_at = timezone.now()
         self.plan.save()
-        scheduling.audit(self.plan, self.admin, "发布计划")
-        self.assertContains(self.client.post(self.url, {"token": token}), "仅可删除从未发布的草稿计划")
+        published = scheduling.audit(self.plan, self.admin, "发布计划")
+        self.assertContains(self.client.post(self.url, {"token": token}), "仅可删除计划和排班均未发布")
+        self.plan.schedule_published_at = timezone.now()
         self.plan.published_at = None
         self.plan.save()
-        scheduling.audit(self.plan, self.admin, "撤回计划发布")
-        self.assertContains(self.client.get(self.url), "已有发布或其他受保护的历史记录")
-        self.assertContains(self.client.get(self.detail), "已有发布或其他受保护的历史记录")
+        self.assertContains(self.client.get(self.url), "仅可删除计划和排班均未发布")
+        self.plan.schedule_published_at = None
+        self.plan.save()
+        scheduling.audit(self.plan, self.admin, "发布排班")
+        scheduling.audit(self.plan, self.admin, "撤回发布", after={"层级": "schedule"})
+        withdrawn = scheduling.audit(self.plan, self.admin, "撤回发布", after={"层级": "plan"}, reason="计划建错")
+        self.assertContains(self.client.post(self.url, {"token": token}), "计划内容已变化")
+        self.assertContains(self.client.get(self.detail), self.url)
+        preview = self.client.get(self.url)
+        self.assertContains(preview, "保留 4 条发布与撤回记录")
+        response = self.client.post(self.url, {"token": preview.context["token"]})
+        self.assertRedirects(response, reverse("training:plan_list"), fetch_redirect_response=False)
+        self.assertFalse(TrainingPlan.objects.filter(pk=self.plan.pk).exists())
+        history = TrainingChangeRecord.objects.filter(deleted_plan__id=self.plan.pk)
+        self.assertEqual(history.count(), 5)
+        original = history.get(pk=published.pk)
+        self.assertIsNone(original.training_plan_id)
+        self.assertEqual(original.created_at, published.created_at)
+        self.assertEqual(original.actor_id, self.admin.pk)
+        self.assertEqual(original.deleted_plan["title"], self.plan.title)
+        self.assertEqual(history.get(pk=withdrawn.pk).reason, "计划建错")
+        self.assertEqual(history.get(action="删除训练计划").actor_id, self.admin.pk)
+
+    def test_unclassified_withdrawal_remains_protected(self):
+        scheduling.audit(self.plan, self.admin, "撤回发布")
+        self.assertContains(self.client.get(self.url), "已有受保护的历史记录")
+
+    def test_task_withdrawal_remains_protected(self):
+        scheduling.audit(self.plan, self.admin, "撤回发布", after={"层级": "task"}, task=self.task)
+        self.assertContains(self.client.get(self.url), "已有受保护的历史记录")
 
     def test_task_assignment_after_preview_blocks_delete(self):
         token = self.client.get(self.url).context["token"]

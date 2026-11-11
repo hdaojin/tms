@@ -7,6 +7,7 @@
     {% if error %}<p class="alert alert-error">{{ error }}</p>{% endif %}
     {% if result %}
       <p>删除后无法恢复。计划名单涉及 {{ result.people }} 人，将一并移除 {{ result.days }} 天排班、{{ result.tasks }} 项草稿任务及其附件和草稿保存记录。</p>
+      {% if result.publication_records %}<p>将保留 {{ result.publication_records }} 条发布与撤回记录，并记录本次删除。</p>{% endif %}
       {% if plan.source_file %}<p>此计划的原始计划文件也将删除。</p>{% endif %}
       <form method="post" class="flex flex-wrap gap-2">
         {% csrf_token %}
