@@ -1,0 +1,88 @@
+{% extends "layouts/app.html" %}
+{% load static %}
+{% block content %}
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">{{ plan.title }}</h2>
+      <p>{{ plan.start_date|date:"Y-m-d" }} 至 {{ plan.end_date|date:"Y-m-d" }}</p>
+      {% for error in errors %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endfor %}
+      {% if snapshot %}
+        <h3 class="font-semibold">确认免交规则变更</h3>
+        {% if snapshot.previous %}
+          <p>原规则 #{{ snapshot.change.target }} · {{ snapshot.previous.label }} · {{ snapshot.previous.start }} 至 {{ snapshot.previous.end }}</p>
+          <p>原名单 {{ snapshot.previous.names|join:"、" }}</p>
+        {% endif %}
+        {% if snapshot.change.rule %}
+          <p>新规则 {{ snapshot.change.rule.label }} · {{ snapshot.change.rule.start }} 至 {{ snapshot.change.rule.end }}</p>
+          <p>整组免交 {{ snapshot.change.rule.role_names|join:"、"|default:"无" }}</p>
+          <p>指定人员 {{ snapshot.change.rule.specified_names|join:"、"|default:"无" }}</p>
+          <p>合并后免交名单（{{ snapshot.change.rule.names|length }} 人）{{ snapshot.change.rule.names|join:"、" }}</p>
+        {% else %}
+          <p>从 {{ snapshot.change.start }} 起结束该规则。</p>
+        {% endif %}
+        <p>原因 {{ reason|linebreaksbr }}</p>
+        <p>按当前排班和可核定名单，应交份数净变化 {{ snapshot.delta|stringformat:"+d" }}。后续排班或计划名单调整可能改变实际影响。</p>
+        {% if snapshot.rows %}
+          <div class="overflow-x-auto">
+            <table class="table table-sm">
+              <thead><tr><th scope="col">训练日</th><th scope="col">姓名</th><th scope="col">训练身份</th><th scope="col">应交变化</th></tr></thead>
+              <tbody>
+                {% for row in snapshot.rows %}
+                  <tr><td>{{ row.date }}</td><td>{{ row.name }}</td><td>{{ row.role }}</td><td>{{ row.delta|stringformat:"+d" }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p>当前没有可核定的应交份数变化。</p>
+        {% endif %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="token" value="{{ token }}">
+          <button class="btn btn-primary" type="submit">确认变更</button>
+          <a class="btn btn-ghost" href="{% url 'training:plan_log_exemptions' plan.pk %}">取消</a>
+        </form>
+      {% else %}
+        <p>结束规则时请选择原规则，并填写生效日期和原因。</p>
+        {% include "components/form.html" with submit_label="预览变更" %}
+      {% endif %}
+      <a class="btn btn-ghost" href="{% url 'training:plan_detail' plan.pk %}">返回计划详情</a>
+    </div>
+  </section>
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">规则及生效区间</h2>
+      {% for pk, rule in rules.items %}
+        <div class="border-b border-base-300 pb-4">
+          <p class="font-semibold">#{{ pk }} · {{ rule.label }} · {{ rule.start }} 至 {{ rule.end }}</p>
+          <p>{{ rule.names|join:"、" }}</p>
+        </div>
+      {% empty %}
+        <p>暂无规则。</p>
+      {% endfor %}
+    </div>
+  </section>
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">变更记录</h2>
+      {% for record in history %}
+        <article class="border-b border-base-300 pb-4">
+          <h3 class="font-semibold">{{ record.action }} · {{ record.after.start }} 生效</h3>
+          <p>{{ record.actor.display_name }} · {{ record.created_at|date:"Y-m-d H:i:s" }}</p>
+          <p>原因 {{ record.reason|linebreaksbr }}</p>
+          {% if record.before %}
+            <p>原规则 #{{ record.after.target }} · {{ record.before.label }} · {{ record.before.start }} 至 {{ record.before.end }} · {{ record.before.names|join:"、" }}</p>
+          {% endif %}
+          {% if record.after.rule %}
+            <p>新规则 #{{ record.pk }} · {{ record.after.rule.label }} · {{ record.after.rule.start }} 至 {{ record.after.rule.end }} · {{ record.after.rule.names|join:"、" }}</p>
+          {% endif %}
+        </article>
+      {% empty %}
+        <p>暂无变更记录。</p>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'js/training-plan-people.js' %}" defer></script>
+{% endblock %}

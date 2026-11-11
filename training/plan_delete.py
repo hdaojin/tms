@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models.deletion import ProtectedError
 from django.db.models import Q
 
+from .log_exemptions import ACTIONS as LOG_EXEMPTION_ACTIONS
 from .models import TaskExecution, TrainingChangeRecord, TrainingPlan, TrainingTask
 from .scheduling import privileged
 
@@ -22,6 +23,8 @@ PUBLICATION_HISTORY = Q(task__isnull=True) & (
     Q(action__in=("发布计划", "发布排班"))
     | Q(action="撤回发布", after__层级__in=("plan", "schedule"))
 )
+LOG_EXEMPTION_HISTORY = Q(task__isnull=True, action__in=LOG_EXEMPTION_ACTIONS.values())
+ARCHIVABLE_HISTORY = PUBLICATION_HISTORY | LOG_EXEMPTION_HISTORY
 
 
 def blocked_reason(plan):
@@ -36,7 +39,7 @@ def blocked_reason(plan):
         return "计划已有调整审批记录，不能删除。"
     if plan.tasks.exclude(status=TrainingTask.Status.DRAFT).exists():
         return "计划已有非草稿任务，不能删除。"
-    archivable = plan.change_records.filter(PUBLICATION_HISTORY).values("pk")
+    archivable = plan.change_records.filter(ARCHIVABLE_HISTORY).values("pk")
     if plan.change_records.exclude(action__in=DRAFT_ACTIONS).exclude(pk__in=archivable).exists():
         return "计划已有受保护的历史记录，不能删除。"
     return ""
@@ -61,6 +64,7 @@ def preview(plan, user):
     return {
         "people": len(people), "days": days, "tasks": len(tasks), "digest": digest,
         "publication_records": plan.change_records.filter(PUBLICATION_HISTORY).count(),
+        "log_exemption_records": plan.change_records.filter(LOG_EXEMPTION_HISTORY).count(),
     }
 
 
@@ -74,13 +78,13 @@ def execute(plan, user, digest):
         raise ValidationError("训练计划内容已变化，请重新预览。")
     try:
         records = TrainingChangeRecord._base_manager.filter(training_plan=current)
-        if result["publication_records"]:
+        if result["publication_records"] or result["log_exemption_records"]:
             snapshot = {
                 "id": current.pk, "title": current.title, "training_cycle_id": current.training_cycle_id,
                 "start_date": current.start_date.isoformat(), "end_date": current.end_date.isoformat(),
             }
             # 保留原记录的主键、时间、操作者和内容，只替换即将删除的计划引用。
-            records.filter(PUBLICATION_HISTORY).update(training_plan=None, deleted_plan=snapshot)
+            records.filter(ARCHIVABLE_HISTORY).update(training_plan=None, deleted_plan=snapshot)
             TrainingChangeRecord.objects.create(deleted_plan=snapshot, actor=user, action="删除训练计划")
         records.filter(action__in=DRAFT_ACTIONS).delete()
         current.tasks.filter(status=TrainingTask.Status.DRAFT).delete()

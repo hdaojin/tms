@@ -8,6 +8,7 @@ from . import workbook_views
 from . import entry_views
 from . import plan_member_views
 from . import historical_roster_views
+from . import log_exemption_views
 
 app_name = "training"
 urlpatterns = [
@@ -46,6 +47,9 @@ urlpatterns = [
     path("plans/create/", views.TrainingPlanCreateView.as_view(), name="plan_create"),
     path("plans/staff-search/", plan_people.plan_staff_search, name="plan_staff_search"),
     path("plans/<int:pk>/", schedule_views.PlanDetailView.as_view(), name="plan_detail"),
+    path("plans/<int:pk>/log-exemptions/", log_exemption_views.plan_log_exemptions, name="plan_log_exemptions"),
+    path("plans/<int:pk>/log-exemptions/search/", log_exemption_views.plan_log_exemption_search,
+         name="plan_log_exemption_search"),
     path("plans/<int:pk>/edit/", views.TrainingPlanUpdateView.as_view(), name="plan_edit"),
     path("plans/<int:pk>/members/", plan_member_views.PlanMembersView.as_view(), name="plan_members"),
     path("plans/<int:pk>/members/history/", historical_roster_views.historical_rosters, name="historical_rosters"),

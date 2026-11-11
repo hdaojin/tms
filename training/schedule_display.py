@@ -114,7 +114,9 @@ def plan_context(view, context):
     entries = entry_context(view, ScheduleDayTable)
     table, is_tasks = entries["table"], entries["task_tab"]
     staff = scheduling.staff(user, plan)
-    history = plan.change_records.select_related("actor", "task")
+    from .log_exemptions import ACTIONS as LOG_EXEMPTION_ACTIONS
+
+    history = plan.change_records.exclude(action__in=LOG_EXEMPTION_ACTIONS.values()).select_related("actor", "task")
     if not staff:
         history = history.filter(task__schedule_slot__coaches=user).distinct()
     from .schedule_history import decorate_history

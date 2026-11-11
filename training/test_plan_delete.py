@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from . import scheduling
+from .log_exemptions import ACTIONS
 from .models import TrainingChangeRecord, TrainingPlan, TrainingTask, TrainingTaskAttachment
 from .tests import TrainingFixtureMixin
 
@@ -104,6 +105,25 @@ class PlanDeleteTests(TrainingFixtureMixin, TestCase):
     def test_unclassified_withdrawal_remains_protected(self):
         scheduling.audit(self.plan, self.admin, "撤回发布")
         self.assertContains(self.client.get(self.url), "已有受保护的历史记录")
+
+    def test_draft_deletion_preserves_log_exemption_history(self):
+        self.member.first_name = "选手甲"
+        self.member.save(update_fields=["first_name"])
+        url = reverse("training:plan_log_exemptions", args=[self.plan.pk])
+        self.assertContains(self.client.get(self.detail), url)
+        preview = self.client.post(url, {
+            "operation": "add", "user": self.member.pk, "start": self.plan.start_date, "reason": "测试免交",
+        })
+        self.assertRedirects(self.client.post(url, {"token": preview.context["token"]}), url)
+        self.assertContains(self.client.get(url), "测试免交")
+        self.assertNotContains(self.client.get(self.detail), "测试免交")
+        preview = self.client.get(self.url)
+        self.assertContains(preview, "保留 1 条日志免交变更记录")
+        response = self.client.post(self.url, {"token": preview.context["token"]})
+        self.assertRedirects(response, reverse("training:plan_list"), fetch_redirect_response=False)
+        record = TrainingChangeRecord.objects.get(deleted_plan__id=self.plan.pk, action=ACTIONS["add"])
+        self.assertEqual(record.after["rule"]["user_ids"], [self.member.pk])
+        self.assertEqual(record.reason, "测试免交")
 
     def test_task_withdrawal_remains_protected(self):
         scheduling.audit(self.plan, self.admin, "撤回发布", after={"层级": "task"}, task=self.task)

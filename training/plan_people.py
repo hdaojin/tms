@@ -64,6 +64,14 @@ def plan_staff_search(request):
             raise PermissionDenied
     elif not request.user.has_perm("training.add_trainingplan"):
         raise PermissionDenied
+    if request.GET.get("role") in {"schedulers", "approvers", "responsible_coaches", "duty_personnel"}:
+        users = eligible_staff(request.GET["role"], plan)
+    else:
+        return JsonResponse({"error": "人员职责无效。"}, status=400)
+    return plan_people_search_response(request, users)
+
+
+def plan_people_search_response(request, users):
     query = request.GET.get("q", "").strip()
     try:
         page = int(request.GET.get("page", "1"))
@@ -71,12 +79,7 @@ def plan_staff_search(request):
         page = 0
     if len(query) > 100 or not 1 <= page <= 10000:
         return JsonResponse({"error": "搜索条件无效，请重新输入。"}, status=400)
-    users = get_user_model().objects.order_by("last_name", "first_name", "pk")
-    if request.GET.get("role") in {"schedulers", "approvers", "responsible_coaches", "duty_personnel"}:
-        users = users.filter(pk__in=eligible_staff(request.GET["role"], plan).values("pk"))
-    else:
-        return JsonResponse({"error": "人员职责无效。"}, status=400)
-    users = annotate_identity_labels(users)
+    users = annotate_identity_labels(users.order_by("last_name", "first_name", "pk"))
     if query:
         users = users.filter(pk__in=user_name_search_ids(users, query))
     rows = list(users[(page - 1) * 20 : page * 20 + 1]) if query else []

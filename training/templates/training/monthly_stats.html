@@ -29,10 +29,10 @@
       </section>
       <section class="mt-4 rounded-box border border-base-300 bg-base-100 p-4 shadow-sm" aria-labelledby="log-days-title">
         <h2 id="log-days-title" class="text-lg font-semibold">每日提交情况</h2>
-        <p class="mt-1 text-sm text-base-content/70">仅统计有训练排班且已到达的日期。未提交表示截至查询时尚无日志记录。</p>
+        <p class="mt-1 text-sm text-base-content/70">仅统计有训练排班且已到达的日期。免交从应交份数中扣除，实际提交仍计入已交份数。</p>
         <div class="mt-3 overflow-x-auto">
           <table class="table table-sm">
-            <thead><tr><th scope="col">训练日期</th><th scope="col">已提交选手</th><th scope="col">已提交教练</th><th scope="col">未提交选手</th><th scope="col">未提交教练</th></tr></thead>
+            <thead><tr><th scope="col">训练日期</th><th scope="col">已提交选手</th><th scope="col">已提交教练</th><th scope="col">未提交选手</th><th scope="col">未提交教练</th><th scope="col">免交选手</th><th scope="col">免交教练</th></tr></thead>
             <tbody>
               {% for row in rows %}
                 <tr>
@@ -41,9 +41,11 @@
                   <td>{% include "training/partials/log_statistics_submitted.html" with submitted=row.submitted_coaches %}</td>
                   <td>{% if row.roster_complete %}{{ row.unsubmitted_competitors|join:"、"|default:"无" }}{% else %}名单不完整，无法核定{% endif %}</td>
                   <td>{{ row.unsubmitted_coaches|join:"、"|default:"无" }}</td>
+                  <td>{{ row.exempt_competitors|join:"、"|default:"无" }}</td>
+                  <td>{{ row.exempt_coaches|join:"、"|default:"无" }}</td>
                 </tr>
               {% empty %}
-                <tr><td colspan="5">当前筛选范围内没有可统计的训练日期。</td></tr>
+                <tr><td colspan="7">当前筛选范围内没有可统计的训练日期。</td></tr>
               {% endfor %}
             </tbody>
           </table>

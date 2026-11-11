@@ -9,6 +9,7 @@ from django.utils import timezone
 from core.navigation import get_section_items
 
 from .historical_rosters import CONFIRMED, REVOKED
+from .log_exemptions import ACTIONS, exemption_history
 from .models import (
     TrainingChangeRecord, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot,
     TrainingTask,
@@ -316,3 +317,137 @@ class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
         self.user = User.objects.get(pk=self.user.pk)
         self.assertEqual(statistics_entries(), [])
         self.assertEqual(self.client.get(self.url).status_code, 403)
+
+    def exemption_url(self):
+        return reverse("training:plan_log_exemptions", args=[self.plan.pk])
+
+    def exemption_preview(self, **data):
+        return self.client.post(self.exemption_url(), {
+            "operation": "add", "start": self.first.isoformat(), "reason": "训练安排", **data,
+        })
+
+    def exemption_confirm(self, response):
+        return self.client.post(self.exemption_url(), {"token": response.context["token"]})
+
+    def test_role_snapshot_and_overlapping_exemptions(self):
+        self.grant("view_all_traininglog")
+        self.plan.schedule_days.get(date=self.first).slots.get().coaches.add(self.student)
+        log = self.log(self.student, self.first)
+        self.plan.responsible_coaches.add(self.student)
+        admin = User.objects.create_superuser("admin")
+        self.client.force_login(admin)
+
+        preview = self.exemption_preview(role="coach")
+        self.assertContains(preview, "确认免交规则变更")
+        self.assertEqual(preview.context["snapshot"]["delta"], -4)
+        self.assertRedirects(self.exemption_confirm(preview), self.exemption_url())
+        original = exemption_history(self.plan).get()
+        self.assertEqual(original.actor, admin)
+        self.plan.responsible_coaches.set([self.coach])
+        first, second = self.stats()["rows"]
+        self.assertEqual(first["exempt_competitors"], ["王五"])
+        self.assertEqual(first["exempt_coaches"], ["王五"])
+        self.assertEqual(first["submitted_coaches"][0]["log_id"], log.pk)
+        self.assertEqual(second["unsubmitted_coaches"], ["李四"])
+        student = next(person for person in self.stats()["people"] if person["user_id"] == self.student.pk)
+        self.assertEqual((student["count"], student["expected"]), (2, 0))
+
+        preview = self.exemption_preview(user=self.student.pk, start=self.second.isoformat())
+        self.assertEqual(preview.context["snapshot"]["delta"], 0)
+        self.assertRedirects(self.exemption_confirm(preview), self.exemption_url())
+        preview = self.exemption_preview(
+            operation="replace", target=original.pk, role="coach", start=self.second.isoformat(),
+        )
+        self.assertEqual(preview.context["snapshot"]["delta"], -2)
+        self.assertRedirects(self.exemption_confirm(preview), self.exemption_url())
+        replacement = exemption_history(self.plan).get(action=ACTIONS["replace"])
+        self.assertEqual(replacement.before["names"], ["王五"])
+        first, second = self.stats()["rows"]
+        self.assertEqual(first["exempt_coaches"], ["王五"])
+        self.assertEqual(second["exempt_competitors"], ["王五"])
+        self.assertEqual(second["exempt_coaches"], ["李四"])
+        self.assertEqual(second["unsubmitted_coaches"], [])
+
+        preview = self.exemption_preview(operation="end", target=replacement.pk, start=self.second.isoformat())
+        self.assertEqual(preview.context["snapshot"]["delta"], 2)
+        self.assertRedirects(self.exemption_confirm(preview), self.exemption_url())
+        first, second = self.stats()["rows"]
+        self.assertEqual(first["exempt_coaches"], ["王五"])
+        self.assertEqual(second["unsubmitted_coaches"], ["李四"])
+        self.assertEqual(second["exempt_competitors"], ["王五"])
+
+        self.client.force_login(self.user)
+        response = self.client.get(self.url)
+        self.assertContains(response, "免交选手")
+        self.assertContains(response, "王五")
+
+    def test_exemption_permissions_stale_preview_and_replay(self):
+        url = self.exemption_url()
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.exemption_preview(user=self.student.pk).status_code, 403)
+        self.client.force_login(User.objects.create_superuser("admin"))
+        self.assertContains(self.client.get(url), "预览变更")
+        preview = self.exemption_preview(role="competitor")
+        self.plan.participants.create(user=self.coach)
+        self.assertContains(self.exemption_confirm(preview), "请重新预览")
+        self.assertFalse(exemption_history(self.plan).exists())
+        preview = self.exemption_preview(role="competitor")
+        self.assertRedirects(self.exemption_confirm(preview), url)
+        self.assertContains(self.exemption_confirm(preview), "请重新预览")
+        self.assertEqual(exemption_history(self.plan).count(), 1)
+        self.assertContains(self.exemption_preview(user=self.student.pk, start=self.plan.end_date + timedelta(days=1)),
+                            "生效日期须在计划范围内")
+
+    def test_exemption_candidates_are_limited_to_plan_rosters(self):
+        duty_only = User.objects.create_user("duty-only", first_name="仅值班")
+        withdrawn = User.objects.create_user("withdrawn", first_name="已退出")
+        self.plan.duty_personnel.add(duty_only)
+        self.plan.responsible_coaches.add(self.coach)
+        self.plan.participants.create(user=withdrawn, is_active=False)
+        search_url = reverse("training:plan_log_exemption_search", args=[self.plan.pk])
+        self.assertEqual(self.client.get(search_url, {"q": "王五"}).status_code, 403)
+        self.client.force_login(User.objects.create_superuser("admin"))
+
+        response = self.client.get(self.exemption_url())
+        self.assertContains(response, "负责教练")
+        self.assertContains(response, "参与选手")
+        candidates = response.context["form"].fields["user"].queryset
+        self.assertEqual(set(candidates.values_list("pk", flat=True)), {self.user.pk, self.student.pk, self.coach.pk})
+        self.assertEqual(self.client.get(search_url, {"q": "ww"}).json()["results"],
+                         [{"id": self.student.pk, "label": "王五"}])
+        self.assertEqual(self.client.get(search_url, {"q": "仅值班"}).json()["results"], [])
+        for params in ({"user": duty_only.pk}, {"user": withdrawn.pk}, {"role": "duty"}):
+            with self.subTest(params=params):
+                response = self.exemption_preview(**params)
+                self.assertTrue(response.context["form"].errors)
+                self.assertNotIn("token", response.context)
+
+        preview = self.exemption_preview(user=self.student.pk)
+        self.plan.participants.filter(user=self.student).update(is_active=False)
+        self.assertContains(self.exemption_confirm(preview), "已不在计划的负责教练或参与选手名单中")
+        self.assertFalse(exemption_history(self.plan).exists())
+
+    def test_exemption_combines_roles_and_multiple_people(self):
+        self.plan.responsible_coaches.add(self.student, self.coach)
+        self.client.force_login(User.objects.create_superuser("admin"))
+        response = self.client.get(self.exemption_url())
+        self.assertContains(response, "所有成员都会免交训练日志")
+        self.assertContains(response, "全部负责教练")
+        self.assertContains(response, "全部参与选手")
+
+        for selection, expected in (
+            ({"role": ["coach", "competitor"]}, [self.user, self.student, self.coach]),
+            ({"role": ["coach"]}, [self.student, self.coach]),
+            ({"role": ["competitor"]}, [self.user, self.student]),
+            ({"user": [self.user.pk, self.student.pk]}, [self.user, self.student]),
+            ({"role": ["coach"], "user": [self.user.pk, self.student.pk]}, [self.user, self.student, self.coach]),
+        ):
+            with self.subTest(selection=selection):
+                preview = self.exemption_preview(**selection)
+                rule = preview.context["snapshot"]["change"]["rule"]
+                self.assertEqual(rule["user_ids"], sorted(user.pk for user in expected))
+                self.assertContains(preview, f"合并后免交名单（{len(expected)} 人）")
+
+        self.assertContains(preview, "指定人员 张三、王五")
+        self.assertRedirects(self.exemption_confirm(preview), self.exemption_url())
+        self.assertEqual(exemption_history(self.plan).get().after["rule"], rule)
