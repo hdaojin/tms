@@ -18,6 +18,13 @@
         <a class="btn btn-outline btn-sm" href="{% url 'training:withdraw_publication' plan.pk 'plan' %}?return_query={{ request.GET.urlencode|urlencode }}">撤回计划</a>
       {% endif %}
     {% endif %}
+    {% if can_access_plan_delete %}
+      {% if plan_delete_reason %}
+        <div class="tooltip" data-tip="{{ plan_delete_reason }}" tabindex="0" aria-label="{{ plan_delete_reason }}"><button type="button" class="btn btn-outline btn-error btn-sm" disabled>删除计划</button></div>
+      {% else %}
+        <a class="btn btn-outline btn-error btn-sm" href="{% url 'training:plan_delete' plan.pk %}">删除计划</a>
+      {% endif %}
+    {% endif %}
   </div></div>
   <p>{{ plan.start_date|date:'Y-m-d' }} 至 {{ plan.end_date|date:'Y-m-d' }} · {{ plan.display_status }} · {% if plan.published_at %}计划已发布{% else %}计划未发布{% endif %} · {% if plan.schedule_published_at %}排班已发布{% else %}排班未发布{% endif %}</p><p class="whitespace-pre-line">{{ plan.objective }}</p>
   {% if can_see_management %}

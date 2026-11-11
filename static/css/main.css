@@ -16,7 +16,7 @@
 @source not "../../static/js/mermaid.min.js";
 @source not "../../static/js/prism.js";
 @plugin "@tailwindcss/typography";
-@plugin "daisyui" {
+@plugin "../../scripts/daisyui-compat.mjs" {
   themes:
     light --default,
     dark --prefersdark,

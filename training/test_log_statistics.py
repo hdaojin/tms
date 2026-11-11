@@ -9,7 +9,10 @@ from django.utils import timezone
 from core.navigation import get_section_items
 
 from .historical_rosters import CONFIRMED, REVOKED
-from .models import TrainingChangeRecord, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot
+from .models import (
+    TrainingChangeRecord, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingScheduleDay, TrainingScheduleSlot,
+    TrainingTask,
+)
 from .selectors import training_log_submission_statistics
 from .tests import TrainingFixtureMixin, User
 
@@ -116,6 +119,36 @@ class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(result["rows"][1]["unsubmitted_coaches"], ["李四"])
         self.assertEqual({p["name"]: p["expected"] for p in result["people"]}, {"张三": 2, "李四": 2, "王五": 2})
         self.assertEqual({p["name"]: p["count"] for p in result["people"]}, {"张三": 1, "李四": 1, "王五": 0})
+
+    def test_early_reading_does_not_add_days_or_coaches(self):
+        self.grant("view_all_traininglog")
+        early_coach = User.objects.create_user("early-coach", first_name="早读教练")
+        self.day(self.first, early_coach, period=TrainingScheduleSlot.Period.EARLY)
+        self.day(self.third, early_coach, period=TrainingScheduleSlot.Period.EARLY)
+        self.log(self.user, self.first)
+        self.log(self.user, self.third)
+        self.log(early_coach, self.first)
+        result = self.stats()
+        self.assertEqual([row["date"] for row in result["rows"]], [self.first, self.second])
+        self.assertEqual(result["rows"][0]["submitted_coaches"], [])
+        self.assertEqual(result["rows"][0]["unsubmitted_coaches"], ["李四"])
+        self.assertEqual({p["name"]: p["count"] for p in result["people"]}, {"张三": 1, "李四": 0, "王五": 0})
+
+    def test_early_reading_assignments_do_not_supply_historical_competitors(self):
+        self.grant("view_all_traininglog")
+        legacy = self.make_plan("后补计划")
+        day = legacy.schedule_days.create(date=self.first)
+        for period, person in [("early", self.student), ("morning", self.user)]:
+            TrainingCycleMember.objects.create(training_cycle=self.cycle_obj, user=person, role="competitor")
+            slot = day.slots.create(period=period, kind="general")
+            task = TrainingTask.objects.create(
+                training_plan=legacy, planned_date=self.first, schedule_slot=slot, title=period,
+                status=TrainingTask.Status.PUBLISHED, created_by=self.user,
+            )
+            task.executions.create(user=person)
+            self.log(person, self.first)
+        row = self.client.get(self.url, {"plan": legacy.pk}).context["rows"][0]
+        self.assertEqual([person["name"] for person in row["submitted_competitors"]], ["张三"])
 
     def test_membership_changes_apply_on_local_date_and_last_change_wins(self):
         self.grant("view_all_traininglog")

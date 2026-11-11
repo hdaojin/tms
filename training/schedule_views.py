@@ -60,6 +60,7 @@ def render(request, template, context=None, **kwargs):
         "training/slot_tasks_clear.html": "清空任务确认",
         "training/workbook_import.html": "导入训练计划",
         "training/plan_clear.html": "清空训练计划",
+        "training/plan_delete.html": "删除训练计划",
         "training/plan_publish.html": "统一发布全部任务",
     }.get(template, "训练计划")
     parents = [breadcrumb_link("训练计划", "training:plan_list")] if request.user.has_perm("training.view_trainingplan") else []
@@ -149,7 +150,11 @@ class PlanDetailView(TrainingPlanDetailView):
         context = plan_context(self, context)
         from .entry_operations import withdrawal_state
         from .plan_actions import _reason
+        from .plan_delete import blocked_reason
 
+        if fragment is None and service.privileged(self.request.user):
+            context["can_access_plan_delete"] = True
+            context["plan_delete_reason"] = blocked_reason(self.object)
         if self.object.published_at and service.privileged(self.request.user):
             context["can_withdraw_plan"] = True
             context["can_manage_board"] = True

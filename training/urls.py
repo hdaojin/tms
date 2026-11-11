@@ -15,6 +15,7 @@ urlpatterns = [
     path("plans/<int:pk>/board/", schedule_views.set_board_listing, name="plan_board_listing"),
     path("plans/<int:pk>/publish-tasks/", entry_views.publish_all_tasks, name="publish_all_tasks"),
     path("plans/<int:pk>/clear/<str:action>/", entry_views.clear_plan, name="plan_clear"),
+    path("plans/<int:pk>/delete/", entry_views.delete_plan, name="plan_delete"),
     path("plans/<int:pk>/entries/", entry_views.entry_operation, name="entry_operation"),
     path("plans/<int:pk>/withdraw/<str:level>/", entry_views.withdraw_publication, name="withdraw_publication"),
     path("plans/<int:pk>/withdraw/task/<int:task_id>/", entry_views.withdraw_publication, {"level": "task"}, name="withdraw_task"),

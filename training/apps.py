@@ -15,8 +15,8 @@ class TrainingConfig(AppConfig):
         from core.utils.signals import register_file_cleanup_signals
         from .models import TaskExecutionAttachment, TrainingLog, TrainingPlan, TrainingTaskAttachment, TrainingProgressAttachment
 
-        register_file_cleanup_signals(TrainingPlan, file_field="source_file")
-        register_file_cleanup_signals(TrainingTaskAttachment, file_field="file")
+        register_file_cleanup_signals(TrainingPlan, file_field="source_file", delete_on_commit=True)
+        register_file_cleanup_signals(TrainingTaskAttachment, file_field="file", delete_on_commit=True)
         register_file_cleanup_signals(TaskExecutionAttachment, file_field="file")
         register_file_cleanup_signals(TrainingProgressAttachment, file_field="file", delete_on_commit=True)
         register_file_cleanup_signals(TrainingLog, file_field="document", delete_on_commit=True)

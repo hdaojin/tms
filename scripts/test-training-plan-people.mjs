@@ -49,14 +49,14 @@ class Element {
   focus() {}
 }
 
-function fixture(readyState = "loading") {
+function fixture(readyState = "loading", results = [{ id: 2, label: "乙" }]) {
   const events = {},
     requests = [];
   const selected = new Element();
   selected.children = [
     new Element({
       personId: "1",
-      personLabel: "甲（one）",
+      personLabel: "甲",
       unavailable: "false",
     }),
   ];
@@ -78,12 +78,11 @@ function fixture(readyState = "loading") {
     ]),
   );
   const root = new Element({
-    fieldName: "competitors",
-    searchUrl: "/training/search/?plan=3&role=competitor",
+    fieldName: "responsible_coaches",
+    searchUrl: "/training/plans/staff-search/?plan=3&role=responsible_coaches",
   });
   root.querySelector = (selector) => elements[selector];
   const form = new Element();
-  form.querySelector = () => ({ value: "12" });
   root.closest = () => form;
   const document = {
     readyState,
@@ -109,7 +108,7 @@ function fixture(readyState = "loading") {
       return {
         ok: true,
         json: async () => ({
-          results: [{ id: 2, label: "乙（two）" }],
+          results,
           has_more: false,
         }),
       };
@@ -119,15 +118,17 @@ function fixture(readyState = "loading") {
   return { elements, requests, form };
 }
 
-test("弹窗取消保留原选择，确认后才应用新选择，搜索携带周期", async () => {
+test("弹窗取消保留原选择，确认后才应用新选择，搜索保留计划和职责", async () => {
   const f = fixture(),
     e = f.elements;
   e["[data-plan-open]"].click();
   e["[data-plan-query]"].value = "乙";
   e["[data-plan-query]"].events.input();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(f.requests[0].searchParams.get("cycle"), "12");
   assert.equal(f.requests[0].searchParams.get("plan"), "3");
+  assert.equal(f.requests[0].searchParams.get("role"), "responsible_coaches");
+  assert.equal(f.requests[0].searchParams.get("q"), "乙");
+  assert.equal(f.requests[0].searchParams.get("page"), "1");
   e["[data-plan-results]"].children[0].click();
   e["[data-plan-cancel]"].click();
   assert.deepEqual(
@@ -176,36 +177,18 @@ test("重置表单恢复初始人员名单并关闭弹窗", () => {
   assert.equal(e["[data-plan-dialog]"].open, false);
 });
 
-test("全部选手隐藏并禁用个别指定，取消与重置恢复选择区状态", () => {
-  const all = new Element();
-  all.checked = true;
-  const groups = new Element();
-  const individuals = new Element();
-  individuals.querySelector = () => groups;
-  const form = new Element();
-  const root = new Element();
-  root.querySelector = (selector) =>
-    selector === '[name="all_competitors"]' ? all : individuals;
-  root.closest = () => form;
-  const document = {
-    readyState: "complete",
-    querySelectorAll: (selector) =>
-      selector === "[data-plan-participants]" ? [root] : [],
-    addEventListener() {},
-  };
-  vm.runInNewContext(source, {
-    document,
-    setTimeout: (callback) => callback(),
-  });
-  assert.equal(individuals.hidden, true);
-  assert.equal(individuals.disabled, true);
-  all.checked = false;
-  all.events.change();
-  assert.equal(individuals.hidden, false);
-  assert.equal(individuals.disabled, false);
-  assert.equal(groups.disabled, false);
-  all.checked = true;
-  form.events.reset();
-  assert.equal(individuals.hidden, true);
-  assert.equal(groups.disabled, true);
+test("同名区分备注无效的候选人不可选", async () => {
+  const { elements: e } = fixture("loading", [
+    { id: 2, label: "乙", invalid: true },
+    { id: 3, label: "乙（教练）" },
+  ]);
+  e["[data-plan-open]"].click();
+  e["[data-plan-query]"].value = "乙";
+  e["[data-plan-query]"].events.input();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const [invalid, eligible] = e["[data-plan-results]"].children;
+  assert.equal(invalid.disabled, true);
+  assert.match(invalid.textContent, /同名备注未填写或重复/);
+  assert.equal(eligible.disabled, false);
 });

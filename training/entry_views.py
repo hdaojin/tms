@@ -273,6 +273,34 @@ def publish_all_tasks(request, pk):
 
 
 @require_http_methods(["GET", "POST"])
+def delete_plan(request, pk):
+    from . import plan_delete
+
+    if not scheduling.privileged(request.user):
+        raise PermissionDenied
+    plan = get_plan(request.user, pk)
+    salt = "training.plan_delete"
+    result, token, error = None, "", ""
+    try:
+        if request.method == "POST":
+            data = signing.loads(request.POST.get("token", ""), salt=salt, max_age=600)
+            if data["user"] != request.user.pk or data["plan"] != plan.pk:
+                raise PermissionDenied
+            plan_delete.execute(plan, request.user, data["digest"])
+            messages.success(request, "训练计划已删除。")
+            return redirect("training:plan_list")
+        result = plan_delete.preview(plan, request.user)
+        token = signing.dumps({"user": request.user.pk, "plan": plan.pk, "digest": result["digest"]}, salt=salt)
+    except ValidationError as exc:
+        error = "；".join(exc.messages)
+    except signing.BadSignature:
+        error = "预览已过期或被修改，请重新预览。"
+    return render(request, "training/plan_delete.html", {
+        "plan": plan, "result": result, "token": token, "error": error,
+    })
+
+
+@require_http_methods(["GET", "POST"])
 def clear_plan(request, pk, action):
     from . import plan_clear
 

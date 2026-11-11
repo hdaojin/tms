@@ -360,3 +360,5 @@ testsql-fixtures/
 # FilePond's vendored runtime dependency is a required deployment asset.
 !static/vendor/filepond/esm/vendor/clsx/dist/
 !static/vendor/filepond/esm/vendor/clsx/dist/clsx.js
+outputs/
+

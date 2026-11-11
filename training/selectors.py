@@ -27,7 +27,7 @@ def training_log_statistics_plans_for(user):
     participant = plans.filter(pk=OuterRef("pk"), participants__user=user)
     coach = TrainingScheduleSlot.objects.filter(
         day__training_plan_id=OuterRef("pk"), coaches=user, is_configured=True, kind__in=ACTIVE_KINDS,
-    )
+    ).exclude(period=TrainingScheduleSlot.Period.EARLY)
     return plans.filter(Exists(participant) | Exists(coach))
 
 
@@ -76,7 +76,9 @@ def _daily_competitors(plan, dates, *, include_backfill=True):
             training_task__training_plan=plan,
             training_task__status=TrainingTask.Status.PUBLISHED,
             training_task__schedule_slot__day__date__in=incomplete_days,
-        ).exclude(status=TaskExecution.Status.CANCELLED).values_list(
+        ).exclude(training_task__schedule_slot__period=TrainingScheduleSlot.Period.EARLY).exclude(
+            status=TaskExecution.Status.CANCELLED,
+        ).values_list(
             "training_task__schedule_slot__day__date", "user_id", "revoked_at",
         )
         assigned = defaultdict(set)
@@ -93,7 +95,7 @@ def training_log_stat_slots(plan, start, end):
 
     return TrainingScheduleSlot.objects.filter(
         day__training_plan=plan, day__date__range=(start, end), kind__in=ACTIVE_KINDS, is_configured=True,
-    )
+    ).exclude(period=TrainingScheduleSlot.Period.EARLY)
 
 
 def training_log_submission_statistics(user, *, plan, q="", date_from=None, date_to=None):
