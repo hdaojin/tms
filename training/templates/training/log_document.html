@@ -1,0 +1,47 @@
+<table id="log-logos"><tbody><tr>
+  <td><img src="tms-asset:school-logo" alt="学校校徽及校名"></td>
+  <td><img src="tms-asset:worldskills-china" alt="世界技能大赛中国标识"></td>
+</tr></tbody></table>
+<h1 id="log-heading">{{ header.heading }}</h1>
+<h2 id="log-title">{{ heading }}</h2>
+<table id="log-metadata"><tbody>
+  <tr><th>日期</th><td>{{ header.date }}</td>
+    {% if coach %}<th>教练姓名</th><td>{{ header.author }}</td>
+    {% else %}<th>授课老师</th><td>{{ header.teachers }}</td>{% endif %}
+  </tr>
+  <tr><th>训练模块</th><td colspan="3">
+    {% if new_layout %}{{ domains|join:"、" }}{% else %}{% for plan in modules %}<p>{{ plan.title }} · {{ plan.periods|join:"、" }}</p>{% endfor %}{% endif %}
+  </td></tr>
+  <tr><th>训练任务</th><td colspan="3">{% if new_layout %}{{ task_title }}{% else %}<ul>
+    {% for task in source.tasks %}<li>{{ task.period }} · {{ task.title }}{% if coach %}（已填 {{ task.filled }}/{{ task.expected }} 人）{% endif %}</li>{% endfor %}
+  </ul>{% endif %}</td></tr>
+</tbody></table>
+{% if coach %}
+<div id="log-goals"><h3>训练目标</h3><div>
+  {% for title, goal, suggested in goals %}<p><strong>{{ title }}</strong><br>{% if goal and suggested %}建议目标 · {% endif %}{{ goal|linebreaksbr }}</p>{% endfor %}
+</div></div>
+{% endif %}
+<div id="log-outline"><h3>训练内容</h3><div>
+  {% if new_layout %}<ol>
+    {% for task in source.tasks %}{% for item in task.outline %}<li>{{ item }}</li>{% endfor %}{% endfor %}
+    {% for item in suggested_items %}<li>{{ item }}</li>{% endfor %}
+  </ol>{% else %}
+    {% for task in source.tasks %}{% if task.outline %}<p><strong>{{ task.title }}</strong></p>
+      <ol>{% for item in task.outline %}<li>{{ item }}</li>{% endfor %}</ol>{% endif %}{% endfor %}
+  {% endif %}
+</div></div>
+{% if gallery %}<div id="log-gallery"><h3>训练图片</h3><div>
+  {% for pk in gallery %}<p><img src="tms-asset:image-{{ pk }}" alt="训练过程图片"></p>{% endfor %}
+</div></div>{% endif %}
+<div id="log-process">
+  {% if coach %}<h3>过程记录</h3><div>{{ sections.process }}</div>{% else %}<h3>学习笔记</h3><div>{{ sections.notes }}</div>{% endif %}
+</div>
+<div id="log-summary"><h3>总结</h3><div>
+  <h4>训练目标达成情况</h4>{{ sections.achievement }}
+  <h4>不足之处</h4>{{ sections.shortcomings }}
+  <h4>{% if coach %}改进方向{% else %}改进建议{% endif %}</h4>{{ sections.improvement }}
+</div></div>
+{% if references %}<div id="log-references"><h3>参考资料</h3><div>
+  <ul>{% for link in references %}<li><a href="{{ link }}">{{ link }}</a></li>{% endfor %}</ul>
+</div></div>{% endif %}
+<table id="log-signature"><tbody><tr><th>填写人</th><td>{{ header.author }}</td></tr></tbody></table>

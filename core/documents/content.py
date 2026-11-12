@@ -32,6 +32,7 @@ CLEANER = nh3.Cleaner(
         "h5",
         "h6",
         "p",
+        "div",
         "em",
         "strong",
         "b",
@@ -77,7 +78,7 @@ CLEANER = nh3.Cleaner(
 )
 
 
-def _normalize_image(asset: DocumentAsset, image_id: str) -> tuple[bytes, str, int]:
+def normalize_document_image(asset: DocumentAsset, image_id: str) -> tuple[bytes, str, int]:
     expected = IMAGE_FORMATS.get(asset.media_type)
     if not expected:
         raise DocumentError(f"图片「{image_id}」只支持 PNG、JPEG 或 WebP。")
@@ -189,7 +190,7 @@ def _prepare_images(soup, assets):
         if image_id not in assets:
             raise DocumentError(f"找不到图片「{image_id}」。")
         if src not in images:
-            content, mime, pixels = _normalize_image(assets[image_id], image_id)
+            content, mime, pixels = normalize_document_image(assets[image_id], image_id)
             images[src] = (content, mime)
             total_pixels += pixels
         total_bytes += len(images[src][0])

@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from django import forms
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import HttpResponse
@@ -98,14 +100,26 @@ def target_detail(request, pk, personal=False):
     from .scheduling import visible_plans
     can_view_plan = visible_plans(user).filter(pk=plan.pk).exists()
     own = target.user_id == user.pk
+    daily_url = ""
+    scheduled_execution = not personal and target.training_task.schedule_slot_id
+    if own and scheduled_execution and user.has_perm("training.view_trainingprogress"):
+        day = target.training_task.planned_date
+        query = urlencode({"cycle": plan.training_cycle_id, "training_date": day.isoformat()})
+        daily_url = f"{reverse('training:daily_progress')}?{query}#task-{target.pk}"
     form = ProgressForm()
     error = ""
     if request.method == "POST":
         try:
             action = request.POST.get("action")
             if action == "status":
+                if scheduled_execution:
+                    raise ValidationError("请在训练完成情况页面填写官方任务。")
                 target = process.change_state(target, user, request.POST.get("status"))
             elif action == "progress":
+                if scheduled_execution:
+                    if not daily_url:
+                        raise PermissionDenied
+                    return HttpResponse(headers={"HX-Redirect": daily_url}) if request.htmx else redirect(daily_url)
                 form = ProgressForm(request.POST, request.FILES)
                 if form.is_valid():
                     previous = (
@@ -153,7 +167,9 @@ def target_detail(request, pk, personal=False):
             "plan": plan,
             "can_view_plan": can_view_plan,
             "own": own,
-            "can_change_state": own
+            "daily_url": daily_url,
+            "scheduled_execution": scheduled_execution,
+            "can_change_state": own and not scheduled_execution
             and user.has_perm("training.change_personaltrainingtask" if personal else "training.change_taskexecution"),
             "can_edit_personal": personal
             and user.has_perm("training.change_personaltrainingtask")

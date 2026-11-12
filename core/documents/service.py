@@ -14,6 +14,9 @@ TEMPLATES = {
     "standard": DocumentTemplate("standard", "标准文档", ("css/documents/base.css", "css/documents/standard.css")),
     "formal": DocumentTemplate("formal", "正式文档", ("css/documents/base.css", "css/documents/formal.css")),
 }
+TRAINING_LOG_TEMPLATE = DocumentTemplate(
+    "training-log", "训练日志", ("css/documents/base.css", "css/documents/training-log.css"),
+)
 
 
 def list_document_templates() -> tuple[DocumentTemplate, ...]:
@@ -21,7 +24,9 @@ def list_document_templates() -> tuple[DocumentTemplate, ...]:
 
 
 def _render_document(document: DocumentInput, *, for_pdf: bool):
-    template = TEMPLATES.get(document.template_id)
+    template = TRAINING_LOG_TEMPLATE if document.template_id == TRAINING_LOG_TEMPLATE.id else TEMPLATES.get(
+        document.template_id,
+    )
     if template is None:
         raise DocumentError("未知的文档模板。")
     if document.document_date is not None and type(document.document_date) is not date:

@@ -23,6 +23,10 @@ class Provider(Protocol):
 
     def test(self, base_url: str, payload: dict, api_key: str) -> str: ...
 
+    def generate(self, base_url: str, payload: dict, api_key: str) -> str: ...
+
+    def supports_images(self, base_url: str, model_id: str) -> bool: ...
+
 
 class RejectRedirects(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -50,6 +54,23 @@ class DeepSeekProvider:
 
     @sensitive_variables()
     def test(self, base_url: str, payload: dict, api_key: str) -> str:
+        return self._completion(
+            base_url, payload, api_key, timeout=25 if payload["thinking"]["type"] == "enabled" else 10,
+            limit=65536,
+        )["message"]["content"]
+
+    @sensitive_variables()
+    def generate(self, base_url: str, payload: dict, api_key: str) -> str:
+        choice = self._completion(base_url, payload, api_key, timeout=120, limit=2 * 1024 * 1024)
+        if choice.get("finish_reason") != "stop":
+            raise ProviderError("模型未返回完整正文，请缩短素材或调整篇幅后重试。")
+        return choice["message"]["content"]
+
+    def supports_images(self, base_url: str, model_id: str) -> bool:
+        return base_url == self.default_url and model_id == self.default_model
+
+    @sensitive_variables()
+    def _completion(self, base_url, payload, api_key, *, timeout, limit):
         request = Request(
             f"{base_url}/chat/completions",
             data=json.dumps(payload).encode(),
@@ -58,8 +79,8 @@ class DeepSeekProvider:
         )
         opener = build_opener(ProxyHandler({}), RejectRedirects())
         try:
-            with opener.open(request, timeout=25 if payload["thinking"]["type"] == "enabled" else 10) as response:
-                body = response.read(65537)
+            with opener.open(request, timeout=timeout) as response:
+                body = response.read(limit + 1)
         except HTTPError as exc:
             code = exc.code
             exc.close()
@@ -82,13 +103,14 @@ class DeepSeekProvider:
         except (HTTPException, OSError):
             raise ProviderError("连接中断，请稍后重试。") from None
 
-        if len(body) > 65536:
-            raise ProviderError("提供商响应超过测试允许的大小。")
+        if len(body) > limit:
+            raise ProviderError("提供商响应超过允许的大小。")
         try:
-            content = json.loads(body)["choices"][0]["message"]["content"]
+            choice = json.loads(body)["choices"][0]
+            content = choice["message"]["content"]
             if isinstance(content, str) and content.strip():
-                return content
-        except (ValueError, KeyError, IndexError, TypeError):
+                return choice
+        except (ValueError, KeyError, IndexError, TypeError, RecursionError):
             pass
         raise ProviderError("提供商未返回有效的文本生成结果。")
 

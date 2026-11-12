@@ -1,0 +1,40 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="space-y-4">
+  <form method="post" class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      {% csrf_token %}
+      <h2 class="card-title">默认 AI 提示词</h2>
+      <div class="grid gap-4 md:grid-cols-2">
+        {% for label, prompt_form in prompt_forms %}
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">{{ label }}</legend>
+            {% include "components/form_errors.html" with form=prompt_form %}
+            {% for field in prompt_form %}{% include "components/field.html" %}{% endfor %}
+          </fieldset>
+        {% endfor %}
+      </div>
+      <button class="btn btn-primary self-start" name="action" value="prompts">保存默认提示词</button>
+    </div>
+  </form>
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">日志标题</h2>
+      <form method="get" class="flex flex-wrap items-end gap-3">
+        {% include "components/field.html" with field=selection.cycle %}
+        <button class="btn btn-outline">选择周期</button>
+      </form>
+      {% if heading_form %}
+        <form method="post" class="space-y-3">
+          {% csrf_token %}
+          {% include "components/form_errors.html" with form=heading_form %}
+          <div class="grid gap-3 sm:grid-cols-2">
+            {% for field in heading_form %}{% include "components/field.html" %}{% endfor %}
+          </div>
+          <button class="btn btn-primary" name="action" value="heading">保存标题设置</button>
+        </form>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

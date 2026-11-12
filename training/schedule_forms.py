@@ -21,6 +21,37 @@ class TrainingRecipientSelect(RecipientSelect):
         return context
 
 
+class SkillSelect(TrainingRecipientSelect):
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"].update(candidate_help="仅显示本项目及当前技术领域内的技能。", candidate_label="技能",
+                                 candidate_placeholder="输入技能名称，不区分大小写")
+        return context
+
+
+class SubtaskInputs(forms.Widget):
+    template_name = "training/subtask_inputs.html"
+
+    class Media:
+        js = ("js/training-checklist-editor.js",)
+
+    def value_from_datadict(self, data, files, name):
+        return data.getlist(name) if hasattr(data, "getlist") else data.get(name, [])
+
+    def format_value(self, value):
+        return value or []
+
+
+def slot_skills(slot):
+    from django.db.models import Q
+
+    skills = Skill.objects.filter(skill_project=slot.day.training_plan.training_cycle.skill_project)
+    domains = list(slot.domains.values_list("pk", flat=True))
+    if domains:
+        skills = skills.filter(Q(primary_domain_id__in=domains) | Q(related_domains__in=domains)).distinct()
+    return skills
+
+
 def plan_coaches(plan):
     return plan.responsible_coaches.all()
 
@@ -88,25 +119,26 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
     attachments = MultipleFileField(label="教练任务附件", required=False, upload_spec=TRAINING_ATTACHMENT_UPLOAD_SPEC)
     reason = forms.CharField(label="调整原因和实际执行情况", required=False)
     assignment_configured = forms.BooleanField(required=False, initial=True, widget=forms.HiddenInput)
-    skills = forms.ModelMultipleChoiceField(label="关联技能", queryset=Skill.objects.none(), required=False)
+    subtask_titles = forms.Field(label="子任务", widget=SubtaskInputs, required=False)
+    skills = forms.ModelMultipleChoiceField(label="关联技能", queryset=Skill.objects.none(), required=False, widget=SkillSelect)
     competitors = forms.ModelMultipleChoiceField(
         label="指定选手", queryset=get_user_model().objects.none(), required=False, widget=TrainingRecipientSelect
     )
 
     class Meta:
         model = TrainingTask
-        fields = ["title", "description", "requirements", "estimated_minutes", "priority", "order", "assign_all"]
-        widgets = {"description": forms.Textarea(attrs={"rows": 3}), "requirements": forms.Textarea(attrs={"rows": 3})}
+        fields = ["title", "requirements", "order", "assign_all"]
+        widgets = {"requirements": forms.Textarea(attrs={"rows": 3})}
 
     def __init__(self, *args, slot, **kwargs):
         super().__init__(*args, **kwargs)
         self.slot = slot
         if not self.instance.pk or self.instance.status == "draft":
             self.fields.pop("reason")
-        self.fields["priority"].required = False
         self.fields["order"].required = False
         plan = slot.day.training_plan
-        self.fields["skills"].queryset = Skill.objects.filter(skill_project=plan.training_cycle.skill_project)
+        self.fields["skills"].queryset = slot_skills(slot)
+        self.fields["skills"].widget.search_url = reverse("training:task_skill_search", args=[slot.pk])
         self.fields["competitors"].queryset = get_user_model().objects.filter(
             training_plan_participations__training_plan=plan,
             training_plan_participations__is_active=True,
@@ -119,6 +151,16 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
         if self.instance.pk:
             self.initial["skills"] = list(self.instance.skill_links.values_list("skill_id", flat=True))
             self.initial["competitors"] = list(self.instance.selected_competitors.values_list("pk", flat=True))
+            self.initial["subtask_titles"] = [item["title"] for item in self.instance.subtasks]
+            self.fields["subtask_titles"].disabled = self.instance.executions.filter(
+                progress_records__checklist__isnull=False,
+            ).exists()
+        skill_ids = self.data.getlist("skills") if self.is_bound else self.initial.get("skills", [])
+        self.fields["skills"].widget.selected = [
+            {"id": skill.pk, "label": skill.name} for skill in self.fields["skills"].queryset.filter(
+                pk__in=[value for value in skill_ids if str(value).isdigit()],
+            )
+        ]
         ids = self.data.getlist("competitors") if self.is_bound else self.initial.get("competitors", [])
         widget.selected = [
             {"id": user.pk, "label": get_user_full_info(user)}
@@ -135,6 +177,8 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        if not cleaned.get("assignment_configured"):
+            cleaned["assign_all"] = self.instance.assign_all
         if cleaned.get("competitors") is not None and not cleaned.get("assign_all"):
             from accounts.services.users import require_distinguishable_users
             from django.contrib.auth import get_user_model
@@ -147,11 +191,14 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
                 require_distinguishable_users(scope, selected)
             except forms.ValidationError as exc:
                 self.add_error("competitors", exc)
-        cleaned["priority"] = cleaned.get("priority") or TrainingTask.Priority.NORMAL
         cleaned["order"] = cleaned.get("order") or 0
-        if not cleaned.get("assignment_configured"):
-            cleaned["assign_all"] = True
         return cleaned
+
+    def clean_subtask_titles(self):
+        titles = [value.strip() for value in self.cleaned_data["subtask_titles"] or [] if value.strip()]
+        if len(titles) > 100 or any(len(title) > 240 for title in titles):
+            raise forms.ValidationError("每项子任务最多 240 字，最多填写 100 项。")
+        return titles
 
 
 class SkillCorrectionForm(StyledFormMixin, forms.Form):

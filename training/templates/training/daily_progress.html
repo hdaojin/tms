@@ -1,0 +1,69 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+  {% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
+  {% if rows %}
+  <form method="post" enctype="multipart/form-data" class="card border border-base-300 bg-base-100 shadow-sm">
+    {% csrf_token %}
+    <input type="hidden" name="version" value="{{ version }}">
+    <div class="card-body gap-4">
+      <div class="divide-y divide-base-300">
+        {% for row in rows %}
+          {% with task=row.execution.training_task %}
+            <section id="task-{{ row.execution.pk }}" class="space-y-2 py-3 first:pt-0">
+              <div class="flex flex-wrap items-center gap-2">
+                {% for link in task.domain_links.all %}
+                  <span class="badge badge-soft badge-primary badge-sm">{{ link.technical_domain.name }}</span>
+                {% endfor %}
+                <span class="badge badge-outline badge-sm">{{ task.schedule_slot.get_period_display }}</span>
+                {% if show_plan_names %}<span class="text-sm text-base-content/70">{{ task.training_plan.title }}</span>{% endif %}
+                {% if task.subtasks or not editable %}
+                  <h2 class="font-semibold">{{ task.title }}</h2>
+                {% else %}
+                  {{ row.form.items }}
+                {% endif %}
+                {% if row.counts %}<span class="text-sm text-base-content/70">{{ row.counts.0 }}/{{ row.counts.1 }}</span>{% endif %}
+              </div>
+              {% if editable %}
+                {{ row.form.items.errors }}
+                {% if task.subtasks %}<div class="pl-4">{{ row.form.items }}</div>{% endif %}
+              {% elif row.record.checklist %}
+                <ul>{% for item in row.record.checklist %}<li>{% if item.done %}已完成{% else %}未完成{% endif %} · {{ item.title }}</li>{% endfor %}</ul>
+              {% endif %}
+              {% if row.record.completed or row.previous_problems or row.execution.older_records %}
+                <details>
+                  <summary>历史填报</summary>
+                  {% if row.record.completed %}<p class="whitespace-pre-wrap">{{ row.record.completed }}</p>{% endif %}
+                  {% if row.previous_problems %}<p class="whitespace-pre-wrap">{{ row.previous_problems }}</p>{% endif %}
+                  {% for old in row.execution.older_records %}
+                    <p class="whitespace-pre-wrap">{{ old.completed }}</p>
+                    <p class="whitespace-pre-wrap">{{ old.problems }}</p>
+                  {% endfor %}
+                </details>
+              {% endif %}
+            </section>
+          {% endwith %}
+        {% endfor %}
+      </div>
+      {% if editable %}
+        {% include "components/form_errors.html" with form=day_form %}
+        {% include "components/field.html" with field=day_form.problems %}
+        {% include "components/field.html" with field=day_form.images %}
+      {% elif notes %}
+        <div>
+          <h2 class="font-semibold">未完成的部分／存在问题</h2>
+          <p class="whitespace-pre-wrap">{{ notes }}</p>
+        </div>
+      {% endif %}
+      {% if attachments and perms.training.view_trainingprogressattachment %}
+        <ul>{% for attachment in attachments %}
+          <li><a class="link" href="{% url 'training:attachment_download' 'progress' attachment.pk %}">{{ attachment.original_filename }}</a></li>
+        {% endfor %}</ul>
+      {% endif %}
+      <div class="flex flex-wrap items-center gap-3">
+        {% if editable %}<button type="submit" class="btn btn-primary">保存当天完成情况</button>{% endif %}
+        <a class="btn btn-outline" href="{% url 'training:my_training' %}?date={{ day|date:'Y-m-d' }}">返回我的训练</a>
+      </div>
+    </div>
+  </form>
+  {% elif not error %}<p>当天没有分配给你的官方任务。</p>{% endif %}
+{% endblock %}

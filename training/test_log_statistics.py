@@ -90,6 +90,22 @@ class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(response.context["selected_plan"], history)
         self.assertContains(response, "个人日志提交份数")
 
+    def test_missing_log_link_targets_only_the_viewer_with_the_same_name(self):
+        from .daily_progress import training_day_url
+
+        self.student.first_name, self.student.last_name = self.user.first_name, self.user.last_name
+        self.student.save()
+        self.bind(self.cycle_obj)
+        self.cycle_obj.status = "active"
+        self.cycle_obj.save()
+        TrainingCycleMember.objects.create(training_cycle=self.cycle_obj, user=self.user, role="competitor")
+        self.grant("view_all_traininglog", "add_traininglog", "view_taskexecution", "view_trainingprogress")
+        response = self.client.get(self.url, {"plan": self.plan.pk, "date_from": self.first.isoformat(),
+                                              "date_to": self.first.isoformat()})
+        url = training_day_url("training:log_ai_start", self.cycle_obj.pk, self.first)
+        self.assertContains(response, f'href="{url.replace("&", "&amp;")}">张三</a>', count=1)
+        self.assertEqual(response.context["rows"][0]["unsubmitted_competitors"].count("张三"), 2)
+
     def test_personal_scope_and_forged_plan(self):
         self.log(self.user, self.first)
         self.log(self.coach, self.first)

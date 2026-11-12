@@ -100,8 +100,14 @@ def change_state(target, user, status):
 
 
 @transaction.atomic
-def save_progress(target, user, *, completed, problems, progress=None, files=()):
+def save_progress(target, user, *, completed, problems, progress=None, files=(), training_date=None,
+                  checklist=None, written_files=None):
     target = lock_target(target)
+    if training_date is not None:
+        from .daily_progress import validate_daily_execution
+
+        validate_daily_execution(target, user, training_date)
+        progress = target.progress_records.filter(training_date=training_date).first()
     require_owner(
         user, target, "training.add_trainingprogress" if progress is None else "training.change_trainingprogress"
     )
@@ -109,14 +115,18 @@ def save_progress(target, user, *, completed, problems, progress=None, files=())
         progress = TrainingProgress.objects.select_for_update().get(pk=progress.pk, **target_fields(target))
         if progress.author_id != user.pk:
             raise PermissionDenied
+        if progress.checklist is not None and checklist is None:
+            raise ValidationError("请通过训练完成情况页面修订。")
         TrainingProgressRevision.objects.create(
-            progress=progress, actor=user, completed=progress.completed, problems=progress.problems
+            progress=progress, actor=user, completed=progress.completed, problems=progress.problems,
+            checklist=progress.checklist,
         )
     else:
-        progress = TrainingProgress(**target_fields(target), author=user)
-    if not (completed.strip() or problems.strip() or files):
+        progress = TrainingProgress(**target_fields(target), author=user, training_date=training_date)
+    if checklist is None and not (completed.strip() or problems.strip() or files):
         raise ValidationError("请填写完成内容、存在问题或上传附件。")
     progress.completed, progress.problems = completed, problems
+    progress.checklist = checklist
     progress.full_clean()
     progress.save()
     attachments = [
@@ -127,8 +137,17 @@ def save_progress(target, user, *, completed, problems, progress=None, files=())
     ]
     for attachment in attachments:
         attachment.full_clean()
-    for attachment in attachments:
-        attachment.save()
+    stored = []
+    try:
+        for attachment in attachments:
+            attachment.save()
+            stored.append((attachment.file.storage, attachment.file.name))
+    except Exception:
+        for storage, name in stored:
+            storage.delete(name)
+        raise
+    if written_files is not None:
+        written_files.extend(stored)
     return progress
 
 

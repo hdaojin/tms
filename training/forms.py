@@ -314,8 +314,8 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
             "training_plan",
             "planned_date",
             "title",
-            "description",
             "requirements",
+            "description",
             "estimated_minutes",
             "priority",
             "status",
@@ -465,8 +465,8 @@ class TaskExecutionForm(StyledFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance.training_task_id and self.instance.training_task.schedule_slot_id:
-            from .process import STATES
-            self.fields["status"].choices = STATES
+            for name in ("status", "completion_note", "problems", "problem_resolved", "solution", "reflection"):
+                self.fields.pop(name)
 
     class Meta:
         model = TaskExecution
@@ -505,7 +505,12 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.author = kwargs.pop("author", None)
         self.backfill = kwargs.pop("backfill", False)
+        self.fixed_day = kwargs.pop("fixed_day", None)
+        simplified_upload = kwargs.pop("simplified_upload", False)
         super().__init__(*args, **kwargs)
+        if simplified_upload:
+            for name in ("topic", "summary", "executions"):
+                self.fields.pop(name)
         if self.instance.pk:
             self.author = self.instance.author
         elif self.author:
@@ -543,6 +548,15 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
             )
         elif not self.instance.pk:
             self.initial["training_date"] = timezone.localdate() - timedelta(days=1)
+        if self.fixed_day:
+            cycle, day = self.fixed_day
+            self.current_cycle = cycle
+            self.initial.update(training_cycle=cycle.pk, training_date=day)
+            self.fields["training_cycle"].queryset = self.fields["training_cycle"].queryset.filter(pk=cycle.pk)
+            self.fields["training_cycle"].disabled = True
+            self.fields["training_cycle"].widget = forms.HiddenInput()
+            self.fields["training_date"].disabled = True
+            self.fields["training_date"].help_text = ""
         self.fields["document"].widget.attrs.update(TRAINING_LOG_UPLOAD_SPEC.widget_attrs())
         latest_date = timezone.localdate() - timedelta(days=1) if self.backfill and not self.instance.pk else timezone.localdate()
         self.fields["training_date"].widget.attrs["max"] = latest_date.isoformat()
@@ -554,7 +568,7 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
             for field in ("training_cycle", "training_date"):
                 self.fields[field].disabled = True
                 self.fields[field].help_text = "已有日志文件，如需修改请先删除日志后重新上传。"
-        if self.author:
+        if self.author and "executions" in self.fields:
             self.fields["executions"].queryset = TaskExecution.objects.filter(user=self.author).select_related(
                 "training_task"
             )
@@ -611,5 +625,5 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
         if self.author and not log.author_id:
             log.author = self.author
         if commit:
-            save_training_log(log, self.cleaned_data.get("executions"), backfill=self.backfill)
+            save_training_log(log, self.cleaned_data.get("executions", ()), backfill=self.backfill)
         return log

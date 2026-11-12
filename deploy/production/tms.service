@@ -2,6 +2,7 @@
 Description=TMS Gunicorn application
 After=network.target postgresql.service
 Wants=postgresql.service
+Wants=tms-training-log-worker.service
 
 [Service]
 Type=simple

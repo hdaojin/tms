@@ -103,12 +103,15 @@
       page = 0;
     }
 
+    const candidateLabel = root.dataset.candidateLabel || "人员";
+    const emptySearch = candidateLabel === "技能" ? "请输入技能名称。" : "请输入姓名或拼音搜索人员。";
+
     async function load(nextPage) {
       const text = query.value.trim();
       cancelSearch();
       if (!text) {
         clearResults();
-        status.textContent = "请输入姓名或拼音搜索人员。";
+        status.textContent = emptySearch;
         return;
       }
       const requestVersion = version;
@@ -148,7 +151,7 @@
         hasMore = data.has_more === true;
         more.hidden = !hasMore;
         syncCandidates();
-        status.textContent = results.childElementCount ? "选择结果可添加人员；已选人员会保留。" : "未找到符合条件的人员。";
+        status.textContent = results.childElementCount ? `选择结果可添加${candidateLabel}。` : `未找到符合条件的${candidateLabel}。`;
       } catch (error) {
         if (requestVersion === version && error.name !== "AbortError") {
           status.textContent = "搜索失败，请检查登录状态后重新搜索。";
@@ -166,7 +169,7 @@
       cancelSearch();
       clearResults();
       if (!query.value.trim()) {
-        status.textContent = "请输入姓名或拼音搜索人员。";
+        status.textContent = emptySearch;
         return;
       }
       timer = setTimeout(() => load(1), 300);
@@ -179,7 +182,7 @@
         cancelSearch();
         query.value = "";
         clearResults();
-        status.textContent = "请输入姓名或拼音搜索人员。";
+        status.textContent = emptySearch;
       }
     });
     more.addEventListener("click", () => {

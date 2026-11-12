@@ -166,6 +166,7 @@ def task_snapshot(task):
         for name in (
             "title",
             "description",
+            "subtasks",
             "requirements",
             "estimated_minutes",
             "priority",
@@ -605,7 +606,12 @@ def _apply_changes(plan, payload, actor=None, *, approved=False, draft_import=Fa
                 _sync_task(task, slot, approved=approved)
             if change.get("import_task"):
                 text = change["import_task"]
-                save_slot_task(slot, actor, {"title": text.splitlines()[0][:180], "description": text if "\n" in text or len(text) > 180 else "", "assign_all": False, "competitors": list(plan.participants.filter(is_active=True).values_list("user_id", flat=True))}, _importing=True, _approved=approved)
+                title, *outline = text.splitlines()
+                save_slot_task(slot, actor, {
+                    "title": title[:180], "description": text if len(title) > 180 else "\n".join(outline),
+                    "assign_all": False,
+                    "competitors": list(plan.participants.filter(is_active=True).values_list("user_id", flat=True)),
+                }, _importing=True, _approved=approved)
 
 
 def slot_complete(slot, *, has_plan_coaches=None):
@@ -756,12 +762,21 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
             raise ValidationError("已取消任务不可编辑，请新增任务。")
     else:
         task = TrainingTask(training_plan=plan, schedule_slot=slot, planned_date=slot.day.date, created_by=user)
+    from .checklists import outline_items, update_subtasks, validate_subtask_change
+
+    titles = values.get("subtask_titles")
+    if titles is None and "description" in values and values["description"] != task.description:
+        titles = outline_items(values["description"])
     _approved = _approved or task.status == "draft"
     if slot.is_locked and not _approved:
         from .change_workflow import request_task_change
+        if titles is not None:
+            validate_subtask_change(task, titles)
         return request_task_change(plan, slot, task if task.pk else None, user, values, publish)
     task._definition_approved = _approved
     before = task_snapshot(task) if task.pk else {}
+    if titles is not None:
+        update_subtasks(task, titles)
     for field in ("title", "description", "requirements", "estimated_minutes", "priority", "order", "assign_all"):
         if field in values:
             setattr(task, field, values[field])

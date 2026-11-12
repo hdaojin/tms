@@ -5,6 +5,7 @@
 {% endblock %}
 
 {% block file_actions %}
+  {% if log.online_document %}<a href="{% url 'training:log_online' log.pk %}" class="btn btn-outline btn-sm">在线日志</a>{% endif %}
   {% if can_edit %}<a href="{% url 'training:log_edit' log.pk %}" class="btn btn-outline btn-sm">编辑</a>{% endif %}
   {% if can_delete %}
     <button type="button" data-modal-target="delete-log-{{ log.pk }}" class="btn btn-error btn-outline btn-sm">删除日志</button>

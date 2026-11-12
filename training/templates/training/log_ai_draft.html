@@ -1,0 +1,176 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="space-y-4">
+  <p>{{ draft.cycle.name }} · {{ draft.training_date|date:"Y-m-d" }} · {% if role == "coach" %}教练日志{% else %}选手日志{% endif %}</p>
+  {% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
+
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">当日任务与完成情况</h2>
+      <ul class="list-disc pl-5">
+        {% for task in task_rows %}
+          <li>{{ task.plan }} · {{ task.period }} · {{ task.title }}
+            {% if role == "coach" %}（已填 {{ task.filled }}/{{ task.expected }} 人{% if task.has_completion_counts %}，全部完成 {{ task.fully_completed }} 人{% endif %}）
+            {% elif task.completion %}（完成 {{ task.completion.0 }}/{{ task.completion.1 }}）
+            {% elif task.filled %}（已填报）{% endif %}
+            {% if role == "coach" and not task.goal %}<span class="text-sm">（训练目标由 AI 拟写）</span>{% endif %}
+            {% if task.goal_edit_url %}<a class="link link-primary" href="{{ task.goal_edit_url }}">编辑训练目标</a>{% endif %}
+          </li>
+        {% empty %}<li>暂无符合条件的任务</li>{% endfor %}
+      </ul>
+      {% if missing %}
+        <ul class="alert alert-warning" role="status">{% for item in missing %}<li>{{ item }}</li>{% endfor %}</ul>
+        {% if progress_url %}<a class="btn btn-primary btn-sm self-start" href="{{ progress_url }}">去填写训练完成情况</a>{% endif %}
+      {% elif progress_url %}
+        <a class="link" href="{{ progress_url }}">填写训练完成情况</a>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if job %}
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">{{ job.get_status_display }}</h2>
+      {% if running %}
+        <p>可以离开此页面，稍后返回查看结果。</p>
+        <a class="btn btn-outline btn-sm self-start" href="{{ request.path }}">刷新状态</a>
+      {% elif job.status == "review" %}
+        {% if not can_view_job %}<p>素材范围已变化，请重新预览。</p>
+        {% elif host %}
+          <p>接收方 {{ job.model.name }}（{{ host }}）。请核对待发送的文本素材。</p>
+          {% if role == "coach" %}<p>结构化身份字段已移除，请检查自由文本是否包含身份信息。</p>{% endif %}
+          <details open>
+            <summary>发送素材</summary>
+            <pre class="whitespace-pre-wrap break-words">{{ job.message }}</pre>
+          </details>
+          <details>
+            <summary>系统提示词</summary>
+            <pre class="whitespace-pre-wrap break-words">{{ job.prompt }}</pre>
+          </details>
+          {% if not missing %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="generation" value="{{ job.pk }}">
+            <button class="btn btn-primary" name="action" value="confirm">确认发送并生成</button>
+          </form>
+          {% endif %}
+        {% else %}<p>模型配置已变化，请重新选择并预览发送内容。</p>{% endif %}
+      {% elif job.status == "ready" %}
+        {% if not can_view_job %}<p>素材范围已变化，请放弃本次结果并重新生成。</p>{% endif %}
+        {% for label, value in result %}
+          <h3 class="font-semibold">{{ label }}</h3>
+          <p class="whitespace-pre-wrap">{{ value }}</p>
+        {% endfor %}
+        <form method="post" class="flex flex-wrap gap-2">
+          {% csrf_token %}
+          <input type="hidden" name="generation" value="{{ job.pk }}">
+          <input type="hidden" name="revision" value="{{ draft.revision }}">
+          {% if can_view_job %}<button class="btn btn-primary" name="action" value="apply">{% if draft.body %}采用结果并替换正文{% else %}采用结果{% endif %}</button>{% endif %}
+          <button class="btn btn-outline" name="action" value="discard">放弃本次结果</button>
+        </form>
+      {% elif job.error %}
+        <p class="alert alert-error" role="alert">{{ job.error }}</p>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if not has_model %}
+  <div class="alert alert-info" role="status">
+    <span>当前没有可用的 AI 模型。{% if can_add_model %}添加并测试模型后即可生成，也可以直接上传文件。{% else %}可直接上传训练日志。{% endif %}</span>
+    <div class="flex flex-wrap gap-2">
+      {% if can_add_model %}<a class="btn btn-outline btn-sm" href="{% url 'ai_models:create' %}">添加 AI 模型</a>{% endif %}
+      <a class="btn btn-outline btn-sm" href="{{ upload_url }}">上传训练日志</a>
+    </div>
+  </div>
+  {% endif %}
+  {% if not missing %}
+  <form method="post" enctype="multipart/form-data" class="space-y-4">
+    {% csrf_token %}
+    {% if can_prepare %}
+    <section class="card border border-base-300 bg-base-100 shadow-sm">
+      <div class="card-body">
+        <h2 class="card-title">模型设置</h2>
+        <div class="grid gap-3 sm:grid-cols-3">
+          {% include "components/field.html" with field=generation_form.model %}
+          {% include "components/field.html" with field=generation_form.thinking %}
+          {% include "components/field.html" with field=generation_form.effort %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+    <details class="collapse collapse-arrow border border-base-300 bg-base-100 shadow-sm" {% if expand_extras %}open{% endif %}>
+      <summary class="collapse-title">
+        <span class="block font-semibold">扩展信息</span>
+        <span class="block text-sm text-base-content/70">可补充写作要求、篇幅和参考资料，让生成的日志更贴合当天训练，也可以添加插图。</span>
+      </summary>
+      <div class="collapse-content space-y-3">
+        {% include "components/form_errors.html" with form=generation_form %}
+        {% include "components/form_errors.html" with form=image_form %}
+        {% if can_prepare %}
+          {% include "components/field.html" with field=generation_form.instructions %}
+          {% include "components/field.html" with field=generation_form.target_words %}
+          {% include "components/field.html" with field=generation_form.references %}
+          {% include "components/field.html" with field=generation_form.reference %}
+        {% endif %}
+        {% include "components/field.html" with field=image_form.images %}
+        {% if image_form.progress_images.field.queryset.exists %}
+          {% include "components/field.html" with field=image_form.progress_images %}
+        {% endif %}
+        {% if images %}
+          <ul class="flex flex-wrap gap-3">
+            {% for image in images %}<li><a href="{% url 'training:log_ai_image' draft.pk image.pk %}" target="_blank" rel="noopener">
+              <img class="max-h-32 rounded-box" src="{% url 'training:log_ai_image' draft.pk image.pk %}" alt="训练日志插图">
+            </a></li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </details>
+    {% if can_prepare %}
+      <button class="btn btn-primary" name="action" value="prepare">预览发送内容</button>
+    {% else %}
+      <button class="btn btn-outline" name="action" value="image" formnovalidate>保存插图</button>
+    {% endif %}
+  </form>
+  {% endif %}
+
+  {% partial draft_editor %}
+</div>
+{% endblock %}
+
+{% partialdef draft_editor %}
+<div id="draft-editor">
+  {% if can_preview %}
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">编辑正文</h2>
+      <form method="post" class="space-y-3" hx-post="{{ request.path }}" hx-target="#draft-editor" hx-swap="outerHTML show:none">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit">
+        {% if editor_error %}<p class="alert alert-error" role="alert">{{ editor_error }}</p>{% endif %}
+        {% include "components/form_errors.html" with form=body_form %}
+        {% for field in body_form %}{% if field.is_hidden %}{{ field }}{% else %}{% include "components/field.html" %}{% endif %}{% endfor %}
+        <button id="save-draft" class="btn btn-primary">保存草稿</button>
+        {% if saved %}<span class="ml-2 text-sm text-success" role="status">草稿已保存</span>{% endif %}
+      </form>
+        <iframe src="{% url 'training:log_ai_preview' draft.pk %}?revision={{ draft.revision }}" sandbox title="训练日志在线预览" class="h-[48rem] w-full rounded-box border border-base-300"></iframe>
+        {% if not running %}
+          <form method="post" class="space-y-3">
+            {% csrf_token %}
+            <input type="hidden" name="revision" value="{{ draft.revision }}">
+            <input type="hidden" name="source_digest" value="{{ source_digest }}">
+            {% if changes %}
+              <p>以下素材在本稿生成后发生变化。</p>
+              <ul class="list-disc pl-5">{% for item in changes %}<li>{{ item }}</li>{% endfor %}</ul>
+              <label class="label"><input class="checkbox" name="accept_changes" type="checkbox" required> 已审阅并确认使用当前草稿</label>
+            {% endif %}
+            <button class="btn btn-primary" name="action" value="submit">提交日志并归档 PDF</button>
+          </form>
+        {% endif %}
+    </div>
+  </section>
+  {% elif editor_error %}
+    <p class="alert alert-error" role="alert">{{ editor_error }}</p>
+  {% endif %}
+</div>
+{% endpartialdef %}

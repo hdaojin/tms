@@ -22,6 +22,7 @@ dependencies = [
     "pypinyin>=0.55.0",
     "weasyprint>=70.0",
     "nh3>=0.3.2",
+    "pypdf>=7.0.1",
 ]
 
 [dependency-groups]

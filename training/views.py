@@ -5,7 +5,7 @@ from django.core.paginator import Paginator
 from django.db.models import BooleanField, Count, Exists, F, OuterRef, Q, Value
 from pathlib import Path
 
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -776,10 +776,19 @@ class TrainingLogMonthlyStatView(FilterableListMixin, TitleMixin, PermissionRequ
                 (plan for plan in self.plans if log_plan_is_ongoing(plan, timezone.localdate())), None,
             )
             if selected:
+                from .daily_progress import training_day_is_available, training_day_url
+
                 context.update(
                     training_log_submission_statistics(user, **{**filters, "plan": selected}),
                     selected_plan=selected,
                 )
+                if user.has_perms(("training.add_traininglog", "training.view_taskexecution", "training.view_trainingprogress")):
+                    member = selected.training_cycle.members.filter(user=user).select_related("training_cycle").first()
+                    today = timezone.localdate()
+                    for row in context.get("rows", []):
+                        if (row["own_missing_competitor"] is not None or row["own_missing_coach"] is not None
+                                ) and training_day_is_available(member, row["date"], today):
+                            row["write_url"] = training_day_url("training:log_ai_start", selected.training_cycle_id, row["date"])
         return context
 
 
@@ -789,7 +798,7 @@ class TrainingLogListView(FilterableListMixin, ListPageMixin, TitleMixin, Permis
     title = "训练日志"
     permission_required = "training.view_traininglog"
     create_url_name = "training:log_create"
-    create_label = "提交当天训练日志"
+    create_label = "上传训练日志"
     template_name = "training/log_list.html"
     title_icon = "icon-[tabler--notebook]"
     table_pagination = {"per_page": 25}
@@ -913,7 +922,7 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     model = TrainingLog
     form_class = TrainingLogForm
     template_name = "training/log_form.html"
-    title = "提交当天训练日志"
+    title = "上传当天训练日志"
     permission_required = "training.add_traininglog"
     backfill = False
 
@@ -921,7 +930,7 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
         from .log_template_views import configure_log_template_form
 
         form = super().get_form(form_class)
-        if not self.object:
+        if not self.object and not form.fixed_day:
             configure_log_template_form(form, backfill=self.backfill)
         return form
 
@@ -934,6 +943,10 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
             context.update(log_template_context(self.request.user, form["training_cycle"].value(),
                                                 backfill=self.backfill))
             context["show_log_templates"] = True
+            if form.fixed_day:
+                context["training_return_url"] = (
+                    f"{reverse('training:my_training')}?date={form.fixed_day[1].isoformat()}"
+                )
         return context
 
     def get_breadcrumb_parents(self):
@@ -945,6 +958,17 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
         kwargs = super().get_form_kwargs()
         kwargs["author"] = self.request.user
         kwargs["backfill"] = self.backfill
+        kwargs["simplified_upload"] = self.object is None
+        if self.object is None and ("cycle" in self.request.GET or "training_date" in self.request.GET):
+            from .log_ai_forms import TrainingDayForm
+
+            selection = TrainingDayForm(self.request.GET, user=self.request.user)
+            if not selection.is_valid():
+                raise Http404("无效的训练日志日期或周期。")
+            cycle, day = selection.cleaned_data["cycle"], selection.cleaned_data["training_date"]
+            if self.backfill != (day < timezone.localdate()):
+                raise Http404("所选日期不适用于此上传入口。")
+            kwargs["fixed_day"] = (cycle, day)
         return kwargs
 
     def get_success_url(self):

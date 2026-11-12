@@ -39,7 +39,7 @@ def has_execution_facts(tasks):
     return execution_facts(tasks).exists()
 
 
-def fingerprint(plan, slot_ids, day_ids):
+def fingerprint(plan, slot_ids, day_ids, *, legacy=False):
     slots = (
         TrainingScheduleSlot.objects.filter(pk__in=slot_ids, day__training_plan=plan)
         .prefetch_related("coaches", "domains")
@@ -51,6 +51,12 @@ def fingerprint(plan, slot_ids, day_ids):
         .prefetch_related("skill_links", "selected_competitors")
         .order_by("pk")
     )
+    task_rows = []
+    for task in tasks:
+        snapshot = service.task_snapshot(task)
+        if legacy:
+            snapshot.pop("subtasks")
+        task_rows.append((task.pk, str(task.updated_at), snapshot))
     data = {
         "publication": [str(plan.published_at), str(plan.schedule_published_at), plan.status],
         "slots": [
@@ -65,7 +71,7 @@ def fingerprint(plan, slot_ids, day_ids):
             for slot in slots
         ],
         "days": [(day.pk, day.revision, service.day_snapshot(day)) for day in days],
-        "tasks": [(task.pk, str(task.updated_at), service.task_snapshot(task)) for task in tasks],
+        "tasks": task_rows,
         "executions": list(
             TaskExecution.objects.filter(training_task__in=tasks)
             .order_by("pk")
@@ -84,7 +90,7 @@ def check_guard(plan, guard):
             | Q(training_task__schedule_slot__day_id__in=guard["days"])
         )
     )
-    if fingerprint(plan, guard["slots"], guard["days"]) != guard["fingerprint"]:
+    if fingerprint(plan, guard["slots"], guard["days"], legacy="version" not in guard) != guard["fingerprint"]:
         raise ValidationError("来源、目标或发布状态已经变化，请重新预览。")
 
 
@@ -273,7 +279,7 @@ def preview(plan, user, command):
     if not payload:
         raise ValidationError("没有可执行的变更。" + "；".join(skipped[:10]))
     ids = sorted({slot.pk for slot in targets} | affected_sources)
-    guard = {"slots": ids, "days": sorted(affected_days), "fingerprint": fingerprint(plan, ids, affected_days)}
+    guard = {"slots": ids, "days": sorted(affected_days), "fingerprint": fingerprint(plan, ids, affected_days), "version": 2}
     payload[0]["entry_guard"] = guard
     needs_approval = approval_required(plan, payload, operation, command.get("reason", ""))
     return {
@@ -379,7 +385,7 @@ def preview_swap(plan, user, command):
                 {"type": "day", "id": day_id, "revision": days[day_id].revision, "before": before, "after": after}
             )
             rows.append({"label": f"{days[day_id].date} 值班 / 日备注", "before": before, "after": after})
-    guard = {"slots": ids, "days": sorted(day_ids), "fingerprint": fingerprint(plan, ids, day_ids)}
+    guard = {"slots": ids, "days": sorted(day_ids), "fingerprint": fingerprint(plan, ids, day_ids), "version": 2}
     payload[0]["entry_guard"] = guard
     needs_approval = approval_required(plan, payload, "swap", command.get("reason", ""))
     return {
@@ -414,7 +420,7 @@ def withdrawal_state(plan, user, level, task_id=None, *, preview=True):
     if not preview:
         return
     ids = list(tasks.exclude(schedule_slot=None).values_list("schedule_slot_id", flat=True))
-    return task, {"slots": ids, "days": [], "fingerprint": fingerprint(plan, ids, [])}
+    return task, {"slots": ids, "days": [], "fingerprint": fingerprint(plan, ids, []), "version": 2}
 
 
 @transaction.atomic

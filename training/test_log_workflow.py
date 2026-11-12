@@ -205,7 +205,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(form["training_cycle"].value(), self.period.pk)
         self.assertNotContains(response, '<select name="training_cycle"')
         self.assertContains(response, f'value="{today:%Y-%m-%d}"')
-        self.assertContains(response, "提交当天训练日志")
+        self.assertContains(response, "上传当天训练日志")
         self.assertContains(response, "只能提交当天训练日志；历史日志请使用")
         self.assertContains(response, f'href="{reverse("training:log_backfill")}">补交入口</a>')
         recent.status = "completed"
@@ -419,7 +419,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         with self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(reverse("training:log_delete", args=[log.pk]), follow=True)
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "提交当天训练日志")
+        self.assertContains(response, "上传训练日志")
         self.assertContains(response, "已删除训练日志及其附件")
 
     def test_orphaned_storage_collision_returns_form_error_without_new_record(self):

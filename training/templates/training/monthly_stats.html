@@ -39,8 +39,8 @@
                   <th scope="row" class="whitespace-nowrap font-normal">{{ row.date|date:"Y-m-d"|keep_date_parts }}</th>
                   <td>{% include "training/partials/log_statistics_submitted.html" with submitted=row.submitted_competitors %}</td>
                   <td>{% include "training/partials/log_statistics_submitted.html" with submitted=row.submitted_coaches %}</td>
-                  <td>{% if row.roster_complete %}{{ row.unsubmitted_competitors|join:"、"|default:"无" }}{% else %}名单不完整，无法核定{% endif %}</td>
-                  <td>{{ row.unsubmitted_coaches|join:"、"|default:"无" }}</td>
+                  <td>{% if row.roster_complete %}{% with names=row.unsubmitted_competitors own_index=row.own_missing_competitor %}{% partial unsubmitted_names %}{% endwith %}{% else %}名单不完整，无法核定{% endif %}</td>
+                  <td>{% with names=row.unsubmitted_coaches own_index=row.own_missing_coach %}{% partial unsubmitted_names %}{% endwith %}</td>
                   <td>{{ row.exempt_competitors|join:"、"|default:"无" }}</td>
                   <td>{{ row.exempt_coaches|join:"、"|default:"无" }}</td>
                 </tr>
@@ -58,3 +58,7 @@
     {% endif %}
   {% endpartialdef %}
 {% endblock %}
+
+{% partialdef unsubmitted_names %}
+  {% for name in names %}{% if row.write_url and forloop.counter0 == own_index %}<a class="link" href="{{ row.write_url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}{% if not forloop.last %}、{% endif %}{% empty %}无{% endfor %}
+{% endpartialdef %}

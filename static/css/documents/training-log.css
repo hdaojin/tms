@@ -1,0 +1,56 @@
+@page { margin: 25.4mm 31.75mm; }
+
+.document-training-log { color: black; }
+.document-training-log .document-header { display: none; }
+
+.document-training-log #log-logos { margin: 0 0 9pt; }
+.document-training-log #log-logos td { border: 0; padding: 0; vertical-align: middle; }
+.document-training-log #log-logos td:last-child { text-align: right; }
+.document-training-log #log-logos td:first-child img { width: 62mm; }
+.document-training-log #log-logos td:last-child img { width: 15mm; }
+.document-training-log :is(#log-heading, #log-title) {
+  margin: 0 0 8pt;
+  text-align: center;
+  font-size: 16pt;
+}
+.document-training-log #log-title { margin-bottom: 13pt; }
+
+.document-training-log :is(#log-metadata, #log-signature) { margin: 0; }
+.document-training-log :is(#log-metadata, #log-signature) :is(th, td) {
+  padding: 5pt 7pt;
+  border: 0.65pt solid black;
+  background: white;
+  vertical-align: middle;
+}
+.document-training-log :is(#log-metadata, #log-signature) th { width: 16%; text-align: center; }
+.document-training-log #log-metadata th:nth-child(3) { width: 20%; }
+.document-training-log #log-metadata p:last-child,
+.document-training-log #log-metadata ul:last-child { margin-bottom: 0; }
+
+.document-training-log :is(#log-goals, #log-outline, #log-process, #log-summary, #log-references, #log-gallery) {
+  margin: -0.65pt 0 0;
+  border: 0.65pt solid black;
+}
+.document-training-log .document-body > div[id^="log-"] > h3:first-child {
+  float: left;
+  width: 16%;
+  margin: 6pt 0 0;
+  padding-inline: 3pt;
+  font-size: 10pt;
+  text-align: center;
+}
+.document-training-log .document-body > div[id^="log-"] > div {
+  min-height: 30pt;
+  margin-left: 16%;
+  border-left: 0.65pt solid black;
+  padding: 6pt 8pt;
+}
+.document-training-log .document-body > div[id^="log-"] > div > :last-child { margin-bottom: 0; }
+.document-training-log .document-body :is(pre, li, p) { overflow-wrap: anywhere; }
+.document-training-log .document-body img { max-height: 115mm; }
+.document-training-log #log-signature { margin-top: -0.65pt; }
+.document-training-log #log-summary h4 { font-size: 10pt; margin: 3pt 0; }
+
+@media screen {
+  .document-training-log .document-sheet { padding: clamp(14px, 7vw, 31.75mm); }
+}

@@ -104,7 +104,7 @@ jobs:
       - name: Check PDF renderer and DEBUG document demo
         run: |
           uv run manage.py check_document_pdf
-          uv run pytest -o django_debug_mode=keep core/test_document_export.py demo/test_documents.py
+          uv run pytest -o django_debug_mode=keep core/test_document_export.py demo/test_documents.py training/test_log_ai.py
 
   frontend:
     name: Frontend build

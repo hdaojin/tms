@@ -93,6 +93,8 @@ class TrainingCycle(models.Model):
     end_date = models.DateField("结束日期", null=True, blank=True)
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.PLANNING)
     description = models.TextField("描述", blank=True)
+    log_edition = models.PositiveSmallIntegerField("日志赛事届次", default=49)
+    log_class = models.CharField("日志班型", max_length=30, default="精英班")
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("最后更新时间", auto_now=True)
 
@@ -603,8 +605,9 @@ class TrainingTask(models.Model):
     selected_competitors = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="selected_training_tasks", verbose_name="指定选手")
     planned_date = models.DateField("计划日期")
     title = models.CharField("任务标题", max_length=180)
-    description = models.TextField("任务描述", blank=True)
-    requirements = models.TextField("训练要求", blank=True)
+    description = models.TextField("训练内容提纲", blank=True, help_text="每行填写一项训练内容。")
+    subtasks = models.JSONField("子任务", default=list, blank=True, editable=False)
+    requirements = models.TextField("训练目标", blank=True)
     estimated_minutes = models.PositiveIntegerField("预计用时（分钟）", null=True, blank=True)
     priority = models.CharField("优先级", max_length=20, choices=Priority.choices, default=Priority.NORMAL)
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.DRAFT)
@@ -915,6 +918,7 @@ class TaskExecutionAttachment(models.Model):
 
 
 class TrainingLog(TimestampedModel):
+    online_document = models.JSONField("在线日志快照", default=dict, blank=True, editable=False)
     canonical_filename = models.CharField("归档文件名", max_length=255, null=True, blank=True, editable=False)
     training_cycle = models.ForeignKey(
         TrainingCycle, verbose_name="训练周期", on_delete=models.PROTECT, related_name="training_logs"
@@ -1087,6 +1091,8 @@ class TrainingStateChange(ImmutableTrainingRecord):
 
 
 class TrainingProgress(TimestampedModel):
+    training_date = models.DateField("训练日期", null=True, blank=True)
+    checklist = models.JSONField("完成情况快照", null=True, blank=True, editable=False)
     execution = models.ForeignKey(TaskExecution, on_delete=models.PROTECT, null=True, blank=True, related_name="progress_records", verbose_name="官方任务分配")
     personal_task = models.ForeignKey(PersonalTrainingTask, on_delete=models.PROTECT, null=True, blank=True, related_name="progress_records", verbose_name="自主任务")
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="选手")
@@ -1097,10 +1103,20 @@ class TrainingProgress(TimestampedModel):
     class Meta:
         verbose_name = verbose_name_plural = "训练进度"
         ordering = ["created_at", "pk"]
-        constraints = [process_target_constraint("training_progress_one_target")]
+        constraints = [
+            process_target_constraint("training_progress_one_target"),
+            models.CheckConstraint(
+                condition=Q(training_date__isnull=True) | Q(execution__isnull=False),
+                name="dated_progress_requires_execution",
+            ),
+            models.UniqueConstraint(
+                fields=["execution", "training_date"], name="uniq_training_progress_execution_day",
+            ),
+        ]
 
 
 class TrainingProgressRevision(ImmutableTrainingRecord):
+    checklist = models.JSONField("修改前完成情况", null=True, blank=True, editable=False)
     progress = models.ForeignKey(TrainingProgress, on_delete=models.PROTECT, related_name="revisions", verbose_name="进度记录")
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="修订人")
     completed = models.TextField("原已完成内容", blank=True)
@@ -1183,3 +1199,76 @@ class TrainingBoardPlan(TimestampedModel):
 
     def __str__(self):
         return self.training_plan.title
+
+class TrainingLogPrompt(TimestampedModel):
+    role = models.CharField("角色", max_length=20, choices=TrainingCycleMember.Role, unique=True)
+    instructions = models.TextField("写作要求", max_length=4000, blank=True)
+    min_words = models.PositiveSmallIntegerField("主体建议最少字数", default=1000)
+    max_words = models.PositiveSmallIntegerField("主体建议最多字数", default=1400)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "训练日志 AI 提示词"
+
+    def __str__(self):
+        return self.get_role_display()
+
+    def clean(self):
+        if not 100 <= self.min_words <= self.max_words <= 4000:
+            raise ValidationError("建议字数须为 100 至 4000 字，最少字数不能超过最多字数。")
+
+
+class TrainingLogDraft(TimestampedModel):
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="作者")
+    cycle = models.ForeignKey(TrainingCycle, on_delete=models.CASCADE, verbose_name="训练周期")
+    training_date = models.DateField("训练日期")
+    submitted_log = models.OneToOneField(
+        TrainingLog, on_delete=models.CASCADE, null=True, blank=True, related_name="online_draft",
+        verbose_name="已提交日志",
+    )
+    body = models.JSONField("正文", default=dict, blank=True)
+    source = models.JSONField("采用的素材快照", default=dict, blank=True)
+    references = models.TextField("参考链接", blank=True)
+    revision = models.PositiveIntegerField("草稿版本", default=0)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "训练日志草稿"
+        constraints = [
+            models.UniqueConstraint(fields=["author", "cycle", "training_date"], name="uniq_training_log_draft_day"),
+        ]
+
+
+class TrainingLogImage(TimestampedModel):
+    draft = models.ForeignKey(TrainingLogDraft, on_delete=models.CASCADE, related_name="images", verbose_name="草稿")
+    caption = models.CharField("图片说明", max_length=180)
+    media_type = models.CharField("媒体类型", max_length=16)
+    content = models.BinaryField("图片数据", editable=False)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "训练日志图片"
+
+
+class TrainingLogGeneration(TimestampedModel):
+    class Status(models.TextChoices):
+        REVIEW = "review", "待确认发送"
+        QUEUED = "queued", "等待生成"
+        RUNNING = "running", "正在生成"
+        READY = "ready", "生成完成"
+        FAILED = "failed", "生成失败"
+
+    draft = models.OneToOneField(TrainingLogDraft, on_delete=models.CASCADE, related_name="generation", verbose_name="草稿")
+    model = models.ForeignKey("ai_models.AIModel", on_delete=models.SET_NULL, null=True, verbose_name="AI 模型")
+    model_revision = models.UUIDField("模型版本")
+    status = models.CharField("生成状态", max_length=10, choices=Status, default=Status.REVIEW, db_index=True)
+    thinking = models.CharField("思考模式", max_length=8)
+    effort = models.CharField("思考强度", max_length=4, blank=True)
+    source = models.JSONField("素材快照", default=dict)
+    prompt = models.TextField("系统提示词")
+    message = models.TextField("发送正文")
+    image_ids = models.JSONField("发送图片", default=list)
+    references = models.TextField("参考链接", blank=True)
+    result = models.JSONField("生成结果", default=dict, blank=True)
+    error = models.CharField("失败原因", max_length=255, blank=True)
+    started_at = models.DateTimeField("开始时间", null=True, blank=True)
+
+    class Meta:
+        verbose_name = verbose_name_plural = "训练日志生成任务"

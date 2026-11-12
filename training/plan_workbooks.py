@@ -21,7 +21,7 @@ IMPORT_SLOT_KINDS["待排班"] = TrainingScheduleSlot.Kind.PENDING
 TEMPLATE = Path(__file__).parent / "resources" / "templates" / "training_plan.xlsx"
 HEADERS = ["日期", "星期", "时间", "领域", "训练任务", "负责教练", "值班人员", "备注"]
 PERIODS = dict((label, value) for value, label in TrainingScheduleSlot.Period.choices)
-ROUNDTRIP_NOTICE = "同一时段多个独立任务导出为单元格内换行；再次导入时整个单元格会成为一个任务，不按换行拆分。"
+ROUNDTRIP_NOTICE = "每个训练任务单元格导入一项任务，首行为标题，其余行作为训练内容提纲。同一时段多个任务导出后再次导入会合并，训练目标请在任务扩展选项维护。"
 
 
 def build_plan_workbook(plan, user=None, *, import_template=False):
@@ -79,7 +79,7 @@ def build_plan_workbook(plan, user=None, *, import_template=False):
                 if slot and not import_template
                 else []
             )
-            task_text = "\n".join(task.title + ("\n" + task.description if task.description else "") for task in tasks)
+            task_text = "\n".join(line for task in tasks for line in [task.title, *(item["title"] for item in task.subtasks)])
             coaches = (
                 "全体"
                 if slot and slot.coaches_all and not import_template

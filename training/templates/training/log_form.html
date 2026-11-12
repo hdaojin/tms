@@ -1,10 +1,11 @@
 {% extends "common/form.html" %}
 {% block content %}
 {% if form.current_cycle %}
-  <p>{% if object %}训练周期{% else %}当前周期{% endif %}：{{ form.current_cycle.name }}（{{ form.current_cycle.code }}）</p>
+  <p>{% if object or form.fixed_day %}训练周期{% else %}当前周期{% endif %}：{{ form.current_cycle.name }}（{{ form.current_cycle.code }}）</p>
 {% elif not view.backfill and not object %}
   <p>未设置有效的当前周期，请联系管理员。</p>
 {% endif %}
+{% if training_return_url %}<a class="link" href="{{ training_return_url }}">返回所选训练日</a>{% endif %}
 {{ block.super }}
 {% if show_log_templates %}{% include "training/_log_template_links.html" %}{% endif %}
 {% endblock %}

@@ -64,6 +64,7 @@ sudo install -d -m 0755 /usr/local/share/tms-deploy
 sudo install -m 0755 scripts/deploy_tms.sh /usr/local/sbin/tms-deploy
 sudo install -m 0755 scripts/update_tms.sh /usr/local/sbin/tms-update
 sudo install -m 0644 deploy/production/tms.service /usr/local/share/tms-deploy/tms.service
+sudo install -m 0644 deploy/production/tms-training-log-worker.service /usr/local/share/tms-deploy/tms-training-log-worker.service
 sudo install -m 0644 deploy/production/tms.caddy /usr/local/share/tms-deploy/tms.caddy
 sudo install -d -m 0750 /etc/tms
 sudo install -m 0640 deploy/production/deploy.conf.example /etc/tms/deploy.conf
@@ -577,3 +578,9 @@ sudo tms-update status
 它只开放更新相关命令，不接受 `--first-install`。仍须人工审阅 SHA 和迁移计划；不会直接 `git pull` 当前代码。
 新 release 自动按其 `uv.lock` 安装运行依赖，前端使用随代码提交的构建产物。
 备份（可在 apply 时显式指定 `--skip-backup` 跳过）、维护、迁移、原子切换和失败处理全部复用 `tms-deploy`，两种 TLS 模式一致。
+
+### 训练日志 AI 后台进程
+
+升级包含训练日志 AI 功能的版本前，按本页安装步骤同步更新部署工具、主服务模板和训练日志后台服务模板。部署会在数据库迁移完成后启动后台服务，并把进程状态纳入发布验收。主服务停止或重启时会同步处理后台服务。
+
+用 `systemctl status tms-training-log-worker.service` 检查进程，用 `journalctl -u tms-training-log-worker.service` 查看错误。后台进程重启后会继续领取等待中的任务。已经开始调用并中断的任务在五分钟后标为失败，作者可重新确认后重试。开发环境可运行 `uv run manage.py run_training_log_worker` 启动队列，也可加 `--once` 仅处理一条。

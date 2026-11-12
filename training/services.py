@@ -108,7 +108,7 @@ def validate_new_log(log, *, backfill=False):
         raise ValidationError("训练日期必须位于训练周期日期范围内。")
 
 
-def save_training_log(log, executions, *, backfill=False):
+def save_training_log(log, executions, *, backfill=False, finalize=None):
     """先预留数据库唯一键，再保存文件；失败时清理本次新增文件。"""
     if not log.pk and not log.document:
         raise ValidationError({"document": "请上传日志文件。"})
@@ -126,6 +126,8 @@ def save_training_log(log, executions, *, backfill=False):
                 log.is_backfill = backfill
             if log.pk:
                 previous = TrainingLog.objects.select_for_update().get(pk=log.pk)
+                if previous.online_document:
+                    raise ValidationError("已提交的在线日志已归档，不能修改。")
                 if previous.training_cycle_id != log.training_cycle_id:
                     raise ValidationError("已有日志不可修改训练周期。")
                 if previous.document and (
@@ -143,6 +145,8 @@ def save_training_log(log, executions, *, backfill=False):
                 saved_name = log.document.name
                 log.save(update_fields=["document", "updated_at"])
             log.executions.set(executions)
+            if finalize is not None:
+                finalize(log)
     except Exception as exc:
         if saved_name:
             storage.delete(saved_name)
@@ -197,9 +201,12 @@ def update_execution_facts(execution, *, user, **values):
     ):
         raise ValidationError("任务未发布或任务、分配已取消，不能更新执行。")
     allowed = {"status", "actual_minutes", "completion_note", "problems", "problem_resolved", "solution", "reflection"}
-    if execution.training_task.schedule_slot_id and "status" in values:
-        from .process import change_state
-        execution = change_state(execution, user, values.pop("status"))
+    if execution.training_task.schedule_slot_id:
+        allowed = {"actual_minutes"}
+        if "status" in values:
+            from .process import change_state
+
+            execution = change_state(execution, user, values.pop("status"))
     for key, value in values.items():
         if key in allowed:
             setattr(execution, key, value)

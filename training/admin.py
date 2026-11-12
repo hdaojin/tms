@@ -12,6 +12,7 @@ from .models import (
     TrainingCycleSkillTreeVersion,
     TrainingLog,
     TrainingLogExecution,
+    TrainingLogPrompt,
     TrainingPlan,
     TrainingTask,
     TrainingTaskAttachment,
@@ -215,6 +216,9 @@ class TrainingLogAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
     fields = ("training_cycle", "author", "training_date", "topic", "summary", "document", "created_at", "updated_at")
 
+    def has_change_permission(self, request, obj=None):
+        return (obj is None or not obj.online_document) and super().has_change_permission(request, obj)
+
     def has_delete_permission(self, request, obj=None):
         if not super().has_delete_permission(request, obj):
             return False
@@ -245,3 +249,9 @@ class TrainingLogAdmin(admin.ModelAdmin):
     @admin.display(description="有附件", boolean=True)
     def has_document(self, obj):
         return bool(obj.document)
+
+
+@admin.register(TrainingLogPrompt)
+class TrainingLogPromptAdmin(admin.ModelAdmin):
+    list_display = ("role", "min_words", "max_words", "updated_at")
+    ordering = ("role",)

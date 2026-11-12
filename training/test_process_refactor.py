@@ -301,7 +301,7 @@ class TrainingProcessTests(ProcessFixture, TestCase):
         self.client.force_login(self.student)
         response = self.client.get(reverse("training:execution_detail", args=[task.executions.get().pk]))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "追加训练进度")
+        self.assertContains(response, "填写训练完成情况")
         response = self.client.get(reverse("training:plan_detail", args=[self.plan.pk]), {"tab": "tasks"})
         self.assertContains(response, task.title)
 

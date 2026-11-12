@@ -26,6 +26,7 @@ readonly AUTH_USERS_FILE="${ENV_DIR}/basic-auth.users"
 readonly AUTH_SNIPPET="/etc/caddy/tms-basic-auth.caddy"
 readonly CADDY_SITE="/etc/caddy/sites-enabled/tms.caddy"
 readonly SYSTEMD_UNIT="/etc/systemd/system/tms.service"
+readonly TRAINING_LOG_WORKER_UNIT="/etc/systemd/system/tms-training-log-worker.service"
 readonly MAINTENANCE_FLAG="${STATE_DIR}/maintenance.flag"
 readonly DEPLOY_STATE="${STATE_DIR}/current-deployment"
 readonly UV_CACHE_DIR="/var/cache/tms/uv"
@@ -760,15 +761,20 @@ install_service_and_caddy() {
     fi
     [[ -f /etc/caddy/Caddyfile ]] || die "缺少 /etc/caddy/Caddyfile"
     prepare_caddy_logging
-    local verify_unit unit_backup site_backup main_backup rendered_unit
+    local verify_unit unit_backup worker_backup site_backup main_backup rendered_unit
     rendered_unit="$(render_systemd_unit "${RELEASE_DIR}")" || die "无法检查候选 Gunicorn 参数或渲染服务配置。"
-    local unit_existed=0 site_existed=0 validation_failed=0
+    local unit_existed=0 worker_existed=0 site_existed=0 validation_failed=0
     unit_backup="$(mktemp)"
+    worker_backup="$(mktemp)"
     site_backup="$(mktemp)"
     main_backup="$(mktemp)"
     if [[ -f "${SYSTEMD_UNIT}" ]]; then
         cp --preserve=all "${SYSTEMD_UNIT}" "${unit_backup}"
         unit_existed=1
+    fi
+    if [[ -f "${TRAINING_LOG_WORKER_UNIT}" ]]; then
+        cp --preserve=all "${TRAINING_LOG_WORKER_UNIT}" "${worker_backup}"
+        worker_existed=1
     fi
     if [[ -f "${CADDY_SITE}" ]]; then
         cp --preserve=all "${CADDY_SITE}" "${site_backup}"
@@ -778,6 +784,9 @@ install_service_and_caddy() {
 
     printf '%s\n' "${rendered_unit}" >"${SYSTEMD_UNIT}"
     chown root:root "${SYSTEMD_UNIT}"; chmod 0644 "${SYSTEMD_UNIT}"
+    sed -e "s/@@APP_USER@@/${TMS_APP_USER}/g" -e "s/@@APP_GROUP@@/${TMS_APP_GROUP}/g" \
+        "${TEMPLATE_DIR}/tms-training-log-worker.service" >"${TRAINING_LOG_WORKER_UNIT}"
+    chown root:root "${TRAINING_LOG_WORKER_UNIT}"; chmod 0644 "${TRAINING_LOG_WORKER_UNIT}"
     install -d -m 0755 -o root -g root /etc/caddy/sites-enabled
     render_caddy_site >"${CADDY_SITE}"
     chown root:root "${CADDY_SITE}"; chmod 0644 "${CADDY_SITE}"
@@ -788,19 +797,24 @@ install_service_and_caddy() {
     fi
     verify_unit="$(mktemp --suffix=.service)"
     sed "s#/srv/tms/current#${RELEASE_DIR}#g" "${SYSTEMD_UNIT}" >"${verify_unit}"
-    systemd-analyze verify "${verify_unit}" || validation_failed=1
+    local verify_worker
+    verify_worker="$(mktemp --suffix=.service)"
+    sed "s#/srv/tms/current#${RELEASE_DIR}#g" "${TRAINING_LOG_WORKER_UNIT}" >"${verify_worker}"
+    systemd-analyze verify "${verify_unit}" "${verify_worker}" || validation_failed=1
     rm -f "${verify_unit}"
+    rm -f "${verify_worker}"
     if (( validation_failed == 0 )); then
         validate_caddy_config || validation_failed=1
     fi
     if (( validation_failed != 0 )); then
         if (( unit_existed )); then cp --preserve=all "${unit_backup}" "${SYSTEMD_UNIT}"; else rm -f "${SYSTEMD_UNIT}"; fi
+        if (( worker_existed )); then cp --preserve=all "${worker_backup}" "${TRAINING_LOG_WORKER_UNIT}"; else rm -f "${TRAINING_LOG_WORKER_UNIT}"; fi
         if (( site_existed )); then cp --preserve=all "${site_backup}" "${CADDY_SITE}"; else rm -f "${CADDY_SITE}"; fi
         cp --preserve=all "${main_backup}" /etc/caddy/Caddyfile
-        rm -f "${unit_backup}" "${site_backup}" "${main_backup}"
+        rm -f "${unit_backup}" "${worker_backup}" "${site_backup}" "${main_backup}"
         die "systemd 或 Caddy 配置校验失败；已恢复磁盘上的原配置。"
     fi
-    rm -f "${unit_backup}" "${site_backup}" "${main_backup}"
+    rm -f "${unit_backup}" "${worker_backup}" "${site_backup}" "${main_backup}"
     systemctl daemon-reload
     systemctl enable tms.service >/dev/null
     if systemctl is-active --quiet caddy; then
@@ -971,7 +985,10 @@ cmd_apply() {
     fi
     atomic_switch "${RELEASE_DIR}"
     systemctl start tms.service
-    if local_healthcheck && https_healthcheck; then
+    if local_healthcheck && https_healthcheck && {
+        [[ ! -f "${RELEASE_DIR}/training/management/commands/run_training_log_worker.py" ]] ||
+            systemctl is-active --quiet tms-training-log-worker.service
+    }; then
         rm -f "${MAINTENANCE_FLAG}"
         record_deploy_state "${RELEASE_ID}" "${SHA}" "${previous}" "${migrations_applied}"
         heading "TMS_DEPLOYMENT_COMPLETE"

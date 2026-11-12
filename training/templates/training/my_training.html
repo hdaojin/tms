@@ -20,35 +20,45 @@
 
   <section class="space-y-3">
     <h2 class="text-xl font-bold">{% if coach_view %}我负责的任务{% else %}分配给我的官方任务{% endif %}</h2>
-    {% regroup tasks by planned_date as date_groups %}
     {% for date_group in date_groups %}
-      {% if all_dates %}<h3 class="font-semibold">{{ date_group.grouper|date:"Y年n月j日 · l" }}</h3>{% endif %}
-      {% regroup date_group.list by schedule_slot.period as period_groups %}
+      {% if all_dates %}<h3 class="font-semibold">{{ date_group.day|date:"Y年n月j日 · l" }}</h3>{% endif %}
+      <div class="flex flex-wrap gap-2">
+        {% for action in date_group.actions %}
+          {% if action.cycle %}<span class="self-center text-sm">{{ action.cycle }}</span>{% endif %}
+          {% if action.completion %}<a class="btn btn-outline btn-sm" href="{{ action.completion }}">填写训练完成情况</a>{% endif %}
+          {% if action.log %}<a class="btn btn-primary btn-sm" href="{{ action.log }}">编写训练日志</a>{% endif %}
+          {% if action.upload %}<a class="btn btn-outline btn-sm" href="{{ action.upload }}">上传训练日志</a>{% endif %}
+          {% if action.submitted %}<a class="btn btn-primary btn-sm" href="{{ action.submitted }}">查看训练日志</a>{% endif %}
+        {% endfor %}
+      </div>
+      {% regroup date_group.tasks by period_key as period_groups %}
       {% for period in period_groups %}
         <div class="space-y-2">
-          <h3 class="font-semibold">{{ period.list.0.schedule_slot.get_period_display|default:"未标注时段" }}</h3>
+          <h3 class="font-semibold">{{ period.list.0.schedule_slot.get_period_display|default:"未标注时段" }}
+            {% if period.list.0.schedule_slot.starts_at %}<span class="ml-2 font-normal">{{ period.list.0.schedule_slot.starts_at|date:"H:i" }}–{{ period.list.0.schedule_slot.ends_at|date:"H:i" }}</span>{% endif %}
+          </h3>
           {% for task in period.list %}
             <article class="card card-border card-sm bg-base-100 shadow-sm">
               <div class="card-body">
                 <div class="text-sm text-base-content/70">
                   {{ task.training_plan.title }}
-                  {% if task.schedule_slot.starts_at %} · {{ task.schedule_slot.starts_at|date:"H:i" }}–{{ task.schedule_slot.ends_at|date:"H:i" }}{% endif %}
+
                 </div>
-                <h4 class="card-title wrap-anywhere">{{ task.title }}</h4>
                 {% if task.domain_links.all %}
-                  <div class="text-sm">{% for link in task.domain_links.all %}{{ link.technical_domain.name }}{% if not forloop.last %}、{% endif %}{% endfor %}</div>
+                  <div class="flex flex-wrap gap-2">{% for link in task.domain_links.all %}<span class="badge badge-primary badge-soft">{{ link.technical_domain.name }}</span>{% endfor %}</div>
                 {% endif %}
+                <h4 class="card-title wrap-anywhere">{{ task.title }}</h4>
                 {% if coach_view and perms.training.view_taskexecution %}
                   <div class="text-sm">
                     {% for label, count in task.board_statuses %}{{ label }} {{ count }} 人{% if not forloop.last %} · {% endif %}
                     {% empty %}暂无可查看的执行分配{% endfor %}
                   </div>
                 {% elif task.board_execution %}
-                  <div class="text-sm">执行状态 · {{ task.board_execution.get_status_display }}</div>
+                  <div class="text-sm">{{ task.completion|default:task.board_execution.get_status_display }}</div>
                 {% endif %}
                 <div class="card-actions">
                   {% if task.board_execution %}
-                    <a class="btn btn-sm btn-primary" href="{% url 'training:execution_detail' task.board_execution.pk %}">进入执行</a>
+                    <a class="btn btn-sm" href="{% url 'training:execution_detail' task.board_execution.pk %}">查看执行记录</a>
                   {% else %}
                     <a class="btn btn-sm" href="{% url 'training:task_detail' task.pk %}">查看任务</a>
                   {% endif %}

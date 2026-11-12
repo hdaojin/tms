@@ -206,13 +206,18 @@ def training_log_submission_statistics(user, *, plan, q="", date_from=None, date
                 people[pk]["count"] += 1
         if not complete:
             uncertain.update(possible_competitors - daily_competitors - exemptions[day])
+        missing_competitors = sorted(
+            (people[pk]["name"], pk) for pk in daily_competitors - submitted.keys() - exempt
+        ) if complete else []
+        missing_coaches = sorted((people[pk]["name"], pk) for pk in daily_named_coaches - submitted.keys() - exempt)
         rows.append({
             "date": day,
             "submitted_competitors": sorted((submitted[pk] for pk in roster & submitted.keys()), key=lambda p: p["name"]),
             "submitted_coaches": sorted((submitted[pk] for pk in coaches[day] & submitted.keys()), key=lambda p: p["name"]),
-            "unsubmitted_competitors": sorted(people[pk]["name"] for pk in daily_competitors - submitted.keys() - exempt)
-            if complete else [],
-            "unsubmitted_coaches": sorted(people[pk]["name"] for pk in daily_named_coaches - submitted.keys() - exempt),
+            "unsubmitted_competitors": [name for name, _ in missing_competitors],
+            "unsubmitted_coaches": [name for name, _ in missing_coaches],
+            "own_missing_competitor": next((i for i, (_, pk) in enumerate(missing_competitors) if pk == user.pk), None),
+            "own_missing_coach": next((i for i, (_, pk) in enumerate(missing_coaches) if pk == user.pk), None),
             "exempt_competitors": sorted(people[pk]["name"] for pk in daily_competitors & exempt),
             "exempt_coaches": sorted(people[pk]["name"] for pk in daily_named_coaches & exempt),
             "roster_complete": complete,
@@ -285,6 +290,7 @@ def training_logs_visible_to(user, queryset=None):
 
 def training_logs_changeable_by(user, queryset=None):
     queryset = queryset if queryset is not None else TrainingLog.objects.all()
+    queryset = queryset.filter(online_document={})
     if user.has_perm("training.change_all_traininglog") or user.is_superuser:
         return queryset
     return queryset.filter(author=user)

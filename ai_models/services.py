@@ -222,3 +222,16 @@ def test_model(user, pk):
     if not current_config.filter(test_started_at=started_at).update(**updates):
         raise ValidationError("测试期间配置已变更，请使用当前配置重新测试。")
     return error
+
+@sensitive_variables()
+def generate_text(user, model_id, revision, payload):
+    model = usable_models(user).filter(pk=model_id, revision=revision).first()
+    if model is None:
+        raise ValidationError("所选模型已变更或已不可用，请重新选择。")
+    base_url = validate_base_url(model.provider, model.base_url)
+    try:
+        key = cipher().decrypt(bytes(model.encrypted_api_key)).decode()
+    except (InvalidToken, UnicodeError):
+        raise ValidationError("无法读取 API 密钥，请检查系统加密配置或重新保存密钥。") from None
+    adapter = PROVIDERS[model.provider]
+    return adapter.generate(base_url, {**payload, "model": model.model_id}, key).replace(key, "[已隐藏]")

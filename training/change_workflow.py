@@ -53,8 +53,12 @@ def apply_payload(plan, payload, actor):
             if slot.revision != item["revision"]:
                 raise ValidationError("排班已经变化，请重新申请任务修改。")
             task = TrainingTask.objects.get(pk=item["id"], schedule_slot=slot) if item["id"] else None
-            if task and (service.task_snapshot(task) != item["before"] or task.updated_at.isoformat() != item["updated_at"]):
-                raise ValidationError("任务已经变化，请重新申请。")
+            if task:
+                current = service.task_snapshot(task)
+                if "subtasks" not in item["before"]:
+                    current.pop("subtasks")
+                if current != item["before"] or task.updated_at.isoformat() != item["updated_at"]:
+                    raise ValidationError("任务已经变化，请重新申请。")
             values = item["after"]
             if values.get("cancel"):
                 result = service.cancel_task(task, actor, values["reason"], _approved=True)

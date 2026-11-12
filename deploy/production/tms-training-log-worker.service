@@ -1,0 +1,28 @@
+[Unit]
+Description=TMS training log generation worker
+After=network.target postgresql.service tms.service
+PartOf=tms.service
+
+[Service]
+Type=simple
+User=@@APP_USER@@
+Group=@@APP_GROUP@@
+WorkingDirectory=/srv/tms/current
+EnvironmentFile=/etc/tms/tms.env
+ExecCondition=/usr/bin/test -f /srv/tms/current/training/management/commands/run_training_log_worker.py
+ExecStart=/srv/tms/current/.venv/bin/python /srv/tms/current/manage.py run_training_log_worker
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=30s
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=

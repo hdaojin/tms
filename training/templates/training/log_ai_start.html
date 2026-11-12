@@ -1,0 +1,22 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<div class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body">
+    {% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
+    {% if existing %}
+      <p>该训练日已有正式日志。</p>
+      {% if perms.training.view_traininglog %}<a class="link" href="{% url 'training:log_detail' existing.pk %}">查看日志</a>{% endif %}
+    {% endif %}
+    {% if day_form %}
+      <form method="post" class="space-y-3">
+        {% csrf_token %}
+        {% include "components/form_errors.html" with form=day_form %}
+        <div class="grid gap-3 sm:grid-cols-2">
+          {% for field in day_form %}{% include "components/field.html" %}{% endfor %}
+        </div>
+        <button class="btn btn-primary">编写所选日期的日志</button>
+      </form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

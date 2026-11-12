@@ -483,6 +483,8 @@ def task_edit(request, slot_pk=None, pk=None):
             if task and "assignment_configured" not in request.POST:
                 # 精简提交仅更新明确提供的字段，不能清空原技能或重取全体名单。
                 values = {key: value for key, value in values.items() if key in request.POST or key in request.FILES}
+            if values.get("assign_all"):
+                values.pop("competitors", None)
             result = service.save_slot_task(slot, request.user, values, task=task, publish=request.POST.get("action") == "publish")
             if isinstance(result, TrainingScheduleChange):
                 return _success(request, slot.day.training_plan, "任务调整申请已提交，审批前原内容保持不变。")
@@ -698,3 +700,20 @@ def legacy_task_create(request):
         "training/task_select_slot.html",
         {"plans": plans, "slots": slots, "selected": selected, "skill_id": request.GET.get("skill", "")},
     )
+
+@require_GET
+def task_skill_search(request, pk):
+    from .schedule_forms import slot_skills
+
+    slot = _slot(request.user, pk)
+    if not (service.can_fill(request.user, slot) or service.can_fill(request.user, slot, create=True)):
+        raise PermissionDenied
+    q = request.GET.get("q", "").strip()[:100]
+    try:
+        page = max(1, min(int(request.GET.get("page", 1)), 10000))
+    except ValueError:
+        page = 1
+    candidates = slot_skills(slot).filter(name__icontains=q).order_by("name", "pk") if q else slot_skills(slot).none()
+    rows = list(candidates.values("id", "name")[(page - 1) * 20:page * 20 + 1])
+    return JsonResponse({"results": [{"id": row["id"], "label": row["name"]} for row in rows[:20]],
+                         "has_more": len(rows) > 20})

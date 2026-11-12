@@ -1,0 +1,21 @@
+<div class="space-y-2" data-subtask-editor>
+  <div class="space-y-2" data-subtask-rows>
+    {% for value in widget.value %}
+    <div class="flex gap-2" data-subtask-row>
+      <input class="input w-full" type="text" name="{{ widget.name }}" value="{{ value }}" maxlength="240" aria-label="子任务" {% if widget.attrs.disabled %}disabled{% endif %}>
+      {% if not widget.attrs.disabled %}<button class="btn btn-ghost" type="button" data-subtask-remove>移除</button>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% if widget.attrs.disabled %}
+    <p class="text-sm">已有选手填报，子任务清单已固定。</p>
+  {% else %}
+    <template data-subtask-template>
+      <div class="flex gap-2" data-subtask-row>
+        <input class="input w-full" type="text" name="{{ widget.name }}" maxlength="240" aria-label="子任务">
+        <button class="btn btn-ghost" type="button" data-subtask-remove>移除</button>
+      </div>
+    </template>
+    <button class="btn btn-outline btn-sm" type="button" data-subtask-add>添加子任务</button>
+  {% endif %}
+</div>

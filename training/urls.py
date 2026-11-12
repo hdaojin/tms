@@ -9,6 +9,7 @@ from . import entry_views
 from . import plan_member_views
 from . import historical_roster_views
 from . import log_exemption_views
+from . import log_ai_views
 
 app_name = "training"
 urlpatterns = [
@@ -67,6 +68,7 @@ urlpatterns = [
     path("slots/<int:slot_pk>/tasks/create/", schedule_views.task_edit, name="slot_task_create"),
     path("slots/<int:pk>/tasks/clear/", schedule_views.clear_slot_tasks, name="slot_tasks_clear"),
     path("slots/<int:pk>/competitors/", schedule_views.task_competitor_search, name="task_competitor_search"),
+    path("slots/<int:pk>/skills/", schedule_views.task_skill_search, name="task_skill_search"),
     path("tasks/", schedule_views.legacy_task_list, name="task_list"),
     path("tasks/create/", schedule_views.legacy_task_create, name="task_create"),
     path("tasks/<int:pk>/", views.TrainingTaskDetailView.as_view(), name="task_detail"),
@@ -77,10 +79,17 @@ urlpatterns = [
     path("my/", board_views.MyTrainingView.as_view(), name="my_training"),
     path("board/", board_views.training_board, name="board"),
     path("executions/", views.TaskExecutionListView.as_view(), name="execution_list"),
+    path("progress/", log_ai_views.daily_progress, name="daily_progress"),
     path("executions/<int:pk>/", process_views.target_detail, name="execution_detail"),
     path("executions/<int:pk>/edit/", views.TaskExecutionUpdateView.as_view(), name="execution_edit"),
     path("executions/<int:pk>/feedback/", views.CoachFeedbackView.as_view(), name="execution_feedback"),
     path("logs/", views.TrainingLogListView.as_view(), name="log_list"),
+    path("logs/ai/", log_ai_views.start, name="log_ai_start"),
+    path("logs/settings/", log_ai_views.log_settings, name="log_settings"),
+    path("logs/ai/<int:pk>/", log_ai_views.draft_page, name="log_ai_draft"),
+    path("logs/ai/<int:pk>/preview/", log_ai_views.draft_preview, name="log_ai_preview"),
+    path("logs/ai/<int:pk>/images/<int:image_pk>/", log_ai_views.draft_image, name="log_ai_image"),
+    path("logs/<int:pk>/online/", log_ai_views.submitted_preview, name="log_online"),
     path("logs/monthly-stats/", views.TrainingLogMonthlyStatView.as_view(), name="monthly_stats"),
     path("logs/create/", views.TrainingLogCreateView.as_view(), name="log_create"),
     path("logs/backfill/", views.TrainingLogBackfillView.as_view(), name="log_backfill"),
