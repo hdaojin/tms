@@ -46,6 +46,7 @@ def render_markdown_text(
     extensions: Sequence[str] = DEFAULT_MARKDOWN_EXTRAS,
     html_postprocessor: Callable[[str], str] | None = None,
     lower_meta_keys: bool = True,
+    strict: bool = False,
 ) -> RenderedMarkdown:
     """Render Markdown text into HTML."""
 
@@ -56,7 +57,9 @@ def render_markdown_text(
         if lower_meta_keys:
             meta_data = _lower_meta_keys(meta_data)
 
-    except Exception:  
+    except Exception:
+        if strict:
+            raise
         rendered_html = ""
         meta_data = {}
         toc_content = None

@@ -19,6 +19,7 @@ function fixture({ error, renderError } = {}) {
     ]),
   );
   const calls = [];
+  let destroyed = false;
   let options;
   const root = {
     dataset: {
@@ -33,6 +34,9 @@ function fixture({ error, renderError } = {}) {
     getDocument(value) {
       options = value;
       return {
+        async destroy() {
+          destroyed = true;
+        },
         promise: error
           ? Promise.reject(error)
           : Promise.resolve({
@@ -56,7 +60,7 @@ function fixture({ error, renderError } = {}) {
       };
     },
   };
-  return { nodes, calls, root, pdfjs, options: () => options };
+  return { nodes, calls, root, pdfjs, options: () => options, destroyed: () => destroyed };
 }
 
 // Node has no location; provide only the same-origin browser context required here.
@@ -113,4 +117,19 @@ test("rejects a cross-origin document before loading", async () => {
   await initializePdfPreview(f.root, f.pdfjs);
   assert.equal(f.options(), undefined);
   assert.match(f.nodes.status.textContent, /下载/);
+});
+
+test("uses in-memory PDF bytes and destroys the loading task on invalidation", async () => {
+  const f = fixture();
+  const controller = new AbortController();
+  const data = new Uint8Array([37, 80, 68, 70, 45]);
+  await initializePdfPreview(f.root, f.pdfjs, { data, signal: controller.signal });
+  assert.equal(f.options().data, data);
+  assert.equal(f.options().url, undefined);
+  assert.equal(f.nodes.canvas.hidden, false);
+  controller.abort();
+  assert.equal(f.destroyed(), true);
+  assert.equal(f.nodes.canvas.width, 0);
+  assert.equal(f.nodes.canvas.hidden, true);
+  assert.equal(f.nodes.next.disabled, true);
 });

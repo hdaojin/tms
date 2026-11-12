@@ -1,0 +1,51 @@
+{% extends "layouts/app.html" %}
+{% load static %}
+
+{% block extra_js %}
+  {{ block.super }}
+  <script type="module" src="{% static 'js/document-demo.mjs' %}"></script>
+{% endblock %}
+
+{% block content %}
+  <div class="grid min-w-0 gap-4 xl:grid-cols-2">
+    <section class="card min-w-0 border border-base-300 bg-base-100 shadow-sm">
+      <form action="{% url 'demo:documents' %}" method="post" enctype="multipart/form-data"
+            class="card-body" data-document-form>
+        {% csrf_token %}
+        {% for error in form.non_field_errors %}
+          <p class="text-sm text-error" role="alert">{{ error }}</p>
+        {% endfor %}
+        <div class="grid gap-3 sm:grid-cols-2">
+          {% for field in form.visible_fields %}
+            <div{% if field.name == 'content' %} class="sm:col-span-2"{% endif %}>
+              {% include "components/field.html" with field=field %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button type="submit" name="action" value="html" class="btn" data-document-js hidden>更新 HTML 预览</button>
+          <button type="submit" name="action" value="preview" class="btn" data-document-js hidden>预览 PDF</button>
+          <button type="submit" name="action" value="download" class="btn btn-primary">下载 PDF</button>
+        </div>
+        <p class="min-h-5 text-sm" data-document-status role="status"></p>
+        <noscript><p class="text-sm">页内预览需要启用 JavaScript。可以直接下载 PDF。</p></noscript>
+      </form>
+    </section>
+    <div class="min-w-0 space-y-4">
+      <section class="card min-w-0 border border-base-300 bg-base-100 shadow-sm" data-document-js hidden>
+        <div class="card-body">
+          <h2 class="card-title text-base">HTML 预览</h2>
+          <p class="text-sm">实际分页请以 PDF 预览为准。</p>
+          <iframe class="h-[65vh] w-full rounded-field border border-base-300"
+                  data-document-html sandbox="allow-same-origin" title="文档 HTML 预览"></iframe>
+        </div>
+      </section>
+      <section class="card min-w-0 border border-base-300 bg-base-100 shadow-sm" data-document-pdf hidden>
+        <div class="card-body">
+          <h2 class="card-title text-base">PDF 预览</h2>
+          {% include "components/pdf_preview.html" with manual=True only %}
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,8 @@
+.document-standard .document-header {
+  padding-bottom: 11pt;
+  margin-bottom: 13pt;
+  border-bottom: 1.5pt solid #24568a;
+}
+
+.document-standard .document-header h1,
+.document-standard .document-body h2 { color: #204469; }

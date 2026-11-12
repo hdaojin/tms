@@ -1,0 +1,28 @@
+{% load static %}
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title|force_escape }}</title>
+  {% for stylesheet in stylesheets %}
+    <link rel="stylesheet" href="{% static stylesheet %}">
+  {% endfor %}
+</head>
+<body class="document-{{ template_id }}">
+  <main class="document-sheet">
+    <header class="document-header">
+      <h1>{{ title|force_escape }}</h1>
+      {% if subtitle %}<p class="document-subtitle">{{ subtitle|force_escape }}</p>{% endif %}
+      {% if organization or author or document_date %}
+        <p class="document-meta">
+          {% if organization %}<span>{{ organization|force_escape }}</span>{% endif %}
+          {% if author %}<span>{{ author|force_escape }}</span>{% endif %}
+          {% if document_date %}<time datetime="{{ document_date|date:'Y-m-d' }}">{{ document_date|date:"Y年n月j日" }}</time>{% endif %}
+        </p>
+      {% endif %}
+    </header>
+    <div class="document-body">{{ body }}</div>
+  </main>
+</body>
+</html>

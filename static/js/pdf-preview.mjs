@@ -1,5 +1,6 @@
 // Keep a single page canvas: long PDFs must not exhaust mobile browser memory.
-export async function initializePdfPreview(root, pdfjs) {
+export async function initializePdfPreview(root, pdfjs, { data, signal } = {}) {
+  if (signal?.aborted) return;
   const canvas = root.querySelector("[data-pdf-canvas]");
   const viewportElement = root.querySelector("[data-pdf-viewport]");
   const previous = root.querySelector("[data-pdf-previous]");
@@ -7,6 +8,8 @@ export async function initializePdfPreview(root, pdfjs) {
   const pageLabel = root.querySelector("[data-pdf-page]");
   const status = root.querySelector("[data-pdf-status]");
   let pdf;
+  let loadingTask;
+  let renderTask;
   let pageNumber = 1;
   let rendering = false;
 
@@ -16,6 +19,7 @@ export async function initializePdfPreview(root, pdfjs) {
   }
 
   function showError(error) {
+    if (signal?.aborted) return;
     status.textContent =
       error?.name === "PasswordException"
         ? "此 PDF 需要密码，请下载后使用本地应用打开。"
@@ -23,13 +27,14 @@ export async function initializePdfPreview(root, pdfjs) {
   }
 
   async function renderPage() {
-    if (rendering || !pdf) return;
+    if (rendering || !pdf || signal?.aborted) return;
     rendering = true;
     updateButtons();
     status.textContent = "正在渲染 PDF…";
     let page;
     try {
       page = await pdf.getPage(pageNumber);
+      if (signal?.aborted) return;
       const natural = page.getViewport({ scale: 1 });
       // Leave room for padding and cap high-DPI canvas allocation to 4M pixels.
       const width = Math.max(1, viewportElement.clientWidth - 24);
@@ -42,11 +47,13 @@ export async function initializePdfPreview(root, pdfjs) {
       );
       canvas.width = Math.max(1, Math.floor(viewport.width * ratio));
       canvas.height = Math.max(1, Math.floor(viewport.height * ratio));
-      await page.render({
+      renderTask = page.render({
         canvasContext: canvas.getContext("2d"),
         viewport,
         transform: [ratio, 0, 0, ratio, 0, 0],
-      }).promise;
+      });
+      await renderTask.promise;
+      if (signal?.aborted) return;
       canvas.hidden = false;
       canvas.setAttribute(
         "aria-label",
@@ -56,23 +63,30 @@ export async function initializePdfPreview(root, pdfjs) {
       status.textContent = "可使用上一页、下一页浏览，也可下载原文件。";
       viewportElement.scrollTop = 0;
     } catch (error) {
-      canvas.hidden = true;
-      showError(error);
+      if (!signal?.aborted) {
+        canvas.hidden = true;
+        showError(error);
+      }
     } finally {
       page?.cleanup();
+      renderTask = undefined;
       rendering = false;
-      updateButtons();
+      if (!signal?.aborted) updateButtons();
     }
   }
 
   try {
-    const url = new URL(root.dataset.pdfUrl, globalThis.location.href);
-    if (url.origin !== globalThis.location.origin)
-      throw new Error("Expected same-origin PDF");
+    let source = { data };
+    if (!data) {
+      const url = new URL(root.dataset.pdfUrl, globalThis.location.href);
+      if (url.origin !== globalThis.location.origin)
+        throw new Error("Expected same-origin PDF");
+      source = { url: url.href };
+    }
     pdfjs.GlobalWorkerOptions.workerSrc = root.dataset.pdfWorker;
     const assets = root.dataset.pdfAssets;
-    pdf = await pdfjs.getDocument({
-      url: url.href,
+    loadingTask = pdfjs.getDocument({
+      ...source,
       cMapUrl: `${assets}cmaps/`,
       cMapPacked: true,
       standardFontDataUrl: `${assets}standard_fonts/`,
@@ -81,17 +95,29 @@ export async function initializePdfPreview(root, pdfjs) {
       disableFontFace: true,
       isEvalSupported: false,
       useWasm: false,
-    }).promise;
+    });
+    signal?.addEventListener("abort", () => {
+      renderTask?.cancel();
+      void loadingTask.destroy().catch(() => {});
+      previous.disabled = true;
+      next.disabled = true;
+      canvas.hidden = true;
+      canvas.width = 0;
+      canvas.height = 0;
+      pageLabel.textContent = "尚未加载";
+    }, { once: true });
+    pdf = await loadingTask.promise;
+    if (signal?.aborted) return;
     previous.addEventListener("click", () => {
       if (rendering || pageNumber <= 1) return;
       pageNumber -= 1;
       void renderPage();
-    });
+    }, { signal });
     next.addEventListener("click", () => {
       if (rendering || pageNumber >= pdf.numPages) return;
       pageNumber += 1;
       void renderPage();
-    });
+    }, { signal });
     // Native CSS resizing keeps the canvas usable through device rotation.
     await renderPage();
   } catch (error) {

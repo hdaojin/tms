@@ -67,7 +67,7 @@ jobs:
       - name: Run tests
         run: |
           set -o pipefail
-          uv run pytest 2>&1 | tee pytest-test.log
+          uv run pytest -m "not document_pdf_native" 2>&1 | tee pytest-test.log
 
       - name: Upload pytest test log
         if: always()
@@ -76,6 +76,35 @@ jobs:
           name: pytest-test-log
           path: pytest-test.log
           if-no-files-found: ignore
+
+  document-pdf:
+    name: Document PDF rendering on Debian 13
+    runs-on: ubuntu-latest
+    container: debian:13
+    env:
+      DEBUG: "True"
+      DATABASE_URL: "sqlite:///:memory:"
+      SAMBA_INTEGRATION_ENABLED: "False"
+      SAMBA_ASYNC_OPERATIONS_ENABLED: "False"
+    steps:
+      - name: Install PDF system dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ca-certificates git libpq5 fontconfig fonts-noto-cjk libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 poppler-utils
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python dependencies
+        run: uv sync --frozen
+
+      - name: Check PDF renderer and DEBUG document demo
+        run: |
+          uv run manage.py check_document_pdf
+          uv run pytest -o django_debug_mode=keep core/test_document_export.py demo/test_documents.py
 
   frontend:
     name: Frontend build

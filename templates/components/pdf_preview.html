@@ -1,5 +1,5 @@
 {% load static %}
-<div data-pdf-preview
+<div {% if manual %}data-pdf-preview-manual{% else %}data-pdf-preview{% endif %}
      data-pdf-url="{{ file_preview.preview_url }}"
      data-pdf-library="{% static 'vendor/pdfjs/pdf.mjs' %}"
      data-pdf-worker="{% static 'vendor/pdfjs/pdf.worker.mjs' %}"

@@ -1,0 +1,14 @@
+.document-formal {
+  color: #1d1d1d;
+  font: 12pt/1.85 "Noto Serif CJK SC", SimSun, serif;
+}
+
+.document-formal .document-header {
+  margin-bottom: 18pt;
+  padding-bottom: 15pt;
+  border-bottom: 0.75pt solid #4b5563;
+  text-align: center;
+}
+
+.document-formal .document-header h1 { font-size: 27pt; }
+.document-formal .document-body h2 { font-size: 15pt; }

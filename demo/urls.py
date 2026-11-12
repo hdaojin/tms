@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from .documents import DocumentDemoView
 
 app_name = "demo"
 
@@ -13,4 +14,5 @@ urlpatterns = [
     path("upload/", views.UploadDemoView.as_view(), name="upload"),
     path("print/", views.PrintDemoView.as_view(), name="print"),
     path("states/", views.StatesDemoView.as_view(), name="states"),
+    path("documents/", DocumentDemoView.as_view(), name="documents"),
 ]
