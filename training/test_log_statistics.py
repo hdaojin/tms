@@ -135,6 +135,41 @@ class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(result["rows"][0]["unsubmitted_coaches"], ["李四"])
         self.assertEqual({p["name"]: p["count"] for p in result["people"]}, {"张三": 1, "李四": 0, "王五": 0})
 
+    def test_all_coaches_count_as_submitted_but_only_named_coaches_are_required(self):
+        self.grant("view_all_traininglog")
+        optional = User.objects.create_user("optional-coach", first_name="其他教练")
+        optional.user_permissions.set(
+            Permission.objects.filter(content_type__app_label="training", codename="view_traininglog_statistics")
+        )
+        for date in (self.first, self.second):
+            slot = self.plan.schedule_days.get(date=date).slots.get()
+            slot.coaches_all = True
+            slot.save(update_fields=["coaches_all"])
+            slot.coaches.add(optional)
+        self.day(self.second, self.coach, period=TrainingScheduleSlot.Period.AFTERNOON)
+        first_log = self.log(optional, self.first)
+        second_log = self.log(optional, self.second)
+        self.log(self.user, self.first)
+
+        result = self.stats()
+        first, second = result["rows"]
+        self.assertEqual(first["unsubmitted_coaches"], [])
+        self.assertEqual(first["unsubmitted_competitors"], ["王五"])
+        self.assertEqual(second["unsubmitted_coaches"], ["李四"])
+        self.assertEqual(second["unsubmitted_competitors"], ["张三", "王五"])
+        self.assertEqual([p["log_id"] for p in first["submitted_coaches"]], [first_log.pk])
+        self.assertEqual([p["log_id"] for p in second["submitted_coaches"]], [second_log.pk])
+        self.assertEqual(
+            {p["user_id"]: (p["count"], p["expected"]) for p in result["people"]},
+            {self.user.pk: (1, 2), self.student.pk: (0, 2), self.coach.pk: (0, 1), optional.pk: (2, 0)},
+        )
+
+        self.client.force_login(optional)
+        response = self.client.get(self.url, {"plan": self.plan.pk})
+        self.assertEqual(response.context["selected_plan"], self.plan)
+        self.assertEqual([p["user_id"] for p in response.context["people"]], [optional.pk])
+        self.assertContains(response, "已交 2 份 / 应交 0 份")
+
     def test_early_reading_assignments_do_not_supply_historical_competitors(self):
         self.grant("view_all_traininglog")
         legacy = self.make_plan("后补计划")
@@ -328,6 +363,23 @@ class TrainingLogStatisticsTests(TrainingFixtureMixin, TestCase):
 
     def exemption_confirm(self, response):
         return self.client.post(self.exemption_url(), {"token": response.context["token"]})
+
+    def test_exemption_preview_only_reduces_named_coach_requirements(self):
+        self.grant("view_all_traininglog")
+        slot = self.plan.schedule_days.get(date=self.first).slots.get()
+        slot.coaches_all = True
+        slot.save(update_fields=["coaches_all"])
+        self.plan.responsible_coaches.add(self.coach)
+        self.client.force_login(User.objects.create_superuser("admin"))
+
+        preview = self.exemption_preview(role="coach", end=self.second.isoformat())
+        snapshot = preview.context["snapshot"]
+        self.assertEqual(snapshot["delta"], -1)
+        self.assertEqual([row["date"] for row in snapshot["rows"]], [self.second.isoformat()])
+        self.assertRedirects(self.exemption_confirm(preview), self.exemption_url())
+        first, second = self.stats()["rows"]
+        self.assertEqual(first["exempt_coaches"], [])
+        self.assertEqual(second["exempt_coaches"], ["李四"])
 
     def test_role_snapshot_and_overlapping_exemptions(self):
         self.grant("view_all_traininglog")

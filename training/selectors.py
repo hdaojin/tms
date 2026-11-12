@@ -99,14 +99,18 @@ def training_log_stat_slots(plan, start, end):
 
 
 def training_log_daily_rosters(plan, start, end):
-    slots = training_log_stat_slots(plan, start, end).values_list("day__date", "coaches")
+    slots = training_log_stat_slots(plan, start, end).values_list("day__date", "coaches_all", "coaches")
     coaches = defaultdict(set)
-    for day, coach in slots:
+    named_coaches = defaultdict(set)
+    for day, coaches_all, coach in slots:
         day_coaches = coaches[day]
         if coach is not None:
             day_coaches.add(coach)
+            if not coaches_all:
+                named_coaches[day].add(coach)
     coaches = dict(sorted(coaches.items()))
-    return coaches, _daily_competitors(plan, coaches) if coaches else {}
+    competitors = _daily_competitors(plan, coaches) if coaches else {}
+    return coaches, named_coaches, competitors
 
 
 def training_log_submission_statistics(user, *, plan, q="", date_from=None, date_to=None):
@@ -116,7 +120,7 @@ def training_log_submission_statistics(user, *, plan, q="", date_from=None, date
         return {}
     start = max(plan.start_date, date_from or plan.start_date)
     end = min(plan.end_date, date_to or plan.end_date, timezone.localdate())
-    coaches, competitors = training_log_daily_rosters(plan, start, end)
+    coaches, named_coaches, competitors = training_log_daily_rosters(plan, start, end)
     dates = list(coaches)
     exemptions = exempt_users(exemption_rules(exemption_history(plan)), dates) if dates else {}
     user_ids = set()
@@ -151,16 +155,17 @@ def training_log_submission_statistics(user, *, plan, q="", date_from=None, date
         roster, complete = competitors[day]
         daily_competitors = roster & people.keys()
         daily_coaches = coaches[day] & people.keys()
+        daily_named_coaches = named_coaches[day] & people.keys()
         exempt = exemptions[day]
         submitted = {
             pk: {"name": people[pk]["name"], "log_id": logs[day, pk]}
             for pk in daily_competitors | daily_coaches
             if (day, pk) in logs
         }
-        for role in (daily_competitors, daily_coaches):
-            for pk in role - exempt:
+        for eligible, required in ((daily_competitors, daily_competitors), (daily_coaches, daily_named_coaches)):
+            for pk in required - exempt:
                 people[pk]["expected"] += 1
-            for pk in role & submitted.keys():
+            for pk in eligible & submitted.keys():
                 people[pk]["count"] += 1
         if not complete:
             uncertain.update(possible_competitors - daily_competitors - exemptions[day])
@@ -170,9 +175,9 @@ def training_log_submission_statistics(user, *, plan, q="", date_from=None, date
             "submitted_coaches": sorted((submitted[pk] for pk in coaches[day] & submitted.keys()), key=lambda p: p["name"]),
             "unsubmitted_competitors": sorted(people[pk]["name"] for pk in daily_competitors - submitted.keys() - exempt)
             if complete else [],
-            "unsubmitted_coaches": sorted(people[pk]["name"] for pk in daily_coaches - submitted.keys() - exempt),
+            "unsubmitted_coaches": sorted(people[pk]["name"] for pk in daily_named_coaches - submitted.keys() - exempt),
             "exempt_competitors": sorted(people[pk]["name"] for pk in daily_competitors & exempt),
-            "exempt_coaches": sorted(people[pk]["name"] for pk in daily_coaches & exempt),
+            "exempt_coaches": sorted(people[pk]["name"] for pk in daily_named_coaches & exempt),
             "roster_complete": complete,
         })
     for pk in uncertain:

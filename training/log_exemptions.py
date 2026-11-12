@@ -119,17 +119,17 @@ def _preview(plan, params):
     change = {"target": target, "start": start.isoformat(), "rule": rule}
     last_day = max(end if rule else start, date.fromisoformat(previous["end"]) if previous else start)
     # 预览未来训练日时，使用当前排班及当前可核定的选手名单。
-    coaches, competitors = training_log_daily_rosters(plan, start, min(last_day, plan.end_date))
+    coaches, named_coaches, competitors = training_log_daily_rosters(plan, start, min(last_day, plan.end_date))
     before = exempt_users(rules, coaches)
     _apply(rules, None, change)
     after = exempt_users(rules, coaches)
     rows = []
     affected = set()
-    for day, daily_coaches in coaches.items():
+    for day in coaches:
         daily_competitors, _ = competitors[day]
         added = after[day] - before[day]
         removed = before[day] - after[day]
-        for role, roster in (("选手", daily_competitors), ("负责教练", daily_coaches)):
+        for role, roster in (("选手", daily_competitors), ("负责教练", named_coaches[day])):
             for pk in sorted(roster & (added | removed)):
                 rows.append({"date": day.isoformat(), "role": role, "user_id": pk, "delta": -1 if pk in added else 1})
                 affected.add(pk)
