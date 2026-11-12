@@ -80,10 +80,29 @@ sudo chown root:root /etc/tms/deploy.conf
 更新稳定入口时，重复人工审查和上面的 `install`。已有 plan 会绑定脚本、配置和两个模板的 SHA-256；
 任一文件变化后旧 plan 都会被拒绝，必须重新生成。
 
+### 3.1 安装 PDF 系统依赖
+
+Debian 13 首次部署或已有服务器首次启用 PDF 渲染时，安装稳定入口后执行：
+
+```bash
+sudo tms-deploy install-pdf-deps
+```
+
+此命令安装缺失的 `fontconfig`、`fonts-noto-cjk`、`libpango-1.0-0`、
+`libpangoft2-1.0-0` 和 `libharfbuzz-subset0`。APT 会显示安装清单供确认。
+Python 包 WeasyPrint 由候选发布的 `uv.lock` 安装。
+
+部署含 PDF 服务的版本后，以当前发布的服务账号实际生成两套中文样张：
+
+```bash
+sudo tms-deploy manage check_document_pdf
+```
+
 ## 4. 命令模型和退出行为
 
 ```text
 tms-deploy inspect [--json]
+tms-deploy install-pdf-deps
 tms-deploy plan [--revision develop] [--first-install] [--json]
 tms-deploy apply <plan-id> --confirm-sha <完整SHA> [--skip-backup]
 tms-deploy verify [--json]

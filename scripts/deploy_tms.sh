@@ -107,6 +107,7 @@ usage() {
     cat <<'EOF'
 用法：
   tms-deploy inspect [--json]
+  tms-deploy install-pdf-deps
   tms-deploy plan [--revision REVISION] [--first-install] [--json]
   tms-deploy apply PLAN_ID --confirm-sha FULL_SHA [--skip-backup]
   tms-deploy verify [--json]
@@ -119,6 +120,7 @@ usage() {
   tms-deploy tls configure-acme|install|check
 
 inspect 严格只读。plan 只写入候选 release 和带哈希的计划记录。
+install-pdf-deps 在 Debian 上安装缺失的 PDF 系统库和中文字体。
 apply 与所有管理子命令都要求 root 权限。
 apply 默认完整备份；--skip-backup 仅跳过本次升级备份，不影响迁移和验收。
 EOF
@@ -399,6 +401,26 @@ cmd_inspect() {
     printf 'basic_auth=%s\n' "$([[ -s "${AUTH_USERS_FILE}" ]] && printf configured || printf missing)"
     printf 'postgres_listen=%s\n' "$(ss -ltn 2>/dev/null | awk '$4 ~ /:5432$/ {print $4}' | paste -sd, - || true)"
     printf 'gunicorn_listen=%s\n' "$(ss -ltn 2>/dev/null | awk '$4 ~ /:8010$/ {print $4}' | paste -sd, - || true)"
+}
+
+cmd_install_pdf_deps() {
+    [[ $# -eq 0 ]] || die "用法：tms-deploy install-pdf-deps"
+    require_root
+    require_root_owned_file "$0"
+    require_cmd apt-get
+    require_cmd dpkg-query
+
+    local package status missing=()
+    for package in fontconfig fonts-noto-cjk libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0; do
+        status="$(dpkg-query -W -f='${db:Status-Status}' "${package}" 2>/dev/null || true)"
+        [[ "${status}" == installed ]] || missing+=("${package}")
+    done
+    if (( ${#missing[@]} == 0 )); then
+        info "PDF 系统库和中文字体已安装。"
+        return
+    fi
+    apt-get update
+    apt-get install --no-install-recommends --no-remove "${missing[@]}"
 }
 
 ensure_plan_prerequisites() {
@@ -1193,6 +1215,7 @@ main() {
     case "${command}" in
         -h|--help|help) usage ;;
         inspect) cmd_inspect "$@" ;;
+        install-pdf-deps) cmd_install_pdf_deps "$@" ;;
         plan) cmd_plan "$@" ;;
         apply) cmd_apply "$@" ;;
         verify) cmd_verify "$@" ;;

@@ -10,6 +10,7 @@ from django.core.files.base import ContentFile
 from django.db.models.signals import post_delete
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.models import UserProfile
 
@@ -19,7 +20,7 @@ from .log_management import (
     filter_training_logs,
     preview_log_deletion,
 )
-from .models import TrainingCycleMember, TrainingLog
+from .models import TrainingCycleMember, TrainingLog, TrainingPlan
 from .tests import TrainingFixtureMixin, User
 
 
@@ -33,8 +34,11 @@ class TrainingLogListManagementTests(TrainingFixtureMixin, TestCase):
         self.author = User.objects.create_user("candidate", last_name="张", first_name="三")
         self.coach = User.objects.create_user("coach", last_name="李", first_name="四")
         UserProfile.objects.create(user=self.author, student_id="20261001")
-        self.period = self.cycle()
+        self.enterContext(patch("django.utils.timezone.localdate", return_value=date(2026, 2, 28)))
+        self.period = self.cycle(end_date=date(2026, 2, 28))
         self.other_period = self.cycle("C2")
+        self.plan = self.create_plan(self.period, date(2026, 1, 2), date(2026, 2, 28))
+        self.other_plan = self.create_plan(self.other_period, date(2026, 1, 1), date(2026, 1, 31))
         self.membership = TrainingCycleMember.objects.create(
             user=self.author, training_cycle=self.period, role="competitor",
         )
@@ -46,6 +50,12 @@ class TrainingLogListManagementTests(TrainingFixtureMixin, TestCase):
                    "change_all_traininglog", "delete_traininglog", "delete_all_traininglog")
         self.client.force_login(self.manager)
         self.url = reverse("training:log_list")
+
+    def create_plan(self, cycle, start, end, **kwargs):
+        return TrainingPlan.objects.create(
+            training_cycle=cycle, title=kwargs.pop("title", "训练计划"), start_date=start, end_date=end,
+            created_by=self.manager, published_at=timezone.now(), schedule_published_at=timezone.now(), **kwargs,
+        )
 
     def grant(self, user, *codes):
         user.user_permissions.add(*Permission.objects.filter(
@@ -70,22 +80,23 @@ class TrainingLogListManagementTests(TrainingFixtureMixin, TestCase):
         log.document.save(f"log-{log.pk}.txt", ContentFile(b"training log"), save=True)
         return log.document.storage, log.document.name
 
-    def test_search_full_name_username_student_id_content_and_filename(self):
+    def test_search_full_name_pinyin_student_id_content_and_filename(self):
         self.log.document = "logs/C1/2026/01/routing-notes.pdf"
         self.log.save()
         for query, expected in (
             ("张三", {self.log.pk, self.other_log.pk}),
-            ("candidate", {self.log.pk, self.other_log.pk}),
+            ("zhangsan", {self.log.pk, self.other_log.pk}),
+            ("candidate", set()),
             ("20261001", {self.log.pk, self.other_log.pk}),
             ("路由实验", {self.log.pk}), ("网络丢包", {self.log.pk}),
             ("routing-notes.pdf", {self.log.pk}),
         ):
             with self.subTest(query=query):
-                self.assertEqual(self.ids(self.client.get(self.url, {"q": query})), expected)
+                self.assertEqual(self.ids(self.client.get(self.url, {"q": query, "plan": "all"})), expected)
 
-    def test_cycle_date_range_and_current_cycle_identity_filters(self):
+    def test_plan_date_range_and_current_cycle_identity_filters(self):
         response = self.client.get(self.url, {
-            "cycle": self.period.pk, "date_from": "2026-01-02", "date_to": "2026-01-03", "member_role": "coach",
+            "plan": self.plan.pk, "date_from": "2026-01-02", "date_to": "2026-01-03", "member_role": "coach",
         })
         self.assertEqual(self.ids(response), {self.coach_log.pk})
         self.assertContains(response, "周期身份")
@@ -101,15 +112,32 @@ class TrainingLogListManagementTests(TrainingFixtureMixin, TestCase):
                          {self.coach_log.pk})
         self.membership.role = "coach"
         self.membership.save()
-        response = self.client.get(self.url, {"cycle": self.period.pk, "member_role": "coach"})
+        response = self.client.get(self.url, {"plan": self.plan.pk, "member_role": "coach"})
         self.assertEqual(self.ids(response), {self.log.pk, self.coach_log.pk})
-        self.assertContains(self.client.get(self.url), "未关联")
+        self.assertContains(self.client.get(self.url, {"plan": self.other_plan.pk}), "未关联")
         for invalid in ({"date_from": "invalid"}, {"date_from": "2026-01-04", "date_to": "2026-01-01"},
-                        {"member_role": "invalid"}, {"cycle": "not-a-number"}):
+                        {"member_role": "invalid"}, {"plan": "not-a-number"}):
             with self.subTest(invalid=invalid):
                 response = self.client.get(self.url, invalid)
                 self.assertEqual(self.ids(response), set())
                 self.assertTrue(response.context["filter_form"].errors)
+
+    def test_default_latest_ongoing_plan_and_training_date_order(self):
+        self.create_plan(self.other_period, date(2026, 1, 1), date(2026, 1, 31))
+        older = self.create_plan(self.period, date(2026, 1, 1), date(2026, 2, 28), title="较早开始")
+        self.create_plan(self.period, date(2026, 2, 28), date(2026, 2, 28), status=TrainingPlan.Status.ARCHIVED)
+        self.create_plan(self.period, date(2026, 2, 28), date(2026, 2, 28), status=TrainingPlan.Status.COMPLETED)
+        self.log.save()
+        response = self.client.get(self.url)
+        self.assertEqual(response.context["filter_form"].default_plan, self.plan)
+        self.assertEqual([row.record.pk for row in response.context["table"].rows], [self.coach_log.pk, self.log.pk])
+        self.assertEqual(self.ids(self.client.get(self.url, {"plan": older.pk})), {self.log.pk, self.coach_log.pk})
+        self.assertEqual(self.ids(self.client.get(self.url, {"plan": self.other_plan.pk})), {self.other_log.pk})
+        with patch("django.utils.timezone.localdate", return_value=date(2026, 3, 1)):
+            response = self.client.get(self.url)
+            self.assertEqual(self.ids(response), set())
+            self.assertContains(response, "暂无进行中的训练计划")
+            self.assertEqual(self.ids(self.client.get(self.url, {"plan": "all"})), {self.log.pk, self.coach_log.pk, self.other_log.pk})
 
     def test_search_respects_visibility_and_htmx_partial(self):
         self.grant(self.author, "view_traininglog", "delete_traininglog")
@@ -117,7 +145,8 @@ class TrainingLogListManagementTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(self.ids(self.client.get(self.url, {"q": "李四"})), set())
         response = self.client.get(self.url)
         self.assertNotContains(response, "data-row-selection")
-        self.assertNotContains(response, ">删除</a>")
+        self.assertContains(response, f'data-modal-target="delete-log-{self.log.pk}"')
+        self.assertEqual(self.client.post(reverse("training:log_delete", args=[self.coach_log.pk])).status_code, 404)
         self.assertFalse(can_manage_log_deletions(self.author))
         self.assertEqual(self.client.post(self.url, {"logs": [self.log.pk], "operation": "delete",
                                                     "selection": "selected"}).status_code, 403)
@@ -127,34 +156,42 @@ class TrainingLogListManagementTests(TrainingFixtureMixin, TestCase):
         self.assertNotContains(response, "<!DOCTYPE")
         self.assertContains(response, "张三")
 
-    def test_single_delete_button_uses_matching_style_and_confirmation_page(self):
-        response = self.client.get(self.url)
+    def test_single_delete_uses_modal_outside_bulk_form_and_shows_alert(self):
+        query = urlencode({"plan": "all"})
+        response = self.client.get(self.url + "?" + query)
         soup = BeautifulSoup(response.content, "html.parser")
         selections = soup.select("input[data-row-selection]")
-        self.assertEqual(len(selections), 3)
+        self.assertEqual(len(selections), 2)
         self.assertTrue(all(field.get("name") == "logs" for field in selections))
         self.assertEqual({int(field["value"]) for field in selections},
-                         {self.log.pk, self.coach_log.pk, self.other_log.pk})
+                         {self.log.pk, self.coach_log.pk})
         self.assertIsNotNone(soup.select_one("input[data-select-page]"))
-        delete = soup.find("a", string="删除")
+        delete = soup.select_one(f'button[data-modal-target="delete-log-{self.log.pk}"]')
         self.assertIsNotNone(delete)
         for css in ("btn", "btn-soft", "btn-error", "btn-xs"):
             self.assertIn(css, delete["class"])
         for label in ("查看", "编辑"):
             self.assertIn("btn-xs", soup.find("a", string=label)["class"])
         self.assertFalse(any(form.find("form") for form in soup.find_all("form")))
-        query = urlencode({"q": "张三", "cycle": self.period.pk})
+        dialog = soup.select_one(f"dialog#delete-log-{self.log.pk}")
+        self.assertIsNone(dialog.find_parent("form"))
+        self.assertIsNotNone(dialog.select_one('form[method="post"] input[name="csrfmiddlewaretoken"]'))
         url = reverse("training:log_delete", args=[self.log.pk]) + "?" + urlencode({"return_query": query})
+        self.assertEqual(dialog.select_one('form[method="post"]')["action"], url)
+        self.assertIsNone(soup.select_one(f"dialog#delete-log-{self.other_log.pk}"))
         response = self.client.get(url)
         self.assertContains(response, "确认删除训练日志")
         soup = BeautifulSoup(response.content, "html.parser")
         self.assertEqual(soup.find("a", string="取消")["href"], self.url + "?" + query)
-        response = self.client.post(url)
+        response = self.client.post(url, follow=True)
         self.assertRedirects(response, self.url + "?" + query)
+        alert = BeautifulSoup(response.content, "html.parser").select_one(".alert-success")
+        self.assertIsNotNone(alert)
+        self.assertIn("已删除训练日志及其附件", alert.get_text())
         self.assertFalse(TrainingLog.objects.filter(pk=self.log.pk).exists())
 
     def test_preview_fixed_selection_and_confirmation_preserve_filters(self):
-        query = urlencode({"q": "张三", "cycle": self.period.pk, "page": 1})
+        query = urlencode({"q": "张三", "plan": self.plan.pk, "page": 1})
         url = self.url + "?" + query
         response = self.client.post(url, {"selection": "selected", "operation": "delete", "logs": [self.log.pk]})
         self.assertEqual(response.status_code, 200)
@@ -175,7 +212,7 @@ class TrainingLogListManagementTests(TrainingFixtureMixin, TestCase):
             self.create_log(self.coach, date(2026, 2, day))
         response = self.client.get(self.url)
         page_ids = {row.record.pk for row in response.context["table"].page.object_list}
-        outside = TrainingLog.objects.exclude(pk__in=page_ids).first()
+        outside = TrainingLog.objects.filter(training_cycle=self.period).exclude(pk__in=page_ids).first()
         self.assertIsNotNone(outside)
         self.client.post(self.url, {"selection": "selected", "operation": "delete", "logs": [outside.pk]})
         self.assertTrue(TrainingLog.objects.filter(pk=outside.pk).exists())
@@ -200,6 +237,63 @@ class TrainingLogListManagementTests(TrainingFixtureMixin, TestCase):
         ))
         with self.assertRaises(PermissionDenied):
             confirm_log_deletion(actor=self.manager, token=preview["token"])
+        self.assertTrue(TrainingLog.objects.filter(pk=self.log.pk).exists())
+
+    def test_ended_plan_cannot_be_deleted_by_staff_with_delete_all_permission(self):
+        self.manager.is_staff = True
+        self.manager.save(update_fields=["is_staff"])
+        pk = self.other_log.pk
+        for route in ("training:log_delete", "admin:training_traininglog_delete"):
+            url = reverse(route, args=[pk])
+            expected = 404 if route.startswith("training:") else 403
+            self.assertEqual(self.client.post(url, {"post": "yes"}).status_code, expected)
+        self.assertEqual(self.client.post(reverse("admin:training_traininglog_changelist"), {
+            "action": "delete_selected", "_selected_action": [pk], "post": "yes",
+        }).status_code, 403)
+        self.assertTrue(TrainingLog.objects.filter(pk=pk).exists())
+        self.assertEqual(self.client.post(reverse("admin:training_traininglog_changelist"), {
+            "action": "delete_selected", "_selected_action": [self.log.pk], "post": "yes",
+        }).status_code, 302)
+        self.assertFalse(TrainingLog.objects.filter(pk=self.log.pk).exists())
+
+    def test_superuser_can_delete_ended_and_unmatched_logs(self):
+        self.manager.is_staff = self.manager.is_superuser = True
+        self.manager.save(update_fields=["is_staff", "is_superuser"])
+        historical = self.other_log
+        admin_single = self.create_log(self.author, date(2026, 1, 5), cycle=self.other_period)
+        admin_batch = self.create_log(self.author, date(2026, 1, 6), cycle=self.other_period)
+        unmatched = self.create_log(self.author, date(2026, 1, 1))
+        query = {"plan": self.other_plan.pk}
+
+        response = self.client.get(self.url, query)
+        self.assertContains(response, f'data-modal-target="delete-log-{historical.pk}"')
+        self.assertEqual(self.client.post(reverse("training:log_delete", args=[historical.pk])).status_code, 302)
+
+        all_logs_url = self.url + "?plan=all"
+        preview = self.client.post(all_logs_url, {"selection": "selected", "operation": "delete", "logs": [unmatched.pk]})
+        self.assertEqual(preview.status_code, 200)
+        confirm = self.client.post(all_logs_url, {"stage": "confirm", "token": preview.context["token"]})
+        self.assertRedirects(confirm, all_logs_url)
+
+        admin_delete_url = reverse("admin:training_traininglog_delete", args=[admin_single.pk])
+        self.assertEqual(self.client.post(admin_delete_url, {"post": "yes"}).status_code, 302)
+        admin_list_url = reverse("admin:training_traininglog_changelist")
+        self.assertEqual(self.client.post(admin_list_url, {
+            "action": "delete_selected", "_selected_action": [admin_batch.pk], "post": "yes",
+        }).status_code, 302)
+        self.assertFalse(TrainingLog.objects.filter(pk__in=[historical.pk, unmatched.pk, admin_single.pk, admin_batch.pk]).exists())
+
+    def test_confirmation_rechecks_plan_end_and_protects_overlap(self):
+        preview = self.preview()
+        with patch("django.utils.timezone.localdate", return_value=date(2026, 3, 1)):
+            with self.assertRaises(ValidationError):
+                confirm_log_deletion(actor=self.manager, token=preview["token"])
+        historical = self.create_plan(self.period, date(2026, 1, 1), date(2026, 1, 2))
+        url = reverse("training:log_delete", args=[self.log.pk])
+        self.assertEqual(self.client.post(url).status_code, 404)
+        historical.schedule_published_at = None
+        historical.save(update_fields=["schedule_published_at"])
+        self.assertEqual(self.client.post(url).status_code, 404)
         self.assertTrue(TrainingLog.objects.filter(pk=self.log.pk).exists())
 
     def test_delete_cleans_files_after_commit_and_failed_batch_rolls_back(self):

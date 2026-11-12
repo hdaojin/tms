@@ -25,7 +25,7 @@ from .member_tables import CycleCandidateTable, CycleMemberTable
 from .member_management import MemberActionForm, prepare_member_add, preview_member_add, confirm_member_add, load_member_add
 from .log_management import (
     LogFilterForm, LogDeleteActionForm, filter_training_logs, can_manage_log_deletions,
-    preview_log_deletion, confirm_log_deletion, log_list_return_url,
+    preview_log_deletion, confirm_log_deletion, delete_training_logs, log_list_return_url,
 )
 
 from core.utils.breadcrumbs import breadcrumb_link
@@ -49,6 +49,8 @@ from .forms import (
 )
 from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
 from .selectors import (
+    log_plan_choices,
+    log_plan_is_ongoing,
     manageable_training_tasks_for,
     training_logs_changeable_by,
     training_logs_deletable_by,
@@ -757,10 +759,7 @@ class TrainingLogMonthlyStatView(FilterableListMixin, TitleMixin, PermissionRequ
             ListFilterSpec("q", "搜索人员", "search", placeholder="姓名、全拼或首字母"),
             ListFilterSpec(
                 "plan", "训练计划", "select", empty_label="自动选择进行中的计划",
-                choices=[
-                    (plan.pk, f"{plan.title}（{'进行中' if plan.end_date >= today else '已完成'}，{plan.start_date:%Y-%m-%d}）")
-                    for plan in self.plans
-                ],
+                choices=log_plan_choices(self.plans, today),
             ),
             ListFilterSpec("date_from", "训练日期从", "date", placeholder="从"),
             ListFilterSpec("date_to", "训练日期至", "date", placeholder="至"),
@@ -774,7 +773,7 @@ class TrainingLogMonthlyStatView(FilterableListMixin, TitleMixin, PermissionRequ
         if form.is_valid():
             filters = form.cleaned_data
             selected = filters["plan"] or next(
-                (plan for plan in self.plans if plan.end_date >= timezone.localdate()), None,
+                (plan for plan in self.plans if log_plan_is_ongoing(plan, timezone.localdate())), None,
             )
             if selected:
                 context.update(
@@ -803,9 +802,9 @@ class TrainingLogListView(FilterableListMixin, ListPageMixin, TitleMixin, Permis
     def get_list_filter_specs(self):
         return (
             ListFilterSpec("q", "搜索日志", "search", placeholder="姓名、拼音、学号、主题、摘要或文件名"),
-            ListFilterSpec("cycle", "训练周期", "select",
-                           choices=[(cycle.pk, cycle.name) for cycle in self.filter_form.fields["cycle"].queryset],
-                           empty_label="全部训练周期"),
+            ListFilterSpec("plan", "训练计划", "select",
+                           choices=self.filter_form.fields["plan"].choices[1:],
+                           empty_label=self.filter_form.fields["plan"].choices[0][1]),
             ListFilterSpec("date_from", "训练日期从", "date", placeholder="从"),
             ListFilterSpec("date_to", "训练日期至", "date", placeholder="至"),
             ListFilterSpec("member_role", "周期身份", "select", choices=TrainingCycleMember.Role.choices,
@@ -813,21 +812,32 @@ class TrainingLogListView(FilterableListMixin, ListPageMixin, TitleMixin, Permis
         )
 
     def get_queryset(self):
-        from django.db.models import Exists, OuterRef
-        queryset = filter_training_logs(self.request.user, self.request.GET) if self.filter_form.is_valid() else TrainingLog.objects.none()
+        user = self.request.user
+        queryset = filter_training_logs(user, self.request.GET, form=self.filter_form) if self.filter_form.is_valid() else TrainingLog.objects.none()
         return (
             queryset
             .select_related("training_cycle", "author")
-            .annotate(execution_count=Count("executions"), can_edit=Exists(training_logs_changeable_by(self.request.user).filter(pk=OuterRef("pk"))))
+            .annotate(
+                execution_count=Count("executions"),
+                can_edit=Exists(training_logs_changeable_by(user).filter(pk=OuterRef("pk"))),
+                can_delete=Exists(training_logs_deletable_by(user).filter(pk=OuterRef("pk"))),
+            )
         )
 
+    @cached_property
+    def can_bulk_delete(self):
+        return can_manage_log_deletions(self.request.user) and self.object_list.filter(can_delete=True).exists()
+
     def get_table_kwargs(self):
-        return {"can_bulk_delete": can_manage_log_deletions(self.request.user)}
+        return {"can_bulk_delete": self.can_bulk_delete}
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(filter_form=self.filter_form, bulk_form=LogDeleteActionForm(),
-                       can_bulk_delete=can_manage_log_deletions(self.request.user))
+        context.update(
+            filter_form=self.filter_form, bulk_form=LogDeleteActionForm(), can_bulk_delete=self.can_bulk_delete,
+            no_current_plan=self.filter_form.is_valid() and not self.filter_form.cleaned_data["plan"]
+            and self.filter_form.default_plan is None,
+        )
         return context
 
     def post(self, request, *args, **kwargs):
@@ -846,8 +856,8 @@ class TrainingLogListView(FilterableListMixin, ListPageMixin, TitleMixin, Permis
             self.object_list = self.get_queryset()
             table = self.get_table(**self.get_table_kwargs())
             ids = normalize_ids(request.POST.getlist("logs"))
-            if not set(ids) <= {row.record.pk for row in table.page.object_list}:
-                raise ValidationError("所选日志不属于当前筛选页，请重新选择。")
+            if not set(ids) <= {row.record.pk for row in table.page.object_list if row.record.can_delete}:
+                raise ValidationError("部分日志不在当前筛选页或不可删除，请重新选择。")
             preview = preview_log_deletion(actor=request.user, ids=ids, return_query=request.GET.urlencode())
             from core.utils.breadcrumbs import build_breadcrumbs
 
@@ -980,16 +990,26 @@ class TrainingLogPreviewView(TrainingLogDownloadView):
 
 
 class TrainingLogDeleteView(TitleMixin, PermissionRequiredMixin, DeleteView):
+    http_method_names = ["get", "post", "head", "options"]
     model = TrainingLog
     template_name = "training/log_confirm_delete.html"
     title = "删除训练日志"
-    permission_required = "training.delete_traininglog"
+    permission_required = ("training.view_traininglog", "training.delete_traininglog")
 
     def get_queryset(self):
         return training_logs_deletable_by(self.request.user)
 
     def get_success_url(self):
         return log_list_return_url(self.request.GET.get("return_query", ""))
+
+    def form_valid(self, form):
+        try:
+            delete_training_logs(actor=self.request.user, ids=[self.object.pk])
+        except ValidationError as exc:
+            messages.error(self.request, "；".join(exc.messages))
+        else:
+            messages.success(self.request, "已删除训练日志及其附件。")
+        return redirect(self.get_success_url())
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

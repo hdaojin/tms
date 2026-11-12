@@ -12,23 +12,60 @@ from standards.selectors import scoped_domains_for
 from .models import TaskExecution, TrainingLog, TrainingPlan, TrainingScheduleSlot, TrainingTask
 
 
-def training_log_statistics_plans_for(user):
+CLOSED_LOG_PLAN_STATUSES = (TrainingPlan.Status.COMPLETED, TrainingPlan.Status.ARCHIVED)
+
+
+def log_reporting_plans(today):
+    return TrainingPlan.objects.filter(
+        published_at__isnull=False, schedule_published_at__isnull=False, start_date__lte=today,
+    )
+
+
+def ongoing_log_plans(today):
+    return Q(end_date__gte=today) & ~Q(status__in=CLOSED_LOG_PLAN_STATUSES)
+
+
+def log_plan_is_ongoing(plan, today):
+    return plan.end_date >= today and plan.status not in CLOSED_LOG_PLAN_STATUSES
+
+
+def log_plan_choices(plans, today):
+    return [
+        (plan.pk, f"{plan.title}（{'进行中' if log_plan_is_ongoing(plan, today) else '已完成'}，{plan.start_date:%Y-%m-%d}）")
+        for plan in plans
+    ]
+
+
+def _log_plan_participation(user, plans):
     from .scheduling import ACTIVE_KINDS
 
-    if not user.has_perm("training.view_traininglog_statistics"):
-        return TrainingPlan.objects.none()
-    plans = TrainingPlan.objects.filter(
-        published_at__isnull=False,
-        schedule_published_at__isnull=False,
-        start_date__lte=timezone.localdate(),
-    ).select_related("training_cycle")
-    if user.is_superuser or user.has_perm("training.view_all_traininglog"):
-        return plans
     participant = plans.filter(pk=OuterRef("pk"), participants__user=user)
     coach = TrainingScheduleSlot.objects.filter(
         day__training_plan_id=OuterRef("pk"), coaches=user, is_configured=True, kind__in=ACTIVE_KINDS,
     ).exclude(period=TrainingScheduleSlot.Period.EARLY)
-    return plans.filter(Exists(participant) | Exists(coach))
+    return Exists(participant) | Exists(coach)
+
+
+def training_log_statistics_plans_for(user):
+    if not user.has_perm("training.view_traininglog_statistics"):
+        return TrainingPlan.objects.none()
+    plans = log_reporting_plans(timezone.localdate()).select_related("training_cycle")
+    if user.has_perm("training.view_all_traininglog"):
+        return plans
+    return plans.filter(_log_plan_participation(user, plans))
+
+
+def training_log_list_plans_for(user, today):
+    if not user.has_perm("training.view_traininglog"):
+        return TrainingPlan.objects.none()
+    plans = log_reporting_plans(today)
+    if user.has_perm("training.view_all_traininglog"):
+        return plans
+    own_logs = TrainingLog.objects.filter(
+        author=user, training_cycle_id=OuterRef("training_cycle_id"),
+        training_date__range=(OuterRef("start_date"), OuterRef("end_date")),
+    )
+    return plans.filter(_log_plan_participation(user, plans) | Exists(own_logs))
 
 
 def _daily_competitors(plan, dates, *, include_backfill=True):
@@ -255,8 +292,22 @@ def training_logs_changeable_by(user, queryset=None):
 
 def training_logs_deletable_by(user, queryset=None):
     queryset = queryset if queryset is not None else TrainingLog.objects.all()
-    if not user.has_perm("training.delete_traininglog"):
+    if not user.has_perms(("training.view_traininglog", "training.delete_traininglog")):
         return queryset.none()
-    if user.has_perm("training.delete_all_traininglog") or user.is_superuser:
+    if user.is_superuser:
         return queryset
-    return queryset.filter(author=user)
+    if not user.has_perm("training.delete_all_traininglog"):
+        queryset = queryset.filter(author=user)
+    today = timezone.localdate()
+    matches_log = Q(
+        training_cycle_id=OuterRef("training_cycle_id"),
+        start_date__lte=OuterRef("training_date"), end_date__gte=OuterRef("training_date"),
+    )
+    ongoing = ongoing_log_plans(today)
+    current = log_reporting_plans(today).filter(matches_log, ongoing)
+    historical = TrainingPlan.objects.filter(
+        matches_log, Q(published_at__isnull=False) | Q(status__in=CLOSED_LOG_PLAN_STATUSES),
+    ).exclude(ongoing)
+    return training_logs_visible_to(user, queryset).filter(
+        Exists(current), ~Exists(historical), training_date__lte=today,
+    )

@@ -39,7 +39,6 @@
           {% block breadcrumbs %}
             {% include "partials/breadcrumbs.html" %}
           {% endblock %}
-          {% include "partials/messages.html" %}
           {% block page_header %}
             {% include "partials/page_header.html" %}
           {% endblock %}
@@ -79,4 +78,5 @@
       </div>
     {% endblock %}
   </div>
+  {% include "partials/messages.html" %}
 {% endblock %}

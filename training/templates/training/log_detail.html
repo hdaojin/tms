@@ -6,7 +6,11 @@
 
 {% block file_actions %}
   {% if can_edit %}<a href="{% url 'training:log_edit' log.pk %}" class="btn btn-outline btn-sm">编辑</a>{% endif %}
-  {% if can_delete %}<a href="{% url 'training:log_delete' log.pk %}" class="btn btn-error btn-outline btn-sm">删除日志</a>{% endif %}
+  {% if can_delete %}
+    <button type="button" data-modal-target="delete-log-{{ log.pk }}" class="btn btn-error btn-outline btn-sm">删除日志</button>
+    {% url 'training:log_delete' log.pk as delete_url %}
+    {% include "training/partials/log_delete_modal.html" with action=delete_url %}
+  {% endif %}
 {% endblock %}
 
 {% block file_unavailable_message %}

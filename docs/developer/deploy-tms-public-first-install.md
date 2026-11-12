@@ -128,6 +128,12 @@ sudo install -o root -g root -m 0640 \
 
 后续部署使用 `/usr/local/sbin/tms-deploy`，不要直接 sudo 执行浮动分支 checkout 内的脚本。
 
+在生成首次发布计划之前，安装 PDF 系统库和中文字体：
+
+```bash
+sudo /usr/local/sbin/tms-deploy install-pdf-deps
+```
+
 ## 4. 设置公网部署参数
 
 ```bash
@@ -230,6 +236,7 @@ sudo /usr/local/sbin/tms-deploy apply \
 ```bash
 sudo /usr/local/sbin/tms-deploy verify
 sudo /usr/local/sbin/tms-deploy status
+sudo /usr/local/sbin/tms-deploy manage check_document_pdf
 
 sudo /usr/local/sbin/tms-deploy admin create
 ```

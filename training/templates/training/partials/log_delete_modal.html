@@ -1,0 +1,3 @@
+{% with log_id=log.pk|stringformat:"s" log_date=log.training_date|date:"Y-m-d" %}
+  {% include "components/confirm_modal.html" with modal_id="delete-log-"|add:log_id title="确认删除训练日志" message="将删除 "|add:log_date|add:" 的训练日志及其附件。此操作无法撤销。" confirm_label="确认删除" action=action csrf_token=csrf_token only %}
+{% endwith %}

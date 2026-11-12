@@ -9,6 +9,9 @@
 {% block list_results %}
   {% partialdef results inline %}
     {% if filter_form.errors %}<div class="alert alert-error mb-3" role="alert">{{ filter_form.errors }}</div>{% endif %}
+    {% if no_current_plan %}
+      {% include "components/alert.html" with message="暂无进行中的训练计划。可选择已完成的计划或查看全部日志。" variant_class="alert-info" %}
+    {% endif %}
     {% if can_bulk_delete %}
     <form method="post" data-bulk-list data-matching-count="{{ table.paginator.count }}" data-selection-label="条日志" novalidate>
       {% csrf_token %}
@@ -17,6 +20,14 @@
     {% endif %}
     {% include "components/table_wrapper.html" with table=table %}
     {% if can_bulk_delete %}</form>{% endif %}
+    {% for row in table.paginated_rows %}
+      {% if row.record.can_delete %}
+        {% url 'training:log_delete' row.record.pk as delete_url %}
+        {% with return_query=request.GET.urlencode|urlencode %}
+          {% include "training/partials/log_delete_modal.html" with log=row.record action=delete_url|add:"?return_query="|add:return_query %}
+        {% endwith %}
+      {% endif %}
+    {% endfor %}
   {% endpartialdef %}
 {% endblock %}
 {% block extra_js %}

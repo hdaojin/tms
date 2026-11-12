@@ -53,11 +53,52 @@
 
   function initDismissibleAlerts(root) {
     root.querySelectorAll("[data-dismiss-alert]").forEach(function (button) {
+      const alert = button.closest(".alert");
+      if (!alert || button.dataset.dismissAlertBound) return;
+      button.dataset.dismissAlertBound = "true";
+      const pauseTimeout = alert.hasAttribute("data-auto-dismiss")
+        ? initAlertTimeout(alert)
+        : null;
+
       button.addEventListener("click", function () {
-        const alert = button.closest(".alert");
-        if (alert) alert.remove();
+        pauseTimeout?.();
+        alert.remove();
       });
     });
+  }
+
+  function initAlertTimeout(alert) {
+    let remaining = 6000;
+    let deadline;
+    let timer = null;
+
+    function resume() {
+      if (timer !== null) return;
+      deadline = performance.now() + remaining;
+      timer = window.setTimeout(function () {
+        alert.remove();
+      }, remaining);
+    }
+
+    function pause() {
+      if (timer === null) return;
+      window.clearTimeout(timer);
+      timer = null;
+      remaining = Math.max(0, deadline - performance.now());
+    }
+
+    alert.addEventListener("mouseenter", pause);
+    alert.addEventListener("focusin", pause);
+    alert.addEventListener("mouseleave", function () {
+      if (!alert.contains(document.activeElement)) resume();
+    });
+    alert.addEventListener("focusout", function (event) {
+      if (!alert.matches(":hover") && !alert.contains(event.relatedTarget))
+        resume();
+    });
+
+    if (!alert.matches(":hover, :focus-within")) resume();
+    return pause;
   }
 
   function initHistoryBack(root) {

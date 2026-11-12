@@ -1,7 +1,9 @@
 from django.contrib import admin
 from django import forms
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from accounts.services.users import get_user_display_name
+from .log_management import delete_training_logs
 from .models import (
     TaskExecution,
     TaskExecutionAttachment,
@@ -23,6 +25,7 @@ from .models import (
     TrainingScheduleSlot,
 )
 from .services import save_cycle_member, validate_new_log
+from .selectors import training_logs_deletable_by
 from .models import TrainingPeriodConfig, TrainingPlanParticipant, TrainingAssignmentCoach, PersonalTrainingTask, TrainingProgress, TrainingProgressRevision, TrainingProgressAttachment, TrainingStateChange, TrainingCoachFeedback
 
 admin.site.register(TrainingLogExecution)
@@ -211,6 +214,29 @@ class TrainingLogAdmin(admin.ModelAdmin):
     date_hierarchy = "training_date"
     readonly_fields = ("created_at", "updated_at")
     fields = ("training_cycle", "author", "training_date", "topic", "summary", "document", "created_at", "updated_at")
+
+    def has_delete_permission(self, request, obj=None):
+        if not super().has_delete_permission(request, obj):
+            return False
+        eligible = training_logs_deletable_by(request.user)
+        return (eligible.filter(pk=obj.pk) if obj else eligible).exists()
+
+    def delete_model(self, request, obj):
+        self._delete_logs(request, [obj.pk])
+
+    def response_action(self, request, queryset, *args, **kwargs):
+        # 后台批量动作先写管理日志，确认失败时一并回滚。
+        with transaction.atomic(using=queryset.db):
+            return super().response_action(request, queryset, *args, **kwargs)
+
+    def delete_queryset(self, request, queryset):
+        self._delete_logs(request, list(queryset.values_list("pk", flat=True)))
+
+    def _delete_logs(self, request, ids):
+        try:
+            delete_training_logs(actor=request.user, ids=ids)
+        except ValidationError as exc:
+            raise PermissionDenied from exc
 
     @admin.display(description="作者", ordering="author__last_name")
     def author_name(self, obj):

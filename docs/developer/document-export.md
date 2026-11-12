@@ -51,7 +51,7 @@ uv sync --frozen
 uv run manage.py check_document_pdf
 ```
 
-`check_document_pdf` 使用两套模板实际渲染含中文、图片、代码和跨页表格的样张。传入 `--output-dir` 和已有目录可保存样张供目视核对。首个生产业务入口启用前，在发布切换前以服务身份运行这项自检。
+`check_document_pdf` 使用两套模板实际渲染含中文、图片、代码和跨页表格的样张。传入 `--output-dir` 和已有目录可保存样张供目视核对。生产服务器通过稳定部署入口安装依赖，并以服务账号运行自检，见 [生产部署手册](deploy-tms-production.md#31-安装-pdf-系统依赖)。
 
 CI 在 Debian 13 容器中运行自检和 PDF 聚焦测试。安装 `poppler-utils` 后，聚焦测试会进一步核对真实 PDF 的分页、中文文字、表头、页码和插图。
 

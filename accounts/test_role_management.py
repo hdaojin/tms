@@ -1,11 +1,15 @@
 from unittest.mock import patch
 from io import StringIO
+from importlib import import_module
+from types import SimpleNamespace
 import time
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.management import call_command
+from django.db import connection
+from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase
 from django.urls import reverse
 
@@ -36,6 +40,24 @@ class RoleIdentityValidationTests(TestCase):
 
 
 class DefaultRoleTests(TestCase):
+    def test_existing_own_log_bundle_assignments_gain_delete_permission(self):
+        migration = import_module("accounts.migrations.0025_grant_current_training_log_deletion")
+        group = Group.objects.create(name="日志维护角色")
+        GroupProfile.objects.create(group=group, codename="log-maintainer", selected_permission_bundles=["training.competitor"])
+        untouched = Group.objects.create(name="日志查看角色")
+        GroupProfile.objects.create(group=untouched, codename="log-viewer", selected_permission_bundles=["training.view_all_logs"])
+        user = User.objects.create_user("existing-log-maintainer")
+        sync_user_permission_assignments(user, ["training.maintain_own_logs"])
+        permission = Permission.objects.get(content_type__app_label="training", codename="delete_traininglog")
+        user.user_permissions.remove(permission)
+        previous = MigrationExecutor(connection).loader.project_state(migration.Migration.dependencies).apps
+
+        migration.grant_current_training_log_deletion(previous, SimpleNamespace(connection=connection))
+
+        self.assertTrue(group.permissions.filter(pk=permission.pk).exists())
+        self.assertTrue(user.user_permissions.filter(pk=permission.pk).exists())
+        self.assertFalse(untouched.permissions.filter(pk=permission.pk).exists())
+
     def test_feedback_impact_command_is_readonly(self):
         user = User.objects.create_user("impact-user")
         output = StringIO()
@@ -59,10 +81,12 @@ class DefaultRoleTests(TestCase):
             self.assertFalse(group.user_set.exists())
             self.assertFalse(group.technical_domain_scopes.exists())
             deletions = group.permissions.filter(codename__startswith="delete_")
+            expected = set()
             if code == "competitor":
-                self.assertEqual(set(deletions.values_list("content_type__app_label", "codename")), {("training", "delete_personaltrainingtask")})
-            else:
-                self.assertFalse(deletions.exists())
+                expected.add(("training", "delete_personaltrainingtask"))
+            if code in {"competitor", "coach"}:
+                expected.add(("training", "delete_traininglog"))
+            self.assertEqual(set(deletions.values_list("content_type__app_label", "codename")), expected)
             user = User.objects.create_user(f"role-{code}")
             user.groups.add(group)
             for label in (

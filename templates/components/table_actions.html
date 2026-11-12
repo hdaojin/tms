@@ -1,6 +1,6 @@
 {% comment %}
 django-tables2 操作列按钮。
-参数: actions, confirm_actions。
+参数: actions, confirm_actions, defer_confirm_modals（在表单外渲染弹窗）。
 {% endcomment %}
 {% if actions or confirm_actions %}
   <div class="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
@@ -13,7 +13,9 @@ django-tables2 操作列按钮。
       </button>
     {% endfor %}
   </div>
-  {% for action in confirm_actions %}
-    {% include "components/confirm_modal.html" with modal_id=action.modal_id title=action.title message=action.message action=action.href confirm_label=action.confirm_label %}
-  {% endfor %}
+  {% if not defer_confirm_modals %}
+    {% for action in confirm_actions %}
+      {% include "components/confirm_modal.html" with modal_id=action.modal_id title=action.title message=action.message action=action.href confirm_label=action.confirm_label %}
+    {% endfor %}
+  {% endif %}
 {% endif %}

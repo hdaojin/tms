@@ -1,15 +1,19 @@
 {% if messages %}
-  <div class="space-y-2">
+  <div
+    class="toast toast-end toast-top top-20 z-40 max-h-[calc(100dvh-6rem)] w-96 overflow-y-auto overscroll-contain print:hidden"
+  >
     {% for message in messages %}
-      {% if message.tags == "success" %}
-        {% include "components/alert.html" with message=message variant="success" icon="icon-[tabler--circle-check]" %}
-      {% elif message.tags == "error" %}
-        {% include "components/alert.html" with message=message variant="error" icon="icon-[tabler--alert-circle]" %}
-      {% elif message.tags == "warning" %}
-        {% include "components/alert.html" with message=message variant="warning" icon="icon-[tabler--alert-triangle]" %}
-      {% else %}
-        {% include "components/alert.html" with message=message variant="info" icon="icon-[tabler--info-circle]" %}
-      {% endif %}
+      {% with title=None dismissible=True auto_dismiss=False extra_class="alert-horizontal shrink-0 wrap-anywhere" %}
+        {% if message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
+          {% include "components/alert.html" with variant_class="alert-success" icon="icon-[tabler--circle-check]" auto_dismiss=True %}
+        {% elif message.level >= DEFAULT_MESSAGE_LEVELS.ERROR %}
+          {% include "components/alert.html" with variant_class="alert-error" icon="icon-[tabler--alert-circle]" %}
+        {% elif message.level >= DEFAULT_MESSAGE_LEVELS.WARNING %}
+          {% include "components/alert.html" with variant_class="alert-warning" icon="icon-[tabler--alert-triangle]" %}
+        {% else %}
+          {% include "components/alert.html" with variant_class="alert-info" icon="icon-[tabler--info-circle]" auto_dismiss=True %}
+        {% endif %}
+      {% endwith %}
     {% endfor %}
   </div>
 {% endif %}

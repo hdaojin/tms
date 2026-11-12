@@ -1,9 +1,14 @@
 {% comment %}
 提示组件。
-参数: title, message, variant_class, icon, dismissible, extra_class。
+参数: title, message, variant_class, icon, dismissible, auto_dismiss, extra_class。
 variant_class 必须是完整 DaisyUI alert 类，例如 alert-info。
+auto_dismiss 用于可自动关闭的浮动提示，需要同时设置 dismissible。
 {% endcomment %}
-<div class="alert {{ variant_class|default:'alert-info' }} {{ extra_class }}" role="alert">
+<div
+  class="alert {{ variant_class|default:'alert-info' }} {{ extra_class }}"
+  role="{% if auto_dismiss %}status{% else %}alert{% endif %}"
+  {% if auto_dismiss %}data-auto-dismiss{% endif %}
+>
   {% if icon %}
     <span class="{{ icon }} size-5" aria-hidden="true"></span>
   {% endif %}

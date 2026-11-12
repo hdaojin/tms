@@ -43,7 +43,7 @@ bundles:
   - code: training.competitor
     name: 训练管理 | 选手训练
     description: 查看本人任务、维护执行记录和训练日志。
-    permissions: [training.view_trainingcycle, training.view_trainingplan, training.view_trainingtask, training.view_trainingtaskattachment, training.view_taskexecution, training.change_taskexecution, training.view_trainingprogress, training.add_trainingprogress, training.change_trainingprogress, training.view_trainingprogressattachment, training.view_trainingcoachfeedback, training.view_personaltrainingtask, training.add_personaltrainingtask, training.change_personaltrainingtask, training.delete_personaltrainingtask, training.view_traininglog, training.add_traininglog, training.change_traininglog]
+    permissions: [training.view_trainingcycle, training.view_trainingplan, training.view_trainingtask, training.view_trainingtaskattachment, training.view_taskexecution, training.change_taskexecution, training.view_trainingprogress, training.add_trainingprogress, training.change_trainingprogress, training.view_trainingprogressattachment, training.view_trainingcoachfeedback, training.view_personaltrainingtask, training.add_personaltrainingtask, training.change_personaltrainingtask, training.delete_personaltrainingtask, training.view_traininglog, training.add_traininglog, training.change_traininglog, training.delete_traininglog]
   - code: training.view_log_templates
     name: 训练管理 | 查看日志模板
     description: 查看全系统训练日志模板管理页并下载模板，包含停用模板。
@@ -86,8 +86,8 @@ bundles:
     permissions: [training.view_trainingplan, training.view_trainingtask, training.add_trainingtask, training.change_trainingtask, training.manage_plan_tasks]
   - code: training.maintain_own_logs
     name: 训练管理 | 维护本人训练日志
-    description: 查看、新增和修改本人训练日志；新增仍需周期成员身份及当前周期，不包含删除。
-    permissions: [training.view_traininglog, training.add_traininglog, training.change_traininglog]
+    description: 查看、新增和修改本人训练日志，并可删除本人在进行中计划内的日志；新增仍需周期成员身份及当前周期。
+    permissions: [training.view_traininglog, training.add_traininglog, training.change_traininglog, training.delete_traininglog]
   - code: training.maintain_cycles
     name: 训练管理 | 维护全系统训练周期
     description: 创建和修改全系统训练周期、推进状态及配置技能树快照，不按技术领域限制。
@@ -106,11 +106,11 @@ bundles:
     permissions: [training.view_traininglog_statistics]
   - code: training.delete_own_logs
     name: 训练管理 | 删除本人日志
-    description: 删除本人训练日志及其文件。
+    description: 删除本人在进行中计划内的训练日志及其文件。
     permissions: [training.view_traininglog, training.delete_traininglog]
   - code: training.delete_all_logs
     name: 训练管理 | 删除全部日志
-    description: 查看并删除全部人员的训练日志及其文件。
+    description: 查看全部人员的训练日志，删除范围限进行中计划内的日志及其文件。
     permissions: [training.view_traininglog, training.view_all_traininglog, training.delete_traininglog, training.delete_all_traininglog]
   - code: training.export_logs
     name: 训练管理 | 导出训练日志

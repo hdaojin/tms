@@ -3,6 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
+from bs4 import BeautifulSoup
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -13,7 +14,7 @@ from django.utils import timezone
 
 from .forms import TrainingLogForm
 from .log_files import DUPLICATE_LOG_MESSAGE
-from .models import TrainingCycle, TrainingCycleMember, TrainingLog
+from .models import TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan
 from .services import save_training_log
 from .tables import TrainingLogTable
 from .tests import TrainingFixtureMixin, User
@@ -45,16 +46,17 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
             save_training_log(log, [])
         table = TrainingLogTable([log])
         self.assertEqual(table.rows[0].get_cell("author"), "夏国金")
-        response = self.client.get(reverse("training:log_list"))
+        response = self.client.get(reverse("training:log_list"), {"plan": "all"})
         self.assertContains(response, "夏国金")
         self.assertNotContains(response, "创建时间")
         self.assertNotContains(response, "修改时间")
         response = self.client.get(reverse("training:log_detail", args=[log.pk]))
+        detail_text = BeautifulSoup(response.content, "html.parser").get_text(" ", strip=True)
         for text in ["创建时间", "修改时间", "2026-10-20 09:02:03", "2026-10-20 10:02:03", "夏国金"]:
-            self.assertContains(response, text)
+            self.assertIn(text, detail_text)
         self.assertNotContains(response, "上传时间")
         self.user.first_name = self.user.last_name = ""
-        self.assertEqual(TrainingLogTable([log]).rows[0].get_cell("author"), self.user.username)
+        self.assertEqual(TrainingLogTable([log]).rows[0].get_cell("author"), "未填写姓名")
 
     def test_list_shows_content_and_attachment_without_summary_links_or_task_count(self):
         log = self.create_log(summary="<script>不执行</script>训练摘要")
@@ -62,7 +64,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
             training_cycle=self.period, author=self.user, training_date=date(2026, 3, 3), topic="文字日志"
         )
         with patch.object(log.document.storage, "open", side_effect=AssertionError("列表不应读取文件")):
-            response = self.client.get(reverse("training:log_list"))
+            response = self.client.get(reverse("training:log_list"), {"plan": "all"})
         for text in ["提交时间", "日志附件", "未附文件", log.canonical_filename]:
             self.assertContains(response, text)
         for text in ["训练内容", "关联任务数", "暂无摘要", "训练摘要"]:
@@ -117,6 +119,13 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         user.user_permissions.add(*Permission.objects.filter(content_type__app_label="training", codename__in=codenames))
         for name in ("_perm_cache", "_user_perm_cache", "_group_perm_cache"):
             user.__dict__.pop(name, None)
+
+    def publish_log_plan(self):
+        self.enterContext(patch("django.utils.timezone.localdate", return_value=date(2026, 3, 3)))
+        TrainingPlan.objects.create(
+            training_cycle=self.period, title="三月计划", start_date=date(2026, 3, 1), end_date=date(2026, 3, 31),
+            created_by=self.user, published_at=timezone.now(), schedule_published_at=timezone.now(),
+        )
 
     def active_cycle(self, code="C1", **kwargs):
         cycle = self.cycle(code, **kwargs)
@@ -315,6 +324,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
             self.assertEqual(self.client.get(reverse(f"training:{route}", args=[log.pk])).status_code, 404)
 
     def test_delete_requires_permission_and_confirmation_and_cleans_file(self):
+        self.publish_log_plan()
         log = self.create_log()
         url = reverse("training:log_delete", args=[log.pk])
         self.assertEqual(self.client.post(url).status_code, 403)
@@ -329,6 +339,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.create_log()
 
     def test_edit_all_does_not_grant_delete_all(self):
+        self.publish_log_plan()
         log = self.create_log()
         self.grant(self.coach, "view_traininglog", "delete_traininglog", "change_all_traininglog", "view_all_traininglog")
         self.client.force_login(self.coach)
@@ -395,6 +406,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(len(list(Path(self.media.name).rglob("*.pdf"))), 1)
 
     def test_http_upload_duplicate_and_delete_return_to_list(self):
+        self.publish_log_plan()
         url = reverse("training:log_backfill")
         response = self.client.post(url, self.data(document=self.upload()))
         log = TrainingLog.objects.get(author=self.user)
@@ -408,6 +420,7 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
             response = self.client.post(reverse("training:log_delete", args=[log.pk]), follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "提交当天训练日志")
+        self.assertContains(response, "已删除训练日志及其附件")
 
     def test_orphaned_storage_collision_returns_form_error_without_new_record(self):
         filename = "logs/C1/2026/03/网络系统管理项目2026年03月02日选手日志-夏国金.pdf"

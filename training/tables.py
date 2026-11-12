@@ -1,5 +1,4 @@
 from pathlib import Path
-from urllib.parse import urlencode
 
 import django_tables2 as tables
 from django.urls import reverse
@@ -13,7 +12,6 @@ from core.tables import ActionsColumn, BaseDateColumn, BaseDateTimeColumn, BaseT
 from core.templatetags.date_display import keep_date_parts
 
 from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
-from .log_management import can_manage_log_deletions
 from .models import TrainingLogTemplate
 
 
@@ -87,16 +85,23 @@ class TrainingLogActionsColumn(ActionsColumn):
         if user and user.has_perm("training.change_traininglog") and getattr(record, "can_edit", False):
             actions.append({"href": reverse("training:log_edit", args=[record.pk]), "label": "编辑",
                             "variant_class": "btn-soft btn-warning"})
-        if user and can_manage_log_deletions(user):
-            query = urlencode({"return_query": request.GET.urlencode()})
-            actions.append({"href": reverse("training:log_delete", args=[record.pk]) + "?" + query,
-                            "label": "删除", "variant_class": "btn-soft btn-error"})
-        # 单条删除进入确认页，避免批量表单中嵌套行内弹窗的 POST 表单。
-        return mark_safe(render_to_string("components/table_actions.html", {"actions": actions}, request=request))
+        confirm_actions = []
+        if user and getattr(record, "can_delete", False):
+            confirm_actions.append({"modal_id": f"delete-log-{record.pk}", "label": "删除", "variant_class": "btn-soft btn-error"})
+        return mark_safe(render_to_string("components/table_actions.html", {
+            "actions": actions, "confirm_actions": confirm_actions, "defer_confirm_modals": True,
+        }, request=request))
+
+
+class TrainingLogSelectionColumn(tables.CheckBoxColumn):
+    def render(self, value, bound_column, record):
+        if not record.can_delete:
+            return ""
+        return super().render(value, bound_column, record)
 
 
 class TrainingLogTable(BaseTable):
-    selection = tables.CheckBoxColumn(accessor="pk", orderable=False, attrs={
+    selection = TrainingLogSelectionColumn(accessor="pk", orderable=False, attrs={
         "th__input": {"class": "checkbox checkbox-sm", "aria-label": "全选当前页", "data-select-page": ""},
         "td__input": {"class": "checkbox checkbox-sm", "name": "logs", "aria-label": "选择日志", "data-row-selection": ""},
     })
@@ -140,3 +145,4 @@ class TrainingLogTable(BaseTable):
     class Meta(BaseTable.Meta):
         model = TrainingLog
         fields = ["selection", "training_date", "training_cycle", "author", "member_role", "created_at", "document", "actions"]
+        order_by = ("-training_date", "-created_at")

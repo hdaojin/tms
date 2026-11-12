@@ -434,13 +434,15 @@ Django
 PostgreSQL
 ```
 
-生产服务器只需要 Python 3.13、uv、Caddy 和 PostgreSQL；不安装 Node/npm，前端构建产物必须已经提交。
+生产服务器需要 Python 3.13、uv、Caddy 和 PostgreSQL。PDF 渲染需要额外安装系统库和中文字体。
+前端构建产物必须已经提交，生产服务器可直接使用这些产物。
 正式拓扑采用 `/srv/tms/releases/<release-id>` 不可变 release、root 管理的 `/srv/tms/current` 原子链接，以及代码目录之外的共享上传目录。
 
 ### 自动化入口
 
 ```bash
 sudo tms-deploy inspect
+sudo tms-deploy install-pdf-deps                        # 首次准备 PDF 运行环境
 sudo tms-deploy plan --revision develop --first-install  # 仅首次部署
 sudo tms-deploy plan --revision develop                  # 日常升级
 sudo tms-deploy apply <plan-id> --confirm-sha <完整SHA>
