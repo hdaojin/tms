@@ -60,7 +60,7 @@ class FilePreviewTests(TestCase):
         descriptor = self.build_descriptor(SimpleUploadedFile("report.pdf", PDF_BYTES), "report.pdf")
         html = render_to_string("common/file_preview_detail.html", {"file_preview": descriptor})
         for text in ('data-pdf-url="/preview/"', 'js/pdf-preview.mjs', 'vendor/pdfjs/pdf.worker.mjs',
-                     'data-pdf-canvas', 'href="/download/"'):
+                     'data-pdf-pages', 'data-pdf-page-template', 'href="/download/"'):
             self.assertIn(text, html)
         self.assertNotIn("<iframe", html)
 

@@ -4,20 +4,26 @@ import { initializePdfPreview } from "../static/js/pdf-preview.mjs";
 
 function fixture({ error, renderError } = {}) {
   const nodes = Object.fromEntries(
-    ["canvas", "viewport", "previous", "next", "page", "status"].map((name) => [
+    ["viewport", "status", "pages", "page-template"].map((name) => [
       name,
       {
-        disabled: true,
-        hidden: true,
-        clientWidth: 360,
-        setAttribute() {},
-        getContext: () => ({}),
-        addEventListener(event, handler) {
-          this[event] = handler;
+        replaceChildren(...children) {
+          this.children = children;
         },
       },
     ]),
   );
+  nodes["page-template"].content = {
+    firstElementChild: {
+      cloneNode: () => ({
+        dataset: {},
+        style: {},
+        clientWidth: 360,
+        setAttribute() {},
+        firstElementChild: { hidden: true, getContext: () => ({}) },
+      }),
+    },
+  };
   const calls = [];
   let destroyed = false;
   let options;
@@ -70,27 +76,48 @@ globalThis.location = {
 };
 globalThis.devicePixelRatio = 3;
 
-test("renders and navigates a private PDF with bounded canvas and strict CSP options", async () => {
+let observer;
+globalThis.IntersectionObserver = class {
+  constructor(callback) {
+    this.callback = callback;
+    observer = this;
+  }
+  observe() {}
+  unobserve() {}
+  disconnect() {
+    this.disconnected = true;
+  }
+};
+
+async function intersect(visible, hidden = []) {
+  observer.callback([
+    ...visible.map((target) => ({ target, isIntersecting: true })),
+    ...hidden.map((target) => ({ target, isIntersecting: false })),
+  ]);
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
+test("renders nearby pages in document order and releases distant canvases", async () => {
   const f = fixture();
   await initializePdfPreview(f.root, f.pdfjs);
-  assert.deepEqual(f.calls, [1]);
-  assert.equal(f.nodes.previous.disabled, true);
-  assert.equal(f.nodes.next.disabled, false);
-  assert.equal(f.nodes.canvas.hidden, false);
-  assert.ok(f.nodes.canvas.width * f.nodes.canvas.height <= 4_000_000);
+  const [first, second] = f.nodes.pages.children;
+  assert.deepEqual(f.nodes.pages.children.map((page) => page.dataset.pageNumber), [1, 2]);
+  assert.deepEqual(f.calls, []);
+  await intersect([first, second]);
+  assert.deepEqual(f.calls, [1, 2]);
+  const canvas = first.firstElementChild;
+  assert.equal(canvas.hidden, false);
+  assert.equal(second.firstElementChild.hidden, false);
+  assert.ok(canvas.width * canvas.height <= 4_000_000);
+  await intersect([], [first]);
+  assert.equal(canvas.width, 0);
+  assert.equal(second.firstElementChild.hidden, false);
+  await intersect([first]);
+  assert.deepEqual(f.calls, [1, 2, 1]);
   assert.equal(f.options().url, "https://tms.example/private/preview/");
   assert.equal(f.options().isEvalSupported, false);
   assert.equal(f.options().disableFontFace, true);
   assert.equal(f.options().useWasm, false);
-  f.nodes.next.click();
-  f.nodes.next.click(); // A second click during rendering must not skip a page.
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(f.calls, [1, 2]);
-  assert.equal(f.nodes.next.disabled, true);
-  assert.equal(f.nodes.previous.disabled, false);
-  f.nodes.previous.click();
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.deepEqual(f.calls, [1, 2, 1]);
 });
 
 test("loading and password failures retain useful download guidance", async () => {
@@ -98,17 +125,17 @@ test("loading and password failures retain useful download guidance", async () =
     const f = fixture({ error });
     await initializePdfPreview(f.root, f.pdfjs);
     assert.match(f.nodes.status.textContent, /下载/);
-    assert.equal(f.nodes.previous.disabled, true);
-    assert.equal(f.nodes.next.disabled, true);
   }
 });
 
-test("render failure hides incomplete canvas and releases navigation", async () => {
+test("render failure keeps the placeholder and shows download guidance", async () => {
   const f = fixture({ renderError: new Error("invalid page") });
   await initializePdfPreview(f.root, f.pdfjs);
-  assert.equal(f.nodes.canvas.hidden, true);
+  const [first] = f.nodes.pages.children;
+  await intersect([first]);
+  assert.equal(first.firstElementChild.hidden, true);
   assert.match(f.nodes.status.textContent, /加载失败/);
-  assert.equal(f.nodes.next.disabled, false);
+  assert.equal(f.nodes.pages.children.length, 2);
 });
 
 test("rejects a cross-origin document before loading", async () => {
@@ -126,10 +153,12 @@ test("uses in-memory PDF bytes and destroys the loading task on invalidation", a
   await initializePdfPreview(f.root, f.pdfjs, { data, signal: controller.signal });
   assert.equal(f.options().data, data);
   assert.equal(f.options().url, undefined);
-  assert.equal(f.nodes.canvas.hidden, false);
+  const [first] = f.nodes.pages.children;
+  await intersect([first]);
+  assert.equal(first.firstElementChild.hidden, false);
   controller.abort();
   assert.equal(f.destroyed(), true);
-  assert.equal(f.nodes.canvas.width, 0);
-  assert.equal(f.nodes.canvas.hidden, true);
-  assert.equal(f.nodes.next.disabled, true);
+  assert.equal(observer.disconnected, true);
+  assert.equal(first.firstElementChild.width, 0);
+  assert.deepEqual(f.nodes.pages.children, []);
 });

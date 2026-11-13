@@ -1,4 +1,4 @@
-@page { margin: 25.4mm 31.75mm; }
+@page { margin: 19.1mm 19.1mm 25.4mm; }
 
 .document-training-log { color: black; }
 .document-training-log .document-header { display: none; }
@@ -52,5 +52,8 @@
 .document-training-log #log-summary h4 { font-size: 10pt; margin: 3pt 0; }
 
 @media screen {
-  .document-training-log .document-sheet { padding: clamp(14px, 7vw, 31.75mm); }
+  .document-training-log .document-sheet {
+    padding: clamp(14px, 5vw, 19.1mm);
+    padding-bottom: clamp(14px, 6.65vw, 25.4mm);
+  }
 }
