@@ -96,8 +96,8 @@ class EntryOperationForm(StyledFormMixin, forms.Form):
     domain = forms.ChoiceField(label="领域", required=False)
     coaches = forms.ModelMultipleChoiceField(label="负责教练", queryset=None, required=False)
     titles = forms.CharField(label="任务标题（每行一项）", required=False, widget=forms.Textarea(attrs={"rows": 4}))
-    description = forms.CharField(
-        label="共同训练内容提纲（每行一项）", required=False, widget=forms.Textarea(attrs={"rows": 3})
+    overview = forms.CharField(
+        label="共同训练内容概述", required=False, widget=forms.Textarea(attrs={"rows": 3})
     )
     reason = forms.CharField(
         label="调整原因（已发布或过期修改必填）", required=False, widget=forms.Textarea(attrs={"rows": 2})

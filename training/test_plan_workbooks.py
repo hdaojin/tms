@@ -164,7 +164,7 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
         confirm_import(self.plan, self.admin, payload, self.members())
         task = self.plan.tasks.get()
         self.assertEqual(task.title, "一个完整任务")
-        self.assertEqual(task.description, "第二段说明")
+        self.assertEqual(task.overview, "第二段说明")
         self.assertEqual(task.status, "draft")
         self.assertEqual(task.executions.count(), 0)
         self.assertEqual(task.selected_competitors.count(), 2)

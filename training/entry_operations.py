@@ -183,7 +183,7 @@ def preview(plan, user, command):
             for title in command["titles"]:
                 values = {
                     "title": title,
-                    "description": command.get("description", ""),
+                    "overview": command.get("overview", ""),
                     "skills": [],
                     "assign_all": True,
                     "competitors": [],

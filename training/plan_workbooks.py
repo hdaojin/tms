@@ -21,7 +21,7 @@ IMPORT_SLOT_KINDS["待排班"] = TrainingScheduleSlot.Kind.PENDING
 TEMPLATE = Path(__file__).parent / "resources" / "templates" / "training_plan.xlsx"
 HEADERS = ["日期", "星期", "时间", "领域", "训练任务", "负责教练", "值班人员", "备注"]
 PERIODS = dict((label, value) for value, label in TrainingScheduleSlot.Period.choices)
-ROUNDTRIP_NOTICE = "每个训练任务单元格导入一项任务，首行为标题，其余行作为训练内容提纲。同一时段多个任务导出后再次导入会合并，训练目标请在任务扩展选项维护。"
+ROUNDTRIP_NOTICE = "每个训练任务单元格导入一项任务，首行为标题，其余行填入训练内容概述并生成子任务。同一时段多个任务导出后再次导入会合并，训练目标请在任务扩展选项维护。"
 
 
 def build_plan_workbook(plan, user=None, *, import_template=False):

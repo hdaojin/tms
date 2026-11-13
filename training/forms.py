@@ -315,7 +315,7 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
             "planned_date",
             "title",
             "requirements",
-            "description",
+            "overview",
             "estimated_minutes",
             "priority",
             "status",
@@ -323,7 +323,7 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
         ]
         widgets = {
             "planned_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
-            "description": forms.Textarea(attrs={"rows": 3}),
+            "overview": forms.Textarea(attrs={"rows": 3}),
             "requirements": forms.Textarea(attrs={"rows": 5}),
         }
 
@@ -408,7 +408,7 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
                 "training_plan",
                 "planned_date",
                 "title",
-                "description",
+                "overview",
                 "requirements",
                 "estimated_minutes",
                 "domains",

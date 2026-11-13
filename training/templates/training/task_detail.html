@@ -1,9 +1,22 @@
 {% extends "layouts/app.html" %}{% load date_display static %}
 {% block content %}<div id="task-content" hx-disinherit="hx-select hx-swap" class="space-y-4" hx-get="{{ request.path }}" hx-trigger="scheduleChanged from:body" hx-select="#task-content" hx-swap="outerHTML">
 <section class="card border border-base-300"><div class="card-body"><h2 class="card-title">{{ task.title }}</h2><p><a class="link" href="{% url 'training:plan_detail' task.training_plan_id %}">{{ task.training_plan.title }}</a> · {{ task.planned_date|keep_date_parts }} · {% if task.schedule_slot %}{{ task.schedule_slot.get_period_display }}{% else %}历史未分时段{% endif %} · {{ task.get_status_display }}</p><p>创建人：{{ task.created_by.display_name }}</p>
-{% if task.requirements %}<h3 class="font-semibold">训练目标</h3><p class="whitespace-pre-line">{{ task.requirements }}</p>{% endif %}
-{% if task.subtasks %}<h3 class="font-semibold">子任务</h3><ol class="list-decimal pl-5">{% for item in task.subtasks %}<li>{{ item.title }}</li>{% endfor %}</ol>
-{% elif not task.schedule_slot_id and task.description %}<div class="prose max-w-none">{{ description_html|safe }}</div>{% endif %}
+{% if task.requirements or task.overview %}
+  <dl class="space-y-3">
+    {% if task.requirements %}{% include 'components/detail_field.html' with label="训练目标" value=task.requirements multiline=True %}{% endif %}
+    {% if task.overview %}
+      {% if task.schedule_slot_id %}
+        {% include 'components/detail_field.html' with label="训练内容概述" value=task.overview multiline=True %}
+      {% else %}
+        <div class="fieldset">
+          <dt class="fieldset-legend">训练内容概述</dt>
+          <dd class="prose max-w-none">{{ description_html|safe }}</dd>
+        </div>
+      {% endif %}
+    {% endif %}
+  </dl>
+{% endif %}
+{% if task.subtasks %}<h3 class="font-semibold">子任务</h3><ol class="list-decimal pl-5">{% for item in task.subtasks %}<li>{{ item.title }}</li>{% endfor %}</ol>{% endif %}
 <dl>{% include 'components/record_timestamps.html' with created_at=task.created_at updated_at=task.updated_at %}</dl>
 <div class="flex flex-wrap gap-2">{% if can_edit and task.status != 'cancelled' %}<a class="btn btn-outline btn-sm" href="{% url 'training:task_edit' task.pk %}" hx-get="{% url 'training:task_edit' task.pk %}" hx-target="#schedule-editor">编辑任务 / 调整选手</a>{% if task.status == 'draft' %}<form method="post" action="{% url 'training:task_action' task.pk %}" hx-post="{% url 'training:task_action' task.pk %}" hx-target="#schedule-editor">{% csrf_token %}{% if task.is_locked %}<input class="input input-sm" name="reason" required placeholder="过期发布原因和实际执行情况">{% endif %}<button class="btn btn-primary btn-sm" name="action" value="publish">{% if task.is_locked %}申请发布{% else %}确认发布并分配选手{% endif %}</button></form>{% endif %}{% endif %}
 {% if can_skills %}<a class="btn btn-outline btn-sm" href="{% url 'training:task_skills' task.pk %}" hx-get="{% url 'training:task_skills' task.pk %}" hx-target="#schedule-editor">维护技能关联</a>{% endif %}</div>

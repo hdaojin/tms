@@ -28,7 +28,7 @@ LABELS = {
     "coaches": "负责教练",
     "primary_coach": "主要教练",
     "title": "任务标题",
-    "description": "训练内容提纲",
+    "overview": "训练内容概述",
     "subtasks": "子任务",
     "subtask_titles": "子任务",
     "requirements": "训练目标",

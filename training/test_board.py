@@ -93,7 +93,7 @@ class TrainingBoardTests(ProcessFixture, TestCase):
         self.assertContains(response, reverse("training:execution_detail", args=[task.executions.get(user=self.student).pk]))
 
     def test_public_screen_requires_explicit_listing_and_current_publication(self):
-        task = self.task(title="公开任务标题", description="内部任务正文")
+        task = self.task(title="公开任务标题", overview="内部任务正文")
         TrainingTaskAttachment.objects.create(
             training_task=task, title="内部任务附件", file="test/private-board-attachment.pdf", uploaded_by=self.coach,
         )

@@ -605,7 +605,7 @@ class TrainingTask(models.Model):
     selected_competitors = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="selected_training_tasks", verbose_name="指定选手")
     planned_date = models.DateField("计划日期")
     title = models.CharField("任务标题", max_length=180)
-    description = models.TextField("训练内容提纲", blank=True, help_text="每行填写一项训练内容。")
+    overview = models.TextField("训练内容概述", blank=True)
     subtasks = models.JSONField("子任务", default=list, blank=True, editable=False)
     requirements = models.TextField("训练目标", blank=True)
     estimated_minutes = models.PositiveIntegerField("预计用时（分钟）", null=True, blank=True)
@@ -654,7 +654,7 @@ class TrainingTask(models.Model):
                 "training_plan_id",
                 "planned_date",
                 "title",
-                "description",
+                "overview",
                 "requirements",
                 "estimated_minutes",
             )

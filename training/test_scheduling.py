@@ -112,6 +112,43 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         before = service.slot_snapshot(slot)
         return {"type": "slot", "id": slot.pk, "revision": slot.revision, "before": before, "after": before | values}
 
+    def test_task_editor_overview_and_assignment(self):
+        self.ready()
+        self.client.force_login(self.coach)
+        create_url = reverse("training:slot_task_create", args=[self.slot.pk])
+        response = self.client.get(create_url)
+        self.assertEqual(list(response.context["form"].fields), [
+            "title", "requirements", "overview", "subtask_titles", "attachments", "skills",
+            "order", "assign_all", "competitors", "assignment_configured",
+        ])
+        self.assertIs(response.context["form"]["assign_all"].value(), True)
+        self.assertContains(response, "data-individual-assignment hidden")
+
+        response = self.client.post(create_url, {
+            "title": "新任务", "overview": "仅填写概述", "assign_all": "on", "assignment_configured": "True",
+        })
+        self.assertEqual(response.status_code, 302)
+        draft = self.slot.tasks.get(title="新任务")
+        self.assertEqual(draft.overview, "仅填写概述")
+        self.assertEqual(draft.subtasks, [])
+        self.assertTrue(draft.assign_all)
+
+        task = self.new_task(assign_all=False, competitors=[self.student.pk], subtask_titles=["核对配置"])
+        edit_url = reverse("training:task_edit", args=[task.pk])
+        response = self.client.get(edit_url)
+        self.assertIs(response.context["form"]["assign_all"].value(), False)
+        self.assertNotContains(response, "data-individual-assignment hidden")
+
+        response = self.client.post(edit_url, {"title": task.title, "overview": "部署后验证网络连通性"})
+        self.assertEqual(response.status_code, 302)
+        task.refresh_from_db()
+        self.assertEqual(task.overview, "部署后验证网络连通性")
+        self.assertEqual([item["title"] for item in task.subtasks], ["核对配置"])
+        self.assertEqual(list(task.selected_competitors.all()), [self.student])
+        detail = self.client.get(reverse("training:task_detail", args=[task.pk]))
+        self.assertContains(detail, "训练内容概述")
+        self.assertContains(detail, task.overview)
+
     def test_framework_idempotent_unique_and_defaults(self):
         service.initialize_schedule(self.plan)
         self.assertEqual(self.plan.schedule_days.count(), 2)

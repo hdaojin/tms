@@ -185,7 +185,7 @@ def target_detail(request, pk, personal=False):
             "can_feedback": process.is_coach(user, target) and user.has_perm("training.add_trainingcoachfeedback"),
             "is_fragment": bool(request.htmx),
             "state_changes": target.state_changes.select_related("actor"),
-            "description_html": markdown(target.description if personal else target.training_task.description),
+            "description_html": markdown(target.description if personal else target.training_task.overview),
         },
     )
 

@@ -124,11 +124,18 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
     competitors = forms.ModelMultipleChoiceField(
         label="指定选手", queryset=get_user_model().objects.none(), required=False, widget=TrainingRecipientSelect
     )
+    field_order = [
+        "title", "requirements", "overview", "subtask_titles", "attachments", "skills",
+        "order", "assign_all", "competitors", "reason",
+    ]
 
     class Meta:
         model = TrainingTask
-        fields = ["title", "requirements", "order", "assign_all"]
-        widgets = {"requirements": forms.Textarea(attrs={"rows": 3})}
+        fields = ["title", "requirements", "overview", "order", "assign_all"]
+        widgets = {
+            "requirements": forms.Textarea(attrs={"rows": 3}),
+            "overview": forms.Textarea(attrs={"rows": 3}),
+        }
 
     def __init__(self, *args, slot, **kwargs):
         super().__init__(*args, **kwargs)

@@ -615,7 +615,7 @@ class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
         )]
         history, _ = decorate_history(history)
         from .process_views import markdown
-        return super().get_context_data(can_edit=can_edit, can_skills=can_skills, visible_executions=executions, task_history=history, description_html=markdown(task.description), **kwargs)
+        return super().get_context_data(can_edit=can_edit, can_skills=can_skills, visible_executions=executions, task_history=history, description_html=markdown(task.overview), **kwargs)
 
     def get_breadcrumb_parents(self):
         if not self.request.user.has_perm("training.view_trainingtask"):

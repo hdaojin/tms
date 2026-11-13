@@ -52,7 +52,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.task_obj = self.task(
             title="配置路由",
             requirements="验证端到端连通",
-            description="配置地址\n核对路由表",
+            subtask_titles=["配置地址", "核对路由表"],
             assign_all=True,
         )
         self.execution = self.task_obj.executions.get(user=self.student)
