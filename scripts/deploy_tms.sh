@@ -27,6 +27,8 @@ readonly AUTH_SNIPPET="/etc/caddy/tms-basic-auth.caddy"
 readonly CADDY_SITE="/etc/caddy/sites-enabled/tms.caddy"
 readonly SYSTEMD_UNIT="/etc/systemd/system/tms.service"
 readonly TRAINING_LOG_WORKER_UNIT="/etc/systemd/system/tms-training-log-worker.service"
+readonly TRAINING_LOG_WORKER_TEMPLATE="${TEMPLATE_DIR}/tms-training-log-worker.service"
+readonly TRAINING_LOG_WORKER_COMMAND="training/management/commands/run_training_log_worker.py"
 readonly MAINTENANCE_FLAG="${STATE_DIR}/maintenance.flag"
 readonly DEPLOY_STATE="${STATE_DIR}/current-deployment"
 readonly UV_CACHE_DIR="/var/cache/tms/uv"
@@ -353,8 +355,17 @@ env_run_as_app() {
 require_installed_layout() {
     require_root_owned_file "$0"
     require_root_owned_file "${TEMPLATE_DIR}/tms.service"
+    [[ -f "${TRAINING_LOG_WORKER_TEMPLATE}" ]] || die "缺少训练日志后台服务模板，请按部署手册更新稳定部署入口和服务模板。"
+    require_root_owned_file "${TRAINING_LOG_WORKER_TEMPLATE}"
     require_root_owned_file "${TEMPLATE_DIR}/tms.caddy"
     require_root_owned_file "${CONFIG_FILE}"
+}
+
+check_training_log_worker() {
+    [[ ! -f "$1/${TRAINING_LOG_WORKER_COMMAND}" ]] || {
+        systemctl is-active --quiet tms-training-log-worker.service &&
+            grep -qw tms-training-log-worker.service < <(systemctl show tms.service -p Wants --value)
+    }
 }
 
 json_bool() { [[ "$1" == "yes" ]] && printf true || printf false; }
@@ -427,7 +438,7 @@ cmd_install_pdf_deps() {
 ensure_plan_prerequisites() {
     require_root
     require_installed_layout
-    for cmd in git tar uv sha256sum runuser install df awk sed stat; do require_cmd "${cmd}"; done
+    for cmd in git tar uv sha256sum runuser install df awk sed stat cmp; do require_cmd "${cmd}"; done
     id "${TMS_DEPLOY_USER}" >/dev/null 2>&1 || die "部署用户不存在：${TMS_DEPLOY_USER}"
     getent group "${TMS_CADDY_GROUP}" >/dev/null 2>&1 || die "Caddy 组不存在：${TMS_CADDY_GROUP}"
     [[ -x /usr/bin/python3.13 ]] || die "缺少 /usr/bin/python3.13"
@@ -529,6 +540,11 @@ cmd_plan() {
     install -d -m 0750 -o "${TMS_DEPLOY_USER}" -g "${TMS_DEPLOY_USER}" "${release_dir}"
     run_as_deployer bash -c 'set -Eeuo pipefail; git --git-dir="$1" archive "$2" | tar -x -C "$3"' \
         bash "${REPOSITORY_DIR}" "${sha}" "${release_dir}"
+    if [[ -f "${release_dir}/${TRAINING_LOG_WORKER_COMMAND}" ]]; then
+        cmp -s "${TEMPLATE_DIR}/tms.service" "${release_dir}/deploy/production/tms.service" &&
+            cmp -s "${TRAINING_LOG_WORKER_TEMPLATE}" "${release_dir}/deploy/production/tms-training-log-worker.service" ||
+            die "训练日志后台服务所需的模板与候选版本不同，请更新稳定模板后重新 plan。"
+    fi
     printf '%s\n' "${sha}" >"${release_dir}/.tms-release-sha"
     chown "${TMS_DEPLOY_USER}:${TMS_DEPLOY_USER}" "${release_dir}/.tms-release-sha"
 
@@ -559,6 +575,7 @@ cmd_plan() {
         printf 'SCRIPT_SHA256=%q\n' "$(sha256sum "$0" | awk '{print $1}')"
         printf 'CONFIG_SHA256=%q\n' "$(sha256sum "${CONFIG_FILE}" | awk '{print $1}')"
         printf 'SERVICE_TEMPLATE_SHA256=%q\n' "$(sha256sum "${TEMPLATE_DIR}/tms.service" | awk '{print $1}')"
+        printf 'WORKER_TEMPLATE_SHA256=%q\n' "$(sha256sum "${TRAINING_LOG_WORKER_TEMPLATE}" | awk '{print $1}')"
         printf 'CADDY_TEMPLATE_SHA256=%q\n' "$(sha256sum "${TEMPLATE_DIR}/tms.caddy" | awk '{print $1}')"
     } >"${manifest}"
     chmod 0600 "${manifest}"
@@ -597,6 +614,7 @@ load_plan() {
     [[ "$(sha256sum "$0" | awk '{print $1}')" == "${SCRIPT_SHA256}" ]] || die "部署入口自 plan 后已变化，请重新 plan。"
     [[ "$(sha256sum "${CONFIG_FILE}" | awk '{print $1}')" == "${CONFIG_SHA256}" ]] || die "部署配置自 plan 后已变化，请重新 plan。"
     [[ "$(sha256sum "${TEMPLATE_DIR}/tms.service" | awk '{print $1}')" == "${SERVICE_TEMPLATE_SHA256}" ]] || die "systemd 模板已变化，请重新 plan。"
+    [[ "$(sha256sum "${TRAINING_LOG_WORKER_TEMPLATE}" | awk '{print $1}')" == "${WORKER_TEMPLATE_SHA256:-}" ]] || die "训练日志后台服务模板已变化，请重新 plan。"
     [[ "$(sha256sum "${TEMPLATE_DIR}/tms.caddy" | awk '{print $1}')" == "${CADDY_TEMPLATE_SHA256}" ]] || die "Caddy 模板已变化，请重新 plan。"
 }
 
@@ -785,7 +803,7 @@ install_service_and_caddy() {
     printf '%s\n' "${rendered_unit}" >"${SYSTEMD_UNIT}"
     chown root:root "${SYSTEMD_UNIT}"; chmod 0644 "${SYSTEMD_UNIT}"
     sed -e "s/@@APP_USER@@/${TMS_APP_USER}/g" -e "s/@@APP_GROUP@@/${TMS_APP_GROUP}/g" \
-        "${TEMPLATE_DIR}/tms-training-log-worker.service" >"${TRAINING_LOG_WORKER_UNIT}"
+        "${TRAINING_LOG_WORKER_TEMPLATE}" >"${TRAINING_LOG_WORKER_UNIT}"
     chown root:root "${TRAINING_LOG_WORKER_UNIT}"; chmod 0644 "${TRAINING_LOG_WORKER_UNIT}"
     install -d -m 0755 -o root -g root /etc/caddy/sites-enabled
     render_caddy_site >"${CADDY_SITE}"
@@ -985,10 +1003,7 @@ cmd_apply() {
     fi
     atomic_switch "${RELEASE_DIR}"
     systemctl start tms.service
-    if local_healthcheck && https_healthcheck && {
-        [[ ! -f "${RELEASE_DIR}/training/management/commands/run_training_log_worker.py" ]] ||
-            systemctl is-active --quiet tms-training-log-worker.service
-    }; then
+    if local_healthcheck && https_healthcheck && check_training_log_worker "${RELEASE_DIR}"; then
         rm -f "${MAINTENANCE_FLAG}"
         record_deploy_state "${RELEASE_ID}" "${SHA}" "${previous}" "${migrations_applied}"
         heading "TMS_DEPLOYMENT_COMPLETE"
@@ -1039,6 +1054,7 @@ cmd_verify() {
     check_external_certificate
     [[ -L "${CURRENT_LINK}" ]] || die "current 不存在。"
     systemctl is-active --quiet tms.service || die "tms.service 未运行。"
+    check_training_log_worker "${CURRENT_LINK}" || die "训练日志后台服务未运行，或未被 tms.service 拉起。请检查服务和部署模板。"
     systemctl is-active --quiet caddy || die "caddy 未运行。"
     validate_caddy_config
     ss -ltn | grep -Eq '127\.0\.0\.1:8010|\[::1\]:8010' || die "Gunicorn 未仅在回环地址监听 8010。"

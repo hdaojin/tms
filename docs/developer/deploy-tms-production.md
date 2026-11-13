@@ -71,6 +71,10 @@ sudo install -m 0640 deploy/production/deploy.conf.example /etc/tms/deploy.conf
 sudo chown root:root /etc/tms/deploy.conf
 ```
 
+已有服务器升级时，从同一个已审阅版本同步安装上面的两个脚本和三个模板，然后重新执行 `plan`。
+保留服务器已有的 `/etc/tms/deploy.conf`。候选 release 的代码和系统已安装的稳定入口位于不同目录，
+发布应用代码时不会自动替换稳定入口。更新脚本或模板后，旧计划需要重新生成。
+
 审阅 `/etc/tms/deploy.conf`。它只能保存域名、仓库、账户名等非秘密拓扑参数；数据库密码和 Django `SECRET_KEY`
 由首次 `apply` 生成，不能复制进部署配置、命令行、日志或版本库。
 
@@ -581,6 +585,23 @@ sudo tms-update status
 
 ### 训练日志 AI 后台进程
 
-升级包含训练日志 AI 功能的版本前，按本页安装步骤同步更新部署工具、主服务模板和训练日志后台服务模板。部署会在数据库迁移完成后启动后台服务，并把进程状态纳入发布验收。主服务停止或重启时会同步处理后台服务。
+升级包含训练日志 AI 功能的版本前，按第 3 节同步安装稳定入口和模板。`plan` 会检查后台服务模板是否存在，并核对两份 systemd 模板与候选版本是否一致。部署在数据库迁移完成后启动后台服务，`apply` 和 `verify` 均检查进程状态和主服务的启动依赖。主服务停止或重启时会同步处理后台服务。
 
 用 `systemctl status tms-training-log-worker.service` 检查进程，用 `journalctl -u tms-training-log-worker.service` 查看错误。后台进程重启后会继续领取等待中的任务。已经开始调用并中断的任务在五分钟后标为失败，作者可重新确认后重试。开发环境可运行 `uv run manage.py run_training_log_worker` 启动队列，也可加 `--once` 仅处理一条。
+
+如果发布已完成、训练日志停在「等待生成」，且 systemd 显示后台服务为 `not-found`，先同步第 3 节的稳定入口和模板。常规恢复可重新计划并发布已审阅版本。若当前 release 已含 worker 命令且数据库迁移已完成，可按以下步骤单独恢复后台进程，继续处理积压任务。示例使用默认应用账号和组 `tms`，自定义部署先用 `systemctl show tms.service -p User -p Group` 确认并替换。若服务文件已存在，先检查和备份现有配置。
+
+```bash
+sudo test -f /srv/tms/current/training/management/commands/run_training_log_worker.py
+worker_dir=$(mktemp -d)
+sed -e 's/@@APP_USER@@/tms/g' -e 's/@@APP_GROUP@@/tms/g' \
+  /usr/local/share/tms-deploy/tms-training-log-worker.service > "$worker_dir/tms-training-log-worker.service"
+sudo systemd-analyze verify "$worker_dir/tms-training-log-worker.service"
+sudo install -o root -g root -m 0644 "$worker_dir/tms-training-log-worker.service" /etc/systemd/system/tms-training-log-worker.service
+sudo systemctl daemon-reload
+sudo systemctl add-wants tms.service tms-training-log-worker.service
+sudo systemctl start tms-training-log-worker.service
+sudo tms-update verify
+```
+
+各步成功后再执行下一步。验收时同时检查已有任务是否从「等待生成」进入生成流程，并确认最终结果。
