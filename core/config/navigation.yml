@@ -132,6 +132,11 @@ sections:
         icon_class: icon-[tabler--run] size-5 text-success
         login_required: false
         children:
+          - key: my_training
+            label: 我的训练
+            url_name: training:my_training
+            icon_class: icon-[tabler--run] size-5 text-success
+            permissions: [training.view_trainingtask]
           - key: my_training_plans
             label: 我的计划
             url_name: training:my_plans
@@ -147,11 +152,6 @@ sections:
             url_name: training:plan_list
             icon_class: icon-[tabler--calendar-stats] size-5 text-success
             permissions: [training.view_trainingplan]
-          - key: my_training
-            label: 我的训练
-            url_name: training:my_training
-            icon_class: icon-[tabler--run] size-5 text-success
-            permissions: [training.view_trainingtask]
           - key: training_board
             label: 训练大屏
             url_name: training:board
