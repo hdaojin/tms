@@ -18,7 +18,7 @@ from core.utils.mixins import TitleMixin
 from .member_tables import PlanCandidateTable, PlanMemberTable
 from .models import TrainingPlanParticipant
 from .plan_members import (
-    PlanMemberActionForm, PlanRosterForm, candidates, change_coaches, change_duty, confirm_members,
+    ParticipantGroupsForm, PlanMemberActionForm, PlanRosterForm, candidates, change_coaches, change_duty, confirm_members,
     ordered_duty, preview_members, require_manager, save_roster,
 )
 from .plan_people import eligible_staff
@@ -183,6 +183,7 @@ class PlanMembersView(FilterableListMixin, TitleMixin, SingleTableView):
             if self.adding else [],
             list_filter_reset_url=f"{self.request.path}?mode={self.request.GET['mode']}" if self.adding else self.request.path,
             participant_action_url=self.return_url(self.request.GET.urlencode()),
+            groups_form=ParticipantGroupsForm() if self.adding else None,
         )
         return context
 
@@ -230,14 +231,34 @@ class PlanMembersView(FilterableListMixin, TitleMixin, SingleTableView):
                 change_coaches(actor=request.user, plan=self.plan, ids=[request.POST.get("user")], operation="remove")
                 messages.success(request, "已移除负责教练。")
                 return redirect(self.return_url(request.GET.urlencode()) + "#coaches")
+            if request.POST.get("stage") == "confirm_groups" and self.adding:
+                confirm_members(actor=request.user, plan=self.plan, token=request.POST.get("token", ""))
+                messages.success(request, "已添加预览名单中的选手。")
+                return redirect(reverse("training:plan_members", args=[self.plan.pk]) + "#participants")
             form = PlanMemberActionForm(request.POST)
             if request.POST.get("stage") != "select" or not self.adding or not form.is_valid() or request.POST.get("selection") != "selected":
                 raise ValidationError("请选择有效操作和当前页成员。")
             self.object_list = self.get_queryset()
             table = self.get_table()
-            ids = normalize_ids(request.POST.getlist("users"))
+            selected = request.POST.getlist("users")
+            ids = normalize_ids(selected) if selected else []
             if not set(ids) <= {row.record.pk for row in table.page.object_list}:
                 raise ValidationError("所选用户不属于当前筛选页，请重新选择。")
+            if request.POST.get("group_selection") == "1":
+                groups_form = ParticipantGroupsForm(request.POST)
+                if not groups_form.is_valid():
+                    raise ValidationError("请选择有效的用户角色。")
+                groups = list(groups_form.cleaned_data["groups"])
+                audience = ""
+                if not groups_form.cleaned_data["elite_class"] and len(groups) == 1 and self.plan.implementation_audience == "精英班":
+                    audience = groups[0].name
+                preview = preview_members(
+                    actor=request.user, plan=self.plan, ids=set(ids) | groups_form.selected_ids(self.plan),
+                    operation="add", audience=audience,
+                )
+                return render(request, "training/plan_participant_preview.html", {
+                    "preview": preview, "plan": self.plan, "return_url": self.return_url(request.GET.urlencode()),
+                })
             preview = preview_members(actor=request.user, plan=self.plan, ids=ids, operation="add")
             confirm_members(actor=request.user, plan=self.plan, token=preview["token"])
             if request.htmx:

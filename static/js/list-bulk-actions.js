@@ -50,6 +50,7 @@
     } else if (form.querySelector('[data-selection-mode]').value === 'all' && !form.querySelector('[data-select-all]')) {
       message = '当前列表不支持选择全部匹配结果。';
     } else if (!(form.querySelector('[data-select-all]') && form.querySelector('[data-selection-mode]').value === 'all')
+      && !form.querySelector('[data-bulk-extra-selection]:checked, [data-bulk-extra-selection] option:checked')
       && ![...form.querySelectorAll('[data-row-selection]')].some(box => box.checked)) {
       message = `请至少选择一${form.dataset.selectionLabel || '条记录'}。`;
     }

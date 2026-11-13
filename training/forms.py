@@ -213,7 +213,7 @@ class TrainingCycleTreeVersionsForm(StyledFormMixin, forms.Form):
 class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = TrainingPlan
-        fields = ["training_cycle", "title", "start_date", "end_date", *TrainingPlan.TIME_FIELDS, "objective", "schedulers", "approvers"]
+        fields = ["training_cycle", "title", "implementation_audience", "start_date", "end_date", *TrainingPlan.TIME_FIELDS, "objective", "schedulers", "approvers"]
         widgets = {
             "start_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
             "end_date": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
@@ -225,6 +225,8 @@ class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["training_cycle"].empty_label = "请选择训练周期"
+        self.fields["implementation_audience"].required = False
+        self.fields["implementation_audience"].help_text = "用于训练日志标题。"
         unknown_periods = set()
         if self.instance.pk:
             from .models import TrainingScheduleSlot
@@ -288,6 +290,9 @@ class TrainingPlanForm(StyledFormMixin, forms.ModelForm):
                 except forms.ValidationError as exc:
                     self.add_error(name, exc)
         return cleaned
+
+    def clean_implementation_audience(self):
+        return self.cleaned_data["implementation_audience"] or self.instance.implementation_audience
 
 
 class TrainingTaskForm(StyledFormMixin, forms.ModelForm):

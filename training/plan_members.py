@@ -2,6 +2,7 @@
 
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
@@ -26,6 +27,23 @@ class PlanMemberActionForm(StyledFormMixin, forms.Form):
         label="操作", choices=[("", "请选择操作"), ("add", "添加计划成员")],
         widget=forms.Select(attrs={"data-bulk-operation": ""}),
     )
+
+
+class ParticipantGroupsForm(StyledFormMixin, forms.Form):
+    elite_class = forms.BooleanField(
+        label="精英班（本周期全体选手）", required=False, initial=True,
+        widget=forms.CheckboxInput(attrs={"data-bulk-extra-selection": ""}),
+    )
+    groups = forms.ModelMultipleChoiceField(
+        label="用户角色", queryset=Group.objects.order_by("name"), required=False,
+        widget=forms.SelectMultiple(attrs={"data-bulk-extra-selection": ""}),
+    )
+
+    def selected_ids(self, plan):
+        eligible = candidates(plan)
+        if not self.cleaned_data["elite_class"]:
+            eligible = eligible.filter(groups__in=self.cleaned_data["groups"])
+        return set(eligible.values_list("pk", flat=True))
 
 
 class PlanRosterForm(StyledFormMixin, forms.Form):
@@ -162,7 +180,7 @@ def candidates(plan):
 
 
 def _state(plan, ids, operation):
-    users = list(User.objects.filter(pk__in=ids).order_by("pk"))
+    users = list(User.objects.filter(pk__in=ids).select_related("profile").order_by("pk"))
     participants = list(plan.participants.filter(user_id__in=ids).order_by("user_id"))
     if len(users) != len(ids):
         raise ValidationError("部分用户已不存在，请重新选择。")
@@ -188,7 +206,7 @@ def _state(plan, ids, operation):
     return users, state
 
 
-def preview_members(*, actor, plan, ids, operation, return_query=""):
+def preview_members(*, actor, plan, ids, operation, return_query="", audience=""):
     plan = TrainingPlan.objects.get(pk=plan.pk)
     require_manager(actor, plan)
     ids = normalize_ids(ids)
@@ -196,10 +214,12 @@ def preview_members(*, actor, plan, ids, operation, return_query=""):
     token = signing.dumps({
         "actor": actor.pk, "plan": plan.pk, "ids": ids, "operation": operation,
         "state": state, "return_query": return_query,
+        "audience": audience, "previous_audience": plan.implementation_audience,
     }, salt=SALT, compress=True)
     return {
-        "token": token, "operation": operation, "return_query": return_query,
-        "rows": [{"name": get_user_display_name(u)} for u in users],
+        "token": token, "operation": operation, "return_query": return_query, "audience": audience,
+        "rows": [{"name": get_user_display_name(u), "note": getattr(getattr(u, "profile", None), "name_disambiguation", "")}
+                 for u in users],
     }
 
 
@@ -220,6 +240,14 @@ def confirm_members(*, actor, plan, token):
     if state != data["state"]:
         raise ValidationError("计划或所选成员状态已变化，请返回列表重新预览。")
     before = {"参与选手": sorted(plan.participants.filter(is_active=True).values_list("user_id", flat=True))}
+    after = {}
+    if data.get("audience"):
+        if data["previous_audience"] != plan.implementation_audience:
+            raise ValidationError("计划实施对象已变化，请重新预览。")
+        before["实施对象"] = plan.implementation_audience
+        plan.implementation_audience = data["audience"]
+        plan.save(update_fields=["implementation_audience", "updated_at"])
+        after["实施对象"] = plan.implementation_audience
     for user_id in data["ids"]:
         if data["operation"] == "add":
             participant, created = TrainingPlanParticipant.objects.get_or_create(training_plan=plan, user_id=user_id)
@@ -230,6 +258,6 @@ def confirm_members(*, actor, plan, token):
             participant = plan.participants.get(user_id=user_id)
             participant.is_active = False
             participant.save(update_fields=["is_active", "updated_at"])
-    audit(plan, actor, "添加计划成员" if data["operation"] == "add" else "退出计划成员", before=before,
-          after={"参与选手": sorted(plan.participants.filter(is_active=True).values_list("user_id", flat=True))})
+    after["参与选手"] = sorted(plan.participants.filter(is_active=True).values_list("user_id", flat=True))
+    audit(plan, actor, "添加计划成员" if data["operation"] == "add" else "退出计划成员", before=before, after=after)
     return data["return_query"]

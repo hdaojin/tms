@@ -1,0 +1,20 @@
+{% extends "layouts/app.html" %}
+{% block content %}
+<section class="card border border-base-300 bg-base-100 shadow-sm">
+  <div class="card-body">
+    <h2 class="card-title">{{ plan.title }} · 确认添加选手</h2>
+    <p>将添加 {{ preview.rows|length }} 位选手。</p>
+    {% if preview.audience %}<p>计划实施对象将设为「{{ preview.audience }}」。</p>{% endif %}
+    <ul class="list-disc pl-5">
+      {% for row in preview.rows %}<li>{{ row.name }}{% if row.note %}（{{ row.note }}）{% endif %}</li>{% endfor %}
+    </ul>
+    <form method="post" action="{{ return_url }}" class="flex flex-wrap gap-2">
+      {% csrf_token %}
+      <input type="hidden" name="stage" value="confirm_groups">
+      <input type="hidden" name="token" value="{{ preview.token }}">
+      <button class="btn btn-primary" type="submit">确认添加</button>
+      <a class="btn btn-outline" href="{{ return_url }}#participants">取消</a>
+    </form>
+  </div>
+</section>
+{% endblock %}

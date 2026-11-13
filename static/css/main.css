@@ -43,7 +43,43 @@
   }
 }
 
+@property --training-log-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0turn;
+}
+
+@keyframes training-log-border-rotation {
+  to {
+    --training-log-border-angle: 1turn;
+  }
+}
+
 @layer components {
+  .training-log-generation-active {
+    border-color: color-mix(in oklab, var(--color-primary) 65%, var(--color-base-300));
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .training-log-generation-active {
+      border-color: transparent;
+      background:
+        linear-gradient(var(--color-base-100), var(--color-base-100)) padding-box,
+        conic-gradient(
+          from var(--training-log-border-angle),
+          var(--color-base-300) 0 55%,
+          var(--color-secondary) 73%,
+          var(--color-primary) 83%,
+          var(--color-base-300) 100%
+        ) border-box;
+      animation: training-log-border-rotation 4s linear infinite;
+    }
+  }
+
+  #log-generation-status:has(.training-log-generation-active) ~ #draft-editor .training-log-submit {
+    display: none;
+  }
+
   .date-part {
     display: inline-block;
     white-space: nowrap;

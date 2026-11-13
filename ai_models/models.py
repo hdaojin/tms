@@ -20,6 +20,11 @@ class ReasoningEffort(models.TextChoices):
     MAX = "max", "最高"
 
 
+class ShareAudience(models.TextChoices):
+    ALL = "all", "共享给所有有使用权限的用户"
+    SELECTED = "selected", "共享给指定用户或角色"
+
+
 class AIModel(TimestampedModel):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="所有者")
     name = models.CharField("显示名称", max_length=100)
@@ -31,7 +36,12 @@ class AIModel(TimestampedModel):
     encrypted_api_key = models.BinaryField("加密 API 密钥", editable=False)
     api_key_preview = models.CharField("API 密钥预览", max_length=11, editable=False)
     revision = models.UUIDField(default=uuid4, editable=False)
-    is_shared = models.BooleanField("共享为公共模型", default=False)
+    is_shared = models.BooleanField("开启共享", default=False)
+    share_audience = models.CharField("共享范围", max_length=8, choices=ShareAudience, default=ShareAudience.ALL)
+    shared_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, verbose_name="指定用户", blank=True, related_name="+"
+    )
+    shared_groups = models.ManyToManyField("auth.Group", verbose_name="指定角色", blank=True, related_name="+")
     is_delisted = models.BooleanField("管理员已下架", default=False)
     verified = models.BooleanField("当前配置已验证", default=False)
     test_started_at = models.DateTimeField("最近发起测试时间", null=True)
@@ -48,7 +58,7 @@ class AIModel(TimestampedModel):
         default_permissions = ("view",)
         permissions = [
             ("manage_own_aimodel", "管理自己的 AI 模型"),
-            ("use_shared_aimodel", "使用公共 AI 模型"),
+            ("use_shared_aimodel", "使用共享 AI 模型"),
         ]
         constraints = [
             models.CheckConstraint(
@@ -56,6 +66,10 @@ class AIModel(TimestampedModel):
                 name="ai_model_shared_requires_verified",
             ),
         ]
+
+    @property
+    def sharing_mode(self):
+        return self.share_audience if self.is_shared else "private"
 
     @property
     def provider_label(self):

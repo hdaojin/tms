@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load static %}
 {% block content %}
 <div class="space-y-4">
   <p>{{ draft.cycle.name }} · {{ draft.training_date|date:"Y-m-d" }} · {% if role == "coach" %}教练日志{% else %}选手日志{% endif %}</p>
@@ -15,9 +16,19 @@
             {% elif task.filled %}（已填报）{% endif %}
             {% if role == "coach" and not task.goal %}<span class="text-sm">（训练目标由 AI 拟写）</span>{% endif %}
             {% if task.goal_edit_url %}<a class="link link-primary" href="{{ task.goal_edit_url }}">编辑训练目标</a>{% endif %}
+            {% if task.has_overview %}（有任务说明）{% endif %}
+            {% if task.reference_files %}（可用附件 {{ task.reference_files|length }} 份）{% endif %}
           </li>
         {% empty %}<li>暂无符合条件的任务</li>{% endfor %}
       </ul>
+      {% if role == "competitor" and task_rows %}
+        {% if not has_personal_progress %}<p>暂无个人训练进度填报，不影响 AI 生成。AI 不会据此判断个人完成情况。</p>{% endif %}
+        {% if coach_reference_count %}
+          <p>已找到 {{ coach_reference_count }} 份相关教练正式日志，将使用对应任务的技术参考。相关任务为 {{ coach_reference_tasks|join:"、" }}。</p>
+        {% else %}
+          <p>暂无对应教练日志可用，仍可根据训练任务及其他资料生成。</p>
+        {% endif %}
+      {% endif %}
       {% if missing %}
         <ul class="alert alert-warning" role="status">{% for item in missing %}<li>{{ item }}</li>{% endfor %}</ul>
         {% if progress_url %}<a class="btn btn-primary btn-sm self-start" href="{{ progress_url }}">去填写训练完成情况</a>{% endif %}
@@ -27,53 +38,7 @@
     </div>
   </section>
 
-  {% if job %}
-  <section class="card border border-base-300 bg-base-100 shadow-sm">
-    <div class="card-body">
-      <h2 class="card-title">{{ job.get_status_display }}</h2>
-      {% if running %}
-        <p>可以离开此页面，稍后返回查看结果。</p>
-        <a class="btn btn-outline btn-sm self-start" href="{{ request.path }}">刷新状态</a>
-      {% elif job.status == "review" %}
-        {% if not can_view_job %}<p>素材范围已变化，请重新预览。</p>
-        {% elif host %}
-          <p>接收方 {{ job.model.name }}（{{ host }}）。请核对待发送的文本素材。</p>
-          {% if role == "coach" %}<p>结构化身份字段已移除，请检查自由文本是否包含身份信息。</p>{% endif %}
-          <details open>
-            <summary>发送素材</summary>
-            <pre class="whitespace-pre-wrap break-words">{{ job.message }}</pre>
-          </details>
-          <details>
-            <summary>系统提示词</summary>
-            <pre class="whitespace-pre-wrap break-words">{{ job.prompt }}</pre>
-          </details>
-          {% if not missing %}
-          <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="generation" value="{{ job.pk }}">
-            <button class="btn btn-primary" name="action" value="confirm">确认发送并生成</button>
-          </form>
-          {% endif %}
-        {% else %}<p>模型配置已变化，请重新选择并预览发送内容。</p>{% endif %}
-      {% elif job.status == "ready" %}
-        {% if not can_view_job %}<p>素材范围已变化，请放弃本次结果并重新生成。</p>{% endif %}
-        {% for label, value in result %}
-          <h3 class="font-semibold">{{ label }}</h3>
-          <p class="whitespace-pre-wrap">{{ value }}</p>
-        {% endfor %}
-        <form method="post" class="flex flex-wrap gap-2">
-          {% csrf_token %}
-          <input type="hidden" name="generation" value="{{ job.pk }}">
-          <input type="hidden" name="revision" value="{{ draft.revision }}">
-          {% if can_view_job %}<button class="btn btn-primary" name="action" value="apply">{% if draft.body %}采用结果并替换正文{% else %}采用结果{% endif %}</button>{% endif %}
-          <button class="btn btn-outline" name="action" value="discard">放弃本次结果</button>
-        </form>
-      {% elif job.error %}
-        <p class="alert alert-error" role="alert">{{ job.error }}</p>
-      {% endif %}
-    </div>
-  </section>
-  {% endif %}
+  {% partial generation_status %}
 
   {% if not has_model %}
   <div class="alert alert-info" role="status">
@@ -84,8 +49,8 @@
     </div>
   </div>
   {% endif %}
-  {% if not missing %}
-  <form method="post" enctype="multipart/form-data" class="space-y-4">
+  {% if not missing and not running and job.status != "ready" %}
+  <form id="log-generation-form" method="post" enctype="multipart/form-data" class="space-y-4">
     {% csrf_token %}
     {% if can_prepare %}
     <section class="card border border-base-300 bg-base-100 shadow-sm">
@@ -111,12 +76,15 @@
           {% include "components/field.html" with field=generation_form.instructions %}
           {% include "components/field.html" with field=generation_form.target_words %}
           {% include "components/field.html" with field=generation_form.references %}
-          {% include "components/field.html" with field=generation_form.reference %}
         {% endif %}
         {% include "components/field.html" with field=image_form.images %}
         {% if image_form.progress_images.field.queryset.exists %}
           {% include "components/field.html" with field=image_form.progress_images %}
         {% endif %}
+        <div id="unsaved-log-images" hidden>
+          <p class="alert alert-warning" role="alert">有尚未保存的日志插图，请先点击「保存插图」再预览。</p>
+        </div>
+        <button class="btn btn-outline" name="action" value="image" formnovalidate>保存插图</button>
         {% if images %}
           <ul class="flex flex-wrap gap-3">
             {% for image in images %}<li><a href="{% url 'training:log_ai_image' draft.pk image.pk %}" target="_blank" rel="noopener">
@@ -127,16 +95,109 @@
       </div>
     </details>
     {% if can_prepare %}
+      {% if images %}{% include "components/field.html" with field=generation_form.text_only %}{% endif %}
       <button class="btn btn-primary" name="action" value="prepare">预览发送内容</button>
-    {% else %}
-      <button class="btn btn-outline" name="action" value="image" formnovalidate>保存插图</button>
     {% endif %}
   </form>
+  {% if can_prepare %}
+    <script defer src="{% static 'js/training-log-images.js' %}"></script>
+  {% endif %}
   {% endif %}
 
   {% partial draft_editor %}
 </div>
 {% endblock %}
+
+{% partialdef generation_status %}
+<div id="log-generation-status"
+     {% if running %}
+       hx-get="{{ request.path }}?generation_status=1&amp;seen_status={{ job.status }}"
+       hx-trigger="every 2s"
+       hx-swap="outerHTML show:none"
+     {% endif %}>
+  {% if job %}
+  <section class="card border bg-base-100 shadow-sm {% if running %}training-log-generation-active{% else %}border-base-300{% endif %}">
+    <div class="card-body">
+      <h2 class="card-title"><span role="status">{{ job.get_status_display }}</span></h2>
+      {% if running %}
+        <p>可以离开此页面，稍后返回查看结果。</p>
+        <a class="btn btn-outline btn-sm self-start" href="{{ request.path }}">刷新状态</a>
+      {% elif job.status == "review" %}
+        {% if not can_view_job %}<p>素材范围已变化，请重新预览。</p>
+        {% elif host %}
+          <p>接收方 {{ job.model.name }}（{{ host }}）。请核对待发送的素材。</p>
+          {% if role == "coach" %}<p>结构化身份字段已移除，请检查自由文本是否包含身份信息。</p>{% endif %}
+          {% if coach_reference_count %}
+            <p>确认后也会向该模型发送 {{ coach_reference_count }} 份教练日志中的任务级技术参考，涉及 {{ coach_reference_tasks|join:"、" }}。</p>
+          {% endif %}
+          <details open>
+            <summary>发送素材</summary>
+            <pre class="whitespace-pre-wrap break-words">{{ preview_message }}</pre>
+          </details>
+          {% if review_images %}
+            <div>
+              <h3 class="font-semibold">将随本次请求发送给模型的图片</h3>
+              <ul class="mt-2 flex flex-wrap gap-3">
+                {% for image in review_images %}
+                  <li><a href="{% url 'training:log_ai_image' draft.pk image.pk %}" target="_blank" rel="noopener">
+                    <img class="max-h-32 rounded-box" src="{% url 'training:log_ai_image' draft.pk image.pk %}" alt="待发送插图 {{ forloop.counter }}">
+                  </a></li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+          <details>
+            <summary>系统提示词</summary>
+            <pre class="whitespace-pre-wrap break-words">{{ job.prompt }}</pre>
+          </details>
+        {% else %}<p>模型配置已变化，请重新选择并预览发送内容。</p>{% endif %}
+        <form method="post" class="flex flex-wrap gap-2">
+          {% csrf_token %}
+          <input type="hidden" name="generation" value="{{ job.pk }}">
+          {% if can_view_job and host and not missing %}
+            <button class="btn btn-primary" name="action" value="confirm">确认发送并生成</button>
+          {% endif %}
+          <button class="btn btn-outline" name="action" value="cancel">取消</button>
+        </form>
+      {% elif job.status == "ready" %}
+        {% if not can_view_job %}<p>素材范围已变化，请放弃本次结果并重新生成。</p>{% endif %}
+        {% for label, value in result %}
+          <h3 class="font-semibold">{{ label }}</h3>
+          <div class="prose max-w-none break-words">{{ value }}</div>
+        {% endfor %}
+        {% if omitted_images %}
+          <div>
+            <h3 class="font-semibold">未插入正文的图片</h3>
+            <p>以下图片未被正文引用，仍保存在草稿中。</p>
+            <ul class="mt-2 flex flex-wrap gap-3">
+              {% for image in omitted_images %}
+                <li><a href="{% url 'training:log_ai_image' draft.pk image.pk %}" target="_blank" rel="noopener">
+                  <img class="max-h-32 rounded-box" src="{% url 'training:log_ai_image' draft.pk image.pk %}" alt="未插入的图片 {{ forloop.counter }}">
+                </a></li>
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+        <form method="post" class="flex flex-wrap gap-2">
+          {% csrf_token %}
+          <input type="hidden" name="generation" value="{{ job.pk }}">
+          <input type="hidden" name="revision" value="{{ draft.revision }}">
+          {% if can_view_job %}<button class="btn btn-primary" name="action" value="apply">{% if draft.body %}采用结果并替换正文{% else %}采用结果{% endif %}</button>{% endif %}
+          <button class="btn btn-outline" name="action" value="discard">放弃本次结果</button>
+        </form>
+      {% elif job.error %}
+        <p class="alert alert-error" role="alert">{{ job.error }}</p>
+        {% if request.GET.generation_status %}
+          <a class="btn btn-outline btn-sm self-start" href="{{ request.path }}">返回生成设置</a>
+        {% endif %}
+      {% endif %}
+    </div>
+  </section>
+  {% elif request.GET.generation_status %}
+    <a class="btn btn-outline btn-sm" href="{{ request.path }}">返回训练日志草稿</a>
+  {% endif %}
+</div>
+{% endpartialdef %}
 
 {% partialdef draft_editor %}
 <div id="draft-editor">
@@ -153,20 +214,18 @@
         <button id="save-draft" class="btn btn-primary">保存草稿</button>
         {% if saved %}<span class="ml-2 text-sm text-success" role="status">草稿已保存</span>{% endif %}
       </form>
-        <iframe src="{% url 'training:log_ai_preview' draft.pk %}?revision={{ draft.revision }}" sandbox title="训练日志在线预览" class="h-[48rem] w-full rounded-box border border-base-300"></iframe>
-        {% if not running %}
-          <form method="post" class="space-y-3">
-            {% csrf_token %}
-            <input type="hidden" name="revision" value="{{ draft.revision }}">
-            <input type="hidden" name="source_digest" value="{{ source_digest }}">
-            {% if changes %}
-              <p>以下素材在本稿生成后发生变化。</p>
-              <ul class="list-disc pl-5">{% for item in changes %}<li>{{ item }}</li>{% endfor %}</ul>
-              <label class="label"><input class="checkbox" name="accept_changes" type="checkbox" required> 已审阅并确认使用当前草稿</label>
-            {% endif %}
-            <button class="btn btn-primary" name="action" value="submit">提交日志并归档 PDF</button>
-          </form>
+      <iframe src="{% url 'training:log_ai_preview' draft.pk %}?revision={{ draft.revision }}" sandbox title="训练日志在线预览" class="h-[48rem] w-full rounded-box border border-base-300"></iframe>
+      <form method="post" class="training-log-submit space-y-3">
+        {% csrf_token %}
+        <input type="hidden" name="revision" value="{{ draft.revision }}">
+        <input type="hidden" name="source_digest" value="{{ source_digest }}">
+        {% if changes %}
+          <p>以下素材在本稿生成后发生变化。</p>
+          <ul class="list-disc pl-5">{% for item in changes %}<li>{{ item }}</li>{% endfor %}</ul>
+          <label class="label"><input class="checkbox" name="accept_changes" type="checkbox" required> 已审阅并确认使用当前草稿</label>
         {% endif %}
+        <button class="btn btn-primary" name="action" value="submit">提交日志并归档 PDF</button>
+      </form>
     </div>
   </section>
   {% elif editor_error %}

@@ -8,7 +8,8 @@ from accounts.services.users import get_user_display_name
 
 from .checklists import completion_counts
 from .daily_progress import active_executions, has_text, scheduled_tasks, validate_training_day
-from .models import TrainingCycleMember, TrainingProgress
+from .log_task_references import task_references
+from .models import TrainingCycleMember, TrainingLog, TrainingProgress
 
 COACH = TrainingCycleMember.Role.COACH
 STUDENT = TrainingCycleMember.Role.COMPETITOR
@@ -21,6 +22,56 @@ FIELDS = {
     STUDENT: (("notes", "学习笔记"), *COMMON_FIELDS, ("improvement", "改进建议")),
 }
 FIELD_LIMIT = 8000
+
+
+def coach_references(cycle, day, task_coaches):
+    coach_ids = set().union(*task_coaches.values())
+    logs = TrainingLog.objects.filter(
+        training_cycle=cycle,
+        training_date=day,
+        author_id__in=cycle.members.filter(role=COACH, user_id__in=coach_ids).values("user_id"),
+    ).exclude(online_document={}).order_by("pk")
+    snapshots, materials = [], []
+    for log in logs:
+        document = log.online_document
+        if not isinstance(document, dict):
+            continue
+        body, source = document.get("body"), document.get("source")
+        if not isinstance(body, dict) or not isinstance(body.get("process"), str) or not body["process"].strip():
+            continue
+        if not isinstance(source, dict) or not isinstance(source.get("header"), dict):
+            continue
+        if source["header"].get("role") != COACH or not isinstance(source.get("tasks"), list):
+            continue
+        excerpts = []
+        for task in source["tasks"]:
+            if not isinstance(task, dict) or not isinstance(task.get("id"), int):
+                continue
+            task_id = task["id"]
+            excerpt = task.get("technical_excerpt")
+            if log.author_id not in task_coaches.get(task_id, ()) or not isinstance(excerpt, dict):
+                continue
+            text_fields = ("任务", "训练说明", "训练目标")
+            outline = excerpt.get("子任务")
+            if not all(isinstance(excerpt.get(key), str) for key in text_fields):
+                continue
+            if not isinstance(outline, list) or not all(isinstance(title, str) for title in outline):
+                continue
+            excerpts.append({"任务编号": task_id, **{key: excerpt[key] for key in text_fields}, "子任务": outline})
+        if not excerpts:
+            continue
+        snapshots.append({
+            "id": log.pk,
+            "cycle_id": cycle.pk,
+            "date": day.isoformat(),
+            "author_id": log.author_id,
+            "task_ids": sorted(excerpt["任务编号"] for excerpt in excerpts),
+            "version": hashlib.sha256(
+                json.dumps([body["process"], source["tasks"], excerpts], ensure_ascii=False, sort_keys=True).encode()
+            ).hexdigest(),
+        })
+        materials.extend(excerpts)
+    return snapshots, materials
 
 
 def progress_material(record):
@@ -58,7 +109,10 @@ def collect_sources(user, cycle, day):
         .order_by("training_plan_id", "schedule_slot__starts_at", "order", "pk")
     )
 
+    tasks = list(tasks)
+    attachments = task_references(user, tasks)
     entries, materials, missing, teachers = [], [], [], {}
+    task_coaches = {}
     goal_task_ids = []
     for task in tasks:
         slot = task.schedule_slot
@@ -90,10 +144,22 @@ def collect_sources(user, cycle, day):
             entry["has_completion_counts"] = True
         slot_teachers = {teacher.pk: get_user_display_name(teacher) for teacher in slot.coaches.all()}
         teachers.update(slot_teachers)
+        task_coaches[task.pk] = set(slot_teachers)
+        overview = task.overview.strip()
+        files = attachments.get(task.pk, [])
+        entry["has_overview"] = bool(overview)
+        entry["reference_files"] = {str(pk): digest for pk, digest, _, _ in files}
+        if member.role == COACH and (overview or entry["goal"] or outline):
+            entry["technical_excerpt"] = {
+                "任务": entry["title"],
+                "训练说明": overview[:4000],
+                "训练目标": entry["goal"][:1000],
+                "子任务": [title[:240] for title in outline[:20]],
+            }
         entry["filled"], entry["expected"] = len(progress), len(task.daily_executions)
         entry["version"] = hashlib.sha256(
             json.dumps(
-                [entry, progress, sorted(slot_teachers.items()) if member.role == STUDENT else []],
+                [entry, overview, progress, sorted(slot_teachers.items()) if member.role == STUDENT else []],
                 ensure_ascii=False,
                 sort_keys=True,
             ).encode()
@@ -105,6 +171,8 @@ def collect_sources(user, cycle, day):
             "训练模块": domains,
             "子任务": outline,
             "训练目标": entry["goal"],
+            "训练说明": overview[:8000],
+            "任务附件": [{"文件": name, "摘录": excerpt} for _, _, name, excerpt in files],
             "执行填报": progress,
         }
         if member.role == COACH:
@@ -112,16 +180,14 @@ def collect_sources(user, cycle, day):
             if not entry["goal"]:
                 goal_task_ids.append(str(task.pk))
                 material["任务编号"] = str(task.pk)
-        elif not progress:
-            missing.append("当天尚未填完训练完成情况，请先完成填报。")
         entries.append(entry)
         materials.append(material)
 
     if not entries:
         missing.append("所选训练日没有符合条件的官方任务。")
-    project = cycle.skill_project.name
+    audiences = "、".join(dict.fromkeys(task.training_plan.implementation_audience for task in tasks))
     header = {
-        "heading": f"第{cycle.log_edition}届世界技能大赛{project.removesuffix('项目')}项目{cycle.log_class}",
+        "heading": f"{cycle.name}{cycle.skill_project.name}{audiences}",
         "author": get_user_display_name(user),
         "date": day.isoformat(),
         "role": member.role,
@@ -130,6 +196,10 @@ def collect_sources(user, cycle, day):
     source = {"format": 2, "header": header, "tasks": entries}
     if goal_task_ids:
         source["goal_task_ids"] = goal_task_ids
+    if member.role == STUDENT and task_coaches:
+        source["coach_logs"], excerpts = coach_references(cycle, day, task_coaches)
+        if excerpts:
+            materials.append({"教练日志技术参考": excerpts})
     return source, materials, list(dict.fromkeys(missing))
 
 
@@ -140,6 +210,17 @@ def check_source_access(old, current):
     for task in old["tasks"]:
         if task["id"] not in allowed or not set(task["execution_ids"]).issubset(allowed[task["id"]]):
             raise ValidationError("部分任务或选手执行记录已不在可用范围，请按当前素材重新生成。")
+    current_tasks = {task["id"]: task for task in current["tasks"]}
+    if any(
+        not task.get("reference_files", {}).keys() <= current_tasks[task["id"]].get("reference_files", {}).keys()
+        for task in old["tasks"]
+    ):
+        raise ValidationError("部分任务附件已不在可用范围，请按当前素材重新生成。")
+    allowed_logs = {log["id"]: set(log["task_ids"]) for log in current.get("coach_logs", [])}
+    if any(
+        not set(log["task_ids"]).issubset(allowed_logs.get(log["id"], ())) for log in old.get("coach_logs", [])
+    ):
+        raise ValidationError("部分教练日志已不在可用范围，请按当前素材重新生成。")
 
 
 def changed_sources(old, current):
@@ -152,7 +233,12 @@ def changed_sources(old, current):
     ]
     if old.get("header") != current["header"]:
         changed.append("训练周期、授课老师或填写人信息")
+    if old.get("coach_logs", []) != current.get("coach_logs", []):
+        changed.append("教练日志技术参考")
     return changed
+
+
+INLINE_DOCUMENT_FORMAT = 3
 
 
 def validate_body(role, body, source=None):
@@ -177,6 +263,8 @@ def validate_body(role, body, source=None):
     ):
         raise ValidationError("日志正文栏目缺失、为空或超过长度限制，请检查后重试。")
     result = {key: body[key].strip() for key in fields}
+    if source and source.get("document_format") == INLINE_DOCUMENT_FORMAT:
+        validate_inline_images(role, result, source["inline_image_ids"])
     if needs_title:
         title = body["task_title"]
         if not isinstance(title, str) or not title.strip() or len(title.strip()) > 20 or "\n" in title or "\r" in title:
@@ -201,3 +289,20 @@ def validate_body(role, body, source=None):
             raise ValidationError("请为每项缺少训练目标的任务提供有效目标，每项最多 400 字。")
         result["suggested_goals"] = {key: goal.strip() for key, goal in goals.items()}
     return result
+
+
+def validate_inline_images(role, body, image_ids):
+    from bs4 import BeautifulSoup
+
+    from core.documents.content import MARKDOWN_EXTRAS
+    from core.utils.markdown import render_markdown_text
+
+    image_field = "process" if role == COACH else "notes"
+    allowed = {f"tms-asset:image-{pk}" for pk in image_ids}
+    for key, value in body.items():
+        html = render_markdown_text(value, extensions=MARKDOWN_EXTRAS, strict=True).html
+        for image in BeautifulSoup(html, "html.parser").find_all("img"):
+            src = image.get("src")
+            if key != image_field or src not in allowed:
+                raise ValidationError("插图须在过程记录或学习笔记中引用本次发送的图片，每张图片只能引用一次。")
+            allowed.remove(src)

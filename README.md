@@ -259,6 +259,14 @@ npm run build:css
 uv run manage.py runserver
 ```
 
+本地测试 AI 辅助编写训练日志时，另开一个终端，在仓库根目录启动生成队列的后台进程：
+
+```bash
+uv run manage.py run_training_log_worker
+```
+
+确认发送后，后台进程领取「等待生成」的任务，页面自动更新状态和生成结果。
+
 默认访问地址：
 
 ```text

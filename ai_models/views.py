@@ -1,13 +1,14 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import ValidationError
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import never_cache
 from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django.views.generic import TemplateView, View
 
+from accounts.services.users import annotate_identity_labels, get_user_full_info, user_name_search_ids
 from core.utils.breadcrumbs import breadcrumb_link
 from core.utils.mixins import SuperuserRequiredMixin, TitleMixin
 
@@ -35,18 +36,14 @@ class ModelListView(ModelPage):
         preference = AIModelPreference.objects.filter(user=user).first()
         default_id = preference.model_id if preference else None
         usable_ids = set(services.usable_models(user).values_list("pk", flat=True))
-        public_models = ()
-        if can_use_shared:
-            public_models = (
-                services.shared_models().select_related("owner").only("name", "provider", "model_id", "owner")
-            )
-            if can_manage:
-                public_models = public_models.exclude(owner=user)
+        shared_models = services.shared_models(user).select_related("owner").only("name", "provider", "model_id", "owner")
+        if can_manage:
+            shared_models = shared_models.exclude(owner=user)
         return super().get_context_data(
             can_manage=can_manage,
             can_use_shared=can_use_shared,
             own_models=services.own_models(user).defer("encrypted_api_key") if can_manage else (),
-            public_models=public_models,
+            shared_models=shared_models,
             default_id=default_id,
             default_unavailable=preference is not None and default_id not in usable_ids,
             usable_ids=usable_ids,
@@ -102,10 +99,61 @@ class ModelDetailView(OwnerPage):
     template_name = "ai_models/detail.html"
 
     def get_context_data(self, **kwargs):
+        if "model" not in kwargs:
+            kwargs["model"] = self.get_model()
+        if "share_form" not in kwargs:
+            kwargs["share_form"] = ShareModelForm(model=kwargs["model"])
+        return super().get_context_data(**kwargs)
+
+
+class ModelShareView(ModelDetailView):
+    http_method_names = ["post"]
+
+    def post(self, request, pk):
         model = self.get_model()
-        return super().get_context_data(
-            model=model, share_form=ShareModelForm(initial={"is_shared": model.is_shared}), **kwargs
-        )
+        form = ShareModelForm(request.POST, model=model)
+        if form.is_valid():
+            data = form.cleaned_data
+            mode = data["mode"]
+            try:
+                services.set_shared(
+                    request.user, pk, mode != "private", audience=mode,
+                    user_ids=[user.pk for user in data["users"]],
+                    group_ids=[group.pk for group in data["groups"]],
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(request, "共享设置已保存。")
+                return redirect("ai_models:detail", pk=pk)
+        return self.render_to_response(self.get_context_data(model=model, share_form=form))
+
+
+@method_decorator(never_cache, name="dispatch")
+class ShareRecipientSearchView(PermissionRequiredMixin, View):
+    permission_required = (services.VIEW, services.MANAGE_OWN)
+
+    def get(self, request, pk):
+        get_object_or_404(services.own_models(request.user).only("pk"), pk=pk)
+        query = request.GET.get("q", "").strip()
+        try:
+            page = int(request.GET.get("page", "1"))
+        except ValueError:
+            page = 0
+        if len(query) > 100 or not 1 <= page <= 10000:
+            return JsonResponse({"error": "搜索条件无效，请重新输入。"}, status=400)
+        if not query:
+            return JsonResponse({"results": [], "has_more": False})
+        eligible = services.share_recipients()
+        matches = annotate_identity_labels(eligible).filter(pk__in=user_name_search_ids(eligible, query))
+        users = list(matches.order_by("last_name", "first_name", "pk")[(page - 1) * 20 : page * 20 + 1])
+        return JsonResponse({
+            "results": [
+                {"id": user.pk, "label": get_user_full_info(user), "invalid": user.identity_invalid}
+                for user in users[:20]
+            ],
+            "has_more": len(users) > 20,
+        })
 
 
 class ModelDeleteView(OwnerPage):
@@ -121,24 +169,16 @@ class ModelDeleteView(OwnerPage):
         return redirect("ai_models:list")
 
 
-class ModelActionView(PermissionRequiredMixin, View):
+class ModelTestView(PermissionRequiredMixin, View):
     permission_required = (services.VIEW, services.MANAGE_OWN)
 
-    def post(self, request, pk, action):
+    def post(self, request, pk):
         try:
-            if action == "test":
-                error = services.test_model(request.user, pk)
-                if error:
-                    messages.error(request, error)
-                else:
-                    messages.success(request, "测试成功，模型已返回文本。")
+            error = services.test_model(request.user, pk)
+            if error:
+                messages.error(request, error)
             else:
-                form = ShareModelForm(request.POST)
-                if not form.is_valid():
-                    raise ValidationError("请选择有效的共享状态。")
-                shared = form.cleaned_data["is_shared"]
-                services.set_shared(request.user, pk, shared)
-                messages.success(request, "已开启共享。" if shared else "已取消共享。")
+                messages.success(request, "测试成功，模型已返回文本。")
         except ValidationError as exc:
             messages.error(request, exc.messages[0])
         return redirect("ai_models:detail", pk=pk)
@@ -158,7 +198,7 @@ class DefaultModelView(PermissionRequiredMixin, View):
 
 
 class ModerationView(ModelPage):
-    title = "公共 AI 模型管理"
+    title = "共享 AI 模型管理"
     template_name = "ai_models/moderation.html"
 
     def get_context_data(self, **kwargs):
@@ -173,7 +213,7 @@ class ModerationView(ModelPage):
 class ModerationActionView(View):
     def post(self, request, pk, delisted):
         services.moderate_model(request.user, pk, delisted)
-        messages.success(request, "公共模型已下架。" if delisted else "已解除下架，所有者可重新开启共享。")
+        messages.success(request, "共享模型已下架。" if delisted else "已解除下架，所有者可重新开启共享。")
         return redirect("ai_models:moderation")
 
 

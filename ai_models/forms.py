@@ -1,12 +1,18 @@
 from django import forms
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
+from django.db.models import Q
+from django.urls import reverse
 
+from accounts.services.users import annotate_identity_labels, get_user_full_info
 from core.utils.forms import StyledFormMixin
+from meetings.widgets import RecipientSelect
 
 from .catalog import provider_catalog
-from .models import ReasoningEffort, ThinkingMode
+from .models import ReasoningEffort, ShareAudience, ThinkingMode
 from .providers import PROVIDERS, validate_base_url
-from .services import normalize_thinking
+from .services import normalize_thinking, share_recipients
 
 
 class ThinkingForm(StyledFormMixin, forms.Form):
@@ -155,9 +161,60 @@ class ModelOptionForm(StyledFormMixin, forms.Form):
         return data
 
 
+class ShareRecipientSelect(RecipientSelect):
+    model_id = None
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"].update(
+            search_url=reverse("ai_models:share_recipients", args=[self.model_id]),
+            candidate_help="可选择有效账号。接收者使用模型时仍需共享模型使用权限。",
+        )
+        return context
+
+
 class ShareModelForm(StyledFormMixin, forms.Form):
-    is_shared = forms.BooleanField(
-        label="共享为公共模型",
-        required=False,
-        help_text="获授权用户可选择此模型。调用内容会发送到所填地址，费用由该 API 账号承担。",
+    mode = forms.ChoiceField(
+        label="共享范围",
+        choices=[("private", "私有"), *ShareAudience.choices],
+        help_text="共享调用的内容会发送到配置的 API 地址，费用由该 API 账号承担。",
     )
+    groups = forms.ModelMultipleChoiceField(
+        label="指定角色",
+        queryset=Group.objects.order_by("name", "pk"),
+        required=False,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "checkbox checkbox-primary"}),
+    )
+    users = forms.ModelMultipleChoiceField(
+        label="指定用户",
+        queryset=get_user_model().objects.none(),
+        required=False,
+        widget=ShareRecipientSelect,
+    )
+
+    def __init__(self, *args, model, **kwargs):
+        existing = list(model.shared_users.values_list("pk", flat=True))
+        super().__init__(
+            *args,
+            initial={"mode": model.sharing_mode, "groups": model.shared_groups.all(), "users": existing},
+            **kwargs,
+        )
+        field = self.fields["users"]
+        field.queryset = get_user_model().objects.filter(Q(is_active=True) | Q(pk__in=existing))
+        field.widget.model_id = model.pk
+        if self.is_bound and self["mode"].value() != ShareAudience.SELECTED:
+            self.fields["groups"].disabled = True
+            field.disabled = True
+        selected_ids = [pk for pk in (self["users"].value() or []) if str(pk).isdecimal()]
+        field.widget.selected = []
+        if selected_ids:
+            selected = annotate_identity_labels(share_recipients()).filter(pk__in=selected_ids)
+            labels = {person.pk: get_user_full_info(person) for person in selected}
+            field.widget.selected = [
+                {
+                    "id": person.pk,
+                    "label": labels.get(person.pk, get_user_full_info(person))
+                    + ("" if person.is_active else "（账号已停用）"),
+                }
+                for person in field.queryset.filter(pk__in=selected_ids).order_by("last_name", "first_name", "pk")
+            ]

@@ -392,7 +392,7 @@ sections:
             icon_class: icon-[tabler--settings] size-5 text-neutral
             staff_required: true
           - key: ai_models_moderation
-            label: 公共 AI 模型管理
+            label: 共享 AI 模型管理
             url_name: ai_models:moderation
             icon_class: icon-[tabler--settings] size-5 text-neutral
             superuser_required: true

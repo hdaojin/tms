@@ -1,7 +1,7 @@
 from datetime import date
 from unittest.mock import patch
 
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -103,6 +103,29 @@ class PlanMembersTests(TrainingFixtureMixin, TestCase):
         self.assertRedirects(response, self.url + "#participants")
         self.assertTrue(self.plan.participants.filter(user=self.student, is_active=True, was_initial=False).exists())
         self.assertEqual(self.plan.change_records.get().action, "添加计划成员")
+
+    def test_group_add_freezes_eligible_members_at_preview(self):
+        group = Group.objects.create(name="第一梯队")
+        disabled = self.student_user("disabled", active=False)
+        group.user_set.add(self.student, disabled)
+        individual = self.student_user("individual")
+        url = self.url + "?mode=add"
+        response = self.client.post(url, {
+            "stage": "select", "operation": "add", "selection": "selected",
+            "group_selection": "1", "groups": [group.pk], "users": [individual.pk],
+        })
+        self.assertContains(response, "将添加 2 位选手")
+        self.assertFalse(self.plan.participants.exists())
+        newcomer = self.student_user("newcomer")
+        group.user_set.add(newcomer)
+        self.assertRedirects(self.client.post(url, {
+            "stage": "confirm_groups", "token": response.context["preview"]["token"],
+        }), self.url + "#participants")
+        self.assertSetEqual(set(self.plan.participants.values_list("user_id", flat=True)), {
+            self.student.pk, individual.pk,
+        })
+        self.plan.refresh_from_db()
+        self.assertEqual(self.plan.implementation_audience, group.name)
 
     def test_remove_and_restore_keep_identity_and_execution(self):
         participant = TrainingPlanParticipant.objects.create(training_plan=self.plan, user=self.student, was_initial=True)
@@ -262,14 +285,14 @@ class PlanMembersTests(TrainingFixtureMixin, TestCase):
 
     def test_participant_htmx_add_returns_existing_section(self):
         response = self.client.get(self.url, {"mode": "add", "section": "participants"}, HTTP_HX_REQUEST="true")
-        self.assertContains(response, "添加所选成员")
+        self.assertContains(response, "预览添加名单")
         self.assertNotContains(response, "<!DOCTYPE")
         response = self.client.post(self.url + "?mode=add", {
             "stage": "select", "operation": "add", "selection": "selected", "users": [self.student.pk],
         }, HTTP_HX_REQUEST="true")
         self.assertContains(response, "已添加计划成员")
         self.assertContains(response, "退出计划")
-        self.assertNotContains(response, "添加所选成员")
+        self.assertNotContains(response, "预览添加名单")
         self.assertEqual(response.headers["HX-Push-Url"], self.url)
 
     def test_participant_table_shows_birth_date_and_age(self):

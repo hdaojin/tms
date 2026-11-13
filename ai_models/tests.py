@@ -5,11 +5,11 @@ from urllib.error import HTTPError
 
 import pytest
 from cryptography.fernet import Fernet
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Group, Permission
 from django.urls import reverse
 
 from . import services
-from .models import AIModel, AIModelOption, AIModelPreference, AIProviderSettings
+from .models import AIModel, AIModelOption, AIModelPreference, AIProviderSettings, ShareAudience
 from .providers import PROVIDERS, DeepSeekProvider, ProviderError, RejectRedirects
 
 pytestmark = pytest.mark.django_db
@@ -156,10 +156,10 @@ def test_sharing_requires_current_test_and_changes_invalidate_it(client, users, 
     owner = users["owner"]
     model = services.save_model(owner, MODEL_DATA)
     client.force_login(owner)
-    response = client.post(url("share", model), {"is_shared": "on"}, follow=True)
+    response = client.post(url("share", model), {"mode": "all"}, follow=True)
     assert "请先手动测试当前配置" in response.content.decode()
     client.post(url("test", model))
-    assert client.post(url("share", model), {"is_shared": "on"}).status_code == 302
+    assert client.post(url("share", model), {"mode": "all"}).status_code == 302
     client.post(url("edit", model), {**MODEL_DATA, "name": "重命名", "api_key": ""})
     model.refresh_from_db()
     assert model.is_shared and model.verified and model.name == "重命名"
@@ -225,6 +225,95 @@ def test_public_default_moderation_and_restore(client, users, upstream):
     assert model.name not in response.content.decode()
     assert "原默认模型已不可用" in response.content.decode()
     assert client.post(url("default", model)).status_code == 404
+
+
+def test_targeted_sharing_requires_permission_and_live_membership(client, users, upstream):
+    owner, consumer, pending, admin = (users[key] for key in ("owner", "consumer", "unassigned", "admin"))
+    pending.first_name = "待授权用户"
+    pending.save(update_fields=["first_name"])
+    role = Group.objects.create(name="模型试用组")
+    consumer.groups.add(role)
+    model = services.save_model(owner, MODEL_DATA)
+    services.test_model(owner, model.pk)
+
+    client.force_login(owner)
+    response = client.post(url("share", model), {"mode": "selected"})
+    assert "请至少选择一个指定用户或角色" in response.content.decode()
+    assert not AIModel.objects.get(pk=model.pk).is_shared
+    assert client.post(
+        url("share", model), {"mode": "selected", "users": [pending.pk], "groups": [role.pk]}
+    ).status_code == 302
+    assert not services.usable_models(pending).exists()
+    assert not services.usable_models(admin).exists()
+
+    client.force_login(consumer)
+    listing = client.get(url("list")).content.decode()
+    assert model.name in listing
+    assert role.name not in listing
+    assert client.post(url("default", model)).status_code == 302
+    consumer.groups.remove(role)
+    assert "原默认模型已不可用" in client.get(url("list")).content.decode()
+    assert client.post(url("default", model)).status_code == 404
+    with pytest.raises(services.ValidationError, match="已不可用"):
+        services.generate_text(consumer, model.pk, model.revision, {})
+    upstream.generate.assert_not_called()
+
+    pending.user_permissions.set(consumer.user_permissions.all())
+    client.force_login(pending)
+    assert model.name in client.get(url("list")).content.decode()
+    role.delete()
+    assert model.name in client.get(url("list")).content.decode()
+    client.force_login(admin)
+    assert model.name in client.get(url("moderation")).content.decode()
+    assert client.get(url("detail", model)).status_code == 404
+    pending.delete()
+    model.refresh_from_db()
+    assert model.is_shared and model.share_audience == ShareAudience.SELECTED
+    assert not services.shared_models(consumer).exists()
+
+
+def test_sharing_scope_switches_and_pauses_preserve_recipients(client, users, upstream):
+    owner, consumer, admin = users["owner"], users["consumer"], users["admin"]
+    consumer.first_name = "指定接收者"
+    consumer.save(update_fields=["first_name"])
+    model = services.save_model(owner, MODEL_DATA)
+    services.test_model(owner, model.pk)
+    role = Group.objects.create(name="空角色")
+    selection = {"mode": "selected", "users": [consumer.pk], "groups": [role.pk]}
+    client.force_login(owner)
+    assert client.post(url("share", model), selection).status_code == 302
+    for mode in ("all", "private"):
+        assert client.post(url("share", model), {"mode": mode}).status_code == 302
+        assert list(model.shared_users.all()) == [consumer]
+        assert list(model.shared_groups.all()) == [role]
+    assert not services.usable_models(consumer).exists()
+    assert client.post(url("share", model), selection).status_code == 302
+    services.moderate_model(admin, model.pk, True)
+    services.moderate_model(admin, model.pk, False)
+    assert not services.usable_models(consumer).exists()
+    assert client.post(url("share", model), selection).status_code == 302
+    services.save_model(owner, {**MODEL_DATA, "api_key": "", "model_id": "changed"}, model.pk)
+    model.refresh_from_db()
+    assert not model.is_shared and model.share_audience == ShareAudience.SELECTED
+    assert list(model.shared_users.all()) == [consumer]
+    assert list(model.shared_groups.all()) == [role]
+
+
+def test_share_recipient_search_and_save_check_identity(client, users, upstream, django_user_model):
+    owner = users["owner"]
+    person = django_user_model.objects.create_user("hidden-login", last_name="张", first_name="三")
+    django_user_model.objects.create_user("duplicate-login", last_name="张", first_name="三")
+    model = services.save_model(owner, MODEL_DATA)
+    services.test_model(owner, model.pk)
+    client.force_login(users["other"])
+    assert client.get(url("share_recipients", model), {"q": "zs"}).status_code == 404
+    client.force_login(owner)
+    response = client.get(url("share_recipients", model), {"q": "zs"})
+    assert {"id": person.pk, "label": "张三", "invalid": True} in response.json()["results"]
+    assert "hidden-login" not in response.content.decode()
+    response = client.post(url("share", model), {"mode": "selected", "users": [person.pk]})
+    assert "同名人员的区分备注未填写或重复" in response.content.decode()
+    assert not model.shared_users.exists()
 
 
 def test_stale_default_after_account_deactivation_and_deletion(client, users, upstream):

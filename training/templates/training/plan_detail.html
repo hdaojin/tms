@@ -26,7 +26,9 @@
       {% endif %}
     {% endif %}
   </div></div>
-  <p>{{ plan.start_date|date:'Y-m-d' }} 至 {{ plan.end_date|date:'Y-m-d' }} · {{ plan.display_status }} · {% if plan.published_at %}计划已发布{% else %}计划未发布{% endif %} · {% if plan.schedule_published_at %}排班已发布{% else %}排班未发布{% endif %}</p><p class="whitespace-pre-line">{{ plan.objective }}</p>
+  <p>{{ plan.start_date|date:'Y-m-d' }} 至 {{ plan.end_date|date:'Y-m-d' }} · {{ plan.display_status }} · {% if plan.published_at %}计划已发布{% else %}计划未发布{% endif %} · {% if plan.schedule_published_at %}排班已发布{% else %}排班未发布{% endif %}</p>
+  <p>实施对象 · {{ plan.implementation_audience }}</p>
+  <p class="whitespace-pre-line">{{ plan.objective }}</p>
   {% if can_see_management %}
   <dl class="flex flex-wrap gap-x-6 gap-y-1">
     {% for label, people in plan_roles %}

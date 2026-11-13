@@ -292,6 +292,7 @@ def plan_snapshot(plan):
         "开始日期": plan.start_date.isoformat(),
         "结束日期": plan.end_date.isoformat(),
         "训练目标": plan.objective,
+        "实施对象": plan.implementation_audience,
         "计划已发布": bool(plan.published_at),
         "时段时间": {name: getattr(plan, name).isoformat() if getattr(plan, name) else None for name in TrainingPlan.TIME_FIELDS},
         "原始文件": plan.source_file.name if plan.source_file else "",

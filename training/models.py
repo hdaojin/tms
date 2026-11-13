@@ -340,6 +340,7 @@ class TrainingPlan(models.Model):
         TrainingCycle, verbose_name="训练周期", on_delete=models.PROTECT, related_name="plans"
     )
     title = models.CharField("计划标题", max_length=180)
+    implementation_audience = models.CharField("实施对象", max_length=150, default="精英班")
     start_date = models.DateField("开始日期")
     end_date = models.DateField("结束日期")
     objective = models.TextField("训练目标")
@@ -1211,6 +1212,10 @@ class TrainingLogPrompt(TimestampedModel):
 
     def __str__(self):
         return self.get_role_display()
+
+    @classmethod
+    def for_role(cls, role):
+        return cls.objects.filter(role=role).first() or cls(role=role)
 
     def clean(self):
         if not 100 <= self.min_words <= self.max_words <= 4000:

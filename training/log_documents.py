@@ -15,7 +15,7 @@ from core.documents.types import DocumentAsset, DocumentInput
 from core.utils.markdown import render_markdown_text
 
 from .log_generation import ACTIVE, check_draft, source_for
-from .log_sources import COACH, changed_sources, check_source_access, validate_body
+from .log_sources import COACH, INLINE_DOCUMENT_FORMAT, changed_sources, check_source_access, validate_body
 from .models import TrainingLog, TrainingLogDraft, TrainingLogGeneration
 from .services import save_training_log
 
@@ -38,7 +38,8 @@ def document_input(data, images):
         for key, value in data["body"].items()
         if key not in {"task_title", "suggested_items", "suggested_goals"}
     }
-    new_layout = source.get("format") == 2
+    compact_layout = source.get("document_format") == INLINE_DOCUMENT_FORMAT
+    new_layout = compact_layout or source.get("format") == 2
     modules = {}
     if not new_layout:
         for task in source["tasks"]:
@@ -50,7 +51,7 @@ def document_input(data, images):
             for image in images
             if not any(f'src="tms-asset:image-{image.pk}"' in section for section in sections.values())
         ]
-        if data.get("include_gallery")
+        if data.get("include_gallery") and not compact_layout
         else []
     )
     return DocumentInput(
@@ -68,6 +69,7 @@ def document_input(data, images):
                 "sections": sections,
                 "modules": modules.values(),
                 "new_layout": new_layout,
+                "compact_layout": compact_layout,
                 "domains": dict.fromkeys(domain for task in source["tasks"] for domain in task.get("domains", [])),
                 "task_title": data["body"].get("task_title") or source["tasks"][0]["title"],
                 "suggested_items": data["body"].get("suggested_items", []),

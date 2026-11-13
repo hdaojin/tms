@@ -4,15 +4,19 @@ from uuid import uuid4
 
 from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.debug import sensitive_variables
 
-from .models import AIModel, AIModelOption, AIModelPreference, AIProviderSettings, ReasoningEffort, ThinkingMode
+from accounts.services.users import require_distinguishable_users
+
+from .models import AIModel, AIModelOption, AIModelPreference, AIProviderSettings, ReasoningEffort, ShareAudience, ThinkingMode
 from .providers import PROVIDERS, ProviderError, validate_base_url
 
 VIEW = "ai_models.view_aimodel"
@@ -64,8 +68,20 @@ def configured_models():
     return AIModel.objects.filter(provider__in=PROVIDERS)
 
 
-def shared_models():
-    return configured_models().filter(is_shared=True, owner__is_active=True)
+def shared_models(user):
+    queryset = configured_models().filter(is_shared=True, owner__is_active=True)
+    if not can_use_shared(user):
+        return queryset.none()
+    people = AIModel.shared_users.through.objects.filter(aimodel_id=OuterRef("pk"), user_id=user.pk)
+    roles = AIModel.shared_groups.through.objects.filter(aimodel_id=OuterRef("pk"), group__user=user)
+    return queryset.filter(
+        Q(share_audience=ShareAudience.ALL)
+        | (Q(share_audience=ShareAudience.SELECTED) & (Exists(people) | Exists(roles)))
+    )
+
+
+def share_recipients():
+    return get_user_model().objects.filter(is_active=True)
 
 
 def usable_models(user):
@@ -73,8 +89,7 @@ def usable_models(user):
     scope = Q(pk__in=[])
     if can_manage(user):
         scope |= Q(owner=user)
-    if can_use_shared(user):
-        scope |= Q(pk__in=shared_models().values("pk"))
+    scope |= Q(pk__in=shared_models(user).values("pk"))
     return configured_models().filter(scope, verified=True)
 
 
@@ -140,7 +155,7 @@ def save_model(user, data, pk=None):
 
 
 @transaction.atomic
-def set_shared(user, pk, shared):
+def set_shared(user, pk, shared, *, audience=ShareAudience.ALL, user_ids=(), group_ids=()):
     model = get_object_or_404(own_models(user).select_for_update(), pk=pk)
     if shared:
         if model.is_delisted:
@@ -148,8 +163,25 @@ def set_shared(user, pk, shared):
         if not model.verified:
             raise ValidationError("请先手动测试当前配置，测试成功后即可共享。")
         validate_base_url(model.provider, model.base_url)
+        if audience not in ShareAudience.values:
+            raise ValidationError("请选择有效的共享范围。")
+        if audience == ShareAudience.SELECTED:
+            user_ids, group_ids = set(user_ids), set(group_ids)
+            if not user_ids and not group_ids:
+                raise ValidationError("请至少选择一个指定用户或角色。")
+            existing = set(model.shared_users.values_list("pk", flat=True))
+            added = user_ids - existing
+            eligible = share_recipients()
+            if set(eligible.filter(pk__in=added).values_list("pk", flat=True)) != added:
+                raise ValidationError("指定用户已停用或不存在，请重新选择。")
+            if set(Group.objects.filter(pk__in=group_ids).values_list("pk", flat=True)) != group_ids:
+                raise ValidationError("指定角色已变化，请重新选择。")
+            require_distinguishable_users(eligible, added)
+            model.shared_users.set(user_ids)
+            model.shared_groups.set(group_ids)
+        model.share_audience = audience
     model.is_shared = shared
-    model.save(update_fields=["is_shared", "updated_at"])
+    model.save(update_fields=["is_shared", "share_audience", "updated_at"])
 
 
 @transaction.atomic

@@ -14,8 +14,8 @@ bundles:
     description: 添加、维护、手动测试和共享本人配置的 AI 模型。
     permissions: [ai_models.view_aimodel, ai_models.manage_own_aimodel]
   - code: ai_models.use_shared
-    name: AI 模型 | 使用公共模型
-    description: 查看并选择已共享的公共 AI 模型。
+    name: AI 模型 | 使用共享模型
+    description: 查看并选择共享给当前用户的 AI 模型。
     permissions: [ai_models.view_aimodel, ai_models.use_shared_aimodel]
 
   - code: notices.view_notices

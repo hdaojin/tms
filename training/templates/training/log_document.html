@@ -9,16 +9,24 @@
     {% if coach %}<th>教练姓名</th><td>{{ header.author }}</td>
     {% else %}<th>授课老师</th><td>{{ header.teachers }}</td>{% endif %}
   </tr>
+  {% if compact_layout %}
+  <tr><th>训练模块</th><td>{{ domains|join:"、" }}</td><th>训练任务</th><td>{{ task_title }}</td></tr>
+  {% else %}
   <tr><th>训练模块</th><td colspan="3">
     {% if new_layout %}{{ domains|join:"、" }}{% else %}{% for plan in modules %}<p>{{ plan.title }} · {{ plan.periods|join:"、" }}</p>{% endfor %}{% endif %}
   </td></tr>
   <tr><th>训练任务</th><td colspan="3">{% if new_layout %}{{ task_title }}{% else %}<ul>
     {% for task in source.tasks %}<li>{{ task.period }} · {{ task.title }}{% if coach %}（已填 {{ task.filled }}/{{ task.expected }} 人）{% endif %}</li>{% endfor %}
   </ul>{% endif %}</td></tr>
+  {% endif %}
 </tbody></table>
 {% if coach %}
 <div id="log-goals"><h3>训练目标</h3><div>
-  {% for title, goal, suggested in goals %}<p><strong>{{ title }}</strong><br>{% if goal and suggested %}建议目标 · {% endif %}{{ goal|linebreaksbr }}</p>{% endfor %}
+  {% if compact_layout %}
+    {% for title, goal, suggested in goals %}{% if goal %}<p>{{ goal|linebreaksbr }}</p>{% endif %}{% endfor %}
+  {% else %}
+    {% for title, goal, suggested in goals %}<p><strong>{{ title }}</strong><br>{% if goal and suggested %}建议目标 · {% endif %}{{ goal|linebreaksbr }}</p>{% endfor %}
+  {% endif %}
 </div></div>
 {% endif %}
 <div id="log-outline"><h3>训练内容</h3><div>

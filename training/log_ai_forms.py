@@ -10,8 +10,9 @@ from core.forms import MultipleFileField
 from core.utils.forms import StyledFormMixin
 
 from .daily_progress import available_cycles, validate_training_day
-from .log_references import IMAGE_SPEC, REFERENCE_SPEC
+from .log_references import IMAGE_SPEC
 from .log_sources import FIELDS, FIELD_LIMIT
+from .log_web_references import MAX_LINKS
 from .models import TrainingLogPrompt
 
 
@@ -53,35 +54,32 @@ class LogGenerationForm(StyledFormMixin, forms.Form):
         label="思考强度", choices=[("", "使用模型设置"), *ReasoningEffort.choices], required=False
     )
     instructions = forms.CharField(label="补充说明和写作要求", max_length=6000, required=False, widget=forms.Textarea)
-    target_words = forms.IntegerField(label="主体建议字数", min_value=100, max_value=4000, required=False)
+    target_words = forms.IntegerField(label="主体内容建议字数", min_value=100, max_value=4000, required=False)
+    text_only = forms.BooleanField(label="本次仅生成正文", required=False, help_text="已保存的插图会留在草稿中。")
     references = forms.CharField(
         label="参考链接",
         max_length=2500,
         required=False,
         widget=forms.Textarea(attrs={"rows": 2}),
-        help_text="每行一个 HTTP 或 HTTPS 链接。若需分析正文，请粘贴内容或上传文件。",
-    )
-    reference = forms.FileField(
-        label="参考文件",
-        required=False,
-        help_text="支持 PDF、DOCX、纯文本和代码。单文件限 5 MiB，PDF 取前 40 页，文本最多提取 12,000 字。",
+        help_text=f"每行填写一个可直接访问的公开网页链接，最多 {MAX_LINKS} 个。预览时会读取正文，供 AI 写作参考。",
     )
 
-    def __init__(self, *args, draft, **kwargs):
+    def __init__(self, *args, draft, role, **kwargs):
         super().__init__(*args, **kwargs)
         models = usable_models(draft.author)
         self.fields["model"].queryset = models
         self.fields["model"].label_from_instance = lambda model: model.name
-        self.fields["reference"].widget.attrs.update(REFERENCE_SPEC.widget_attrs())
-        self.initial["references"] = draft.references
-        self.initial["model"] = (
-            AIModelPreference.objects.filter(
-                user=draft.author,
-                model__in=models,
-            )
-            .values_list("model_id", flat=True)
-            .first()
+        setting = TrainingLogPrompt.for_role(role)
+        self.fields["target_words"].help_text = (
+            f"留空时，系统建议主体内容为 {setting.min_words}–{setting.max_words} 字。"
         )
+        self.initial.setdefault("references", draft.references)
+        if "model" not in self.initial:
+            self.initial["model"] = (
+                AIModelPreference.objects.filter(user=draft.author, model__in=models)
+                .values_list("model_id", flat=True)
+                .first()
+            )
 
     def clean_references(self):
         url = forms.URLField(assume_scheme="https")
@@ -92,6 +90,9 @@ class LogGenerationForm(StyledFormMixin, forms.Form):
                 if not value.lower().startswith(("https://", "http://")):
                     raise ValidationError("参考链接须以 http:// 或 https:// 开头。")
                 links.append(url.clean(value))
+        links = list(dict.fromkeys(links))
+        if len(links) > MAX_LINKS:
+            raise ValidationError(f"最多填写 {MAX_LINKS} 个参考链接。")
         return "\n".join(links)
 
     def clean(self):
@@ -107,7 +108,7 @@ class LogImageForm(StyledFormMixin, forms.Form):
         label="日志插图",
         upload_spec=IMAGE_SPEC,
         required=False,
-        help_text="图片用于日志排版，可上传或从训练完成情况带入。",
+        help_text="可上传或从训练完成情况带入。选好图片后请点击「保存插图」。",
     )
     progress_images = forms.ModelMultipleChoiceField(
         label="带入训练过程图片",
@@ -147,7 +148,11 @@ class LogPromptForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = TrainingLogPrompt
         fields = ("instructions", "min_words", "max_words")
-        labels = {"instructions": "默认写作要求"}
+        labels = {
+            "instructions": "写作提示词",
+            "min_words": "主体内容最少字数",
+            "max_words": "主体内容最多字数",
+        }
 
 
 class LogActionForm(forms.Form):

@@ -1,4 +1,5 @@
 import json
+import socket
 from datetime import date, datetime, timedelta, timezone as utc_timezone
 from io import BytesIO
 from pathlib import Path
@@ -25,6 +26,7 @@ from . import log_generation, process
 from .log_documents import document_input, draft_document, source_digest, submit_draft
 from .log_references import read_reference
 from .log_sources import COACH, FIELDS, STUDENT, collect_sources, validate_body
+from .log_web_references import fetch_reference_pages
 from .models import TrainingLog, TrainingLogDraft, TrainingLogGeneration, TrainingLogPrompt
 from .test_process_refactor import ProcessFixture
 
@@ -189,7 +191,20 @@ class TrainingLogAITests(ProcessFixture, TestCase):
 
     def test_role_materials_and_coverage(self):
         draft = self.draft()
-        self.assertRaisesMessage(ValidationError, "尚未填完", self.prepare, draft)
+        job = self.prepare(draft)
+        self.assertEqual(json.loads(job.message)["任务及填报"][0]["执行填报"], [])
+        log_generation.confirm_generation(draft, job.pk)
+        with patch("training.log_generation.generate_text", return_value=json.dumps(example_body(STUDENT))):
+            self.assertTrue(log_generation.run_generation())
+        log_generation.resolve_generation(draft, job.pk, apply=True, revision=draft.revision)
+        draft.refresh_from_db()
+        self.assertEqual(draft.body, example_body(STUDENT))
+        self.assertFalse(self.execution.progress_records.exists())
+        reviewed_source = source_digest(log_generation.source_for(draft)[0])
+        with patch("training.log_documents.generate_document_pdf", return_value=b"%PDF-1.4\n"):
+            log = submit_draft(draft, draft.revision, reviewed_source, False)
+        self.assertEqual(log.author, self.student)
+        self.assertFalse(self.execution.progress_records.exists())
         self.fill()
         source, material, missing = collect_sources(self.coach, self.cycle_obj, self.day)
         self.assertEqual(missing, [])
@@ -202,6 +217,55 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         source, _, missing = collect_sources(self.coach, self.cycle_obj, self.day)
         self.assertFalse(missing)
         self.assertEqual(source["goal_task_ids"], [str(self.task_obj.pk)])
+
+    def test_coach_reference_is_scoped_and_hidden_in_student_preview(self):
+        source, _, _ = collect_sources(self.coach, self.cycle_obj, self.day)
+        source["tasks"][0]["technical_excerpt"]["训练说明"] = "教练历史技术摘录"
+        log = TrainingLog.objects.create(
+            author=self.coach,
+            training_cycle=self.cycle_obj,
+            training_date=self.day,
+            online_document={
+                "source": source,
+                "body": {**example_body(COACH), "process": "其他选手私密内容"},
+            },
+        )
+        draft = self.draft()
+        job = self.prepare(draft)
+        self.assertEqual(job.source["coach_logs"][0]["task_ids"], [self.task_obj.pk])
+        self.assertIn("教练历史技术摘录", job.message)
+        self.assertNotIn("其他选手私密内容", job.message)
+        self.client.force_login(self.student)
+        response = self.client.get(reverse("training:log_ai_draft", args=[draft.pk]))
+        self.assertContains(response, "已找到 1 份相关教练正式日志")
+        self.assertNotContains(response, "教练历史技术摘录")
+        self.assertNotContains(response, "其他选手私密内容")
+
+        log.online_document["body"]["process"] = "已变更的过程记录"
+        log.save(update_fields=["online_document"])
+        self.assertRaisesMessage(ValidationError, "素材已变化", log_generation.confirm_generation, draft, job.pk)
+
+        log.online_document["source"]["tasks"][0]["id"] = self.task_obj.pk + 1
+        log.save(update_fields=["online_document"])
+        self.assertEqual(collect_sources(self.student, self.cycle_obj, self.day)[0]["coach_logs"], [])
+
+    def test_task_attachment_content_is_authorized_and_versioned(self):
+        task = self.task(
+            title="附件任务",
+            assign_all=False,
+            competitors=[self.student.pk],
+            attachments=[SimpleUploadedFile("guide.txt", b"routing guide")],
+        )
+        source, materials, _ = collect_sources(self.student, self.cycle_obj, self.day)
+        self.assertIn("routing guide", json.dumps(materials))
+        _, other_materials, _ = collect_sources(self.student2, self.cycle_obj, self.day)
+        self.assertNotIn("routing guide", json.dumps(other_materials))
+
+        attachment = task.attachments.get()
+        Path(attachment.file.path).write_bytes(b"new routing guide")
+        changed, materials, _ = collect_sources(self.student, self.cycle_obj, self.day)
+        self.assertNotEqual(source, changed)
+        self.assertIn("new routing guide", json.dumps(materials))
 
     def test_coach_can_generate_without_any_student_progress(self):
         self.coach.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai_models"))
@@ -231,10 +295,11 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertContains(board, "09:00–12:00")
         response = self.client.get(reverse("training:log_ai_start"))
         self.assertContains(response, "当日任务与完成情况")
-        self.assertContains(response, "当天尚未填完训练完成情况")
-        self.assertContains(response, "去填写训练完成情况")
-        self.assertNotContains(response, "扩展信息")
-        self.assertNotContains(response, "保存插图")
+        self.assertContains(response, "暂无个人训练进度填报，不影响 AI 生成")
+        self.assertContains(response, "填写训练完成情况")
+        self.assertContains(response, "扩展信息")
+        self.assertContains(response, "保存插图")
+        self.assertNotContains(response, 'name="reference"')
         self.assertFalse(TrainingLogDraft.objects.exists())
 
     def test_missing_goal_links_to_task_editor_only_when_authorized(self):
@@ -285,8 +350,10 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         fields = {key: value for key, value in body.items() if key != "suggested_goals"}
         log_generation.edit_draft(draft, draft.revision, fields | {"process": "补充过程记录"})
         preview = self.client.get(reverse("training:log_ai_preview", args=[draft.pk]))
-        self.assertContains(preview, "建议目标 · 能核对防火墙访问规则")
+        self.assertContains(preview, "能核对防火墙访问规则")
+        self.assertNotContains(preview, "建议目标")
         self.assertContains(preview, "验证端到端连通")
+        self.assertFalse(BeautifulSoup(preview.content, "html.parser").select("#log-goals strong"))
         task.refresh_from_db()
         self.assertEqual(task.requirements, "")
 
@@ -369,7 +436,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         soup = BeautifulSoup(render_document_html(doc), "html.parser")
         self.assertEqual(
             doc.title,
-            f"第49届世界技能大赛{self.project.name.removesuffix('项目')}项目精英班选手日志（{self.student.first_name}）",
+            f"{self.cycle_obj.name}{self.project.name}精英班选手日志（{self.student.first_name}）",
         )
         rows = soup.select("#log-metadata tr")
         self.assertEqual(rows[1].td.get_text(strip=True), self.linux.name)
@@ -378,7 +445,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
             [node.get_text() for node in soup.select("#log-outline li")], ["配置地址", "核对路由表", "验证端到端连通"]
         )
 
-    def test_uploaded_and_imported_images_stay_out_of_model_payload(self):
+    def test_uploaded_and_imported_images_require_confirmation_and_render_inline(self):
         def picture(name):
             return SimpleUploadedFile(name, Path("training/static/training", name).read_bytes())
 
@@ -392,36 +459,92 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         )
         draft = self.draft()
         self.client.force_login(self.student)
+        url = reverse("training:log_ai_draft", args=[draft.pk])
         response = self.client.post(
-            reverse("training:log_ai_draft", args=[draft.pk]),
+            url, {"action": "prepare", "model": self.model.pk, "images": [picture("worldskills-china.png")]}
+        )
+        self.assertContains(response, "有尚未保存的日志插图")
+        self.assertFalse(draft.images.exists())
+        self.assertFalse(TrainingLogGeneration.objects.filter(draft=draft).exists())
+        response = self.client.post(
+            url,
             {
-                "action": "prepare",
+                "action": "image",
                 "model": self.model.pk,
+                "instructions": "保留本次写作要求",
                 "images": [picture("worldskills-china.png")],
                 "progress_images": [progress.attachments.get().pk],
             },
         )
-        self.assertEqual(response.status_code, 302, response.context["image_form"].errors if response.context else "")
+        self.assertContains(response, "保留本次写作要求")
         self.assertEqual(draft.images.count(), 2)
+        self.assertEqual(self.client.post(url, {"action": "prepare", "model": self.model.pk}).status_code, 302)
         job = TrainingLogGeneration.objects.get(draft=draft)
-        self.assertFalse(job.image_ids)
+        inline, omitted = job.image_ids
         self.assertNotIn("school-logo", job.message)
+        self.assertContains(self.client.get(url), reverse("training:log_ai_image", args=[draft.pk, inline]))
         log_generation.confirm_generation(draft, job.pk)
-        with patch("training.log_generation.generate_text", return_value=json.dumps(example_body(STUDENT))) as call:
+        self.assertContains(self.client.get(url), "等待生成")
+        self.assertNotContains(self.client.get(url), "扩展信息")
+        status_url = f"{url}?generation_status=1&seen_status=queued"
+        self.assertEqual(self.client.get(status_url, headers={"HX-Request": "true"}).status_code, 204)
+        body = example_body(STUDENT)
+        body["notes"] += f"\n\n![路由截图](tms-asset:image-{inline})"
+
+        def generate(*args):
+            response = self.client.get(status_url, headers={"HX-Request": "true"})
+            self.assertContains(response, "正在生成")
+            self.assertContains(response, "seen_status=running")
+            self.assertNotContains(response, "扩展信息")
+            return json.dumps(body)
+
+        with patch("training.log_generation.generate_text", side_effect=generate) as call:
             self.assertTrue(log_generation.run_generation())
-        self.assertIsInstance(call.call_args.args[3]["messages"][1]["content"], str)
+        content = call.call_args.args[3]["messages"][1]["content"]
+        self.assertEqual([block["type"] for block in content], ["text", "image_url", "image_url"])
+        self.assertTrue(content[1]["image_url"]["url"].startswith("data:image/png;base64,"))
+        response = self.client.get(status_url, headers={"HX-Request": "true"})
+        self.assertContains(response, "生成完成")
+        self.assertContains(response, "<strong>学习笔记</strong>", html=True)
+        self.assertContains(response, reverse("training:log_ai_image", args=[draft.pk, omitted]))
+        self.assertNotContains(response, "扩展信息")
         draft.refresh_from_db()
         log_generation.resolve_generation(draft, job.pk, apply=True, revision=draft.revision)
         draft.refresh_from_db()
         rendered = render_document_html(document_input(draft_document(draft), draft.images.all()))
-        self.assertEqual(len(BeautifulSoup(rendered, "html.parser").select("#log-gallery img")), 2)
+        soup = BeautifulSoup(rendered, "html.parser")
+        self.assertEqual(len(soup.select("#log-process img")), 1)
+        self.assertFalse(soup.select("#log-gallery"))
+        module_row = soup.select("#log-metadata tr")[1]
+        self.assertEqual([node.get_text(strip=True) for node in module_row.find_all("th")], ["训练模块", "训练任务"])
+        self.assertEqual(len(module_row.find_all(["th", "td"])), 4)
+        with self.assertRaisesMessage(ValidationError, "每张图片只能引用一次"):
+            validate_body(STUDENT, body | {"achievement": f"![截图](tms-asset:image-{inline})"}, job.source)
 
-    def test_superuser_can_manage_role_prompts_and_cycle_heading(self):
+    def test_text_only_generation_retains_images_and_uses_text_payload(self):
+        draft = self.draft()
+        draft.images.create(media_type="image/png", content=b"image", caption="")
+        self.model.model_id = "deepseek-v4-pro"
+        self.model.save(update_fields=["model_id", "updated_at"])
+        self.client.force_login(self.student)
+        url = reverse("training:log_ai_draft", args=[draft.pk])
+        data = {"action": "prepare", "model": self.model.pk}
+        self.assertContains(self.client.post(url, data), "所选模型不支持读图")
+        self.assertEqual(self.client.post(url, {**data, "text_only": "on"}).status_code, 302)
+        job = TrainingLogGeneration.objects.get(draft=draft)
+        self.assertFalse(job.image_ids)
+        log_generation.confirm_generation(draft, job.pk)
+        with patch("training.log_generation.generate_text", return_value=json.dumps(example_body(STUDENT))) as call:
+            self.assertTrue(log_generation.run_generation())
+        self.assertIsInstance(call.call_args.args[3]["messages"][1]["content"], str)
+        self.assertEqual(draft.images.count(), 1)
+
+    def test_superuser_can_manage_role_prompts(self):
         url = reverse("training:log_settings")
         self.client.force_login(self.coach)
         self.assertEqual(self.client.get(url).status_code, 403)
         self.client.force_login(self.admin)
-        self.assertContains(self.client.get(url), "默认 AI 提示词")
+        self.assertContains(self.client.get(url), "AI 写作提示词")
         data = {"action": "prompts"}
         for role in (COACH, STUDENT):
             data.update(
@@ -430,19 +553,42 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertEqual(self.client.post(url, data).status_code, 302)
         self.assertEqual(TrainingLogPrompt.objects.count(), 2)
         self.assertIn("按实际记录编写", log_generation.system_prompt(STUDENT, None))
+        self.assertContains(self.client.get(url), "系统约束")
+        self.assertNotContains(self.client.get(url), "日志标题")
+        self.assertIn("主体建议篇幅为 1000–1400 字", log_generation.system_prompt(STUDENT, None))
+        self.assertIn("主体建议篇幅为 约 800 字", log_generation.system_prompt(STUDENT, 800))
+
+    def test_log_heading_combines_audiences_in_task_order(self):
+        from copy import copy
+
+        from .models import TrainingPlan
+
+        self.plan.implementation_audience = "第一梯队"
+        self.plan.save(update_fields=["implementation_audience"])
+        task = copy(self.task_obj)
+        task.pk = None
+        task.title = "第二项任务"
+        second_plan = TrainingPlan.objects.get(pk=self.plan.pk)
+        second_plan.pk = None
+        second_plan.title = "另一计划"
+        second_plan.implementation_audience = "第二梯队"
+        second_plan.save()
+        day = copy(self.slot.day)
+        day.pk = None
+        day.training_plan = second_plan
+        day.save()
+        slot = copy(self.slot)
+        slot.pk = None
+        slot.day = day
+        slot.save()
+        task.training_plan = second_plan
+        task.schedule_slot = slot
+        task.save()
+        task.executions.create(user=self.student)
+        source, _, _ = collect_sources(self.student, self.cycle_obj, self.day)
         self.assertEqual(
-            self.client.post(
-                f"{url}?cycle={self.cycle_obj.pk}",
-                {
-                    "action": "heading",
-                    "log_edition": 50,
-                    "log_class": "集训班",
-                },
-            ).status_code,
-            302,
+            source["header"]["heading"], f"{self.cycle_obj.name}{self.project.name}第一梯队、第二梯队",
         )
-        self.cycle_obj.refresh_from_db()
-        self.assertEqual(self.cycle_obj.log_edition, 50)
 
     def test_task_editor_searches_skills_and_saves_ordered_subtasks(self):
         from standards.models import Skill
@@ -522,6 +668,37 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertEqual(job.status, Status.FAILED)
         self.assertEqual(draft.body, original)
 
+    def test_review_includes_reference_excerpt_and_can_be_cancelled(self):
+        draft = self.ready_draft()
+        self.client.force_login(self.student)
+        url = reverse("training:log_ai_draft", args=[draft.pk])
+        TrainingLogPrompt.objects.update_or_create(role=STUDENT, defaults={"min_words": 700, "max_words": 900})
+        self.assertContains(self.client.get(url), "700–900 字")
+        with patch("training.log_web_references.read_page", return_value="公开网页正文") as read:
+            response = self.client.post(
+                url, {"action": "prepare", "model": self.model.pk, "references": "https://example.com/"}
+            )
+        self.assertEqual(response.status_code, 302)
+        read.assert_called_once_with("https://example.com/")
+        job = TrainingLogGeneration.objects.get(draft=draft)
+        self.assertContains(self.client.get(url), "公开网页正文")
+        self.assertEqual(self.client.post(url, {"action": "cancel", "generation": job.pk}).status_code, 302)
+        self.assertFalse(TrainingLogGeneration.objects.filter(pk=job.pk).exists())
+        self.assertTrue(TrainingLogDraft.objects.get(pk=draft.pk).body)
+
+    def test_reference_rejects_host_resolving_to_private_address(self):
+        addresses = [
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443)),
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443)),
+        ]
+        with (
+            patch("training.log_web_references.socket.getaddrinfo", return_value=addresses),
+            patch("training.log_web_references.socket.socket") as connect,
+            self.assertRaisesMessage(ValidationError, "无法读取第 1 个参考链接"),
+        ):
+            fetch_reference_pages("https://example.com/")
+        connect.assert_not_called()
+
     def test_expired_job_requires_explicit_retry_and_model_changes_block_calls(self):
         self.fill()
         draft = self.draft()
@@ -552,7 +729,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertContains(response, "配置路由")
         self.assertEqual(response.headers["X-Frame-Options"], "SAMEORIGIN")
         self.assertIn("img-src data:", response.headers["Content-Security-Policy"])
-        with self.assertRaisesMessage(ValidationError, "图片仅用于日志插图"):
+        with self.assertRaisesMessage(ValidationError, "部分插图已失效"):
             self.prepare(draft, image_ids={999})
         self.task_obj.__class__.objects.filter(pk=self.task_obj.pk).update(status="cancelled")
         response = self.client.get(reverse("training:log_ai_draft", args=[draft.pk]))

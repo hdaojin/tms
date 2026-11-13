@@ -72,11 +72,18 @@
       {% endif %}
       <form method="post" action="{% url 'ai_models:share' model.pk %}" class="space-y-3">
         {% csrf_token %}
+        {% for error in share_form.non_field_errors %}
+          <p class="alert alert-error" role="alert">{{ error }}</p>
+        {% endfor %}
         <fieldset class="space-y-3" {% if not model.verified or model.is_delisted %}disabled{% endif %}>
-          {% include "components/field.html" with field=share_form.is_shared %}
+          {% include "components/field.html" with field=share_form.mode %}
+          <p class="text-sm text-base-content/70">以下名单仅在定向共享时生效。切换到其他范围会保留上次保存的名单。</p>
+          {% include "components/field.html" with field=share_form.groups %}
+          {% include "components/field.html" with field=share_form.users %}
           <button type="submit" class="btn">保存共享设置</button>
         </fieldset>
       </form>
     </div>
   </section>
+  {{ share_form.media }}
 {% endblock %}

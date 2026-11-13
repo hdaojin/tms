@@ -1,3 +1,4 @@
+import json
 from datetime import timedelta
 from urllib.parse import urlsplit
 
@@ -10,18 +11,21 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from django.views.decorators.cache import never_cache
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.vary import vary_on_headers
 
 from ai_models.services import can_manage
+from bs4 import BeautifulSoup
 
-from core.documents.content import normalize_document_image
+from core.documents.content import CLEANER, MARKDOWN_EXTRAS, normalize_document_image
 from core.documents.limits import MAX_IMAGE_TOTAL_BYTES
 from core.documents.service import render_document_html
 from core.documents.types import DocumentError, DocumentRenderError
 from core.utils.breadcrumbs import breadcrumb_link, build_breadcrumbs
+from core.utils.markdown import render_markdown_text
 
 from . import log_generation
 from .checklists import completion_counts
@@ -36,8 +40,9 @@ from .daily_progress import (
 )
 from .log_ai_forms import DraftBodyForm, LogActionForm, LogGenerationForm, LogImageForm, TrainingDayForm
 from .log_documents import document_input, draft_document, source_digest, submit_draft
-from .log_references import IMAGE_SPEC, image_asset, read_reference
+from .log_references import IMAGE_SPEC, image_asset
 from .log_sources import FIELDS, STUDENT, changed_sources, check_source_access
+from .log_web_references import fetch_reference_pages
 from .models import TrainingLog, TrainingLogDraft, TrainingLogGeneration, TrainingProgressAttachment
 from .scheduling import can_fill, visible_plans
 from .selectors import training_logs_visible_to, visible_training_tasks_for
@@ -252,6 +257,10 @@ def add_images(draft, uploads, progress_ids):
     if not uploads and not progress_ids:
         return
     draft = log_generation.lock_draft(draft)
+    if TrainingLogGeneration.objects.filter(
+        draft=draft, status__in=(*log_generation.ACTIVE, Status.READY)
+    ).exists():
+        raise ValidationError("请先完成本次生成并处理结果，再修改插图。")
     current, _, _ = log_generation.source_for(draft)
     progress_images = list(available_progress_images(draft, current).filter(pk__in=progress_ids))
     if len(progress_images) != len(progress_ids):
@@ -283,6 +292,47 @@ def add_images(draft, uploads, progress_ids):
         draft.save(update_fields=["revision", "updated_at"])
 
 
+def candidate_sections(job, role, images):
+    image_urls = {
+        f"tms-asset:image-{image.pk}": reverse("training:log_ai_image", args=[job.draft_id, image.pk])
+        for image in images
+        if image.pk in job.image_ids
+    }
+    used = set()
+    sections = []
+    for key, label in FIELDS[role]:
+        html = render_markdown_text(job.result.get(key, ""), extensions=MARKDOWN_EXTRAS).html
+        soup = BeautifulSoup(CLEANER.clean(html), "html.parser")
+        for node in soup.find_all(id=True):
+            del node["id"]
+        for link in soup.find_all("a", href=True):
+            del link["href"]
+        for image in soup.find_all("img"):
+            src = image.get("src")
+            if src in image_urls:
+                used.add(src)
+                image["src"] = image_urls[src]
+            else:
+                image.decompose()
+        sections.append((label, mark_safe(str(soup))))
+    if job.result.get("task_title"):
+        sections.insert(0, ("训练任务概括标题", job.result["task_title"]))
+    if job.result.get("suggested_items"):
+        sections.append(("补充训练内容", "\n".join(job.result["suggested_items"])))
+    if role != STUDENT:
+        goals = job.result.get("suggested_goals", {})
+        combined = "\n".join(
+            goal for task in job.source["tasks"] if (goal := task["goal"] or goals.get(str(task.get("id"))))
+        )
+        if combined:
+            sections.insert(0, ("训练目标", combined))
+    omitted = [
+        image for image in images
+        if image.pk in job.image_ids and f"tms-asset:image-{image.pk}" not in used
+    ]
+    return sections, omitted
+
+
 @never_cache
 @vary_on_headers("HX-Request")
 @require_http_methods(["GET", "POST"])
@@ -290,9 +340,14 @@ def draft_page(request, pk=None, *, draft=None):
     draft = draft if draft is not None else get_draft(request.user, pk)
     action = request.POST.get("action") if request.method == "POST" else None
     inline_edit = action == "edit" and bool(request.htmx)
+    status_poll = request.method == "GET" and request.htmx and request.GET.get("generation_status") == "1"
     if draft.submitted_log_id:
         url = reverse("training:log_detail", args=[draft.submitted_log_id])
-        return HttpResponse(headers={"HX-Redirect": url}) if inline_edit else redirect(url)
+        return HttpResponse(headers={"HX-Redirect": url}) if inline_edit or status_poll else redirect(url)
+    if status_poll and TrainingLogGeneration.objects.filter(
+        draft=draft, status__in=log_generation.ACTIVE, status=request.GET.get("seen_status")
+    ).exists():
+        return HttpResponse(status=204)
     try:
         log_generation.check_draft(draft)
         current, _, missing = log_generation.source_for(draft)
@@ -300,12 +355,18 @@ def draft_page(request, pk=None, *, draft=None):
         error = "；".join(exc.messages)
         if inline_edit:
             return render(request, "training/log_ai_draft.html#draft_editor", {"editor_error": error})
+        if status_poll:
+            return HttpResponse(headers={"HX-Redirect": request.path})
         return page(request, "log_ai_start", "AI 辅助编写训练日志", error=error)
     role = current["header"]["role"]
+    generation_values = {}
+    if action == "image":
+        generation_values = {key: request.POST[key] for key in LogGenerationForm.base_fields if key in request.POST}
     generation_form = LogGenerationForm(
         request.POST if action == "prepare" else None,
-        request.FILES if action == "prepare" else None,
         draft=draft,
+        role=role,
+        initial=generation_values,
     )
     image_form = LogImageForm(
         request.POST if action in {"image", "prepare"} else None,
@@ -322,36 +383,52 @@ def draft_page(request, pk=None, *, draft=None):
             error = "；".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
         else:
             if success_url:
-                if not inline_edit:
+                if action == "image" and generation_values:
+                    draft.refresh_from_db()
+                    image_form = LogImageForm(available=available_progress_images(draft, current))
+                    body_form = DraftBodyForm(role=role, draft=draft)
+                elif not inline_edit:
                     return redirect(f"{success_url}#draft-editor" if action == "edit" else success_url)
-                saved = True
-                draft.refresh_from_db()
-                body_form = DraftBodyForm(role=role, draft=draft)
+                else:
+                    saved = True
+                    draft.refresh_from_db()
+                    body_form = DraftBodyForm(role=role, draft=draft)
     job = TrainingLogGeneration.objects.select_related("model").filter(draft=draft).first() if draft.pk else None
     images = list(draft.images.defer("content").order_by("pk")) if draft.pk else []
     can_view_job = False
-    host, result = "", []
+    host, result, preview_message = "", [], ""
+    review_images, omitted_images = [], []
     if job:
         try:
             check_source_access(job.source, current)
         except ValidationError:
             pass
         else:
-            can_view_job = True
+            can_view_job = not changed_sources(job.source, current)
             if job.model and job.model.revision == job.model_revision:
                 host = urlsplit(job.model.base_url).hostname
-            if job.status == Status.READY:
-                result = [(label, job.result.get(key, "")) for key, label in FIELDS[role]]
-                if job.result.get("task_title"):
-                    result.insert(0, ("训练任务概括标题", job.result["task_title"]))
-                if job.result.get("suggested_items"):
-                    result.append(("补充训练内容", "\n".join(job.result["suggested_items"])))
-                suggested_goals = job.result.get("suggested_goals", {})
-                result.extend(
-                    (f"{task['title']} · 建议训练目标", suggested_goals[str(task["id"])])
-                    for task in job.source["tasks"]
-                    if str(task["id"]) in suggested_goals
-                )
+            if can_view_job and job.status == Status.REVIEW:
+                payload = json.loads(job.message)
+                payload.pop("教练日志技术参考", None)
+                preview_message = json.dumps(payload, ensure_ascii=False, indent=2)
+                review_images = [image for image in images if image.pk in job.image_ids]
+            if can_view_job and job.status == Status.READY:
+                result, omitted_images = candidate_sections(job, role, images)
+    if status_poll:
+        if not job or job.status == Status.REVIEW:
+            return HttpResponse(headers={"HX-Redirect": request.path})
+        return render(
+            request,
+            "training/log_ai_draft.html#generation_status",
+            {
+                "draft": draft,
+                "job": job,
+                "can_view_job": can_view_job,
+                "result": result,
+                "running": job.status in log_generation.ACTIVE,
+                "omitted_images": omitted_images,
+            },
+        )
     can_preview, changes = False, []
     if draft.source:
         try:
@@ -383,6 +460,14 @@ def draft_page(request, pk=None, *, draft=None):
         "AI 辅助编写训练日志",
         draft=draft,
         task_rows=[{**entry, "goal_edit_url": edit_links.get(entry["id"])} for entry in current["tasks"]],
+        coach_reference_count=len(current.get("coach_logs", [])),
+        coach_reference_tasks=[
+            task["title"]
+            for task in current["tasks"]
+            if any(task["id"] in log["task_ids"] for log in current.get("coach_logs", []))
+        ],
+        has_personal_progress=any(task["filled"] for task in current["tasks"]),
+        preview_message=preview_message,
         missing=missing,
         role=role,
         generation_form=generation_form,
@@ -391,13 +476,17 @@ def draft_page(request, pk=None, *, draft=None):
         job=job,
         host=host,
         result=result,
+        review_images=review_images,
+        omitted_images=omitted_images,
         error="" if action == "edit" and can_preview else error,
         editor_error=error if action == "edit" and can_preview else "",
         has_model=has_model,
         can_prepare=has_model and not missing and not (job and job.status in (*log_generation.ACTIVE, Status.READY)),
         can_add_model=can_manage(request.user),
         upload_url=training_upload_url(draft.cycle_id, draft.training_date),
-        expand_extras=bool(generation_form.errors or image_form.errors or (error and action in {"prepare", "image"})),
+        expand_extras=bool(
+            generation_form.errors or image_form.errors or action == "image" or (error and action == "prepare")
+        ),
         running=bool(job and job.status in log_generation.ACTIVE),
         can_preview=can_preview,
         can_view_job=can_view_job,
@@ -412,30 +501,26 @@ def draft_page(request, pk=None, *, draft=None):
 
 def handle_action(request, draft, action, generation_form, image_form, body_form):
     if action in {"prepare", "image"}:
+        if action == "prepare" and (request.FILES.getlist("images") or request.POST.getlist("progress_images")):
+            raise ValidationError("有尚未保存的日志插图，请先点击「保存插图」再预览。")
         images_valid = image_form.is_valid()
         generation_valid = action == "image" or generation_form.is_valid()
         if not images_valid or not generation_valid:
             return None
-        with transaction.atomic():
+        if action == "image":
             add_images(
                 draft,
                 image_form.cleaned_data["images"],
                 set(image_form.cleaned_data["progress_images"].values_list("pk", flat=True)),
             )
-            if action == "prepare":
-                values = generation_form.cleaned_data
-                file = values["reference"]
-                log_generation.prepare_generation(
-                    draft,
-                    model=values["model"],
-                    thinking=values["thinking"],
-                    effort=values["effort"],
-                    instructions=values["instructions"],
-                    references=values["references"],
-                    reference_text=read_reference(file) if file else "",
-                    image_ids=set(),
-                    target_words=values["target_words"],
-                )
+            messages.success(request, "已保存日志插图。")
+        else:
+            values = generation_form.cleaned_data
+            log_generation.prepare_generation(
+                draft,
+                **values,
+                reference_text=fetch_reference_pages(values["references"]),
+            )
     elif action == "edit":
         if not body_form.is_valid():
             return None
@@ -451,6 +536,8 @@ def handle_action(request, draft, action, generation_form, image_form, body_form
         data = form.cleaned_data
         if action == "confirm":
             log_generation.confirm_generation(draft, data["generation"])
+        elif action == "cancel":
+            log_generation.cancel_generation(draft, data["generation"])
         elif action in {"apply", "discard"}:
             log_generation.resolve_generation(
                 draft,
@@ -519,58 +606,32 @@ def draft_image(request, pk, image_pk):
 @never_cache
 @require_http_methods(["GET", "POST"])
 def log_settings(request):
-    from django import forms
-
-    from core.utils.forms import StyledFormMixin
     from .log_ai_forms import LogPromptForm
-    from .models import TrainingCycle, TrainingCycleMember, TrainingLogPrompt
+    from .models import TrainingCycleMember, TrainingLogPrompt
 
     if not request.user.is_active or not request.user.is_superuser:
         raise PermissionDenied
 
-    class CycleForm(StyledFormMixin, forms.ModelForm):
-        class Meta:
-            model = TrainingCycle
-            fields = ("log_edition", "log_class")
-
-        log_edition = forms.IntegerField(label="日志赛事届次", min_value=1, max_value=32767)
-
-    class SelectCycleForm(StyledFormMixin, forms.Form):
-        cycle = forms.ModelChoiceField(label="训练周期", queryset=TrainingCycle.objects.all())
-
-    selection = SelectCycleForm(request.GET if "cycle" in request.GET else None)
-    cycle = selection.cleaned_data["cycle"] if selection.is_valid() else None
-    editing_heading = request.method == "POST" and request.POST.get("action") == "heading"
-    heading_form = CycleForm(request.POST if editing_heading else None, instance=cycle) if cycle else None
-    if editing_heading:
-        if not heading_form:
-            return HttpResponse("请先选择训练周期。", status=400)
-        if heading_form.is_valid():
-            cycle.log_edition = heading_form.cleaned_data["log_edition"]
-            cycle.log_class = heading_form.cleaned_data["log_class"]
-            cycle.save(update_fields=["log_edition", "log_class", "updated_at"])
-            messages.success(request, "已保存训练周期的日志标题设置。")
-            return redirect(f"{reverse('training:log_settings')}?cycle={cycle.pk}")
-
     configs = {item.role: item for item in TrainingLogPrompt.objects.all()}
     prompt_forms = []
     editing_prompt = request.method == "POST" and request.POST.get("action") == "prompts"
-    for role, label in TrainingCycleMember.Role.choices:
+    for role in (TrainingCycleMember.Role.COACH, TrainingCycleMember.Role.COMPETITOR):
         prompt = configs.get(role) or TrainingLogPrompt(role=role)
         initial = {"instructions": prompt.instructions or log_generation.default_instructions(role)}
         prompt_forms.append(
             (
-                label,
+                role.label,
                 LogPromptForm(request.POST if editing_prompt else None, instance=prompt, prefix=role, initial=initial),
+                log_generation.generation_constraints(role),
             )
         )
     if editing_prompt:
-        valid = [form.is_valid() for _, form in prompt_forms]
+        valid = [form.is_valid() for _, form, _ in prompt_forms]
         if all(valid):
             with transaction.atomic():
-                for _, form in prompt_forms:
+                for _, form, _ in prompt_forms:
                     TrainingLogPrompt.objects.update_or_create(role=form.instance.role, defaults=form.cleaned_data)
-            messages.success(request, "已保存默认提示词。")
+            messages.success(request, "已保存写作提示词。")
             return redirect(request.get_full_path())
 
     return page(
@@ -578,6 +639,4 @@ def log_settings(request):
         "log_settings",
         "训练日志设置",
         prompt_forms=prompt_forms,
-        selection=selection,
-        heading_form=heading_form,
     )

@@ -23,7 +23,8 @@ urlpatterns = [
     path("<int:pk>/", views.ModelDetailView.as_view(), name="detail"),
     path("<int:pk>/edit/", views.ModelEditView.as_view(), name="edit"),
     path("<int:pk>/delete/", views.ModelDeleteView.as_view(), name="delete"),
-    path("<int:pk>/test/", views.ModelActionView.as_view(), {"action": "test"}, name="test"),
-    path("<int:pk>/share/", views.ModelActionView.as_view(), {"action": "share"}, name="share"),
+    path("<int:pk>/test/", views.ModelTestView.as_view(), name="test"),
+    path("<int:pk>/share/", views.ModelShareView.as_view(), name="share"),
+    path("<int:pk>/share/recipients/", views.ShareRecipientSearchView.as_view(), name="share_recipients"),
     path("<int:pk>/default/", views.DefaultModelView.as_view(), name="default"),
 ]
