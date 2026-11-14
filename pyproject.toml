@@ -23,6 +23,7 @@ dependencies = [
     "weasyprint>=70.0",
     "nh3>=0.3.2",
     "pypdf>=7.0.1",
+    "litellm-core>=1.109.1",
 ]
 
 [dependency-groups]

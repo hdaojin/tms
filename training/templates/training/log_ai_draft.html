@@ -44,7 +44,7 @@
   <div class="alert alert-info" role="status">
     <span>当前没有可用的 AI 模型。{% if can_add_model %}添加并测试模型后即可生成，也可以直接上传文件。{% else %}可直接上传训练日志。{% endif %}</span>
     <div class="flex flex-wrap gap-2">
-      {% if can_add_model %}<a class="btn btn-outline btn-sm" href="{% url 'ai_models:create' %}">添加 AI 模型</a>{% endif %}
+      {% if can_add_model %}<a class="btn btn-outline btn-sm" href="{% url 'ai:create' %}">添加 AI 模型</a>{% endif %}
       <a class="btn btn-outline btn-sm" href="{{ upload_url }}">上传训练日志</a>
     </div>
   </div>

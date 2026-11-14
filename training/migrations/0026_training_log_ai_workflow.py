@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('ai_models', '0004_provider_model_defaults'),
+        ('ai', '0004_provider_model_defaults'),
         ('training', '0025_retain_deleted_plan_publication_history'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
@@ -137,7 +137,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='trainingloggeneration',
             name='model',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='ai_models.aimodel', verbose_name='AI 模型'),
+            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, to='ai.aimodel', verbose_name='AI 模型'),
         ),
         migrations.AddField(
             model_name='traininglogimage',

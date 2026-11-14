@@ -1,0 +1,16 @@
+{% extends "common/table_page.html" %}
+
+{% block list_filters %}
+  {% if default_unavailable %}
+    <p class="alert alert-warning" role="status">原默认模型已不可用，请重新选择。</p>
+  {% elif not default_id %}
+    <p class="mb-4">尚未选择默认模型。</p>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
+{% block list_results %}
+  {% partialdef results inline %}
+    {% include "components/table_wrapper.html" with table=table %}
+  {% endpartialdef %}
+{% endblock %}

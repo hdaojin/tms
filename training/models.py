@@ -1271,7 +1271,7 @@ class TrainingLogGeneration(TimestampedModel):
         FAILED = "failed", "生成失败"
 
     draft = models.OneToOneField(TrainingLogDraft, on_delete=models.CASCADE, related_name="generation", verbose_name="草稿")
-    model = models.ForeignKey("ai_models.AIModel", on_delete=models.SET_NULL, null=True, verbose_name="AI 模型")
+    model = models.ForeignKey("ai.AIModel", on_delete=models.SET_NULL, null=True, verbose_name="AI 模型")
     model_revision = models.UUIDField("模型版本")
     status = models.CharField("生成状态", max_length=10, choices=Status, default=Status.REVIEW, db_index=True)
     thinking = models.CharField("思考模式", max_length=8)

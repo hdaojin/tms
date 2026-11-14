@@ -19,7 +19,7 @@
 ## 当前目录
 
 - [accounts/overview.md](accounts/overview.md): 用户与权限授权说明。
-- [ai_models/overview.md](ai_models/overview.md): AI 模型配置、手动测试、共享与默认模型设置。
+- [ai/overview.md](ai/overview.md): AI 模型配置、手动测试、共享与默认模型设置。
 - [assessments/overview.md](assessments/overview.md): 竞赛与考核、模块、参与人员和业务资料说明。
 - [articles/overview.md](articles/overview.md): 文章内容说明。
 - [behaviors/overview.md](behaviors/overview.md): 操行记录与角色边界。

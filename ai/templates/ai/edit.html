@@ -1,0 +1,54 @@
+{% extends "common/form.html" %}
+{% load static %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <script src="{% static 'js/ai-model-form.js' %}" defer></script>
+{% endblock %}
+
+{% block form_content %}
+  {{ form.catalog|json_script:"ai-provider-catalog" }}
+  <form method="post" class="space-y-6" id="ai-model-form">
+    {% csrf_token %}
+    {% include "components/form_errors.html" with form=form %}
+    <fieldset class="space-y-4">
+      <legend class="font-semibold">基本信息</legend>
+      {% include "components/field.html" with field=form.name %}
+      {% include "components/field.html" with field=form.provider %}
+    </fieldset>
+    <fieldset class="space-y-4">
+      <legend class="font-semibold">API 连接</legend>
+      {% include "components/field.html" with field=form.base_url %}
+      <p id="ai-api-default" class="text-sm text-base-content/70">
+        {% if form.effective_default %}留空将使用 {{ form.effective_default }}{% endif %}
+      </p>
+      <input type="hidden" name="shown_default_base_url" value="{{ form.effective_default }}">
+      {% include "components/field.html" with field=form.api_key %}
+      <p class="text-sm text-base-content/70">API 请求和生成素材将发送至所选 API 地址。</p>
+    </fieldset>
+    <fieldset class="space-y-4">
+      <legend class="font-semibold">模型设置</legend>
+      {% include "components/field.html" with field=form.model_choice %}
+      <div id="ai-discovery" hidden>
+        <button type="button" class="btn btn-sm"
+                data-url="{% if model %}{% url 'ai:discover_saved' model.pk %}{% else %}{% url 'ai:discover' %}{% endif %}">
+          获取模型列表
+        </button>
+        <p class="text-sm text-base-content/70 mt-2" role="status"></p>
+        <label class="block mt-2" hidden>
+          API 返回的模型
+          <select class="select w-full"></select>
+        </label>
+      </div>
+      <div id="ai-manual-model">{% include "components/field.html" with field=form.model_id %}</div>
+    </fieldset>
+    <details id="ai-advanced" {% if form.thinking.errors or form.reasoning_effort.errors %}open{% endif %}>
+      <summary class="cursor-pointer font-semibold">高级选项</summary>
+      {% include "ai/thinking_fields.html" %}
+    </details>
+    <div class="flex justify-end gap-3">
+      <a class="btn btn-ghost" href="{% if model %}{% url 'ai:detail' model.pk %}{% else %}{% url 'ai:list' %}{% endif %}">取消</a>
+      <button type="submit" class="btn btn-primary">保存模型</button>
+    </div>
+  </form>
+{% endblock %}

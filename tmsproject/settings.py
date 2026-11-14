@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 # from django.forms.renderers import TemplatesSetting
 
+import os
 from pathlib import Path
 
 import environ
@@ -77,7 +78,7 @@ INSTALLED_APPS = [
     # Local apps
     'core',
     'accounts',
-    'ai_models.apps.AIModelsConfig',
+    'ai.apps.AIConfig',
     'samba',
     'standards.apps.StandardsConfig',
     'assessments.apps.AssessmentsConfig',
@@ -251,3 +252,9 @@ SAMBA_COMMAND_TIMEOUT_SECONDS = env.int('SAMBA_COMMAND_TIMEOUT_SECONDS', default
 SAMBA_OPERATION_STALE_MINUTES = env.int('SAMBA_OPERATION_STALE_MINUTES', default=30)  # type: ignore
 SAMBA_TASK_ENCRYPTION_KEY = env('SAMBA_TASK_ENCRYPTION_KEY', default='')  # type: ignore
 AI_MODEL_ENCRYPTION_KEY = env('AI_MODEL_ENCRYPTION_KEY', default='')  # type: ignore
+
+# Use the model metadata bundled with the locked SDK.
+os.environ['LITELLM_LOCAL_MODEL_COST_MAP'] = 'True'
+
+# Exact scheme, hostname and port for administrator-approved API endpoints.
+AI_TRUSTED_ENDPOINTS = env.list('AI_TRUSTED_ENDPOINTS', default=[])

@@ -29,6 +29,7 @@ readonly SYSTEMD_UNIT="/etc/systemd/system/tms.service"
 readonly TRAINING_LOG_WORKER_UNIT="/etc/systemd/system/tms-training-log-worker.service"
 readonly TRAINING_LOG_WORKER_TEMPLATE="${TEMPLATE_DIR}/tms-training-log-worker.service"
 readonly TRAINING_LOG_WORKER_COMMAND="training/management/commands/run_training_log_worker.py"
+readonly AI_RENAME_COMMAND="ai/management/commands/migrate_ai_app_label.py"
 readonly MAINTENANCE_FLAG="${STATE_DIR}/maintenance.flag"
 readonly DEPLOY_STATE="${STATE_DIR}/current-deployment"
 readonly UV_CACHE_DIR="/var/cache/tms/uv"
@@ -555,7 +556,16 @@ cmd_plan() {
     candidate_django "${release_dir}" check
     candidate_django "${release_dir}" check --deploy | tee "${release_dir}/.tms-check-deploy.txt"
     candidate_django "${release_dir}" makemigrations --check --dry-run
-    candidate_django "${release_dir}" migrate --plan | tee "${release_dir}/.tms-migration-plan.txt"
+    local ai_preflight=""
+    if [[ -f "${release_dir}/${AI_RENAME_COMMAND}" ]]; then
+        ai_preflight="$(candidate_django "${release_dir}" migrate_ai_app_label --dry-run --if-needed)"
+        printf '%s\n' "${ai_preflight}"
+    fi
+    if grep -qx 'TMS_AI_RENAME_REQUIRED' <<<"${ai_preflight}"; then
+        printf '%s\n' 'AI APP 更名预检通过，常规迁移计划将在停机转换后生成。' | tee "${release_dir}/.tms-migration-plan.txt"
+    else
+        candidate_django "${release_dir}" migrate --plan | tee "${release_dir}/.tms-migration-plan.txt"
+    fi
     candidate_django "${release_dir}" collectstatic --noinput --clear
 
     secure_release_permissions "${release_dir}"
@@ -985,10 +995,28 @@ cmd_apply() {
         install_service_and_caddy
     fi
 
-    local migration_output
+    local migration_output ai_preflight="" ai_rename_needed=0
+    if [[ -f "${RELEASE_DIR}/${AI_RENAME_COMMAND}" ]]; then
+        ai_preflight="$(candidate_django "${RELEASE_DIR}" migrate_ai_app_label --dry-run --if-needed)"
+        printf '%s\n' "${ai_preflight}"
+        if grep -qx 'TMS_AI_RENAME_REQUIRED' <<<"${ai_preflight}"; then
+            ai_rename_needed=1
+        fi
+    fi
+    if (( ai_rename_needed )); then
+        local ai_key_setting
+        ai_key_setting="$(grep '^AI_MODEL_ENCRYPTION_KEY=.' "${RUNTIME_ENV}")"
+        : >"${MAINTENANCE_FLAG}"
+        chmod 0644 "${MAINTENANCE_FLAG}"
+        systemctl stop tms-training-log-worker.service tms.service || die "未能停机，AI APP 转换已中止。"
+        env_run_as_app "${MIGRATE_ENV}" env "${ai_key_setting}" \
+            "${RELEASE_DIR}/.venv/bin/python" "${RELEASE_DIR}/manage.py" migrate_ai_app_label --apply
+        unset ai_key_setting
+        migrations_applied=1
+    fi
     if ! migration_output="$(env_run_as_app "${MIGRATE_ENV}" "${RELEASE_DIR}/.venv/bin/python" \
         "${RELEASE_DIR}/manage.py" showmigrations --plan)"; then
-        die "无法读取待执行迁移；尚未进入维护状态。"
+        die "无法读取待执行迁移。"
     fi
     migration_count="$(grep -c '^\[ \]' <<<"${migration_output}" || true)"
     : >"${MAINTENANCE_FLAG}"

@@ -45,7 +45,7 @@ urlpatterns = [
     # path("pages/", include("django.contrib.flatpages.urls")),  # 内置的 flatpages 应用
     path("accounts/", include("accounts.urls", namespace="accounts")),
     path("samba/", include("samba.urls", namespace="samba")),
-    path("ai-models/", include("ai_models.urls", namespace="ai_models")),
+    path("ai-models/", include("ai.urls", namespace="ai")),
     path("meetings/", include("meetings.urls", namespace="meetings")),
     path("notices/", include("notices.urls", namespace="notices")),
     path("notes/", include("notes.urls", namespace="notes")),

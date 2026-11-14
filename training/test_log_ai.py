@@ -17,7 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 from pypdf import PdfReader, PdfWriter
 
-from ai_models.models import AIModel
+from ai.models import AIModel
 from bs4 import BeautifulSoup
 from core.documents.service import generate_document_pdf, render_document_html
 from core.documents.types import DocumentRenderError
@@ -58,7 +58,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
             assign_all=True,
         )
         self.execution = self.task_obj.executions.get(user=self.student)
-        self.student.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai_models"))
+        self.student.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai"))
         self.model = AIModel.objects.create(
             owner=self.student,
             provider="deepseek",
@@ -290,7 +290,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertIn("new routing guide", json.dumps(materials))
 
     def test_coach_can_generate_without_any_student_progress(self):
-        self.coach.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai_models"))
+        self.coach.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai"))
         self.model.owner = self.coach
         self.model.save(update_fields=["owner", "updated_at"])
         draft = TrainingLogDraft.objects.create(author=self.coach, cycle=self.cycle_obj, training_date=self.day)
@@ -328,7 +328,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
 
     def test_missing_goal_links_to_task_editor_only_when_authorized(self):
         self.task_obj.__class__.objects.filter(pk=self.task_obj.pk).update(requirements="")
-        self.coach.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai_models"))
+        self.coach.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai"))
         self.model.owner = self.coach
         self.model.save(update_fields=["owner", "updated_at"])
         self.client.force_login(self.coach)
@@ -350,7 +350,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
 
     def test_coach_generates_only_missing_goals_and_preserves_them_on_draft_edit(self):
         task = self.task(slot=self.other_slot(), title="配置防火墙", subtask_titles=["核对访问规则"], assign_all=True)
-        self.coach.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai_models"))
+        self.coach.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai"))
         self.model.owner = self.coach
         self.model.save(update_fields=["owner", "updated_at"])
         draft = TrainingLogDraft.objects.create(author=self.coach, cycle=self.cycle_obj, training_date=self.day)
@@ -422,7 +422,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.model.save(update_fields=["verified", "updated_at"])
         self.client.force_login(self.student)
         response = self.client.get(reverse("training:log_ai_start"))
-        self.assertContains(response, reverse("ai_models:create"))
+        self.assertContains(response, reverse("ai:create"))
         self.assertContains(response, reverse("training:log_create"))
         self.assertContains(response, "当前没有可用的 AI 模型")
         self.assertNotContains(response, "预览发送内容")
@@ -532,7 +532,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
 
         with patch("training.log_generation.generate_text", side_effect=generate) as call:
             self.assertTrue(log_generation.run_generation())
-        content = call.call_args.args[3]["messages"][1]["content"]
+        content = call.call_args.args[3].messages[1]["content"]
         self.assertEqual([block["type"] for block in content], ["text", "image_url", "image_url"])
         self.assertTrue(content[1]["image_url"]["url"].startswith("data:image/png;base64,"))
         response = self.client.get(status_url, headers={"HX-Request": "true"})
@@ -569,7 +569,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         log_generation.confirm_generation(draft, job.pk)
         with patch("training.log_generation.generate_text", return_value=json.dumps(example_body(STUDENT))) as call:
             self.assertTrue(log_generation.run_generation())
-        self.assertIsInstance(call.call_args.args[3]["messages"][1]["content"], str)
+        self.assertIsInstance(call.call_args.args[3].messages[1]["content"], str)
         self.assertEqual(draft.images.count(), 1)
 
     def test_superuser_can_manage_role_prompts(self):
@@ -696,7 +696,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
             call_command("run_training_log_worker", once=True)
             call_command("run_training_log_worker", once=True)
         model_call.assert_called_once()
-        self.assertEqual(model_call.call_args.args[3]["response_format"], {"type": "json_object"})
+        self.assertEqual(model_call.call_args.args[3].response_mode, "json")
         job.refresh_from_db()
         draft.refresh_from_db()
         self.assertEqual(job.status, Status.FAILED)

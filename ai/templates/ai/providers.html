@@ -1,0 +1,59 @@
+{% extends "layouts/app.html" %}
+{% load static %}
+
+{% block extra_head %}
+  {{ block.super }}
+  <script src="{% static 'js/ai-model-form.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <h2 class="card-title">新建模型的默认设置</h2>
+      <form method="post" class="space-y-3">
+        {% csrf_token %}
+        {% include "components/form_errors.html" with form=form %}
+        <input type="hidden" name="enabled_present" value="1">
+        {% include "components/field.html" with field=form.enabled %}
+        {% include "components/field.html" with field=form.default_base_url %}
+        {% if form.thinking %}{% include "ai/thinking_fields.html" %}{% endif %}
+        <button class="btn btn-primary" type="submit">保存默认设置</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="card-title">可选模型</h2>
+        <a class="btn btn-primary" href="{% url 'ai:option_create' provider %}">添加模型</a>
+      </div>
+      <ul class="divide-y divide-base-300">
+        {% if show_builtin %}
+          <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div>
+              <p class="font-medium">{{ builtin_model }}</p>
+              <p class="text-sm text-base-content/70">默认模型</p>
+            </div>
+            <a class="btn btn-sm" href="{% url 'ai:option_fallback' provider %}">编辑</a>
+          </li>
+        {% endif %}
+        {% for option in options %}
+          <li class="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div class="min-w-0 break-words">
+              <p class="font-medium">{{ option.name }}</p>
+              <p class="text-sm text-base-content/70">
+                {{ option.model_id }}
+                {% if option.is_default %} · 默认模型{% endif %}
+                {% if option.supports_images %} · 支持图片{% endif %}
+                {% if option.supports_json %} · 支持 JSON{% endif %}
+                {% if not option.is_active %} · 已隐藏{% endif %}
+              </p>
+            </div>
+            <a class="btn btn-sm" href="{% url 'ai:option_edit' provider option.pk %}" aria-label="编辑 {{ option.name }}">编辑</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+{% endblock %}

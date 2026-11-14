@@ -4,8 +4,9 @@ from django import forms
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from ai_models.models import AIModelPreference, ReasoningEffort, ThinkingMode
-from ai_models.services import usable_models
+from ai.dispatcher import supports_thinking
+from ai.models import AIModelPreference, ReasoningEffort, ThinkingMode
+from ai.services import usable_models
 from core.forms import MultipleFileField
 from core.utils.forms import StyledFormMixin
 
@@ -98,7 +99,9 @@ class LogGenerationForm(StyledFormMixin, forms.Form):
     def clean(self):
         data = super().clean()
         model = data.get("model")
-        if data.get("effort") and model and (data["thinking"] or model.thinking) != ThinkingMode.ENABLED:
+        if model and not supports_thinking(model) and (data.get("thinking") or data.get("effort")):
+            self.add_error("thinking", "所选模型未开放思考设置，请使用模型默认值。")
+        elif data.get("effort") and model and (data.get("thinking") or model.thinking) != ThinkingMode.ENABLED:
             self.add_error("effort", "请先开启思考模式。")
         return data
 

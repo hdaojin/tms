@@ -8,8 +8,8 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.utils import timezone
 
-from ai_models.providers import PROVIDERS, ProviderError
-from ai_models.services import generate_text, normalize_thinking, usable_models
+from ai.dispatcher import GenerationRequest, ProviderError, generate_text, supports_images
+from ai.services import normalize_thinking, usable_models
 
 from .log_prompt_defaults import COACH_INSTRUCTIONS, STUDENT_INSTRUCTIONS
 from .log_sources import (
@@ -87,7 +87,7 @@ def selected_model(user, pk, revision=None):
 def generation_images(draft, model, image_ids, *, include_content=False):
     if not image_ids:
         return []
-    if not PROVIDERS[model.provider].supports_images(model.base_url, model.model_id):
+    if not supports_images(model):
         raise ValidationError("所选模型不支持读图，请选择支持读图的模型，或勾选「本次仅生成正文」。")
     queryset = draft.images.filter(pk__in=image_ids).order_by("pk")
     images = list(queryset if include_content else queryset.defer("content"))
@@ -328,15 +328,14 @@ def run_generation():
                 user_content.append(
                     {"type": "image_url", "image_url": {"url": f"data:{image.media_type};base64,{encoded}"}}
                 )
-        payload = {
-            "messages": [{"role": "system", "content": job.prompt}, {"role": "user", "content": user_content}],
-            "thinking": {"type": job.thinking},
-            "response_format": {"type": "json_object"},
-            "max_tokens": 16000 if job.effort != "max" else 32000,
-            "stream": False,
-        }
-        if job.effort:
-            payload["reasoning_effort"] = job.effort
+        payload = GenerationRequest(
+            messages=[{"role": "system", "content": job.prompt}, {"role": "user", "content": user_content}],
+            thinking=job.thinking,
+            reasoning_effort=job.effort,
+            response_mode="json",
+            max_output_tokens=16000 if job.effort != "max" else 32000,
+            images=bool(images),
+        )
         reply = call_model(job, payload)
         current, _, _ = source_for(job.draft)
         check_source_access(job.source, current)

@@ -17,7 +17,7 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from django.views.decorators.http import require_GET, require_http_methods
 from django.views.decorators.vary import vary_on_headers
 
-from ai_models.services import can_manage
+from ai.services import can_manage
 from bs4 import BeautifulSoup
 
 from core.documents.content import CLEANER, MARKDOWN_EXTRAS, normalize_document_image

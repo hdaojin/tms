@@ -1,0 +1,14 @@
+{% extends "layouts/app.html" %}
+
+{% block content %}
+  <section class="card border border-base-300 bg-base-100 shadow-sm">
+    <div class="card-body">
+      <p>删除「{{ model.name }}」将移除 TMS 中保存的模型配置和密钥。将此模型设为默认项的用户需要重新选择。</p>
+      <form class="flex flex-wrap gap-3" method="post">
+        {% csrf_token %}
+        <a class="btn" href="{% url 'ai:detail' model.pk %}">取消</a>
+        <button class="btn btn-error" type="submit">确认删除</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}

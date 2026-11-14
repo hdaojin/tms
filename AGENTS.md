@@ -22,7 +22,7 @@ TMS 是基于 Django 6 / Python 3.13 的单体应用。主要前端与交互技�
 
 - 平台基础：`core`、`accounts`、`samba`。
 - 领域主链路：`standards`、`assessments`、`scoring`、`evidence`、`training`。
-- 业务扩展：`glossary`、`worldskills_forum`、`feedback`、`notes`、`meetings`、`notices`、`behaviors`、`event_countdown`、`ai_models`。
+- 业务扩展：`glossary`、`worldskills_forum`、`feedback`、`notes`、`meetings`、`notices`、`behaviors`、`event_countdown`、`ai`。
 - `demo` 仅在 `DEBUG=True` 时加载。
 
 领域主链路应保持为：
@@ -175,6 +175,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - 计划、排班、任务分别保存和发布，通常要求计划发布后填排班、排班发布后填任务；Excel 可向已发布的空计划一次导入排班及任务草稿，仍须依次发布排班和任务，预览有错误则整份不导入，确认时事务复核空计划与预览时的参与选手名单，导入任务固定该名单。早读与晚上可不设置，默认时间由超级管理员在后台维护。训练周期首次保存后固定；日期范围和每日时段仅在未发布且无有效任务和排班内容时可修改。结束后自动显示完成但仍可按规则补改。具备对应权限的排班人员和全部明确分配的负责教练可维护任务；旧任务管理员仅保留历史关系。日级信息和每时段独立标记首次填写，首次免原因、免审批（含过期），清空不重置；未发布的排班或任务（含撤回后）修改免原因、免审批，即使已过期；已发布排班的后续修改必须写原因。已发布排班调整由涉及教练依次确认后终审，已发布且过期的非首次排班／任务修改直接交指定审批人员或超级管理员终审，均保留前后快照及执行事实。整份排班发布前须完成所有日期值班和已启用时段；教练不再区分主次。草稿结构修改同步空白排班框架，保留历史任务引用的日期和时段快照。有效超级管理员直接保存排班和任务内容调整，包括已发布及过期内容，原因选填，免教练确认和审批。保存仍校验业务约束并记录操作者、时间及前后内容。待审申请按原有版本校验处理。撤回发布、取消任务和清空仍按各自规则执行。调整事务入口为 `training/change_workflow.py`，常规保存继续使用 `training/scheduling.py`；执行事实、进度、反馈和自主任务写入使用 `training/process.py`。自主任务的教练范围来自同计划该选手官方分配的历史负责关系，不从领域或角色名推导。升级和补录流程见 `docs/developer/training-plan-refactor.md`。
 
 - 训练日志模板管理入口为 `training:log_template_list`，菜单及页面要求独立的 `view_traininglogtemplate` 权限，写操作另需对应新增、修改、删除权限。提交页模板下载复用新增日志权限与周期成员/状态校验，不要求模板管理权限；模板文件属于 `training` 并经私有下载视图提供。
+- AI 模型管理与统一调用由 `ai` APP 提供，外部地址沿用 `/ai-models/`。旧库须完成 [AI APP 原地更名](docs/developer/ai-app-rename-migration.md) 后再运行新版迁移。
 - 官方任务从「我的训练」按排班日期填写「训练完成情况」。勾选结果同步执行状态并留痕，首次填报后固定子任务清单。AI 辅助日志使用私有草稿，作者确认发送与提交，正式日志由现有文档渲染及私有日志保存入口归档，详见 ADR 0016。
 
 - APP URL 使用 `app_name` namespace，并由 `tmsproject/urls.py` `include()`。

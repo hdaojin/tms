@@ -9,14 +9,14 @@ bundles:
     description: 查看用户、用户资料和角色列表。
     permissions: [accounts.view_all_profiles, auth.view_group]
 
-  - code: ai_models.manage_own
+  - code: ai.manage_own
     name: AI 模型 | 管理自己的模型
     description: 添加、维护、手动测试和共享本人配置的 AI 模型。
-    permissions: [ai_models.view_aimodel, ai_models.manage_own_aimodel]
-  - code: ai_models.use_shared
+    permissions: [ai.view_aimodel, ai.manage_own_aimodel]
+  - code: ai.use_shared
     name: AI 模型 | 使用共享模型
     description: 查看并选择共享给当前用户的 AI 模型。
-    permissions: [ai_models.view_aimodel, ai_models.use_shared_aimodel]
+    permissions: [ai.view_aimodel, ai.use_shared_aimodel]
 
   - code: notices.view_notices
     name: 通知 | 查看通知
