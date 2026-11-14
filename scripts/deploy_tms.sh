@@ -555,7 +555,6 @@ cmd_plan() {
     [[ -d "${release_dir}/static/vendor" ]] || die "仓库缺少已提交的 static/vendor"
     candidate_django "${release_dir}" check
     candidate_django "${release_dir}" check --deploy | tee "${release_dir}/.tms-check-deploy.txt"
-    candidate_django "${release_dir}" makemigrations --check --dry-run
     local ai_preflight=""
     if [[ -f "${release_dir}/${AI_RENAME_COMMAND}" ]]; then
         ai_preflight="$(candidate_django "${release_dir}" migrate_ai_app_label --dry-run --if-needed)"
@@ -564,6 +563,7 @@ cmd_plan() {
     if grep -qx 'TMS_AI_RENAME_REQUIRED' <<<"${ai_preflight}"; then
         printf '%s\n' 'AI APP 更名预检通过，常规迁移计划将在停机转换后生成。' | tee "${release_dir}/.tms-migration-plan.txt"
     else
+        candidate_django "${release_dir}" makemigrations --check --dry-run
         candidate_django "${release_dir}" migrate --plan | tee "${release_dir}/.tms-migration-plan.txt"
     fi
     candidate_django "${release_dir}" collectstatic --noinput --clear
@@ -1013,6 +1013,8 @@ cmd_apply() {
             "${RELEASE_DIR}/.venv/bin/python" "${RELEASE_DIR}/manage.py" migrate_ai_app_label --apply
         unset ai_key_setting
         migrations_applied=1
+        env_run_as_app "${MIGRATE_ENV}" "${RELEASE_DIR}/.venv/bin/python" "${RELEASE_DIR}/manage.py" \
+            makemigrations --check --dry-run
     fi
     if ! migration_output="$(env_run_as_app "${MIGRATE_ENV}" "${RELEASE_DIR}/.venv/bin/python" \
         "${RELEASE_DIR}/manage.py" showmigrations --plan)"; then
