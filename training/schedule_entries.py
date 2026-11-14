@@ -105,11 +105,11 @@ def entry_context(view, day_table, *, matching_only=False):
                 valid = False
     today = timezone.localdate()
     result = []
+    current_week_start = today - timedelta(days=today.weekday())
     for day in days:
         day.training_plan = plan
         day.editor_suffix = suffix
         day.is_past = day.date < today
-        day.week_past = day.date - timedelta(days=day.date.weekday()) + timedelta(days=6) < today
         day.duty_label = (
             (
                 "全体"
@@ -125,7 +125,9 @@ def entry_context(view, day_table, *, matching_only=False):
             else "—"
         )
         day.visible_note = day.note if internal or plan.schedule_published_at else ""
-        day.week_start = (day.date - timedelta(days=day.date.weekday())).isoformat()
+        week_start = day.date - timedelta(days=day.date.weekday())
+        day.week_start = week_start.isoformat()
+        day.week_current = week_start == current_week_start
         matches = []
         for slot in sorted(day.slots.all(), key=lambda item: TrainingScheduleSlot.Period.values.index(item.period)):
             slot.day = day

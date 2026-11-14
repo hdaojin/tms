@@ -7,13 +7,16 @@ const source = readFileSync(
   new URL("../static/js/training-entries.js", import.meta.url),
   "utf8",
 );
-function fixture({ result = null, checkboxes = [], preferences = [] } = {}) {
+function fixture({ result = null, checkboxes = [], preferences = [], now = Date.parse('2026-11-14T10:00:00Z') } = {}) {
   const listeners = {},
     storage = new Map(),
     requests = [];
   for (const [key, value] of preferences) storage.set(key, value);
   const dialog = { open: true, dataset: { dirty: "1" } };
   const context = {
+    Date: class extends Date {
+      static now() { return now; }
+    },
     document: {
       getElementById: () => dialog,
       querySelectorAll: (selector) =>
@@ -22,12 +25,14 @@ function fixture({ result = null, checkboxes = [], preferences = [] } = {}) {
       addEventListener: (name, fn) => (listeners[name] ||= []).push(fn),
     },
     window: {
+      addEventListener: (name, fn) => (listeners[name] ||= []).push(fn),
       confirm: () => false,
       htmx: { ajax: (...args) => requests.push(args) },
     },
     localStorage: {
       getItem: (key) => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value),
+      removeItem: (key) => storage.delete(key),
     },
   };
   vm.runInNewContext(source, context);
@@ -90,7 +95,6 @@ test("task links inside a card do not open the schedule drawer", () => {
 });
 
 test("weekly collapse changes only the selected week and is saved per plan", () => {
-  const f = fixture();
   const rows = [
     { dataset: { week: "2026-11-02" } },
     { dataset: { week: "2026-11-09" } },
@@ -102,37 +106,51 @@ test("weekly collapse changes only the selected week and is saved per plan", () 
     setAttribute() {},
     closest: () => result,
   };
-  f.dispatch("click", {
+  const click = {
     target: {
       closest: (selector) =>
         selector === "[data-week-toggle]" ? button : null,
     },
-  });
+  };
+  const f = fixture();
+  f.dispatch("click", click);
   assert.equal(rows[0].hidden, true);
   assert.equal(rows[1].hidden, undefined);
-  assert.equal(f.storage.get("training-week:12:2026-11-02"), "1");
+  const key = "training-week:12:2026-11-02";
+  assert.deepEqual(JSON.parse(f.storage.get(key)), {
+    collapsed: true,
+    expiresAt: Date.parse("2026-11-15T10:00:00Z"),
+  });
+  const sunday = fixture({ now: Date.parse("2026-11-15T10:00:00Z") });
+  sunday.dispatch("click", click);
+  assert.equal(JSON.parse(sunday.storage.get(key)).expiresAt, Date.parse("2026-11-15T16:00:00Z"));
 });
 
-test("past weeks start collapsed but an explicit expansion takes priority", () => {
-  const row = { dataset: { week: "2026-01-05" } };
-  let expanded;
-  const button = {
-    dataset: { weekToggle: "2026-01-05", weekPast: "1" },
-    setAttribute: (key, value) => {
-      expanded = value;
-    },
-  };
+test("only the current week opens by default and valid preferences take priority", () => {
+  const weeks = ["2026-11-02", "2026-11-09", "2026-11-16"];
+  const rows = weeks.map((week) => ({ dataset: { week } }));
+  const expanded = new Map();
+  const buttons = weeks.map((week) => ({
+    dataset: { weekToggle: week },
+    setAttribute: (key, value) => expanded.set(week, value),
+  }));
   const result = {
     dataset: { planId: "8" },
     querySelectorAll: (selector) =>
-      selector === "[data-week-toggle]" ? [button] : [row],
+      selector === "[data-week-toggle]" ? buttons : rows,
   };
-  fixture({ result });
-  assert.equal(row.hidden, true);
-  assert.equal(expanded, "false");
-  fixture({ result, preferences: [["training-week:8:2026-01-05", "0"]] });
-  assert.equal(row.hidden, false);
-  assert.equal(expanded, "true");
+  const now = Date.parse("2026-11-15T15:59:59Z");
+  const keys = weeks.map((week) => `training-week:8:${week}`);
+  const f = fixture({ result, now, preferences: [
+    [keys[0], "0"],
+    [keys[1], JSON.stringify({ collapsed: true, expiresAt: now })],
+    [keys[2], JSON.stringify({ collapsed: false, expiresAt: now + 1000 })],
+  ] });
+  assert.deepEqual(rows.map((row) => row.hidden), [true, false, false]);
+  assert.deepEqual([...expanded.values()], ["false", "true", "true"]);
+  assert.deepEqual([...f.storage.keys()], [keys[2]]);
+  fixture({ result, now: now + 1000, preferences: f.storage });
+  assert.deepEqual(rows.map((row) => row.hidden), [true, true, false]);
 });
 
 test("all-duty disables the concrete list and unchecking enables it", () => {

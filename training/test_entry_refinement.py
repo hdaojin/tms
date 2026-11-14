@@ -193,10 +193,14 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
             days = response.context["entry_days"]
             self.assertTrue(days[0].is_past)
             self.assertFalse(days[1].is_past)
-            self.assertFalse(days[0].week_past)
+            self.assertTrue(days[0].week_current)
+            self.assertContains(response, 'data-week-toggle="2025-12-29" aria-expanded="true"')
+        with patch("django.utils.timezone.now", return_value=datetime(2025, 12, 28, 15, 59, tzinfo=dt_timezone.utc)):
+            response = self.client.get(reverse("training:plan_detail", args=[self.plan.pk]))
+            self.assertContains(response, 'data-week="2025-12-29" hidden')
         with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 5, 0, tzinfo=dt_timezone.utc)):
             response = self.client.get(reverse("training:plan_detail", args=[self.plan.pk]))
-            self.assertTrue(response.context["entry_days"][0].week_past)
+            self.assertFalse(response.context["entry_days"][0].week_current)
 
     def test_whole_rest_day_needs_no_duty_but_training_day_does(self):
         self.publish_plan()

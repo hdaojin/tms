@@ -19,8 +19,8 @@
   {% endif %}
   <tbody {{ table.attrs.tbody.as_html }}>
     {% for row in table.paginated_rows %}
-      {% ifchanged row.record.week_start %}<tr><td colspan="{{ table.columns|length }}" class="bg-base-200 text-left"><button type="button" class="btn btn-ghost btn-sm" data-week-toggle="{{ row.record.week_start }}" data-week-past="{{ row.record.week_past|yesno:'1,0' }}" aria-expanded="true">收起 / 展开 · {{ row.record.week_label }}</button></td></tr>{% endifchanged %}
-      <tr {{ row.attrs.as_html }} data-week="{{ row.record.week_start }}">
+      {% ifchanged row.record.week_start %}<tr><td colspan="{{ table.columns|length }}" class="bg-base-200 text-left"><button type="button" class="btn btn-ghost btn-sm" data-week-toggle="{{ row.record.week_start }}" aria-expanded="{{ row.record.week_current|yesno:'true,false' }}">收起 / 展开 · {{ row.record.week_label }}</button></td></tr>{% endifchanged %}
+      <tr {{ row.attrs.as_html }} data-week="{{ row.record.week_start }}"{% if not row.record.week_current %} hidden{% endif %}>
         {% for column, cell in row.items %}
           <td {{ column.attrs.td.as_html }}>{% if column.localize == None %}{{ cell }}{% else %}{% if column.localize %}{{ cell|localize }}{% else %}{{ cell|unlocalize }}{% endif %}{% endif %}</td>
         {% endfor %}

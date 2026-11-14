@@ -4,12 +4,30 @@
   function mayDiscard(dialog) {
     return !dialog?.open || !dialog.dataset.dirty || window.confirm('当前内容尚未保存，确定放弃修改？');
   }
+  const dayMs = 24 * 60 * 60 * 1000;
+  const shanghaiOffsetMs = 8 * 60 * 60 * 1000;
+  function shanghaiWeekStart(now) {
+    const date = new Date(now + shanghaiOffsetMs);
+    date.setUTCHours(0, 0, 0, 0);
+    date.setUTCDate(date.getUTCDate() - (date.getUTCDay() + 6) % 7);
+    return date;
+  }
   function weekState(root) {
     const result = root.closest?.('[data-plan-id]') || root.querySelector?.('[data-plan-id]');
     if (!result) return;
+    const now = Date.now();
+    const currentWeek = shanghaiWeekStart(now).toISOString().slice(0, 10);
     for (const button of result.querySelectorAll('[data-week-toggle]')) {
-      let collapsed = button.dataset.weekPast === '1';
-      try { const preference = localStorage.getItem(`training-week:${result.dataset.planId}:${button.dataset.weekToggle}`); if (preference !== null) collapsed = preference === '1'; } catch {}
+      let collapsed = button.dataset.weekToggle !== currentWeek;
+      const key = `training-week:${result.dataset.planId}:${button.dataset.weekToggle}`;
+      try {
+        const preference = JSON.parse(localStorage.getItem(key));
+        if (typeof preference?.collapsed === 'boolean' && preference.expiresAt > now) {
+          collapsed = preference.collapsed;
+        } else if (preference !== null) {
+          localStorage.removeItem(key);
+        }
+      } catch {}
       button.setAttribute('aria-expanded', String(!collapsed));
       for (const row of result.querySelectorAll('[data-week]')) if (row.dataset.week === button.dataset.weekToggle) row.hidden = collapsed;
     }
@@ -81,7 +99,12 @@
       const collapsed = week.getAttribute('aria-expanded') === 'true';
       week.setAttribute('aria-expanded', String(!collapsed));
       for (const row of result.querySelectorAll('[data-week]')) if (row.dataset.week === week.dataset.weekToggle) row.hidden = collapsed;
-      try { localStorage.setItem(`training-week:${result.dataset.planId}:${week.dataset.weekToggle}`, collapsed ? '1' : '0'); } catch {}
+      const now = Date.now();
+      const nextMonday = shanghaiWeekStart(now).getTime() + 7 * dayMs - shanghaiOffsetMs;
+      const expiresAt = Math.min(now + dayMs, nextMonday);
+      try {
+        localStorage.setItem(`training-week:${result.dataset.planId}:${week.dataset.weekToggle}`, JSON.stringify({ collapsed, expiresAt }));
+      } catch {}
       return;
     }
     const close = event.target.closest('form[method="dialog"]');
@@ -122,3 +145,5 @@
   wholeCoachLists();
   operationFields();
 })();
+  document.addEventListener('htmx:historyRestore', () => weekState(document));
+  window.addEventListener('pageshow', event => { if (event.persisted) weekState(document); });
