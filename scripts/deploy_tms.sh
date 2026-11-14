@@ -997,7 +997,10 @@ cmd_apply() {
 
     local migration_output ai_preflight="" ai_rename_needed=0
     if [[ -f "${RELEASE_DIR}/${AI_RENAME_COMMAND}" ]]; then
-        ai_preflight="$(candidate_django "${RELEASE_DIR}" migrate_ai_app_label --dry-run --if-needed)"
+        # 候选 release 在 plan 阶段已收紧为 root:tms，部署用户无权访问其 .venv；
+        # apply 阶段的只读预检改用服务账号与运行期环境（含 AI 凭据密钥）。
+        ai_preflight="$(env_run_as_app "${RUNTIME_ENV}" "${RELEASE_DIR}/.venv/bin/python" \
+            "${RELEASE_DIR}/manage.py" migrate_ai_app_label --dry-run --if-needed)"
         printf '%s\n' "${ai_preflight}"
         if grep -qx 'TMS_AI_RENAME_REQUIRED' <<<"${ai_preflight}"; then
             ai_rename_needed=1
