@@ -23,6 +23,15 @@
       <a class="btn btn-primary btn-sm" href="{% url 'accounts:user_roles' target_user.pk %}">分配角色</a>
       <a class="btn btn-outline btn-sm" href="{% url 'accounts:user_permissions' target_user.pk %}">查看有效权限及来源</a>
     </div>
+  {% if issue_form %}
+      <details>
+        <summary class="btn btn-outline btn-sm">生成密码重置链接</summary>
+        <div class="mt-4">
+          {% url 'accounts:admin_password_reset_issue' target_user.pk as issue_url %}
+          {% include "components/form.html" with form=issue_form action=issue_url submit_label="生成密码重置链接" %}
+        </div>
+      </details>
+    {% endif %}
   </div>
 </section>
 {% endif %}

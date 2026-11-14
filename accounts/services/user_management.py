@@ -13,6 +13,7 @@ from django.db.models import Q
 
 from accounts.models import GroupProfile, UserProfile
 from accounts.selectors import permission_display_name
+from accounts.services.password_reset import revoke_password_reset_grants
 from accounts.services.roles import _user_roles_state
 from accounts.services.users import (
     annotate_identity_labels, get_user_display_name, require_distinguishable_users, user_name_search_ids,
@@ -256,6 +257,8 @@ def save_users(*, actor, token, target_id=None):
         if operation in ("activate", "deactivate"):
             user.is_active = operation == "activate"
             user.save(update_fields=["is_active"])
+            if not user.is_active:
+                revoke_password_reset_grants(user.pk)
         elif operation == "add_roles":
             user.groups.add(*payload["roles"])
         elif operation == "remove_roles":

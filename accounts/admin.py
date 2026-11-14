@@ -7,6 +7,7 @@ from core.utils.admin_deletion import discard_registered_delete_permissions
 from standards.models import TechnicalDomainGroupScope
 from .admin_forms import GroupPermissionBundleAdminForm, NamedUserCreationForm, UserPermissionBundleAdminForm
 from .models import UserProfile, GroupProfile
+from .services.password_reset import revoke_password_reset_grants
 from .services.permission_assignments import (
     sync_group_permission_assignments,
     sync_user_permission_assignments,
@@ -52,6 +53,11 @@ class CustomUserAdmin(DefaultUserAdmin):
         )
         discard_registered_delete_permissions(objs, perms_needed)
         return deleted_objects, model_count, perms_needed, protected
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if change and not obj.is_active:
+            revoke_password_reset_grants(obj.pk)
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)

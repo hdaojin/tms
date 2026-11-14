@@ -19,7 +19,8 @@ from django.views.decorators.http import require_http_methods
 from django.views.generic import DetailView
 from django_tables2 import SingleTableView
 
-from .forms import CustomUserCreationForm, ProfileForm, RegistrationInvitationForm
+from .forms import CustomUserCreationForm, PasswordResetLinkIssueForm, ProfileForm, RegistrationInvitationForm
+from .services.password_reset import can_issue_password_reset
 from .services.users import (
     ROLE_STAFF,
     ROLE_SUPERUSER,
@@ -316,4 +317,6 @@ class UserDetailView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, De
         context["role_badges"] = get_user_role_badges(target_user, size="badge-lg")
         context["can_manage_profile"] = can_manage_profile
         context["can_edit_profile"] = can_manage_profile and not profile.locked
+        if can_issue_password_reset(self.request.user, target_user):
+            context["issue_form"] = PasswordResetLinkIssueForm()
         return context

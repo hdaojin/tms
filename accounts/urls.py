@@ -12,6 +12,12 @@ from .views import (
     revoke_invitation,
 )
 from .forms import CustomAuthenticationForm
+from .password_views import (
+    AccountPasswordChangeDoneView,
+    AccountPasswordChangeView,
+    admin_password_reset_issue,
+    password_reset_grant,
+)
 from .role_views import RoleEditView, UserPermissionView, UserRolesView
 from .user_management_views import UserManagementView
 
@@ -27,6 +33,10 @@ urlpatterns = [
         extra_context={'title': '登录'},
     ), name="login"),
     path('profile/', account_profile, name="profile"),
+    path("password-change/", AccountPasswordChangeView.as_view(), name="password_change"),
+    path("password-change/done/", AccountPasswordChangeDoneView.as_view(), name="password_change_done"),
+    path("password-reset/<uuid:grant_id>/", password_reset_grant, name="password_reset_grant"),
+    path("users/<int:pk>/password-reset-link/", admin_password_reset_issue, name="admin_password_reset_issue"),
     path('logout/', auth_views.logout_then_login, name="logout"),
     path('signup/', account_signup, name="signup"),
     path('generate-invite/', generate_invitation, name='generate_invitation'),

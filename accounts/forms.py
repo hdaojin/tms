@@ -1,9 +1,24 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm, PasswordChangeForm, SetPasswordForm
 from django.contrib.auth.models import User
 from core.utils.forms import StyledFormMixin
 from .models import UserProfile
 from .services.registration import DEFAULT_INVITATION_HOURS, MAX_INVITATION_HOURS, MAX_INVITATION_USES
+
+
+class StyledPasswordChangeForm(StyledFormMixin, PasswordChangeForm):
+    pass
+
+
+class StyledSetPasswordForm(StyledFormMixin, SetPasswordForm):
+    pass
+
+
+class PasswordResetLinkIssueForm(StyledFormMixin, forms.Form):
+    identity_verified = forms.BooleanField(
+        label="我已通过当面沟通或其他可信方式核实该用户身份，确认本次密码重置申请属于该用户本人。",
+    )
+    reason = forms.CharField(label="核验备注", max_length=200, required=False)
 
 
 class CustomAuthenticationForm(StyledFormMixin, AuthenticationForm):

@@ -3,6 +3,7 @@
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
+  <a class="btn btn-outline" href="{% url 'accounts:password_change' %}">修改密码</a>
   <!-- 用户账号信息卡片 -->
   {% include 'accounts/partials/user_info_card.html' with target_user=user email_field=form.email %}
   

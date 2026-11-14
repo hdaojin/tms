@@ -1,8 +1,43 @@
+import uuid
+
+from django.conf import settings
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.validators import RegexValidator
 from core.models import AuditedModel, TimestampedModel
+
+
+class PasswordResetGrant(TimestampedModel):
+    id = models.UUIDField("授权标识", primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+", verbose_name="目标用户",
+    )
+    issued_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="+", verbose_name="签发人",
+    )
+    token_digest = models.CharField("令牌摘要", max_length=64, unique=True)
+    password_fingerprint = models.CharField("签发时密码状态摘要", max_length=64)
+    expires_at = models.DateTimeField("过期时间")
+    used_at = models.DateTimeField("使用时间", null=True, blank=True)
+    revoked_at = models.DateTimeField("撤销时间", null=True, blank=True)
+    reason = models.CharField("核验备注", max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = "密码重置授权"
+        verbose_name_plural = "密码重置授权"
+        indexes = [models.Index(fields=["user", "-created_at"], name="reset_grant_user_created")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(used_at__isnull=True, revoked_at__isnull=True),
+                name="reset_grant_one_open_per_user",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(expires_at__gt=models.F("created_at")),
+                name="reset_grant_expiry_after_creation",
+            ),
+        ]
 
 # Create your models here.
 
