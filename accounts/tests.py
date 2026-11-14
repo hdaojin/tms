@@ -203,6 +203,18 @@ class UserListTableTemplateRegressionTest(TestCase):
 		self.assertContains(response, '选手21')
 		self.assertContains(response, '?page=2')
 
+	def test_user_list_renders_indistinguishable_users_without_selection(self):
+		first = User.objects.create_user('duplicate-first', first_name='同名用户')
+		second = User.objects.create_user('duplicate-second', first_name='同名用户')
+		distinct = User.objects.create_user('distinct', first_name='可区分用户')
+
+		response = self.client.get(reverse('accounts:user_list'), {'q': '用户'})
+
+		self.assertContains(response, '<span title="同名备注未填写或重复">无法区分</span>', count=2)
+		self.assertNotContains(response, f'name="users" value="{first.pk}"')
+		self.assertNotContains(response, f'name="users" value="{second.pk}"')
+		self.assertContains(response, f'name="users" value="{distinct.pk}"')
+
 
 class UserListRoleColumnTests(TestCase):
 	def setUp(self):

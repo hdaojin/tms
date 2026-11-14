@@ -382,7 +382,7 @@ sections:
             icon_class: icon-[tabler--shield-lock] size-5 text-warning
             permissions: [auth.view_group]
           - key: account_invitation
-            label: 生成邀请码
+            label: 新用户注册
             url_name: accounts:generate_invitation
             icon_class: icon-[tabler--user-plus] size-5 text-info
             superuser_required: true

@@ -9,6 +9,7 @@ from .views import (
     account_profile,
     account_signup,
     generate_invitation,
+    revoke_invitation,
 )
 from .forms import CustomAuthenticationForm
 from .role_views import RoleEditView, UserPermissionView, UserRolesView
@@ -29,6 +30,7 @@ urlpatterns = [
     path('logout/', auth_views.logout_then_login, name="logout"),
     path('signup/', account_signup, name="signup"),
     path('generate-invite/', generate_invitation, name='generate_invitation'),
+    path('generate-invite/<int:pk>/revoke/', revoke_invitation, name='revoke_invitation'),
     path('users/', UserListView.as_view(), name='user_list'),
     path('users/manage/', UserManagementView.as_view(), name='user_manage'),
     path('users/<int:pk>/manage/', UserManagementView.as_view(), name='user_manage_single'),

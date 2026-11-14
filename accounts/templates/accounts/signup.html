@@ -8,6 +8,9 @@
 {% block auth_content %}
   <fieldset class="fieldset mx-auto mb-6 w-full max-w-lg rounded-box border border-base-300 bg-base-100 p-6 shadow-xl">
     <legend class="fieldset-legend mb-4 text-center text-2xl font-bold">{{ title }}</legend>
+    {% if registration_throttled %}
+      <p class="alert alert-warning" role="alert">当前注册提交较多，请稍后重试。</p>
+    {% endif %}
     
     <form action="{% url 'accounts:signup' %}" method="post">
       {% csrf_token %}
@@ -55,7 +58,6 @@
         </div>
         <p class="text-info text-xs mt-1">必填，请分别填写真实的姓和名</p>
       </fieldset>
-      {% include 'components/field.html' with field=form.name_disambiguation %}
       
       {# 邀请码字段 #}
       {% include 'components/field.html' with field=form.invitation_code %}

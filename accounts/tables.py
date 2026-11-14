@@ -25,7 +25,7 @@ class UserListTable(BaseTable):
 
     def render_selection(self, record):
         if getattr(record, "identity_invalid", False):
-            return format_html('<span title="同名备注未填写或重复">无法区分</span>')
+            return mark_safe('<span title="同名备注未填写或重复">无法区分</span>')
         return format_html(
             '<input type="checkbox" class="checkbox checkbox-sm" name="users" value="{}" aria-label="选择{}" data-row-selection>',
             record.pk, getattr(record, "identity_label", "") or get_user_display_name(record),

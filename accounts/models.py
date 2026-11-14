@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.validators import RegexValidator
+from core.models import AuditedModel, TimestampedModel
 
 # Create your models here.
 
@@ -97,3 +98,44 @@ class GroupProfile(models.Model):
 
     def __str__(self):
         return f"{self.group.name} 的信息"
+
+class RegistrationInvitation(AuditedModel):
+    code_digest = models.CharField("邀请码摘要", max_length=64, unique=True, editable=False)
+    expires_at = models.DateTimeField("到期时间")
+    max_uses = models.PositiveSmallIntegerField("注册名额")
+    used_count = models.PositiveSmallIntegerField("已用名额", default=0)
+    revoked_at = models.DateTimeField("撤销时间", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "注册邀请"
+        verbose_name_plural = "注册邀请"
+        ordering = ("-created_at", "-pk")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(max_uses__gte=1, max_uses__lte=50, used_count__lte=models.F("max_uses")),
+                name="registration_invitation_valid_quota",
+            ),
+        ]
+
+
+class RegistrationInvitationUse(TimestampedModel):
+    invitation = models.ForeignKey(
+        RegistrationInvitation, on_delete=models.PROTECT, related_name="registrations", verbose_name="注册邀请",
+    )
+    user = models.OneToOneField(
+        get_user_model(), on_delete=models.SET_NULL, null=True, related_name="registration_invitation_use",
+        verbose_name="注册账号",
+    )
+
+    class Meta:
+        verbose_name = "邀请使用记录"
+        verbose_name_plural = "邀请使用记录"
+
+
+class RegistrationSubmissionWindow(TimestampedModel):
+    started_at = models.DateTimeField("窗口开始时间")
+    submissions = models.PositiveIntegerField("提交次数", default=0)
+
+    class Meta:
+        verbose_name = "注册限速窗口"
+        verbose_name_plural = "注册限速窗口"

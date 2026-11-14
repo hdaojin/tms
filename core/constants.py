@@ -9,7 +9,6 @@ from pathlib import Path
 
 # ============ 默认配置值 ============
 DEFAULT_CACHE_TIMEOUT = 300  # 默认缓存超时时间，单位秒
-INVITATION_CODE_TIMEOUT = 24 * 60 * 60  # 邀请码超时时间，单位秒
 
 
 # ============ 允许上传的文件扩展名和大小常量 ============

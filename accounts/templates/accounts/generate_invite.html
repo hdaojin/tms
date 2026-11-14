@@ -1,42 +1,76 @@
 {% extends "layouts/app.html" %}
 
 {% block content %}
-  <!-- 邀请码内容 -->
-  <div class="space-y-6 w-auto">
-    <div>
-      <h2 class="text-xl font-semibold flex items-center gap-2 mb-4">
-        <span class="icon-[tabler--qrcode]"></span>
-        邀请码
-      </h2>
-
-      <p class="text-base-content/70 mb-4">请将以下邀请码提供给需要注册的用户（建议复制后通过安全渠道发送）：</p>
-
-      <div class="flex gap-2 items-end">
-        <label class="input input-bordered flex-1">
-          <span class="label">邀请码</span>
-          <input type="text" readonly value="{{ code }}" id="inviteCode" class="font-mono text-sm" />
-        </label>
-        <button id="copyBtn" class="btn btn-primary" type="button" data-copy-target="#inviteCode" data-copied-label="已复制">
-          <span class="icon-[tabler--copy]"></span>
-          复制
-        </button>
+  <div class="space-y-4">
+    <form method="post" action="{% url 'accounts:generate_invitation' %}" class="card border border-base-300 bg-base-100 shadow-sm">
+      {% csrf_token %}
+      <div class="card-body">
+        {% include 'components/field.html' with field=form.hours %}
+        {% include 'components/field.html' with field=form.max_uses %}
+        <div><button class="btn btn-primary" type="submit">生成邀请码</button></div>
       </div>
+    </form>
 
-      <div class="alert alert-info mt-4">
-        <span class="icon-[tabler--info-circle] shrink-0"></span>
-        <div>
-          <p class="font-semibold">使用说明：</p>
-          <ul class="list-disc list-inside text-sm mt-1">
-            <li>点击"复制"按钮，将邀请码发送给用户</li>
-            <li>邀请码有效期：24小时</li>
-            <li>使用签名技术，安全防伪造</li>
-          </ul>
+    {% if code %}
+      <section class="card border border-base-300 bg-base-100 shadow-sm">
+        <div class="card-body">
+          <label class="block font-medium" for="registration-invitation">注册邀请</label>
+          <textarea id="registration-invitation" class="textarea w-full" rows="5" readonly>请打开以下链接，填写邀请码完成新用户注册。
+注册链接：{{ signup_url }}
+邀请码：{{ code }}
+到期时间：{{ issued_invitation.expires_at|date:"Y-m-d H:i:s" }}（北京时间）
+注册名额：{{ issued_invitation.max_uses }} 人</textarea>
+          <p class="text-sm">邀请码只在生成时显示，请现在复制。</p>
+          <div>
+            <button class="btn btn-primary" type="button" data-copy-target="#registration-invitation">
+              <span class="icon-[tabler--copy]" aria-hidden="true"></span>
+              复制注册邀请
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
+    {% endif %}
+
+    <div class="overflow-x-auto">
+      <table class="table">
+        <caption class="text-left font-medium">已生成的邀请</caption>
+        <thead>
+          <tr><th>编号</th><th>到期时间</th><th>已用 / 名额</th><th>状态</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          {% for invitation in invitation_page %}
+            <tr>
+              <td>{{ invitation.pk }}</td>
+              <td>{{ invitation.expires_at|date:"Y-m-d H:i:s" }}</td>
+              <td>{{ invitation.used_count }} / {{ invitation.max_uses }}</td>
+              {% if invitation.revoked_at %}
+                <td>已撤销</td><td></td>
+              {% elif invitation.expires_at <= now %}
+                <td>已过期</td><td></td>
+              {% elif invitation.used_count >= invitation.max_uses %}
+                <td>已用完</td><td></td>
+              {% else %}
+                <td>有效</td>
+                <td>
+                  <form method="post" action="{% url 'accounts:revoke_invitation' invitation.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm">撤销</button>
+                  </form>
+                </td>
+              {% endif %}
+            </tr>
+          {% empty %}
+            <tr><td colspan="5">暂无注册邀请。</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
+    {% if invitation_page.has_other_pages %}
+      <nav aria-label="邀请列表分页" class="flex items-center gap-2">
+        {% if invitation_page.has_previous %}<a class="btn btn-sm" href="?page={{ invitation_page.previous_page_number }}">上一页</a>{% endif %}
+        <span>{{ invitation_page.number }} / {{ invitation_page.paginator.num_pages }}</span>
+        {% if invitation_page.has_next %}<a class="btn btn-sm" href="?page={{ invitation_page.next_page_number }}">下一页</a>{% endif %}
+      </nav>
+    {% endif %}
   </div>
-
-{% endblock %}
-
-{% block right_sidebar %}
 {% endblock %}

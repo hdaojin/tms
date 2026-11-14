@@ -59,11 +59,6 @@ class PlanCandidateTable(CycleCandidateTable):
     def render_first_name(self, record):
         return record.identity_label or super().render_first_name(record)
 
-    def render_selection(self, record):
-        if record.identity_invalid:
-            return format_html('<span title="同名备注未填写或重复">无法区分</span>')
-        return super().render_selection(record)
-
     class Meta(CycleCandidateTable.Meta):
         fields = ("selection", "first_name", "roles", "birth_date", "age", "join_date")
         sequence = fields

@@ -7,27 +7,36 @@ from django.contrib.auth import get_user_model, login as auth_login
 from django.contrib.auth.models import Group
 from django.contrib.auth.views import LoginView
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import transaction
+from django.core.paginator import Paginator
+from django.db import IntegrityError
 from django.db.models import Case, CharField, Count, F, OuterRef, Subquery, Value, When
 from django.db.models.functions import Coalesce
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.cache import never_cache
+from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
+from django.views.decorators.http import require_http_methods
 from django.views.generic import DetailView
 from django_tables2 import SingleTableView
 
-from .forms import CustomUserCreationForm, ProfileForm
+from .forms import CustomUserCreationForm, ProfileForm, RegistrationInvitationForm
 from .services.users import (
     ROLE_STAFF,
     ROLE_SUPERUSER,
     ROLE_UNASSIGNED,
     get_user_role_badges,
 )
-from .services.registration import apply_default_registration_group
+from .services.registration import (
+    allow_registration_submission, issue_registration_invitation, register_invited_user,
+    revoke_registration_invitation,
+)
 from .services.profiles import update_profile
 from .tables import PermissionBundleReferenceTable, RoleListTable, UserListTable
 from core.permissions import get_permission_bundle_specs
-from core.utils.invitation import generate_invitation_code
+from core.utils.breadcrumbs import build_breadcrumbs
 from core.utils.decorators import superuser_required
 from core.utils.mixins import TitleMixin
-from .models import UserProfile
+from .models import RegistrationInvitation, UserProfile
 from .services.user_management import filter_users
 from .user_management_forms import UserActionForm, UserFilterForm
 from core.utils.listing import FilterableListMixin, ListFilterSpec
@@ -46,25 +55,32 @@ class CustomLoginView(LoginView):
 
 
 @login_not_required
+@never_cache
+@sensitive_post_parameters("invitation_code", "password1", "password2")
+@require_http_methods(["GET", "POST"])
 def account_signup(request):
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
+        if not allow_registration_submission():
+            response = render(request, 'accounts/signup.html', {
+                'title': "新用户注册",
+                'form': CustomUserCreationForm(),
+                'registration_throttled': True,
+            }, status=429)
+            response["Retry-After"] = "60"
+            return response
         if form.is_valid():
-            with transaction.atomic():
-                user = form.save(commit=False)
-                # 姓名已由表单处理（last_name 和 first_name）
-                # 新注册用户默认不激活（例如等待邮件激活）
-                user.is_active = False
-                user.save()
-                UserProfile.objects.get_or_create(user=user, defaults={
-                    "name_disambiguation": form.cleaned_data["name_disambiguation"],
-                })
-                apply_default_registration_group(user)
-            # 此处可添加发送激活邮件逻辑
-            return render(request, 'accounts/signup_done.html', {
-                'title': "注册成功",
-                'new_user': user
-            }) 
+            user = form.save(commit=False)
+            try:
+                register_invited_user(user=user, code=form.cleaned_data["invitation_code"])
+            except ValidationError as error:
+                form.add_error("invitation_code", error)
+            except IntegrityError:
+                if not User.objects.filter(username=user.username).exists():
+                    raise
+                form.add_error("username", "该用户名已被使用。")
+            else:
+                return render(request, 'accounts/signup_done.html', {'title': "注册成功", 'new_user': user})
     else:
         form = CustomUserCreationForm()
     
@@ -83,13 +99,38 @@ def account_home(request):
 
 
 @superuser_required
+@never_cache
+@require_http_methods(["GET", "POST"])
+@sensitive_variables("code")
 def generate_invitation(request):
-    code = generate_invitation_code()
+    if not request.user.is_active:
+        raise PermissionDenied
+    form = RegistrationInvitationForm(request.POST if request.method == "POST" else None)
+    invitation = code = None
+    if request.method == "POST" and form.is_valid():
+        invitation, code = issue_registration_invitation(actor=request.user, **form.cleaned_data)
+    title = '新用户注册'
     return render(request, 'accounts/generate_invite.html', {
-        'title': '生成邀请码',
+        'title': title,
         'title_icon': 'icon-[tabler--user-plus]',
+        'breadcrumbs': build_breadcrumbs(request, title),
+        'signup_url': request.build_absolute_uri(reverse('accounts:signup')),
+        'form': form,
+        'issued_invitation': invitation,
         'code': code,
+        'now': timezone.now(),
+        'invitation_page': Paginator(RegistrationInvitation.objects.defer("code_digest"), 20).get_page(
+            request.GET.get("page"),
+        ),
     })
+
+
+@superuser_required
+@require_http_methods(["POST"])
+def revoke_invitation(request, pk):
+    if revoke_registration_invitation(actor=request.user, invitation_id=pk):
+        messages.success(request, "邀请码已撤销。")
+    return redirect("accounts:generate_invitation")
 
 
 @login_required

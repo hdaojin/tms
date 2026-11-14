@@ -135,6 +135,14 @@
       button.addEventListener("click", function () {
         const input = document.querySelector(button.dataset.copyTarget);
         if (!input) return;
+        function selectText() {
+          input.focus();
+          input.select();
+        }
+        if (!navigator.clipboard?.writeText) {
+          selectText();
+          return;
+        }
         const originalText = button.innerHTML;
         const copiedText = button.dataset.copiedLabel || "已复制";
         navigator.clipboard.writeText(input.value).then(
@@ -148,9 +156,7 @@
               button.classList.add("btn-primary");
             }, 2000);
           },
-          function () {
-            input.select();
-          },
+          selectText,
         );
       });
     });

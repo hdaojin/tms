@@ -1,9 +1,9 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
-from core.utils.invitation import validate_invitation_code  
 from core.utils.forms import StyledFormMixin
 from .models import UserProfile
+from .services.registration import DEFAULT_INVITATION_HOURS, MAX_INVITATION_HOURS, MAX_INVITATION_USES
 
 
 class CustomAuthenticationForm(StyledFormMixin, AuthenticationForm):
@@ -51,16 +51,12 @@ class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
             'placeholder': '名',
         })
     )
-    name_disambiguation = forms.CharField(
-        label="姓名区分备注", max_length=80, required=False,
-        help_text="同名时用于区分身份，可由能查看姓名的用户看到。",
-    )
     invitation_code = forms.CharField(
         max_length=100, 
         required=True, 
         label="邀请码",
         help_text="请填写管理员提供的邀请码（复制粘贴即可）。",
-        widget=forms.TextInput(attrs={
+        widget=forms.PasswordInput(attrs={
             'placeholder': '粘贴邀请码',
         })
     )
@@ -78,15 +74,20 @@ class CustomUserCreationForm(StyledFormMixin, UserCreationForm):
             'placeholder': '请再次填写密码',
         })
 
-    def clean_invitation_code(self):
-        code_str = self.cleaned_data.get('invitation_code', '').strip()
-        if not code_str or not validate_invitation_code(code_str):
-            raise forms.ValidationError("邀请码无效或已过期")
-        return code_str
-    
     class Meta:
         model = User
         fields = ("username", "last_name", "first_name", "invitation_code", "password1", "password2")
+
+
+class RegistrationInvitationForm(StyledFormMixin, forms.Form):
+    hours = forms.IntegerField(
+        label="有效期（小时）", min_value=1, max_value=MAX_INVITATION_HOURS, initial=DEFAULT_INVITATION_HOURS,
+        help_text=f"默认 {DEFAULT_INVITATION_HOURS} 小时，最多 {MAX_INVITATION_HOURS} 小时。",
+    )
+    max_uses = forms.IntegerField(
+        label="注册名额", min_value=1, max_value=MAX_INVITATION_USES, initial=1,
+        help_text=f"默认 1 人，最多 {MAX_INVITATION_USES} 人。",
+    )
 
 
 class ProfileForm(StyledFormMixin, forms.ModelForm):
