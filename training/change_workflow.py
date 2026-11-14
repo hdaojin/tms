@@ -138,7 +138,7 @@ def can_review(user, change):
 
 
 @transaction.atomic
-def request_task_change(plan, slot, task, user, values, publish):
+def request_task_change(plan, slot, task, user, values, publish, *, written_files=None):
     from .models import TrainingChangeAttachment
 
     attachments = values.get("attachments", [])
@@ -154,7 +154,10 @@ def request_task_change(plan, slot, task, user, values, publish):
         attachment.full_clean()
         pending_files.append(attachment)
     for attachment in pending_files:
+        attachment.file.seek(0)
         attachment.save()
+        if written_files is not None:
+            written_files.append((attachment.file.storage, attachment.file.name))
     return change
 
 

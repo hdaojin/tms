@@ -45,6 +45,55 @@ def active_executions():
     return TaskExecution.objects.filter(revoked_at__isnull=True).exclude(status=TaskExecution.Status.CANCELLED)
 
 
+LOG_COMPLETION_REQUIRED = "请先填写训练完成情况，再编写或上传训练日志。"
+
+
+def log_completion_pending(user, cycle_id, day):
+    from django.db.models import Exists, OuterRef
+
+    if not TrainingCycleMember.objects.filter(
+        training_cycle_id=cycle_id, user=user, role=TrainingCycleMember.Role.COMPETITOR,
+    ).exists():
+        return False
+    completed = TrainingProgress.objects.filter(
+        execution_id=OuterRef("pk"), training_date=day, author=user, checklist__isnull=False,
+    )
+    return active_executions().filter(
+        user=user, training_task__in=scheduled_tasks(cycle_id, day),
+    ).filter(~Exists(completed)).exists()
+
+
+def visible_all_day_tasks(tasks, task):
+    from .scheduling import matching_day_tasks
+
+    if not task.schedule_slot_id:
+        return []
+    peers = list(tasks.filter(pk__in=matching_day_tasks(task.schedule_slot, task.title).order_by().values("pk"))
+                 .select_related("schedule_slot").order_by("schedule_slot__starts_at", "pk"))
+    return peers if {"morning", "afternoon"} <= {peer.schedule_slot.period for peer in peers} else []
+
+
+def mark_task_viewed(task, user, peers=()):
+    now = timezone.now()
+    active_executions().filter(
+        user=user, training_task__in=[peer.pk for peer in peers] or [task.pk],
+        viewed_at__isnull=True, training_task__status=TrainingTask.Status.PUBLISHED,
+        training_task__schedule_slot__ends_at__gt=now,
+        training_task__training_plan__published_at__isnull=False,
+        training_task__training_plan__schedule_published_at__isnull=False,
+    ).update(viewed_at=now, updated_at=now)
+
+
+def displayed_execution_status(execution, slot, now):
+    if not slot or execution.status not in {TaskExecution.Status.ASSIGNED, TaskExecution.Status.IN_PROGRESS}:
+        return execution.get_status_display()
+    if slot.ends_at and now >= slot.ends_at:
+        return TaskExecution.Status.UNFINISHED.label
+    if execution.viewed_at and slot.starts_at and now >= slot.starts_at:
+        return TaskExecution.Status.IN_PROGRESS.label
+    return execution.get_status_display()
+
+
 def daily_executions(user, cycle, day):
     return (
         active_executions()
@@ -82,6 +131,34 @@ def has_text(record):
     return bool(record and (record.completed.strip() or record.problems.strip()))
 
 
+def completion_groups(executions):
+    from .checklists import checklist_items
+
+    groups = {}
+    for row in executions:
+        task = row.training_task
+        slot = task.schedule_slot
+        titles = tuple(item["title"] for item in checklist_items(task))
+        key = (task.training_plan_id, slot.primary_domain_id, slot.kind, task.title, titles)
+        groups.setdefault(key, []).append(row)
+    return groups.values()
+
+
+def expand_completion(group, selected):
+    from .checklists import checklist_items
+
+    selected = set(selected)
+    indexes = {
+        index for index, item in enumerate(checklist_items(group[0].training_task)) if item["id"] in selected
+    }
+    return {
+        execution.pk: [
+            item["id"] for index, item in enumerate(checklist_items(execution.training_task)) if index in indexes
+        ]
+        for execution in group
+    }
+
+
 def day_fingerprint(executions):
     from .checklists import checklist_items
 
@@ -95,7 +172,7 @@ def day_fingerprint(executions):
     ]
 
 
-def save_day(user, cycle, day, fingerprint, entries, *, problems, images):
+def save_day(user, cycle, day, fingerprint, entries, *, problems, images, issues=None):
     from django.core.exceptions import ValidationError
     from django.db import transaction
 
@@ -127,7 +204,7 @@ def save_day(user, cycle, day, fingerprint, entries, *, problems, images):
                 or set(entries) != {e.pk for e in executions}
             ):
                 raise ValidationError("当天任务或填报已变化，请重新打开页面后填写。")
-            if not problems.strip() and any(
+            if not problems.strip() and not issues and any(
                 set(entries[row.pk]) != {item["id"] for item in checklist_items(row.training_task)}
                 for row in executions
             ):
@@ -148,6 +225,7 @@ def save_day(user, cycle, day, fingerprint, entries, *, problems, images):
                     problems=problems if execution.pk == shared_execution_id else "",
                     files=images if execution.pk == shared_execution_id else (),
                     checklist=checklist,
+                    issues=issues if execution.pk == shared_execution_id else None,
                     written_files=written_files,
                 )
                 status = (
@@ -155,7 +233,7 @@ def save_day(user, cycle, day, fingerprint, entries, *, problems, images):
                     if len(selected) == len(items)
                     else TaskExecution.Status.PARTIALLY_COMPLETED
                     if selected
-                    else TaskExecution.Status.ASSIGNED
+                    else TaskExecution.Status.UNFINISHED
                 )
                 now = timezone.now()
                 updates = {"status": status, "updated_at": now}

@@ -75,8 +75,16 @@ class ProcessFixture(TrainingFixtureMixin):
         TrainingCycleMember.objects.create(training_cycle=self.cycle_obj, user=user, role=role)
         return user
 
-    def task(self, **values):
-        return scheduling.save_slot_task(self.slot, self.coach, {"title": "任务", **values}, publish=True)
+    def other_slot(self, period="afternoon"):
+        slot = self.slot.day.slots.get(period=period)
+        slot.kind, slot.primary_domain = "technical", self.linux
+        slot.save()
+        slot.domains.add(self.linux)
+        slot.coaches.add(self.coach)
+        return slot
+
+    def task(self, *, slot=None, **values):
+        return scheduling.save_slot_task(slot or self.slot, self.coach, {"title": "任务", **values}, publish=True)
 
 
 class TrainingProcessTests(ProcessFixture, TestCase):
@@ -299,21 +307,38 @@ class TrainingProcessTests(ProcessFixture, TestCase):
         self.assertNotContains(response, "排班调整申请")
         self.assertEqual(self.client.get(reverse("training:task_detail", args=[task.pk])).status_code, 404)
         self.client.force_login(self.student)
-        response = self.client.get(reverse("training:execution_detail", args=[task.executions.get().pk]))
+        response = self.client.get(reverse("training:my_training"), {"date": task.planned_date.isoformat()})
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "填写训练完成情况")
+        self.assertContains(response, reverse("training:task_detail", args=[task.pk]))
         response = self.client.get(reverse("training:plan_detail", args=[self.plan.pk]), {"tab": "tasks"})
         self.assertContains(response, task.title)
 
     def test_http_personal_task_form_and_coach_feedback(self):
         self.task()
         self.client.force_login(self.student)
-        response = self.client.post(
-            reverse("training:personal_create", args=[self.plan.pk]),
-            {"date": "2026-01-02", "title": "自主排错", "period": "", "description": "**实践**"},
+        query = "?date=2026-01-02&scope=all"
+        url = reverse("training:personal_create", args=[self.plan.pk]) + query
+        return_url = reverse("training:my_training") + query
+        self.assertContains(self.client.get(return_url), url.replace("&", "&amp;"))
+        response = self.client.get(url)
+        self.assertEqual(
+            [(crumb.label, crumb.url) for crumb in response.context["breadcrumbs"][-2:]],
+            [("我的训练", return_url), ("添加自主训练任务", None)],
         )
-        self.assertEqual(response.status_code, 302)
+        form = response.context["form"]
+        self.assertEqual(list(form.fields), ["date", "title", "domain", "description", "skills"])
+        self.assertTrue(form.fields["date"].disabled)
+        self.assertContains(response, "任务描述")
+        response = self.client.post(url, {
+            "date": "2026-01-01", "title": "自主排错", "period": "morning", "description": "**实践**",
+        })
+        self.assertRedirects(response, return_url)
         task = PersonalTrainingTask.objects.get()
+        self.assertEqual(task.date, date(2026, 1, 2))
+        self.assertEqual(task.period, "")
+        self.assertRedirects(self.client.post(url, {"title": "第二项自主任务"}), return_url)
+        self.assertEqual(PersonalTrainingTask.objects.filter(date=task.date).count(), 2)
+        self.assertEqual(self.client.post(url.replace("2026-01-02", "2026-01-03"), {"title": "计划外"}).status_code, 404)
         self.client.force_login(self.coach)
         response = self.client.post(
             reverse("training:personal_detail", args=[task.pk]),

@@ -121,7 +121,7 @@
       <h2 class="card-title"><span role="status">{{ job.get_status_display }}</span></h2>
       {% if running %}
         <p>可以离开此页面，稍后返回查看结果。</p>
-        <a class="btn btn-outline btn-sm self-start" href="{{ request.path }}">刷新状态</a>
+        <a class="btn btn-outline btn-sm self-start" href="{{ request.get_full_path }}">刷新状态</a>
       {% elif job.status == "review" %}
         {% if not can_view_job %}<p>素材范围已变化，请重新预览。</p>
         {% elif host %}
@@ -188,13 +188,13 @@
       {% elif job.error %}
         <p class="alert alert-error" role="alert">{{ job.error }}</p>
         {% if request.GET.generation_status %}
-          <a class="btn btn-outline btn-sm self-start" href="{{ request.path }}">返回生成设置</a>
+          <a class="btn btn-outline btn-sm self-start" href="{{ request.get_full_path }}">返回生成设置</a>
         {% endif %}
       {% endif %}
     </div>
   </section>
   {% elif request.GET.generation_status %}
-    <a class="btn btn-outline btn-sm" href="{{ request.path }}">返回训练日志草稿</a>
+    <a class="btn btn-outline btn-sm" href="{{ request.get_full_path }}">返回训练日志草稿</a>
   {% endif %}
 </div>
 {% endpartialdef %}
@@ -205,7 +205,7 @@
   <section class="card border border-base-300 bg-base-100 shadow-sm">
     <div class="card-body">
       <h2 class="card-title">编辑正文</h2>
-      <form method="post" class="space-y-3" hx-post="{{ request.path }}" hx-target="#draft-editor" hx-swap="outerHTML show:none">
+      <form method="post" class="space-y-3" hx-post="{{ request.get_full_path }}" hx-target="#draft-editor" hx-swap="outerHTML show:none">
         {% csrf_token %}
         <input type="hidden" name="action" value="edit">
         {% if editor_error %}<p class="alert alert-error" role="alert">{{ editor_error }}</p>{% endif %}

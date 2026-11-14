@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone as dt_timezone
 from unittest.mock import patch
 
+from django.contrib.auth.models import Permission
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import TestCase
 from django.urls import reverse
@@ -62,13 +63,13 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
             reason,
         )
 
-    def save_day(self, day=None, note="备注", reason=""):
+    def save_day(self, day=None, note="备注", reason="", *, user=None):
         day = day or self.day
         day.refresh_from_db()
         before = service.day_snapshot(day)
         return service.save_schedule(
             self.plan,
-            self.admin,
+            user or self.admin,
             [
                 {
                     "type": "day",
@@ -108,6 +109,10 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
 
     def test_past_initial_entry_is_immediate_but_later_edit_requires_reason_and_approval(self):
         self.publish_plan()
+        self.plan.schedulers.add(self.coach)
+        self.coach.user_permissions.add(Permission.objects.get(
+            content_type__app_label="training", codename="schedule_trainingplan",
+        ))
         with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 4, tzinfo=dt_timezone.utc)):
             self.assertIsNone(self.save_slot())
             self.assertIsNone(self.save_day())
@@ -120,14 +125,18 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
             self.plan.schedule_published_at = timezone.now()
             self.plan.save(update_fields=["schedule_published_at", "updated_at"])
             with self.assertRaisesMessage(ValidationError, "调整原因"):
-                self.save_day(note="第二次")
-            change = self.save_day(note="第二次", reason="补正")
+                self.save_day(note="第二次", user=self.coach)
+            change = self.save_day(note="第二次", reason="补正", user=self.coach)
             self.assertEqual(change.status, "pending")
             self.day.refresh_from_db()
             self.assertEqual(self.day.note, "草稿再次修改")
             service.review_change(change, self.admin, approve=True)
             self.day.refresh_from_db()
             self.assertEqual(self.day.note, "第二次")
+            self.assertIsNone(self.save_day(note="管理员补正"))
+            self.day.refresh_from_db()
+            self.assertEqual(self.day.note, "管理员补正")
+            self.assertEqual(self.plan.schedule_changes.count(), 1)
 
     def test_clearing_does_not_reset_initial_entry(self):
         self.publish_plan()
@@ -235,6 +244,10 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
         forms = response.context["slot_forms"]
         self.assertEqual(len(forms), self.day.slots.filter(is_configured=True).count())
         self.assertContains(response, "全天同一安排")
+        self.assertContains(response, "应用到选定的时段")
+        self.assertContains(response, "data-apply-slot", count=len(forms))
+        for form in forms:
+            self.assertContains(response, f'data-apply-slot value="{form.prefix}" checked')
         self.assertContains(response, "data-schedule-reset")
         self.assertNotContains(response, 'value="publish"')
         data = self.editor_data(response) | {"day_only": "1", "day-0-note": "全天休息"}

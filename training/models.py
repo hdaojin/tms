@@ -625,6 +625,13 @@ class TrainingTask(models.Model):
     class Meta:
         verbose_name = verbose_name_plural = "训练任务"
         ordering = ["planned_date", "order", "pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["schedule_slot"],
+                condition=Q(schedule_slot__isnull=False) & ~Q(status="cancelled"),
+                name="uniq_active_training_task_per_slot",
+            )
+        ]
 
     @property
     def skill_project(self):
@@ -828,6 +835,7 @@ class TaskExecution(models.Model):
     )
     status = models.CharField("状态", max_length=30, choices=Status.choices, default=Status.ASSIGNED)
     assigned_at = models.DateTimeField("分配时间", auto_now_add=True)
+    viewed_at = models.DateTimeField("首次查看时间", null=True, blank=True)
     started_at = models.DateTimeField("开始时间", null=True, blank=True)
     completed_at = models.DateTimeField("完成时间", null=True, blank=True)
     actual_minutes = models.PositiveIntegerField(
@@ -1092,6 +1100,7 @@ class TrainingStateChange(ImmutableTrainingRecord):
 
 
 class TrainingProgress(TimestampedModel):
+    issues = models.JSONField("当天问题", default=list, blank=True)
     training_date = models.DateField("训练日期", null=True, blank=True)
     checklist = models.JSONField("完成情况快照", null=True, blank=True, editable=False)
     execution = models.ForeignKey(TaskExecution, on_delete=models.PROTECT, null=True, blank=True, related_name="progress_records", verbose_name="官方任务分配")
@@ -1117,6 +1126,7 @@ class TrainingProgress(TimestampedModel):
 
 
 class TrainingProgressRevision(ImmutableTrainingRecord):
+    issues = models.JSONField("原当天问题", default=list, blank=True)
     checklist = models.JSONField("修改前完成情况", null=True, blank=True, editable=False)
     progress = models.ForeignKey(TrainingProgress, on_delete=models.PROTECT, related_name="revisions", verbose_name="进度记录")
     actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="修订人")

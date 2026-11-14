@@ -85,9 +85,9 @@ class TrainingListPageTests(TrainingFixtureMixin, TestCase):
                 ("published", {today_published.pk, future_published.pk}),
             ):
                 with self.subTest(status=status):
-                    response = self.client.get(url, {"status": status})
+                    response = self.client.get(url, {"scope": "all", "status": status})
                     self.assertEqual(self.table_ids(response), expected)
-            response = self.client.get(url, {"status": "published", "q": "当天"})
+            response = self.client.get(url, {"scope": "all", "status": "published", "q": "当天"})
             self.assertEqual(self.table_ids(response), {today_published.pk})
 
     def test_plan_search_never_expands_visible_range(self):
@@ -100,8 +100,8 @@ class TrainingListPageTests(TrainingFixtureMixin, TestCase):
         hidden = self.plan(cycle, "不可见计划")
         self.client.force_login(viewer)
         url = reverse("training:plan_list")
-        self.assertEqual(self.table_ids(self.client.get(url, {"q": "SCOPE"})), {visible.pk})
-        self.assertEqual(self.table_ids(self.client.get(url, {"q": hidden.title})), set())
+        self.assertEqual(self.table_ids(self.client.get(url, {"scope": "all", "q": "SCOPE"})), {visible.pk})
+        self.assertEqual(self.table_ids(self.client.get(url, {"scope": "all", "q": hidden.title})), set())
 
     def test_plan_edit_action_matches_object_permission(self):
         cycle = self.cycle()
@@ -116,13 +116,13 @@ class TrainingListPageTests(TrainingFixtureMixin, TestCase):
         list_url = reverse("training:plan_list")
         own_url = reverse("training:plan_edit", args=[own.pk])
         assigned_url = reverse("training:plan_edit", args=[assigned.pk])
-        response = self.client.get(list_url)
+        response = self.client.get(list_url, {"scope": "all"})
         self.assertContains(response, own_url)
         self.assertContains(response, assigned_url)
         self.assertEqual(self.client.get(assigned_url).status_code, 200)
         assigned.schedulers.remove(viewer)
         assigned.task_managers.add(viewer)
-        self.assertNotContains(self.client.get(list_url), assigned_url)
+        self.assertNotContains(self.client.get(list_url, {"scope": "all"}), assigned_url)
         self.assertEqual(self.client.get(assigned_url).status_code, 404)
 
     def test_htmx_filters_return_only_updated_results(self):
@@ -130,7 +130,7 @@ class TrainingListPageTests(TrainingFixtureMixin, TestCase):
         plan = self.plan(cycle, "局部刷新计划")
         for list_name, query, expected in (
             ("cycle_list", {"q": "FRAGMENT", "status": "planning"}, cycle.pk),
-            ("plan_list", {"q": "局部刷新计划"}, plan.pk),
+            ("plan_list", {"scope": "all", "q": "局部刷新计划"}, plan.pk),
         ):
             with self.subTest(page=list_name):
                 response = self.client.get(reverse(f"training:{list_name}"), query, HTTP_HX_REQUEST="true")

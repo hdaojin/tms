@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 from standards.models import Skill
 from .models import (
     TaskExecution,
+    TrainingChangeRecord,
     TrainingCycleMember,
     TrainingPlan,
     TrainingScheduleDay,
@@ -133,7 +134,9 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(draft.subtasks, [])
         self.assertTrue(draft.assign_all)
 
-        task = self.new_task(assign_all=False, competitors=[self.student.pk], subtask_titles=["核对配置"])
+        task = service.save_slot_task(self.slot, self.coach, {
+            "assign_all": False, "competitors": [self.student.pk], "subtask_titles": ["核对配置"],
+        }, task=draft, publish=True)
         edit_url = reverse("training:task_edit", args=[task.pk])
         response = self.client.get(edit_url)
         self.assertIs(response.context["form"]["assign_all"].value(), False)
@@ -292,6 +295,42 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         stale.refresh_from_db()
         self.assertEqual(stale.status, "pending")
 
+    def test_superuser_adjusts_published_schedule_directly_and_stale_request_cannot_overwrite(self):
+        self.ready()
+        change = service.save_schedule(
+            self.plan, self.scheduler, [self.change_slot(coaches=[self.collaborator.pk])], "待审交接",
+        )
+        self.assertIsNone(service.save_schedule(
+            self.plan, self.admin, [self.change_slot(coaches=[self.coach.pk])],
+        ))
+        self.confirm_change_coaches(change)
+        with self.assertRaisesMessage(ValidationError, "已经变化"):
+            service.review_change(change, self.approver, approve=True)
+        self.assertEqual(list(self.slot.coaches.values_list("pk", flat=True)), [self.coach.pk])
+        change.refresh_from_db()
+        self.assertEqual(change.status, "pending")
+        self.assertEqual(self.plan.schedule_changes.count(), 1)
+
+    def test_superuser_saves_expired_published_task_without_approval(self):
+        self.ready()
+        task = self.new_task(assign_all=True)
+        with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 4, tzinfo=dt_timezone.utc)):
+            url = reverse("training:task_edit", args=[task.pk])
+            self.client.force_login(self.admin)
+            self.assertNotContains(self.client.get(url), "提交修改审批")
+            response = self.client.post(url, {"title": "直接补正"})
+            self.assertEqual(response.status_code, 302)
+            response = self.client.post(url, {"title": "再次补正", "reason": "补充说明"})
+            self.assertEqual(response.status_code, 302)
+            service.assign_competitors(task, self.admin, selected=[self.student.pk])
+        task.refresh_from_db()
+        self.assertEqual(task.title, "再次补正")
+        record = TrainingChangeRecord.objects.get(task=task, actor=self.admin, action="保存任务", reason="补充说明")
+        self.assertEqual(record.before["title"], "直接补正")
+        self.assertEqual(record.after["title"], "再次补正")
+        self.assertIsNotNone(task.executions.get(user=self.student2).revoked_at)
+        self.assertFalse(self.plan.schedule_changes.exists())
+
     def test_requester_permission_revocation_is_rechecked(self):
         self.ready()
         change = service.save_schedule(
@@ -414,11 +453,12 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
     def test_export_layout_and_only_published_effective_content(self):
         self.ready()
         first = self.new_task(title="第一任务" * 15)
-        second = self.new_task(title="第二任务")
-        draft = self.new_task(title="机密草稿")
-        TrainingTask.objects.filter(pk=draft.pk).update(status="draft")
+        afternoon = self.day.slots.get(period="afternoon")
+        afternoon.kind = "general"
+        afternoon.save()
+        afternoon.coaches.add(self.coach)
+        service.save_slot_task(afternoon, self.coach, {"title": "机密草稿"})
         service.publish_slot_task(first, self.coach)
-        service.publish_slot_task(second, self.coach)
         rest = self.day.slots.get(period="evening")
         change = service.save_schedule(self.plan, self.scheduler, [self.change_slot(rest, kind="rest")], "晚间休息")
         self.confirm_change_coaches(change)
@@ -431,7 +471,7 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
             [sheet.cell(2, col).value for col in range(1, 9)],
             ["日期", "星期", "时间", "领域", "训练任务", "负责教练", "值班人员", "备注"],
         )
-        self.assertIn("第二任务", sheet["E4"].value)
+        self.assertIn("第一任务", sheet["E4"].value)
         self.assertNotIn("机密草稿", str(list(sheet.values)))
         self.assertEqual(sheet["D6"].value, "休息")
         self.assertIn("A3:A6", str(sheet.merged_cells))
@@ -477,8 +517,10 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         self.assertContains(response, "局部新增")
         unrelated = self.day.slots.get(period="evening")
         self.assertNotContains(response, f'id="schedule-slot-{unrelated.pk}"')
+        task = self.slot.tasks.get()
         response = self.client.post(
-            url, {"title": "筛选中新增"}, HTTP_HX_REQUEST="true", HTTP_HX_CURRENT_URL=current + "?q=LDAP"
+            reverse("training:task_edit", args=[task.pk]), {"title": "筛选中修改"},
+            HTTP_HX_REQUEST="true", HTTP_HX_CURRENT_URL=current + "?q=LDAP",
         )
         self.assertEqual(response.headers["HX-Trigger"], "scheduleChanged")
         self.assertNotContains(response, 'hx-swap-oob="outerHTML"')
@@ -771,19 +813,138 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         service.publish_slot_task(task, self.coach)
         self.assertFalse(task.executions.filter(user=later).exists())
 
-    def test_entries_task_expansion_and_editor_targets(self):
+    def test_day_task_editor_checks_scope_and_overwrites_in_place(self):
+        self.ready(general=True)
+        slots = list(self.day.slots.exclude(period="early"))
+        for slot in slots:
+            slot.kind = "general"
+            slot.save()
+            slot.coaches.set([self.coach])
+        self.slot.refresh_from_db()
+        task = self.new_task(subtask_titles=["原子任务"])
+        execution_ids = list(task.executions.values_list("pk", flat=True))
+        url = reverse("training:day_task_edit", args=[self.plan.pk, self.day.pk])
+        self.client.force_login(self.collaborator)
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(self.coach)
+        response = self.client.get(url)
+        self.assertContains(response, "编辑全天任务")
+        self.assertContains(response, 'name="targets"', count=3)
+        data = {
+            "version": response.context["version"], "action": "apply",
+            "targets": [slot.pk for slot in slots],
+            "common-title": "统一训练", "common-subtask_titles": ["步骤一", "步骤二"],
+            "common-assign_all": "on", "common-assignment_configured": "True",
+        }
+        self.assertContains(self.client.post(url, data), "请确认覆盖")
+        response = self.client.post(url, data | {"overwrite": "on"})
+        self.assertRedirects(response, url)
+        task.refresh_from_db()
+        self.assertEqual(task.title, "统一训练")
+        self.assertEqual(task.status, "published")
+        self.assertEqual(list(task.executions.values_list("pk", flat=True)), execution_ids)
+        self.assertEqual([item["title"] for item in task.subtasks], ["步骤一", "步骤二"])
+        self.assertEqual(self.plan.tasks.filter(status="draft").count(), 2)
+        self.assertContains(self.client.post(url, data | {"overwrite": "on"}), "已经变化")
+        response = self.client.get(url)
+        prefix = f"slot-{self.slot.pk}"
+        response = self.client.post(url, {
+            "version": response.context["version"], "slot": self.slot.pk,
+            f"{prefix}-title": "仅修改上午", f"{prefix}-assign_all": "on",
+            f"{prefix}-assignment_configured": "True",
+            f"{prefix}-subtask_titles": ["步骤一", "步骤二"],
+        }, HTTP_HX_REQUEST="true")
+        self.assertContains(response, "仅修改上午")
+        task.refresh_from_db()
+        self.assertEqual(task.title, "仅修改上午")
+        self.assertEqual(self.plan.tasks.filter(title="统一训练").count(), 2)
+
+    def test_day_task_editor_requires_common_coach_and_checks_early_separately(self):
+        self.ready(general=True)
+        slots = {slot.period: slot for slot in self.day.slots.all()}
+        for slot in slots.values():
+            slot.kind = "general"
+            slot.save()
+        slots["morning"].coaches.set([self.coach, self.collaborator])
+        slots["afternoon"].coaches.set([self.collaborator])
+        slots["evening"].coaches.set([self.coach])
+        slots["early"].coaches.set([self.coach])
+        self.client.force_login(self.admin)
+        plan_url = reverse("training:plan_detail", args=[self.plan.pk])
+        url = reverse("training:day_task_edit", args=[self.plan.pk, self.day.pk])
+        self.assertNotContains(self.client.get(plan_url), "编辑全天任务")
+        self.assertEqual(self.client.get(url).status_code, 403)
+
+        slots["evening"].coaches_all = True
+        slots["evening"].save()
+        slots["evening"].coaches.set([self.coach, self.collaborator])
+        self.assertContains(self.client.get(plan_url), "编辑全天任务")
+        response = self.client.get(url)
+        self.assertContains(response, 'name="targets"', count=3)
+        self.client.force_login(self.coach)
+        self.assertNotContains(self.client.get(plan_url), "编辑全天任务")
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.client.force_login(self.collaborator)
+        self.assertContains(self.client.get(plan_url), "编辑全天任务")
+        response = self.client.get(url)
+        self.assertContains(response, 'name="targets"', count=3)
+        self.assertEqual(self.client.post(url, {
+            "action": "apply", "targets": [slots["early"].pk], "version": response.context["version"],
+        }).status_code, 403)
+        slots["early"].coaches.add(self.collaborator)
+        self.assertContains(self.client.get(url), 'name="targets"', count=4)
+
+        slots["afternoon"].coaches.set([self.coach])
+        slots["evening"].coaches.set([self.collaborator])
+        self.assertEqual(self.client.post(url, {
+            "action": "apply", "targets": [slots["morning"].pk], "version": response.context["version"],
+        }).status_code, 403)
+
+    def test_day_task_apply_rolls_back_when_started_assignment_would_be_removed(self):
+        self.ready(general=True)
+        afternoon = self.day.slots.get(period="afternoon")
+        afternoon.kind = "general"
+        afternoon.save()
+        afternoon.coaches.set([self.coach])
+        evening = self.day.slots.get(period="evening")
+        evening.kind = "general"
+        evening.save()
+        evening.coaches.set([self.coach])
+        task = self.new_task()
+        execution = task.executions.get(user=self.student2)
+        execution.started_at = timezone.now()
+        execution.save()
+        self.client.force_login(self.admin)
+        url = reverse("training:day_task_edit", args=[self.plan.pk, self.day.pk])
+        response = self.client.get(url)
+        response = self.client.post(url, {
+            "version": response.context["version"], "action": "apply", "overwrite": "on",
+            "targets": [afternoon.pk, self.slot.pk],
+            "common-title": "不能覆盖", "common-competitors": [self.student.pk],
+            "common-assignment_configured": "True",
+        })
+        self.assertContains(response, "已经开始的执行不能移出")
+        task.refresh_from_db()
+        self.assertEqual(task.title, "部署服务")
+        self.assertFalse(afternoon.tasks.exists())
+
+    def test_entries_allow_only_one_active_task_and_keep_editor_targets(self):
         self.ready()
-        for title in ("第一项", "第二项", "第三项"):
-            self.new_task(title=title)
+        task = self.new_task(title="唯一任务")
+        with self.assertRaisesMessage(ValidationError, "该时段已有任务"):
+            self.new_task(title="重复任务")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            TrainingTask.objects.create(
+                training_plan=self.plan, schedule_slot=self.slot, planned_date=self.day.date,
+                title="直接写入重复任务", created_by=self.coach,
+            )
         self.client.force_login(self.coach)
         url = reverse("training:plan_detail", args=[self.plan.pk])
         response = self.client.get(url)
-        self.assertContains(response, "还有 1 项")
-        self.assertContains(response, 'data-task-expand')
         self.assertContains(response, 'hx-target="#task-editor"')
-        for title in ("第一项", "第二项", "第三项"):
-            self.assertContains(response, title)
-        editor = self.client.get(reverse("training:slot_task_create", args=[self.slot.pk]), HTTP_HX_REQUEST="true", HTTP_HX_TARGET="task-editor")
+        self.assertContains(response, "唯一任务")
+        self.assertNotContains(response, reverse("training:slot_task_create", args=[self.slot.pk]))
+        editor = self.client.get(reverse("training:task_edit", args=[task.pk]), HTTP_HX_REQUEST="true", HTTP_HX_TARGET="task-editor")
         self.assertContains(editor, 'hx-target="#task-editor"')
         self.assertNotContains(editor, '<html')
         self.client.force_login(self.scheduler)

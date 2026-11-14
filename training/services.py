@@ -123,6 +123,10 @@ def save_training_log(log, executions, *, backfill=False, finalize=None):
             if not log.pk:
                 get_user_model().objects.select_for_update().get(pk=log.author_id)
                 validate_new_log(log, backfill=backfill)
+                from .daily_progress import LOG_COMPLETION_REQUIRED, log_completion_pending
+
+                if log_completion_pending(log.author, log.training_cycle_id, log.training_date):
+                    raise ValidationError(LOG_COMPLETION_REQUIRED)
                 log.is_backfill = backfill
             if log.pk:
                 previous = TrainingLog.objects.select_for_update().get(pk=log.pk)
@@ -214,20 +218,6 @@ def update_execution_facts(execution, *, user, **values):
     return execution
 
 
-@transaction.atomic
-def record_coach_feedback(execution, *, user, feedback):
-    execution = TaskExecution.objects.select_for_update().get(pk=execution.pk)
-    task = execution.training_task
-    if task.schedule_slot_id:
-        from .process import add_feedback
-        return add_feedback(execution, user, feedback)
-    if not user.is_superuser and not task.coach_links.filter(user=user).exists():
-        raise ValidationError("只有任务教练或超级管理员可以填写教练反馈。")
-    execution.coach_feedback = feedback
-    execution.feedback_by = user
-    execution.feedback_at = timezone.now()
-    execution.save(update_fields=["coach_feedback", "feedback_by", "feedback_at", "updated_at"])
-    return execution
 
 
 def suggest_executions_for_log(user, cycle, date):

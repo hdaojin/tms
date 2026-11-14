@@ -36,7 +36,7 @@ class PlanStagesTests(ProcessFixture, TestCase):
                 **{name: getattr(self.plan, name).isoformat() for name in TrainingPlan.TIME_FIELDS}, **overrides}
 
     def test_task_publication_is_individual_and_all_three_gates_apply(self):
-        draft = scheduling.save_slot_task(self.slot, self.coach, {"title": "未发布的秘密任务"})
+        draft = scheduling.save_slot_task(self.other_slot(), self.coach, {"title": "未发布的秘密任务"})
         live = scheduling.save_slot_task(self.slot, self.coach, {"title": "已发布的任务"}, publish=True)
         self.assertEqual(draft.status, "draft")
         self.assertFalse(draft.executions.exists())
@@ -154,10 +154,9 @@ class PlanStagesTests(ProcessFixture, TestCase):
         before = scheduling.slot_snapshot(self.slot)
         payload = [{"type": "slot", "id": self.slot.pk, "revision": self.slot.revision, "before": before,
                     "after": before | {"coaches": [self.other.pk]}}]
-        change = scheduling.save_schedule(self.plan, self.admin, payload, "交接负责教练")
+        change = scheduling.save_schedule(self.plan, self.coach, payload, "交接负责教练")
         with self.assertRaises(PermissionDenied):
             review(change, self.admin, approve=True)
-        review(change, self.coach, approve=True)
         review(change, self.other, approve=True)
         self.slot.refresh_from_db()
         self.assertIn(self.coach.pk, self.slot.coaches.values_list("pk", flat=True))
@@ -170,7 +169,7 @@ class PlanStagesTests(ProcessFixture, TestCase):
     def test_all_duty_approval_rechecks_roster(self):
         day = self.slot.day
         before = scheduling.day_snapshot(day)
-        change = scheduling.save_schedule(self.plan, self.admin, [{
+        change = scheduling.save_schedule(self.plan, self.coach, [{
             "type": "day", "id": day.pk, "revision": day.revision, "before": before,
             "after": before | {"duty_all": True, "duty_coaches": []},
         }], "安排全员值班")
@@ -205,13 +204,13 @@ class PlanStagesTests(ProcessFixture, TestCase):
         before = scheduling.slot_snapshot(self.slot)
         payload = [{"type": "slot", "id": self.slot.pk, "revision": self.slot.revision, "before": before,
                     "after": before | {"coaches": [self.other.pk]}}]
-        change = scheduling.save_schedule(self.plan, self.admin, payload, "申请交接")
-        review(change, self.coach, approve=False, note="仍按原安排")
+        change = scheduling.save_schedule(self.plan, self.coach, payload, "申请交接")
+        review(change, self.other, approve=False, note="仍按原安排")
         change.refresh_from_db()
         self.slot.refresh_from_db()
         self.assertEqual(change.status, "rejected")
         self.assertIn(self.coach.pk, self.slot.coaches.values_list("pk", flat=True))
-        self.assertEqual(change.confirmations[0]["decision"], "reject")
+        self.assertEqual(change.confirmations[1]["decision"], "reject")
 
     def test_new_responsible_coach_can_view_and_confirm_request_before_handoff(self):
         before = scheduling.slot_snapshot(self.slot)

@@ -101,7 +101,7 @@ def change_state(target, user, status):
 
 @transaction.atomic
 def save_progress(target, user, *, completed, problems, progress=None, files=(), training_date=None,
-                  checklist=None, written_files=None):
+                  checklist=None, written_files=None, issues=None):
     target = lock_target(target)
     if training_date is not None:
         from .daily_progress import validate_daily_execution
@@ -119,7 +119,7 @@ def save_progress(target, user, *, completed, problems, progress=None, files=(),
             raise ValidationError("请通过训练完成情况页面修订。")
         TrainingProgressRevision.objects.create(
             progress=progress, actor=user, completed=progress.completed, problems=progress.problems,
-            checklist=progress.checklist,
+            checklist=progress.checklist, issues=progress.issues,
         )
     else:
         progress = TrainingProgress(**target_fields(target), author=user, training_date=training_date)
@@ -127,6 +127,8 @@ def save_progress(target, user, *, completed, problems, progress=None, files=(),
         raise ValidationError("请填写完成内容、存在问题或上传附件。")
     progress.completed, progress.problems = completed, problems
     progress.checklist = checklist
+    if issues is not None:
+        progress.issues = issues
     progress.full_clean()
     progress.save()
     attachments = [

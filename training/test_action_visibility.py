@@ -70,29 +70,6 @@ class TrainingActionVisibilityTests(TrainingFixtureMixin, TestCase):
         self.assertNotContains(self.client.get(reverse("training:task_detail", args=[self.task.pk])), url)
         self.assertEqual(self.client.get(url).status_code, 404)
 
-    def test_execution_edit_link_only_for_own_execution(self):
-        other_cycle = self.cycle(code="OTHER")
-        self.bind(other_cycle)
-        TrainingCycleMember.objects.create(training_cycle=other_cycle, user=self.owner, role="competitor")
-        TrainingCycleMember.objects.create(training_cycle=other_cycle, user=self.user, role="coach")
-        plan = TrainingPlan.objects.create(
-            training_cycle=other_cycle,
-            title="另一计划",
-            start_date=date(2026, 1, 1),
-            end_date=date(2026, 1, 31),
-            created_by=self.owner,
-        )
-        task = TrainingTask.objects.create(
-            training_plan=plan,
-            title="另一任务",
-            planned_date=date(2026, 1, 10),
-            requirements="要求",
-            created_by=self.owner,
-        )
-        task.coach_links.create(user=self.user)
-        other = TaskExecution.objects.create(training_task=task, user=self.owner)
-        response = self.client.get(reverse("training:execution_list"))
-        mine = TaskExecution.objects.get(training_task=self.task, user=self.user)
-        self.assertContains(response, reverse("training:execution_edit", args=[mine.pk]))
-        self.assertNotContains(response, reverse("training:execution_edit", args=[other.pk]))
-        self.assertContains(response, reverse("training:execution_detail", args=[other.pk]))
+    def test_single_execution_pages_are_removed(self):
+        for path in ("/training/executions/", "/training/executions/1/", "/training/executions/1/edit/"):
+            self.assertEqual(self.client.get(path).status_code, 404)

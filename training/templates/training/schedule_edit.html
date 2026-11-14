@@ -1,4 +1,5 @@
 {% extends is_fragment|yesno:'layouts/htmx.html,layouts/app.html' %}
+{% load static %}
 {% block content %}{% if not is_fragment %}<div id="schedule-editor">{% endif %}
 <h2 class="text-xl font-bold mb-4">{% if day_only %}编辑全天排班{% else %}编辑时段排班{% endif %}</h2>
 {% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
@@ -12,7 +13,15 @@
 {% include 'components/field.html' with field=unified_form.domain_choice %}
 {% include 'components/field.html' with field=unified_form.coaches_all %}
 {% include 'components/field.html' with field=unified_form.coaches %}
-<button type="button" class="btn btn-outline btn-sm" data-apply-day>应用到全部已启用时段</button><p class="text-sm text-base-content/60">应用后可逐时段微调，点击保存后生效。</p></fieldset>{% endif %}
+<fieldset>
+  <legend>选择时段</legend>
+  <div class="flex flex-wrap gap-3">
+    {% for form in slot_forms %}
+      <label class="inline-flex items-center gap-2"><input type="checkbox" class="checkbox checkbox-sm" data-apply-slot value="{{ form.prefix }}" checked> {{ form.initial.period_label }}</label>
+    {% endfor %}
+  </div>
+</fieldset>
+<button type="button" class="btn btn-outline btn-sm" data-apply-day{% if not slot_forms.forms %} disabled{% endif %}>应用到选定的时段</button><p class="text-sm text-base-content/60">应用后可逐时段微调，点击保存或提交审批。</p></fieldset>{% endif %}
 {% for form in slot_forms %}<fieldset class="border border-base-300 rounded p-3"><legend>{{ form.initial.date_label }} · {{ form.initial.period_label }}</legend>{{ form.non_field_errors }}<div class="flex flex-col gap-4">{% for field in form.hidden_fields %}{{ field }}{% endfor %}{% for field in form.visible_fields %}{% include 'components/field.html' with field=field %}{% endfor %}</div></fieldset>{% endfor %}
 {% for period in disabled_periods %}<div class="border border-base-300 rounded p-3 text-base-content/50">{{ period }} · 未启用</div>{% endfor %}
 </section>
@@ -20,6 +29,7 @@
 <fieldset class="border border-base-300 rounded p-3 space-y-3"><legend>值班</legend>{% include 'components/field.html' with field=form.duty_all %}{% include 'components/field.html' with field=form.duty_coaches %}<p class="text-sm text-base-content/60">全部已启用时段均为休息或不安排时，值班人员可不选。</p></fieldset>
 <fieldset class="border border-base-300 rounded p-3"><legend>备注</legend>{% include 'components/field.html' with field=form.note %}</fieldset>
 {% endfor %}
-{% if show_reason %}<label class="block">调整原因（修改时必填）<textarea class="textarea w-full" name="reason">{{ reason }}</textarea></label><p class="text-sm">修改已发布排班时由涉及教练和值班人员依次确认后终审；过期修改直接终审。</p>{% endif %}
-<div class="flex flex-wrap items-center gap-3"><button type="button" class="btn btn-outline" data-schedule-reset hx-get="{% url 'training:schedule_edit' plan.pk %}?{{ reset_query }}{{ editor_suffix }}" hx-target="#schedule-editor">重置</button><button class="btn btn-primary" name="action" value="save">{% if plan.schedule_published_at %}提交审批{% else %}保存{% endif %}</button><a class="btn btn-ghost" href="{% url 'training:plan_detail' plan.pk %}">返回计划</a></div>
+{% if show_reason %}<label class="block">调整原因（{% if direct_adjustment %}选填{% else %}修改时必填{% endif %}）<textarea class="textarea w-full" name="reason">{{ reason }}</textarea></label>{% if not direct_adjustment %}<p class="text-sm">修改已发布排班时由涉及教练和值班人员依次确认后终审；过期修改直接终审。</p>{% endif %}{% endif %}
+<div class="flex flex-wrap items-center gap-3"><button type="button" class="btn btn-outline" data-schedule-reset hx-get="{% url 'training:schedule_edit' plan.pk %}?{{ reset_query }}{{ editor_suffix }}" hx-target="#schedule-editor">重置</button><button class="btn btn-primary" name="action" value="save">{% if show_reason and not direct_adjustment %}提交审批{% else %}保存{% endif %}</button><a class="btn btn-ghost" href="{% url 'training:plan_detail' plan.pk %}">返回计划</a></div>
 </form>{% if not is_fragment %}</div>{% endif %}{% endblock %}
+{% block extra_js %}{% if not is_fragment %}<script src="{% static 'js/training-entries.js' %}" defer></script>{% endif %}{% endblock %}

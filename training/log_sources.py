@@ -5,6 +5,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Prefetch
 
 from accounts.services.users import get_user_display_name
+from standards.models import Skill, TechnicalDomain
 
 from .checklists import completion_counts
 from .daily_progress import active_executions, has_text, scheduled_tasks, validate_training_day
@@ -79,9 +80,8 @@ def progress_material(record):
         return {
             "已完成": [item["title"] for item in record.checklist if item["done"]],
             "未完成": [item["title"] for item in record.checklist if not item["done"]],
-            "存在问题": record.problems.strip(),
         }
-    return {"完成内容": record.completed.strip(), "存在问题": record.problems.strip()}
+    return {"完成内容": record.completed.strip()}
 
 
 def collect_sources(user, cycle, day):
@@ -97,7 +97,7 @@ def collect_sources(user, cycle, day):
         executions = executions.filter(user=user)
         tasks = tasks.filter(pk__in=executions.values("training_task_id"))
     executions = executions.prefetch_related(
-        Prefetch("progress_records", TrainingProgress.objects.filter(training_date=day), to_attr="daily_records"),
+        Prefetch("progress_records", TrainingProgress.objects.filter(training_date=day).prefetch_related("attachments"), to_attr="daily_records"),
     ).order_by("pk")
     tasks = (
         tasks.select_related("training_plan", "schedule_slot")
@@ -114,6 +114,11 @@ def collect_sources(user, cycle, day):
     entries, materials, missing, teachers = [], [], [], {}
     task_coaches = {}
     goal_task_ids = []
+    daily_issues = []
+    daily_images = []
+    seen_issues = set()
+    seen_images = set()
+    grouped_materials = {}
     for task in tasks:
         slot = task.schedule_slot
         outline = [item["title"] for item in task.subtasks]
@@ -136,6 +141,18 @@ def collect_sources(user, cycle, day):
             if record.checklist is not None or has_text(record)
         ]
         progress = [progress_material(record) for record in records]
+        for record in records:
+            problems = record.issues or ([{"description": record.problems.strip()}] if record.problems.strip() else [])
+            for problem in problems:
+                identity = (record.author_id, json.dumps(problem, ensure_ascii=False, sort_keys=True))
+                if identity not in seen_issues:
+                    seen_issues.add(identity)
+                    daily_issues.append(problem)
+            if user.has_perm("training.view_trainingprogressattachment"):
+                for attachment in record.attachments.all():
+                    if attachment.pk not in seen_images:
+                        seen_images.add(attachment.pk)
+                        daily_images.append(attachment.pk)
         counts = [count for record in records if (count := completion_counts(record)) is not None]
         if counts and member.role == STUDENT:
             entry["completion"] = list(counts[0])
@@ -159,7 +176,8 @@ def collect_sources(user, cycle, day):
         entry["filled"], entry["expected"] = len(progress), len(task.daily_executions)
         entry["version"] = hashlib.sha256(
             json.dumps(
-                [entry, overview, progress, sorted(slot_teachers.items()) if member.role == STUDENT else []],
+                [entry, overview, progress, [(record.completed, record.problems, record.issues) for record in records],
+                 sorted(slot_teachers.items()) if member.role == STUDENT else []],
                 ensure_ascii=False,
                 sort_keys=True,
             ).encode()
@@ -181,7 +199,16 @@ def collect_sources(user, cycle, day):
                 goal_task_ids.append(str(task.pk))
                 material["任务编号"] = str(task.pk)
         entries.append(entry)
-        materials.append(material)
+        key = (task.training_plan_id, slot.kind, slot.primary_domain_id, task.title)
+        if member.role == STUDENT and key in grouped_materials:
+            existing = grouped_materials[key]
+            existing["时段"] += "、" + material["时段"]
+            for result in progress:
+                if result not in existing["执行填报"]:
+                    existing["执行填报"].append(result)
+        else:
+            grouped_materials[key] = material
+            materials.append(material)
 
     if not entries:
         missing.append("所选训练日没有符合条件的官方任务。")
@@ -194,6 +221,21 @@ def collect_sources(user, cycle, day):
         "teachers": "、".join(dict.fromkeys(teachers.values())) if member.role == STUDENT else "",
     }
     source = {"format": 2, "header": header, "tasks": entries}
+    if daily_issues or daily_images:
+        domains = dict(TechnicalDomain.objects.filter(
+            skill_project=cycle.skill_project, pk__in={item.get("domain") for item in daily_issues},
+        ).values_list("pk", "name"))
+        skills = dict(Skill.objects.filter(
+            skill_project=cycle.skill_project, pk__in={pk for item in daily_issues for pk in item.get("skills", [])},
+        ).values_list("pk", "name"))
+        materials.append({"当天训练总结": {
+            "问题列表": [
+                {"问题": item["description"], "领域": domains.get(item.get("domain"), ""),
+                 "关联技能点": [skills[pk] for pk in item.get("skills", []) if pk in skills]}
+                for item in daily_issues
+            ],
+            "当天过程图片数量": len(daily_images),
+        }})
     if goal_task_ids:
         source["goal_task_ids"] = goal_task_ids
     if member.role == STUDENT and task_coaches:

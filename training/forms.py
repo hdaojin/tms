@@ -466,34 +466,6 @@ class TrainingTaskForm(StyledFormMixin, forms.ModelForm):
         return task
 
 
-class TaskExecutionForm(StyledFormMixin, forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance.training_task_id and self.instance.training_task.schedule_slot_id:
-            for name in ("status", "completion_note", "problems", "problem_resolved", "solution", "reflection"):
-                self.fields.pop(name)
-
-    class Meta:
-        model = TaskExecution
-        fields = [
-            "status",
-            "actual_minutes",
-            "completion_note",
-            "problems",
-            "problem_resolved",
-            "solution",
-            "reflection",
-        ]
-        widgets = {
-            name: forms.Textarea(attrs={"rows": 3})
-            for name in ["completion_note", "problems", "solution", "reflection"]
-        }
-
-
-class CoachFeedbackForm(StyledFormMixin, forms.Form):
-    coach_feedback = forms.CharField(label="教练反馈", widget=forms.Textarea(attrs={"rows": 5}))
-
-
 class TrainingLogForm(StyledFormMixin, forms.ModelForm):
     executions = forms.ModelMultipleChoiceField(
         label="关联任务执行", queryset=TaskExecution.objects.none(), required=False, widget=forms.CheckboxSelectMultiple
@@ -591,6 +563,10 @@ class TrainingLogForm(StyledFormMixin, forms.ModelForm):
                 try:
                     validate_new_log(TrainingLog(training_cycle=cycle, author=self.author, training_date=training_date),
                                      backfill=self.backfill)
+                    from .daily_progress import LOG_COMPLETION_REQUIRED, log_completion_pending
+
+                    if log_completion_pending(self.author, cycle.pk, training_date):
+                        raise forms.ValidationError(LOG_COMPLETION_REQUIRED)
                 except forms.ValidationError as exc:
                     self.add_error(None, exc)
             others = TrainingLog.objects.filter(training_cycle=cycle).exclude(pk=self.instance.pk)

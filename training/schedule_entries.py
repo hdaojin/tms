@@ -4,7 +4,7 @@ from datetime import date, timedelta
 
 import django_tables2 as tables
 from django.core.paginator import Paginator
-from django.db.models import Prefetch
+from django.db.models import Exists, OuterRef, Prefetch
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.html import format_html, format_html_join
@@ -13,7 +13,7 @@ from django.utils.safestring import mark_safe
 from core.tables import BaseTable, BaseDateColumn
 from accounts.services.users import get_user_display_name
 from . import scheduling
-from .models import TrainingScheduleSlot
+from .models import TrainingScheduleSlot, TrainingTask
 from .selectors import visible_training_tasks_for
 
 
@@ -85,7 +85,8 @@ def entry_context(view, day_table, *, matching_only=False):
         .only("pk", "schedule_slot_id", "training_plan_id", "title", "status", "order")
         .order_by("order", "pk")
     )
-    slots = TrainingScheduleSlot.objects.select_related("primary_domain").prefetch_related(
+    active_tasks = TrainingTask.objects.filter(schedule_slot_id=OuterRef("pk")).exclude(status="cancelled")
+    slots = TrainingScheduleSlot.objects.annotate(has_active_task=Exists(active_tasks)).select_related("primary_domain").prefetch_related(
         "coaches", "domains", Prefetch("tasks", queryset=visible_tasks, to_attr="visible_tasks")
     )
     days = plan.schedule_days.prefetch_related("duty_coaches", Prefetch("slots", queryset=slots)).order_by(
@@ -104,8 +105,8 @@ def entry_context(view, day_table, *, matching_only=False):
             except ValueError:
                 valid = False
     today = timezone.localdate()
-    result = []
     current_week_start = today - timedelta(days=today.weekday())
+    result = []
     for day in days:
         day.training_plan = plan
         day.editor_suffix = suffix
@@ -156,7 +157,7 @@ def entry_context(view, day_table, *, matching_only=False):
             )
             slot.state_label, slot.state_class = slot_state(slot)
             slot.can_schedule = bool(plan.published_at and scheduling.can_schedule(user, plan))
-            slot.can_fill = scheduling.can_fill(user, slot, create=True)
+            slot.can_fill = not slot.has_active_task and scheduling.can_fill(user, slot, create=True)
             for task in slot.visible_tasks:
                 task.can_edit = task.status != "cancelled" and scheduling.can_fill(user, slot)
             match = valid and (not weekdays or str(day.date.weekday()) in weekdays)
@@ -200,6 +201,10 @@ def entry_context(view, day_table, *, matching_only=False):
                 slot.visible_tasks = []
             if match:
                 matches.append(slot)
+        day.can_edit_tasks = any(
+            slot.can_fill or any(task.can_edit for task in slot.visible_tasks)
+            for slot in scheduling.day_task_slots(user, day.slots.all())
+        )
         day.matching_slots = matches
         if matches:
             result.append(day)

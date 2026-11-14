@@ -79,9 +79,15 @@ class PlanMembersTests(TrainingFixtureMixin, TestCase):
             start_date=timezone.localdate(), end_date=timezone.localdate(), published_at=timezone.now(),
         )
         self.client.force_login(self.student)
-        url = reverse("training:my_plans")
+        url = reverse("training:plan_list")
+        legacy_url = reverse("training:my_plans")
+        self.assertRedirects(
+            self.client.get(legacy_url, {"status": "completed", "scope": "all"}),
+            f"{url}?status=completed",
+        )
         self.assertEqual(list(self.client.get(url).context["object_list"]), [self.plan])
         self.assertEqual(list(self.client.get(url, {"status": "completed"}).context["object_list"]), [history])
+        self.assertEqual(set(self.client.get(url, {"scope": "all"}).context["object_list"]), {self.plan, history})
         self.client.force_login(self.admin)
         self.assertEqual(list(self.client.get(url).context["object_list"]), [])
 

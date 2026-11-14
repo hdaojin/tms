@@ -44,15 +44,17 @@ class ScheduleDayTable(BaseTable):
         from django.urls import reverse
 
         label = format_html('<span class="whitespace-nowrap">{} 星期{}</span>', record.date.isoformat(), "一二三四五六日"[record.date.weekday()])
+        summary = format_html('<div>{}</div><div class="mt-2 text-sm">值班：{}</div><div class="mt-1 whitespace-pre-wrap text-sm">{}</div>', label, record.duty_label, record.visible_note)
+        links = []
         if scheduling.can_schedule(self.user, self.plan) and self.plan.published_at:
             url = reverse("training:schedule_edit", args=[self.plan.pk]) + f"?days={record.pk}&day_only=1{record.editor_suffix}"
-            return format_html(
-                '{}<br><a class="link text-xs" href="{}" hx-get="{}" hx-target="#schedule-editor">编辑全天排班</a>',
-                format_html('<div>{}</div><div class="mt-2 text-sm">值班：{}</div><div class="mt-1 whitespace-pre-wrap text-sm">{}</div>', label, record.duty_label, record.visible_note),
-                url,
-                url,
-            )
-        return format_html('<div>{}</div><div class="mt-2 text-sm">值班：{}</div><div class="mt-1 whitespace-pre-wrap text-sm">{}</div>', label, record.duty_label, record.visible_note)
+            links.append((url, url, "schedule-editor", "编辑全天排班"))
+        if record.can_edit_tasks:
+            url = reverse("training:day_task_edit", args=[self.plan.pk, record.pk])
+            links.append((url, url, "task-editor", "编辑全天任务"))
+        return format_html("{}{}", summary, format_html_join(
+            "", '<div><a class="link text-xs" href="{}" hx-get="{}" hx-target="#{}">{}</a></div>', links
+        ))
 
     def cell(self, record, period):
         from .schedule_entries import render_slot

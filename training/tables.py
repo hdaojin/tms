@@ -11,7 +11,7 @@ from accounts.services.users import get_user_display_name
 from core.tables import ActionsColumn, BaseDateColumn, BaseDateTimeColumn, BaseTable
 from core.templatetags.date_display import keep_date_parts
 
-from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
+from .models import TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
 from .models import TrainingLogTemplate
 
 
@@ -61,19 +61,6 @@ class TrainingTaskTable(BaseTable):
     class Meta(BaseTable.Meta):
         model = TrainingTask
         fields = ["planned_date", "title", "training_plan", "priority", "status", "actions"]
-
-
-class TaskExecutionTable(BaseTable):
-    actions = ActionsColumn(
-        "training:execution_detail", "training:execution_edit", edit_perm="training.change_taskexecution", edit_allowed_attr="can_edit"
-    )
-
-    def render_user(self, value):
-        return get_user_display_name(value)
-
-    class Meta(BaseTable.Meta):
-        model = TaskExecution
-        fields = ["training_task", "user", "status", "actual_minutes", "actions"]
 
 
 class TrainingLogActionsColumn(ActionsColumn):

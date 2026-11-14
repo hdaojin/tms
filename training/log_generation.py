@@ -58,6 +58,10 @@ def check_draft(draft):
         ).exists()
     ):
         raise ValidationError("该训练日已有正式日志。")
+    from .daily_progress import LOG_COMPLETION_REQUIRED, log_completion_pending
+
+    if log_completion_pending(draft.author, draft.cycle_id, draft.training_date):
+        raise ValidationError(LOG_COMPLETION_REQUIRED)
 
 
 def lock_draft(draft):
@@ -183,7 +187,8 @@ def prepare_generation(
     images = generation_images(draft, model, image_ids)
     source["document_format"] = INLINE_DOCUMENT_FORMAT
     source["inline_image_ids"] = [image.pk for image in images]
-    coach_material = materials.pop()["教练日志技术参考"] if source.get("coach_logs") else []
+    coach_material = materials.pop()["教练日志技术参考"] if materials and "教练日志技术参考" in materials[-1] else []
+    daily_summary = materials.pop()["当天训练总结"] if materials and "当天训练总结" in materials[-1] else None
     payload = {
         "任务及填报": materials,
         "作者补充要求": instructions,
@@ -191,6 +196,8 @@ def prepare_generation(
     }
     if coach_material:
         payload["教练日志技术参考"] = coach_material
+    if daily_summary:
+        payload["当天训练总结"] = daily_summary
     if images:
         payload["插图引用（按发送顺序）"] = [f"tms-asset:image-{image.pk}" for image in images]
     message = json.dumps(payload, ensure_ascii=False, indent=2)

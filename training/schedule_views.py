@@ -1,7 +1,10 @@
+from copy import copy
+
 from django import forms
 from django.contrib import messages
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Case, IntegerField, Prefetch, When
 from django.forms import formset_factory
 from django.http import HttpResponse, JsonResponse, Http404
@@ -9,8 +12,8 @@ from django.shortcuts import get_object_or_404, redirect, render as django_rende
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from . import scheduling as service
-from .models import TrainingBoardPlan, TrainingScheduleSlot, TrainingScheduleChange
-from .schedule_forms import DayScheduleForm, SlotScheduleForm, SlotTaskForm, SkillCorrectionForm
+from .models import TrainingBoardPlan, TrainingPlan, TrainingScheduleSlot, TrainingScheduleChange, TrainingTask
+from .schedule_forms import DayScheduleForm, DayTaskForm, SlotScheduleForm, SlotTaskForm, SkillCorrectionForm
 from .entry_navigation import filters_for, editor_suffix, next_entry
 from .selectors import visible_training_tasks_for
 from .views import TrainingPlanDetailView
@@ -18,7 +21,6 @@ from .views import TrainingPlanDetailView
 
 def row_updates(request, response, plan, slot_ids, day_ids=None):
     # 无筛选时只替换本页受影响行；筛选可能改变成员时重取结果。
-    import copy
     import json
     from urllib.parse import urlsplit
     from django.http import QueryDict
@@ -31,7 +33,7 @@ def row_updates(request, response, plan, slot_ids, day_ids=None):
     if any(value for key, value in params.items() if key not in {"tab", "page", "sort", "fragment"}):
         return response
     from .schedule_display import plan_context
-    local_request = copy.copy(request)
+    local_request = copy(request)
     local_request.GET = params
     view = PlanDetailView()
     view.setup(local_request)
@@ -44,14 +46,15 @@ def row_updates(request, response, plan, slot_ids, day_ids=None):
     return response
 
 
-def render(request, template, context=None, **kwargs):
+def render(request, template, context=None, *, page_title=None, breadcrumb_parents=None, **kwargs):
     from core.utils.breadcrumbs import build_breadcrumbs, breadcrumb_link
 
     context = dict(context or {})
     plan = context.get("plan")
-    title = {
+    title = page_title or {
         "training/schedule_edit.html": "编辑排班",
         "training/slot_task_form.html": "填写训练任务",
+        "training/day_task_edit.html": "编辑全天任务",
         "training/task_skills.html": "维护任务关联",
         "training/task_select_slot.html": "选择计划和时段",
         "training/process_detail.html": "训练执行",
@@ -63,9 +66,11 @@ def render(request, template, context=None, **kwargs):
         "training/plan_delete.html": "删除训练计划",
         "training/plan_publish.html": "统一发布全部任务",
     }.get(template, "训练计划")
-    parents = [breadcrumb_link("训练计划", "training:plan_list")] if request.user.has_perm("training.view_trainingplan") else []
-    if plan and parents and context.get("can_view_plan", True):
-        parents.append(breadcrumb_link(plan.title, "training:plan_detail", args=[plan.pk]))
+    parents = breadcrumb_parents
+    if parents is None:
+        parents = [breadcrumb_link("训练计划", "training:plan_list")] if request.user.has_perm("training.view_trainingplan") else []
+        if plan and parents and context.get("can_view_plan", True):
+            parents.append(breadcrumb_link(plan.title, "training:plan_detail", args=[plan.pk]))
     context.update(
         title=title, title_icon="icon-[tabler--calendar]", breadcrumbs=build_breadcrumbs(request, title, parents)
     )
@@ -430,6 +435,7 @@ def edit_schedule(request, pk):
             "editor_suffix": editor_suffix(filters_for(request)),
             "reason": source.get("reason", ""),
             "show_reason": bool(plan.schedule_published_at) and any(service.was_filled(obj) for obj in [*editable_days, *slots]),
+            "direct_adjustment": service.privileged(request.user),
             "is_fragment": bool(request.htmx),
         },
     )
@@ -458,6 +464,150 @@ def _slot(user, pk):
     return slot
 
 
+def _day_task_rows(plan, day_id, user):
+    day = get_object_or_404(plan.schedule_days.all(), pk=day_id)
+    active_tasks = TrainingTask.objects.exclude(status="cancelled").prefetch_related("attachments")
+    slots = list(day.slots.prefetch_related("coaches", Prefetch("tasks", queryset=active_tasks, to_attr="active_tasks")))
+    slots.sort(key=lambda slot: TrainingScheduleSlot.Period.values.index(slot.period))
+    day.training_plan = plan
+    for slot in slots:
+        slot.day = day
+    allowed = {slot.pk for slot in service.day_task_slots(user, slots)}
+    visible = set(visible_training_tasks_for(user, active_tasks.filter(schedule_slot__day=day)).values_list("pk", flat=True))
+    rows = []
+    for slot in slots:
+        task = next(iter(slot.active_tasks), None)
+        editable = slot.pk in allowed and (task is None or task.pk in visible) and service.can_fill(
+            user, slot, create=task is None,
+        )
+        rows.append({"slot": slot, "task": task if task and task.pk in visible else None, "editable": editable})
+    if not any(row["editable"] for row in rows):
+        raise PermissionDenied
+    return day, rows
+
+
+def _day_task_version(rows):
+    return {
+        str(row["slot"].pk): [
+            row["slot"].revision,
+            row["task"].pk if row["task"] else None,
+            row["task"].updated_at.isoformat() if row["task"] else None,
+        ]
+        for row in rows if row["editable"]
+    }
+
+
+@require_http_methods(["GET", "POST"])
+def day_task_edit(request, pk, day_id):
+    plan = get_plan(request.user, pk)
+    if request.method == "GET":
+        return _render_day_tasks(request, plan, day_id)
+
+    written_files = []
+    try:
+        with transaction.atomic():
+            plan = TrainingPlan.objects.select_for_update().get(pk=plan.pk)
+            response = _render_day_tasks(request, plan, day_id, written_files=written_files)
+    except Exception:
+        for storage, name in written_files:
+            storage.delete(name)
+        raise
+    return response
+
+
+def _render_day_tasks(request, plan, day_id, *, written_files=None, saved_message=""):
+    day, rows = _day_task_rows(plan, day_id, request.user)
+    editable = {str(row["slot"].pk): row for row in rows if row["editable"]}
+    applying = request.POST.get("action") == "apply"
+    selected = request.POST.getlist("targets") if applying else [request.POST.get("slot", "")]
+    bound = request.method == "POST" and not saved_message
+    error = ""
+    version = _day_task_version(rows)
+    if bound:
+        if len(set(selected)) != len(selected) or not set(selected) <= editable.keys():
+            raise PermissionDenied
+        try:
+            if not selected:
+                raise ValidationError("请选择至少一个时段。")
+            original = signing.loads(request.POST.get("version", ""), salt="training.day-tasks", max_age=3600)
+            if original["user"] != request.user.pk or original["day"] != day.pk:
+                raise PermissionDenied
+            if any(original["slots"].get(key) != version[key] for key in selected):
+                raise ValidationError("排班或任务已经变化，请核对当前内容后重新提交。")
+            if applying and any(editable[key]["task"] for key in selected) and request.POST.get("overwrite") != "on":
+                raise ValidationError("请确认覆盖选中时段的已有任务。")
+        except signing.BadSignature:
+            error = "编辑页面已过期，请核对当前内容后重新提交。"
+        except ValidationError as exc:
+            error = exc.messages[0]
+    common = None
+    if editable:
+        common = DayTaskForm(
+            request.POST if bound and applying else None, request.FILES if bound and applying else None,
+            prefix="common", slot=next(iter(editable.values()))["slot"], unified=True,
+        )
+    for key, row in editable.items():
+        editing = bound and not applying and key in selected
+        row["form"] = DayTaskForm(
+            request.POST if editing else None, request.FILES if editing else None,
+            prefix=f"slot-{key}", instance=copy(row["task"]), slot=row["slot"],
+        )
+        row["selected"] = not bound or not applying or key in selected
+    if bound and not error:
+        form = common if applying else editable[selected[0]]["form"]
+        if form.is_valid():
+            values = _task_form_values(form)
+            if applying:
+                values["replace_attachments"] = True
+                values["confirm_shared_content"] = request.POST.get("overwrite") == "on"
+            try:
+                with transaction.atomic():
+                    results = []
+                    for key in selected:
+                        row = editable[key]
+                        try:
+                            result = service.save_slot_task(
+                                row["slot"], request.user, values, task=row["task"], written_files=written_files,
+                            )
+                        except ValidationError as exc:
+                            raise ValidationError([f'{row["slot"].get_period_display()}：{message}' for message in exc.messages]) from exc
+                        results.append(result)
+            except ValidationError as exc:
+                for storage, name in written_files:
+                    storage.delete(name)
+                written_files.clear()
+                form.add_error(None, exc)
+            else:
+                message = (
+                    "任务已保存。待审批的调整会在批准后生效。"
+                    if any(isinstance(result, TrainingScheduleChange) for result in results)
+                    else "任务已保存。"
+                )
+                if request.htmx:
+                    response = _render_day_tasks(request, plan, day_id, saved_message=message)
+                    response["HX-Trigger"] = "scheduleChanged"
+                else:
+                    messages.success(request, message)
+                    response = redirect("training:day_task_edit", pk=plan.pk, day_id=day.pk)
+                return row_updates(request, response, plan, [int(key) for key in selected])
+    return render(request, "training/day_task_edit.html", {
+        "plan": plan, "day": day, "rows": rows, "common": common, "error": error, "saved_message": saved_message,
+        "has_existing": any(row["task"] for row in editable.values()),
+        "direct_adjustment": service.privileged(request.user),
+        "version": signing.dumps({"user": request.user.pk, "day": day.pk, "slots": version}, salt="training.day-tasks"),
+        "is_fragment": bool(request.htmx),
+    })
+
+
+def _task_form_values(form):
+    values = dict(form.cleaned_data)
+    values["skills"] = list(values["skills"].values_list("pk", flat=True))
+    values["competitors"] = list(values["competitors"].values_list("pk", flat=True))
+    if values["assign_all"]:
+        values.pop("competitors")
+    return values
+
+
 @require_http_methods(["GET", "POST"])
 def task_edit(request, slot_pk=None, pk=None):
     task = get_object_or_404(visible_training_tasks_for(request.user), pk=pk) if pk else None
@@ -470,16 +620,20 @@ def task_edit(request, slot_pk=None, pk=None):
     slot = _slot(request.user, task.schedule_slot_id if task else slot_pk)
     if not service.can_fill(request.user, slot, create=task is None):
         raise PermissionDenied
-    navigation = {"entry_filters": filters_for(request).urlencode(), "editor_suffix": editor_suffix(filters_for(request))}
+    if task is None and slot.tasks.exclude(status="cancelled").exists():
+        return _error(request, slot.day.training_plan, ValidationError("该时段已有任务，请编辑已有任务。"))
+    navigation = {
+        "entry_filters": filters_for(request).urlencode(),
+        "editor_suffix": editor_suffix(filters_for(request)),
+        "direct_adjustment": service.privileged(request.user),
+    }
     initial = {}
     if not task and request.GET.get("skill", "").isdigit():
         initial["skills"] = [int(request.GET["skill"])]
     form = SlotTaskForm(request.POST if request.method == "POST" else None, request.FILES if request.method == "POST" else None, instance=task, slot=slot, initial=initial)
     if request.method == "POST" and form.is_valid():
         try:
-            values = dict(form.cleaned_data)
-            values["skills"] = list(values["skills"].values_list("pk", flat=True))
-            values["competitors"] = list(values["competitors"].values_list("pk", flat=True))
+            values = _task_form_values(form)
             if task and "assignment_configured" not in request.POST:
                 # 精简提交仅更新明确提供的字段，不能清空原技能或重取全体名单。
                 values = {key: value for key, value in values.items() if key in request.POST or key in request.FILES}
@@ -694,7 +848,10 @@ def legacy_task_create(request):
     plans = service.visible_plans(request.user)
     selected = plans.filter(pk=request.GET["plan"]).first() if request.GET.get("plan", "").isdigit() else None
     slots = plan_slots(selected, request.user) if selected else []
-    slots = [slot for slot in slots if service.can_fill(request.user, slot, create=True)]
+    slots = [
+        slot for slot in slots
+        if service.can_fill(request.user, slot, create=True) and not slot.tasks.exclude(status="cancelled").exists()
+    ]
     return render(
         request,
         "training/task_select_slot.html",

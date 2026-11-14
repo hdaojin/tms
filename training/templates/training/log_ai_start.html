@@ -5,7 +5,7 @@
     {% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
     {% if existing %}
       <p>该训练日已有正式日志。</p>
-      {% if perms.training.view_traininglog %}<a class="link" href="{% url 'training:log_detail' existing.pk %}">查看日志</a>{% endif %}
+      {% if perms.training.view_traininglog %}<a class="link" href="{{ existing_url }}">查看日志</a>{% endif %}
     {% endif %}
     {% if day_form %}
       <form method="post" class="space-y-3">

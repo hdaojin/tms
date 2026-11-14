@@ -77,6 +77,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
             training_date=self.day,
             completed=completed,
             problems=problems,
+            checklist=[{**item, "done": True} for item in self.task_obj.subtasks],
         )
 
     def draft(self):
@@ -120,7 +121,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertContains(invalid, "有未完成项目时")
         self.assertFalse(self.execution.progress_records.filter(training_date=self.day).exists())
 
-        for checked, expected in [(ids[:0], "assigned"), (ids[:1], "partially_completed"), (ids, "completed")]:
+        for checked, expected in [(ids[:0], "unfinished"), (ids[:1], "partially_completed"), (ids, "completed")]:
             token = self.client.get(url).context["version"]
             response = self.client.post(url, {"version": token, f"{key}-items": checked, "problems": "待核对"})
             self.assertRedirects(
@@ -139,8 +140,28 @@ class TrainingLogAITests(ProcessFixture, TestCase):
 
             save_slot_task(self.slot, self.coach, {"subtask_titles": ["新任务"]}, task=self.task_obj)
 
+    def test_day_issues_and_merged_checklist_are_saved_as_daily_material(self):
+        second = self.task(slot=self.other_slot(), title=self.task_obj.title)
+        self.client.force_login(self.student)
+        url = reverse("training:daily_progress") + f"?cycle={self.cycle_obj.pk}&training_date={self.day}"
+        page = self.client.get(url)
+        self.assertEqual(len(page.context["rows"]), 1)
+        response = self.client.post(url, {
+            "version": page.context["version"],
+            f"task-{self.execution.pk}-items": [self.task_obj.subtasks[0]["id"]],
+            "issues-TOTAL_FORMS": "2", "issues-INITIAL_FORMS": "0",
+            "issues-0-description": "地址冲突", "issues-0-domain": self.linux.pk,
+            "issues-1-description": "链路不通", "issues-1-domain": self.linux.pk,
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(second.executions.get(user=self.student).status, "partially_completed")
+        _, materials, _ = collect_sources(self.student, self.cycle_obj, self.day)
+        self.assertEqual(len([item for item in materials if item.get("任务") == self.task_obj.title]), 1)
+        summary = next(item["当天训练总结"] for item in materials if "当天训练总结" in item)
+        self.assertEqual([item["问题"] for item in summary["问题列表"]], ["地址冲突", "链路不通"])
+
     def test_daily_save_is_atomic_across_tasks(self):
-        second = self.task(title="第二项", assign_all=True).executions.get(user=self.student)
+        second = self.task(slot=self.other_slot(), title="第二项", assign_all=True).executions.get(user=self.student)
         process.save_progress(second, self.student, training_date=self.day, completed="", problems="旧的任务说明")
         self.client.force_login(self.student)
         url = reverse("training:daily_progress") + f"?cycle={self.cycle_obj.pk}&training_date={self.day}"
@@ -148,8 +169,8 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         token = page.context["version"]
         form = BeautifulSoup(page.content, "html.parser").select_one('form[enctype="multipart/form-data"]')
         self.assertEqual(len(form.select("section[id^=task-]")), 2)
-        self.assertEqual(len(form.select('textarea[name="problems"]')), 1)
-        self.assertNotIn("旧的任务说明", form.select_one('textarea[name="problems"]').get_text())
+        self.assertIsNotNone(form.select_one('textarea[name="issues-0-description"]'))
+        self.assertNotIn("旧的任务说明", form.select_one('textarea[name="issues-0-description"]').get_text())
         self.assertIn("旧的任务说明", form.select_one(f"#task-{second.pk} details").get_text())
         self.assertEqual(len(form.select('input[type=file][name="images"]')), 1)
         self.assertNotIn("上午", [heading.get_text(strip=True) for heading in form.select("h2")])
@@ -191,26 +212,25 @@ class TrainingLogAITests(ProcessFixture, TestCase):
 
     def test_role_materials_and_coverage(self):
         draft = self.draft()
+        with self.assertRaisesMessage(ValidationError, "请先填写训练完成情况"):
+            self.prepare(draft)
+        self.fill()
         job = self.prepare(draft)
-        self.assertEqual(json.loads(job.message)["任务及填报"][0]["执行填报"], [])
         log_generation.confirm_generation(draft, job.pk)
         with patch("training.log_generation.generate_text", return_value=json.dumps(example_body(STUDENT))):
             self.assertTrue(log_generation.run_generation())
         log_generation.resolve_generation(draft, job.pk, apply=True, revision=draft.revision)
         draft.refresh_from_db()
         self.assertEqual(draft.body, example_body(STUDENT))
-        self.assertFalse(self.execution.progress_records.exists())
         reviewed_source = source_digest(log_generation.source_for(draft)[0])
         with patch("training.log_documents.generate_document_pdf", return_value=b"%PDF-1.4\n"):
             log = submit_draft(draft, draft.revision, reviewed_source, False)
         self.assertEqual(log.author, self.student)
-        self.assertFalse(self.execution.progress_records.exists())
-        self.fill()
         source, material, missing = collect_sources(self.coach, self.cycle_obj, self.day)
         self.assertEqual(missing, [])
         self.assertEqual(source["tasks"][0]["expected"], 2)
         self.assertEqual(material[0]["已填人数"], 1)
-        self.assertEqual(material[0]["执行填报"][0]["完成内容"], "已核对路由表")
+        self.assertEqual(material[0]["执行填报"][0]["已完成"], ["配置地址", "核对路由表"])
         self.assertNotIn(self.student.first_name, json.dumps(material, ensure_ascii=False))
         self.assertEqual(collect_sources(self.other, self.cycle_obj, self.day)[0]["tasks"], [])
         self.task_obj.__class__.objects.filter(pk=self.task_obj.pk).update(requirements="")
@@ -219,6 +239,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertEqual(source["goal_task_ids"], [str(self.task_obj.pk)])
 
     def test_coach_reference_is_scoped_and_hidden_in_student_preview(self):
+        self.fill()
         source, _, _ = collect_sources(self.coach, self.cycle_obj, self.day)
         source["tasks"][0]["technical_excerpt"]["训练说明"] = "教练历史技术摘录"
         log = TrainingLog.objects.create(
@@ -251,6 +272,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
 
     def test_task_attachment_content_is_authorized_and_versioned(self):
         task = self.task(
+            slot=self.other_slot(),
             title="附件任务",
             assign_all=False,
             competitors=[self.student.pk],
@@ -293,9 +315,11 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertContains(board, "填写训练完成情况")
         self.assertContains(board, "编写训练日志")
         self.assertContains(board, "09:00–12:00")
+        self.assertContains(self.client.get(reverse("training:log_ai_start")), "请先填写训练完成情况")
+        self.fill()
         response = self.client.get(reverse("training:log_ai_start"))
         self.assertContains(response, "当日任务与完成情况")
-        self.assertContains(response, "暂无个人训练进度填报，不影响 AI 生成")
+        self.assertNotContains(response, "暂无个人训练进度填报")
         self.assertContains(response, "填写训练完成情况")
         self.assertContains(response, "扩展信息")
         self.assertContains(response, "保存插图")
@@ -325,7 +349,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertNotContains(self.client.get(url), "编辑训练目标")
 
     def test_coach_generates_only_missing_goals_and_preserves_them_on_draft_edit(self):
-        task = self.task(title="配置防火墙", subtask_titles=["核对访问规则"], assign_all=True)
+        task = self.task(slot=self.other_slot(), title="配置防火墙", subtask_titles=["核对访问规则"], assign_all=True)
         self.coach.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai_models"))
         self.model.owner = self.coach
         self.model.save(update_fields=["owner", "updated_at"])
@@ -363,6 +387,9 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 2, tzinfo=utc_timezone.utc)):
             response = self.client.get(today_url, {"date": self.day.isoformat()})
             upload = response.context["date_groups"][0]["actions"][0]["upload"]
+            self.assertContains(response, "请先填写训练完成情况")
+            self.assertContains(self.client.get(upload), "请先填写训练完成情况")
+            self.fill()
             self.assertIn(reverse("training:log_backfill"), upload)
             self.assertIn(f"training_date={self.day}", upload)
             form = self.client.get(upload).context["form"]
@@ -377,7 +404,10 @@ class TrainingLogAITests(ProcessFixture, TestCase):
                 },
             )
             log = TrainingLog.objects.get(author=self.student)
-            self.assertRedirects(posted, reverse("training:log_detail", args=[log.pk]), fetch_redirect_response=False)
+            detail = reverse("training:log_detail", args=[log.pk])
+            self.assertRedirects(posted, f"{detail}?return_date={self.day}&return_plan={self.plan.pk}")
+            crumbs = self.client.get(posted.url).context["breadcrumbs"]
+            self.assertEqual(crumbs[-2].url, f"{today_url}?date={self.day}&plan={self.plan.pk}")
             self.assertEqual(log.training_date, self.day)
             self.assertEqual(log.training_cycle, self.cycle_obj)
             self.assertTrue(log.is_backfill)
@@ -387,6 +417,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
             self.assertNotContains(response, ">编写训练日志</a>")
 
     def test_no_usable_model_offers_add_and_upload(self):
+        self.fill()
         self.model.verified = False
         self.model.save(update_fields=["verified", "updated_at"])
         self.client.force_login(self.student)
@@ -415,7 +446,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertContains(self.client.get(reverse("training:log_ai_preview", args=[draft.pk])), "第二次修改")
 
     def test_multiple_tasks_use_summary_title_and_bounded_suggested_content(self):
-        second = self.task(title="验证连通", requirements="验证访问", assign_all=True)
+        second = self.task(slot=self.other_slot(), title="验证连通", requirements="验证访问", assign_all=True)
         process.save_progress(
             second.executions.get(user=self.student),
             self.student,
@@ -456,6 +487,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
             completed="完成检查",
             problems="",
             files=[picture("school-logo.png")],
+            checklist=[{**item, "done": True} for item in self.task_obj.subtasks],
         )
         draft = self.draft()
         self.client.force_login(self.student)
@@ -522,6 +554,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
             validate_body(STUDENT, body | {"achievement": f"![截图](tms-asset:image-{inline})"}, job.source)
 
     def test_text_only_generation_retains_images_and_uses_text_payload(self):
+        self.fill()
         draft = self.draft()
         draft.images.create(media_type="image/png", content=b"image", caption="")
         self.model.model_id = "deepseek-v4-pro"
@@ -605,7 +638,8 @@ class TrainingLogAITests(ProcessFixture, TestCase):
                 {"id": matching.pk, "label": matching.name},
             ],
         )
-        url = reverse("training:slot_task_create", args=[self.slot.pk])
+        slot = self.other_slot()
+        url = reverse("training:slot_task_create", args=[slot.pk])
         response = self.client.get(url)
         self.assertContains(response, "添加子任务")
         self.assertNotIn("priority", response.context["form"].fields)
@@ -624,7 +658,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
             ).status_code,
             302,
         )
-        task = self.slot.tasks.get(title="动态子任务")
+        task = slot.tasks.get(title="动态子任务")
         self.assertEqual([item["title"] for item in task.subtasks], ["配置地址", "测试路由"])
         self.assertTrue(task.assign_all)
         self.assertEqual(task.executions.count(), 2)
@@ -687,6 +721,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertTrue(TrainingLogDraft.objects.get(pk=draft.pk).body)
 
     def test_reference_rejects_host_resolving_to_private_address(self):
+        self.fill()
         addresses = [
             (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443)),
             (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 443)),

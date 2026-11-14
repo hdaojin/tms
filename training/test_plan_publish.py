@@ -10,14 +10,14 @@ from .test_process_refactor import ProcessFixture
 
 
 class PlanPublishTests(ProcessFixture, TestCase):
-    def draft(self, title, **values):
-        return scheduling.save_slot_task(self.slot, self.coach, {"title": title, **values})
+    def draft(self, title, *, slot=None, **values):
+        return scheduling.save_slot_task(slot or self.slot, self.coach, {"title": title, **values})
 
     def test_preview_and_publish_preserve_task_allocation_and_skip_other_states(self):
         first = self.draft("全体训练")
-        second = self.draft("指定选手", assign_all=False, competitors=[self.student.pk])
-        published = self.task(title="已经发布")
-        removed = self.draft("已经取消")
+        second = self.draft("指定选手", slot=self.other_slot(), assign_all=False, competitors=[self.student.pk])
+        published = self.task(slot=self.other_slot("early"), title="已经发布")
+        removed = self.draft("已经取消", slot=self.other_slot("evening"))
         scheduling.cancel_task(removed, self.coach, "不再需要")
         before = self.plan.change_records.count()
         result = plan_publish.preview(self.plan, self.admin)
@@ -58,7 +58,7 @@ class PlanPublishTests(ProcessFixture, TestCase):
 
     def test_failed_commit_rolls_back_every_task(self):
         first = self.draft("第一项")
-        second = self.draft("第二项")
+        second = self.draft("第二项", slot=self.other_slot())
         result = plan_publish.preview(self.plan, self.admin)
         original = scheduling.publish_slot_task
         calls = 0
@@ -104,7 +104,7 @@ class PlanPublishTests(ProcessFixture, TestCase):
     def test_new_draft_invalidates_preview(self):
         self.draft("原任务")
         result = plan_publish.preview(self.plan, self.admin)
-        self.draft("后来新增")
+        self.draft("后来新增", slot=self.other_slot())
         with self.assertRaisesMessage(ValidationError, "重新预览"):
             plan_publish.publish(self.plan, self.admin, result["digest"])
         self.assertFalse(self.plan.tasks.filter(status="published").exists())

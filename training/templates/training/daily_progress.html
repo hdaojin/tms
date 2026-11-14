@@ -1,4 +1,5 @@
 {% extends "layouts/app.html" %}
+{% load static %}
 {% block content %}
   {% if error %}<p class="alert alert-error" role="alert">{{ error }}</p>{% endif %}
   {% if rows %}
@@ -14,7 +15,7 @@
                 {% for link in task.domain_links.all %}
                   <span class="badge badge-soft badge-primary badge-sm">{{ link.technical_domain.name }}</span>
                 {% endfor %}
-                <span class="badge badge-outline badge-sm">{{ task.schedule_slot.get_period_display }}</span>
+                {% for item in row.group %}<span class="badge badge-outline badge-sm">{{ item.training_task.schedule_slot.get_period_display }}</span>{% endfor %}
                 {% if show_plan_names %}<span class="text-sm text-base-content/70">{{ task.training_plan.title }}</span>{% endif %}
                 {% if task.subtasks or not editable %}
                   <h2 class="font-semibold">{{ task.title }}</h2>
@@ -24,6 +25,14 @@
                 {% if row.counts %}<span class="text-sm text-base-content/70">{{ row.counts.0 }}/{{ row.counts.1 }}</span>{% endif %}
               </div>
               {% if editable %}
+                {% if row.inconsistent %}
+                  <p class="text-sm">各时段原有填报不同，保存会按本次勾选统一更新。</p>
+                  <ul class="text-sm">
+                    {% for period, checklist in row.previous_counts %}
+                      <li>{{ period }} · {% if checklist %}{% for item in checklist %}{{ item.title }}（{% if item.done %}已完成{% else %}未完成{% endif %}）{% if not forloop.last %}、{% endif %}{% endfor %}{% else %}暂无勾选填报{% endif %}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
                 {{ row.form.items.errors }}
                 {% if task.subtasks %}<div class="pl-4">{{ row.form.items }}</div>{% endif %}
               {% elif row.record.checklist %}
@@ -45,13 +54,30 @@
         {% endfor %}
       </div>
       {% if editable %}
+        {% if needs_merge_confirmation %}
+          <label class="flex items-center gap-2"><input type="checkbox" name="confirm_merge" class="checkbox checkbox-sm" required>确认按本次勾选统一各时段的完成情况</label>
+        {% endif %}
         {% include "components/form_errors.html" with form=day_form %}
-        {% include "components/field.html" with field=day_form.problems %}
+        <fieldset class="space-y-3" data-completion-issues>
+          <legend class="font-semibold">未完成的部分／存在问题</legend>
+          {{ issue_forms.management_form }}
+          {{ issue_forms.non_form_errors }}
+          <div class="space-y-3" data-issue-rows>
+            {% for issue in issue_forms %}
+              {% include 'training/completion_issue.html' %}
+            {% endfor %}
+          </div>
+          <template data-issue-template>
+            {% include 'training/completion_issue.html' with issue=issue_forms.empty_form %}
+          </template>
+          <button type="button" class="btn btn-outline btn-sm" data-add-issue>添加一条问题</button>
+        </fieldset>
         {% include "components/field.html" with field=day_form.images %}
-      {% elif notes %}
+      {% elif notes or issue_forms.initial %}
         <div>
           <h2 class="font-semibold">未完成的部分／存在问题</h2>
           <p class="whitespace-pre-wrap">{{ notes }}</p>
+          <ul>{% for issue in issue_forms.initial %}<li>{{ issue.description }}</li>{% endfor %}</ul>
         </div>
       {% endif %}
       {% if attachments and perms.training.view_trainingprogressattachment %}
@@ -61,9 +87,13 @@
       {% endif %}
       <div class="flex flex-wrap items-center gap-3">
         {% if editable %}<button type="submit" class="btn btn-primary">保存当天完成情况</button>{% endif %}
-        <a class="btn btn-outline" href="{% url 'training:my_training' %}?date={{ day|date:'Y-m-d' }}">返回我的训练</a>
+        <a class="btn btn-outline" href="{% if training_return_url %}{{ training_return_url }}{% else %}{% url 'training:my_training' %}?date={{ day|date:'Y-m-d' }}{% endif %}">返回我的训练</a>
       </div>
     </div>
   </form>
   {% elif not error %}<p>当天没有分配给你的官方任务。</p>{% endif %}
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'meetings/recipients.js' %}" defer></script>
+  <script src="{% static 'js/training-completion.js' %}" defer></script>
 {% endblock %}

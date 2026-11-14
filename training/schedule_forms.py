@@ -140,6 +140,24 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
     def __init__(self, *args, slot, **kwargs):
         super().__init__(*args, **kwargs)
         self.slot = slot
+        self.shared_task = None
+        title = self.data.get(self.add_prefix("title"), self.instance.title) if self.is_bound else self.instance.title
+        if title and self.prefix != "common":
+            source = scheduling.matching_day_tasks(slot, title).exclude(pk=self.instance.pk).first()
+            if source and (not self.instance.pk or title != self.instance.title or source.pk < self.instance.pk):
+                self.shared_task = source
+                if self.instance.pk and title != self.instance.title:
+                    self.fields["confirm_shared_content"] = forms.BooleanField(
+                        label="确认采用已有同名任务的扩展信息", required=False,
+                    )
+                for field_name in scheduling.SHARED_TASK_FIELDS:
+                    self.fields[field_name].disabled = True
+                self.initial.update(
+                    overview=source.overview,
+                    requirements=source.requirements,
+                    subtask_titles=[item["title"] for item in source.subtasks],
+                    skills=list(source.skill_links.values_list("skill_id", flat=True)),
+                )
         if not self.instance.pk or self.instance.status == "draft":
             self.fields.pop("reason")
         self.fields["order"].required = False
@@ -156,19 +174,24 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
         widget = self.fields["competitors"].widget
         widget.search_url = reverse("training:task_competitor_search", args=[slot.pk])
         if self.instance.pk:
-            self.initial["skills"] = list(self.instance.skill_links.values_list("skill_id", flat=True))
+            if not self.shared_task:
+                self.initial["skills"] = list(self.instance.skill_links.values_list("skill_id", flat=True))
+                self.initial["subtask_titles"] = [item["title"] for item in self.instance.subtasks]
             self.initial["competitors"] = list(self.instance.selected_competitors.values_list("pk", flat=True))
-            self.initial["subtask_titles"] = [item["title"] for item in self.instance.subtasks]
-            self.fields["subtask_titles"].disabled = self.instance.executions.filter(
+            self.fields["subtask_titles"].disabled = bool(self.shared_task) or self.instance.executions.filter(
                 progress_records__checklist__isnull=False,
             ).exists()
-        skill_ids = self.data.getlist("skills") if self.is_bound else self.initial.get("skills", [])
+            if not self.shared_task and title and scheduling.matching_day_tasks(slot, title).exclude(
+                pk=self.instance.pk,
+            ).filter(executions__progress_records__checklist__isnull=False).exists():
+                self.fields["subtask_titles"].disabled = True
+        skill_ids = self.data.getlist(self.add_prefix("skills")) if self.is_bound and not self.shared_task else self.initial.get("skills", [])
         self.fields["skills"].widget.selected = [
             {"id": skill.pk, "label": skill.name} for skill in self.fields["skills"].queryset.filter(
                 pk__in=[value for value in skill_ids if str(value).isdigit()],
             )
         ]
-        ids = self.data.getlist("competitors") if self.is_bound else self.initial.get("competitors", [])
+        ids = self.data.getlist(self.add_prefix("competitors")) if self.is_bound else self.initial.get("competitors", [])
         widget.selected = [
             {"id": user.pk, "label": get_user_full_info(user)}
             for user in annotate_identity_labels(self.fields["competitors"].queryset).filter(
@@ -218,3 +241,22 @@ class SkillCorrectionForm(StyledFormMixin, forms.Form):
             self.fields.pop("reason")
         self.fields["skills"].queryset = Skill.objects.filter(skill_project=task.skill_project)
         self.initial["skills"] = list(task.skill_links.values_list("skill_id", flat=True))
+
+
+class DayTaskForm(SlotTaskForm):
+    """全天任务表单复用时段任务字段和校验。"""
+
+    def __init__(self, *args, slot, unified=False, **kwargs):
+        super().__init__(*args, slot=slot, **kwargs)
+        if unified:
+            self.fields["skills"].queryset = Skill.objects.filter(
+                skill_project=slot.day.training_plan.training_cycle.skill_project,
+            )
+            self.fields["skills"].widget = forms.SelectMultiple(attrs={"class": "select w-full"})
+            self.fields["reason"] = forms.CharField(label="调整原因", required=False)
+        self.fields["estimated_minutes"] = forms.IntegerField(label="预计用时（分钟）", min_value=0, required=False)
+        self.fields["priority"] = forms.ChoiceField(label="优先级", choices=TrainingTask.Priority.choices, required=False)
+        self.initial.update(estimated_minutes=self.instance.estimated_minutes, priority=self.instance.priority)
+
+    def clean_priority(self):
+        return self.cleaned_data["priority"] or TrainingTask.Priority.NORMAL

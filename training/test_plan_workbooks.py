@@ -50,12 +50,12 @@ class PlanWorkbookTests(ProcessFixture, TestCase):
 
     def test_export_only_contains_viewers_assigned_task_content(self):
         self.task(title="只给选手一的保密任务", assign_all=False, competitors=[self.student.pk])
-        self.task(title="只给选手二的保密任务", assign_all=False, competitors=[self.student2.pk])
+        self.task(slot=self.other_slot(), title="只给选手二的保密任务", assign_all=False, competitors=[self.student2.pk])
         first = load_workbook(BytesIO(build_plan_workbook(self.plan, self.student)))["训练计划"]
         second = load_workbook(BytesIO(build_plan_workbook(self.plan, self.student2)))["训练计划"]
         self.assertIn("只给选手一", first["E4"].value)
         self.assertNotIn("只给选手二", str(list(first.values)))
-        self.assertIn("只给选手二", second["E4"].value)
+        self.assertIn("只给选手二", str(list(second.values)))
         self.assertNotIn("只给选手一", str(list(second.values)))
 
     def test_special_domains_import_and_export_with_distinct_labels(self):

@@ -1,1 +1,4 @@
 {% extends "common/form.html" %}
+{% block form_content %}
+  {% include "components/form.html" with form=form action=form_action submit_label="保存" %}
+{% endblock %}

@@ -1,7 +1,12 @@
 <div data-recipient-picker data-search-url="{{ widget.search_url }}" data-meeting-id="{{ widget.meeting_id }}"
      data-candidate-label="{{ widget.candidate_label|default:'人员' }}"
-     data-field-name="{{ widget.name }}" class="min-w-0 space-y-3">
-  <p class="text-xs text-base-content/70">{{ widget.candidate_help|default:"仅可搜索已启用且具备会议查看权限的账号。" }}</p>
+     data-field-name="{{ widget.name }}" class="min-w-0 {% if widget.attrs.compact %}space-y-2{% else %}space-y-3{% endif %}">
+  {% if not widget.attrs.compact %}<p class="text-xs text-base-content/70">{{ widget.candidate_help|default:"仅可搜索已启用且具备会议查看权限的账号。" }}</p>{% endif %}
+  {% if widget.attrs.compact %}
+    <input type="search" id="{{ widget.attrs.id }}" class="input w-full" data-recipient-query
+           placeholder="{{ widget.candidate_placeholder }}" autocomplete="off" aria-label="搜索技能"
+           aria-invalid="{{ widget.aria_invalid }}" aria-describedby="{{ widget.aria_describedby }}">
+  {% endif %}
   <div data-recipient-selected class="flex flex-wrap gap-2" aria-label="已选{{ widget.candidate_label|default:'人员' }}">
     {% for person in widget.selected %}
       <span data-recipient-id="{{ person.id }}" data-recipient-label="{{ person.label }}" data-unavailable="{{ person.unavailable|yesno:'true,false' }}" class="badge badge-outline h-auto max-w-full gap-2 py-2">
@@ -11,12 +16,12 @@
       </span>
     {% endfor %}
   </div>
-  <label class="flex flex-wrap items-center gap-2">
+  {% if not widget.attrs.compact %}<label class="flex flex-wrap items-center gap-2">
     <span>搜索{{ widget.candidate_label|default:"人员" }}</span>
     <input type="search" id="{{ widget.attrs.id }}" class="input w-full sm:w-80" data-recipient-query
            placeholder="{{ widget.candidate_placeholder|default:'输入姓名或拼音，不输入时不显示候选' }}" autocomplete="off"
            aria-invalid="{{ widget.aria_invalid }}" aria-describedby="{{ widget.aria_describedby }}">
-  </label>
+  </label>{% endif %}
   <p id="{{ widget.attrs.id }}_status" data-recipient-status class="text-sm text-base-content/70" role="status" aria-live="polite"></p>
   <div data-recipient-results class="flex flex-wrap gap-2" aria-label="{{ widget.candidate_label|default:'人员' }}搜索结果"></div>
   <button type="button" class="btn btn-outline btn-sm" data-recipient-more hidden>加载更多</button>

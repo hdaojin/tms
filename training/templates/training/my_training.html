@@ -5,12 +5,25 @@
     <div class="card-body gap-3">
       <div class="text-sm font-semibold text-primary">{% if coach_view %}教练视图{% else %}选手视图{% endif %}</div>
       <h2 class="text-2xl font-bold">{% if all_dates %}全部任务{% else %}{{ day|date:"Y年n月j日 · l" }}{% endif %}</h2>
-      <nav class="flex flex-wrap items-end gap-2" aria-label="训练日期">
-        <a class="btn btn-sm" href="?date={{ previous_day|date:'Y-m-d' }}">上一天</a>
-        <a class="btn btn-sm" href="{% url 'training:my_training' %}">今天</a>
-        <a class="btn btn-sm" href="?date={{ next_day|date:'Y-m-d' }}">下一天</a>
-        {% if not all_dates %}<a class="btn btn-sm" href="?scope=all&amp;date={{ day|date:'Y-m-d' }}">全部任务</a>{% endif %}
+      {% if selected_plan and plan_choices|length == 1 %}<p class="font-semibold">{{ selected_plan.title }}</p>{% endif %}
+      {% if plan_choices|length > 1 %}
         <form method="get" class="flex flex-wrap items-center gap-2">
+          <input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
+          {% if all_dates %}<input type="hidden" name="scope" value="all">{% endif %}
+          <label for="training-plan">训练计划</label>
+          <select class="select select-sm" id="training-plan" name="plan">
+            {% for plan in plan_choices %}<option value="{{ plan.pk }}" {% if plan == selected_plan %}selected{% endif %}>{{ plan.title }}</option>{% endfor %}
+          </select>
+          <button class="btn btn-sm">切换计划</button>
+        </form>
+      {% endif %}
+      <nav class="flex flex-wrap items-end gap-2" aria-label="训练日期">
+        <a class="btn btn-sm" href="?date={{ previous_day|date:'Y-m-d' }}{% if selected_plan %}&amp;plan={{ selected_plan.pk }}{% endif %}">上一天</a>
+        <a class="btn btn-sm" href="{% url 'training:my_training' %}{% if selected_plan %}?plan={{ selected_plan.pk }}{% endif %}">今天</a>
+        <a class="btn btn-sm" href="?date={{ next_day|date:'Y-m-d' }}{% if selected_plan %}&amp;plan={{ selected_plan.pk }}{% endif %}">下一天</a>
+        {% if not all_dates %}<a class="btn btn-sm" href="?scope=all&amp;date={{ day|date:'Y-m-d' }}{% if selected_plan %}&amp;plan={{ selected_plan.pk }}{% endif %}">全部任务</a>{% endif %}
+        <form method="get" class="flex flex-wrap items-center gap-2">
+          {% if selected_plan %}<input type="hidden" name="plan" value="{{ selected_plan.pk }}">{% endif %}
           <input class="input input-sm w-40" aria-label="训练日期" type="date" name="date" required value="{{ day|date:'Y-m-d' }}">
           <button class="btn btn-sm" type="submit">查看日期</button>
         </form>
@@ -21,53 +34,58 @@
   <section class="space-y-3">
     <h2 class="text-xl font-bold">{% if coach_view %}我负责的任务{% else %}分配给我的官方任务{% endif %}</h2>
     {% for date_group in date_groups %}
-      {% if all_dates %}<h3 class="font-semibold">{{ date_group.day|date:"Y年n月j日 · l" }}</h3>{% endif %}
+      <article class="rounded-box border border-base-300 p-4 space-y-3">
+      <h3 class="font-semibold">{{ date_group.day|date:"Y年n月j日 · l" }}</h3>
       <div class="flex flex-wrap gap-2">
         {% for action in date_group.actions %}
           {% if action.cycle %}<span class="self-center text-sm">{{ action.cycle }}</span>{% endif %}
           {% if action.completion %}<a class="btn btn-outline btn-sm" href="{{ action.completion }}">填写训练完成情况</a>{% endif %}
-          {% if action.log %}<a class="btn btn-primary btn-sm" href="{{ action.log }}">编写训练日志</a>{% endif %}
-          {% if action.upload %}<a class="btn btn-outline btn-sm" href="{{ action.upload }}">上传训练日志</a>{% endif %}
+          {% if action.log_blocked %}
+            {% if action.log %}<button type="button" class="btn btn-primary btn-sm" disabled>编写训练日志</button>{% endif %}
+            {% if action.upload %}<button type="button" class="btn btn-outline btn-sm" disabled>上传训练日志</button>{% endif %}
+            <span class="self-center text-sm">{{ action.log_blocked }}</span>
+          {% else %}
+            {% if action.log %}<a class="btn btn-primary btn-sm" href="{{ action.log }}">编写训练日志</a>{% endif %}
+            {% if action.upload %}<a class="btn btn-outline btn-sm" href="{{ action.upload }}">上传训练日志</a>{% endif %}
+          {% endif %}
           {% if action.submitted %}<a class="btn btn-primary btn-sm" href="{{ action.submitted }}">查看训练日志</a>{% endif %}
         {% endfor %}
       </div>
-      {% regroup date_group.tasks by period_key as period_groups %}
-      {% for period in period_groups %}
-        <div class="space-y-2">
-          <h3 class="font-semibold">{{ period.list.0.schedule_slot.get_period_display|default:"未标注时段" }}
-            {% if period.list.0.schedule_slot.starts_at %}<span class="ml-2 font-normal">{{ period.list.0.schedule_slot.starts_at|date:"H:i" }}–{{ period.list.0.schedule_slot.ends_at|date:"H:i" }}</span>{% endif %}
-          </h3>
-          {% for task in period.list %}
-            <article class="card card-border card-sm bg-base-100 shadow-sm">
-              <div class="card-body">
-                <div class="text-sm text-base-content/70">
-                  {{ task.training_plan.title }}
-
-                </div>
-                {% if task.domain_links.all %}
-                  <div class="flex flex-wrap gap-2">{% for link in task.domain_links.all %}<span class="badge badge-primary badge-soft">{{ link.technical_domain.name }}</span>{% endfor %}</div>
-                {% endif %}
-                <h4 class="card-title wrap-anywhere">{{ task.title }}</h4>
-                {% if coach_view and perms.training.view_taskexecution %}
-                  <div class="text-sm">
-                    {% for label, count in task.board_statuses %}{{ label }} {{ count }} 人{% if not forloop.last %} · {% endif %}
-                    {% empty %}暂无可查看的执行分配{% endfor %}
+      <div class="overflow-x-auto">
+        <table class="table">
+          <thead class="sr-only"><tr><th scope="col">时段</th><th scope="col">领域</th><th scope="col">任务</th><th scope="col">完成情况</th></tr></thead>
+          <tbody>
+            {% for row in date_group.rows %}
+              <tr>
+                <td>{% if row.all_day %}全天{% else %}{% for task in row.periods %}
+                  <div class="whitespace-nowrap">
+                    {% if row.periods|length > 1 %}<a class="link" href="{{ task.training_url }}">{% endif %}
+                    {{ task.schedule_slot.get_period_display|default:"未标注时段" }}
+                    {% if row.periods|length > 1 %}</a>{% endif %}
+                    {% if task.schedule_slot.starts_at %}<span class="text-xs">{{ task.schedule_slot.starts_at|date:"H:i" }}–{{ task.schedule_slot.ends_at|date:"H:i" }}</span>{% endif %}
                   </div>
-                {% elif task.board_execution %}
-                  <div class="text-sm">{{ task.completion|default:task.board_execution.get_status_display }}</div>
-                {% endif %}
-                <div class="card-actions">
-                  {% if task.board_execution %}
-                    <a class="btn btn-sm" href="{% url 'training:execution_detail' task.board_execution.pk %}">查看执行记录</a>
-                  {% else %}
-                    <a class="btn btn-sm" href="{% url 'training:task_detail' task.pk %}">查看任务</a>
+                {% endfor %}{% endif %}</td>
+                <td>{{ row.domains|join:"、"|default:"—" }}</td>
+                <td><a class="link link-primary wrap-anywhere text-base" href="{{ row.task.training_url }}">{{ row.task.title }}</a>
+                  {% if row.subtask_count or row.skill_count or row.attachment_count %}
+                    <div class="flex flex-wrap gap-2 text-sm text-base-content/70">
+                      {% if row.subtask_count %}<span>子任务 {{ row.subtask_count }} 项</span>{% endif %}
+                      {% if row.skill_count %}<span>关联技能 {{ row.skill_count }} 项</span>{% endif %}
+                      {% if row.attachment_count %}<span>附件 {{ row.attachment_count }} 个</span>{% endif %}
+                    </div>
                   {% endif %}
-                </div>
-              </div>
-            </article>
-          {% endfor %}
-        </div>
-      {% endfor %}
+                </td>
+                <td>
+                  {% for period, result in row.completion %}
+                    <div>{% if period %}{{ period }} · {% endif %}{{ result }}</div>
+                  {% endfor %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      </article>
     {% empty %}
       <p class="rounded-box border border-base-300 p-4 text-base-content/70">
         {% if coach_view %}{{ all_dates|yesno:"暂无你负责的已发布任务,当天没有你负责的已发布任务" }}{% else %}{{ all_dates|yesno:"暂无分配给你的官方任务,当天没有分配给你的官方任务" }}{% endif %}
@@ -79,18 +97,18 @@
     {% if perms.training.view_personaltrainingtask or perms.training.add_personaltrainingtask %}
       <section class="card card-border bg-base-100 shadow-sm">
         <div class="card-body">
-          <h2 class="card-title">自主训练</h2>
+          <h2 class="card-title">自主训练任务</h2>
           {% if perms.training.view_personaltrainingtask %}
             <ul class="space-y-2">
               {% for task in personal_tasks %}
-                <li><a class="link" href="{% url 'training:personal_detail' task.pk %}">{{ task.date|date:"Y-m-d" }} · {{ task.title }} · {{ task.get_status_display }}</a></li>
+                <li>{{ task.date|date:"Y-m-d" }}{% if task.domain %} · {{ task.domain.name }}{% endif %} · <a class="link" href="{{ task.training_url }}">{{ task.title }}</a> · {{ task.get_status_display }}</li>
               {% empty %}<li>暂无自主任务。</li>{% endfor %}
             </ul>
           {% endif %}
           {% if perms.training.add_personaltrainingtask %}
             <div class="card-actions">
               {% for plan in personal_plans %}
-                <a class="btn btn-sm" href="{% url 'training:personal_create' plan.pk %}">{{ plan.title }}：添加自主任务</a>
+                <a class="btn btn-sm" href="{% url 'training:personal_create' plan.pk %}?date={{ day|date:'Y-m-d' }}{% if all_dates %}&amp;scope=all{% endif %}{% if plan_choices|length > 1 %}&amp;plan={{ plan.pk }}{% endif %}">添加自主任务</a>
               {% endfor %}
             </div>
           {% endif %}

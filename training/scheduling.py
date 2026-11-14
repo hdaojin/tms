@@ -124,6 +124,16 @@ def can_fill(user, slot, *, create=False, skills_only=False):
     )
 
 
+def day_task_slots(user, slots):
+    configured = [slot for slot in slots if slot.is_configured and slot.kind in ACTIVE_KINDS]
+    required = {"morning", "afternoon", "evening"}
+    coaches = {slot.period: {coach.pk for coach in slot.coaches.all()} for slot in configured}
+    common = set.intersection(*(coaches.get(period, set()) for period in required))
+    if not privileged(user):
+        common &= {user.pk}
+    return [slot for slot in configured if common & coaches[slot.period]]
+
+
 def audit(plan, user, action, *, before=None, after=None, reason="", task=None):
     record = TrainingChangeRecord.objects.create(
         training_plan=plan,
@@ -661,12 +671,13 @@ def save_schedule(plan, user, payload, reason=""):
             raise PermissionDenied
         initial = initial and not was_filled(obj)
         item["after"]["has_been_filled"] = True
-    if plan.schedule_published_at and not initial and not reason.strip():
-        raise ValidationError("修改已填写的排班或日级信息时，请填写调整原因。")
-    from .change_workflow import create_change
-    if not initial and plan.schedule_published_at:
+    if plan.schedule_published_at and not initial and not privileged(user):
+        if not reason.strip():
+            raise ValidationError("修改已填写的排班或日级信息时，请填写调整原因。")
+        from .change_workflow import create_change
+
         return create_change(plan, user, payload, reason)
-    _apply_changes(plan, payload, user, approved=initial or not plan.schedule_published_at)
+    _apply_changes(plan, payload, user, approved=True)
     audit(plan, user, "首次填写排班" if initial else "保存排班", after={"调整": payload}, reason=reason)
 
 
@@ -740,8 +751,20 @@ def validate_skills(task, skill_ids, domain_ids=None):
             raise ValidationError("技能与任务技术领域必须至少有一个交集。")
 
 
+def matching_day_tasks(slot, title):
+    return TrainingTask.objects.filter(
+        schedule_slot__day_id=slot.day_id,
+        schedule_slot__primary_domain_id=slot.primary_domain_id,
+        schedule_slot__kind=slot.kind,
+        title=title,
+    ).exclude(status="cancelled").order_by("pk")
+
+
+SHARED_TASK_FIELDS = ("overview", "requirements", "subtask_titles", "skills", "attachments")
+
+
 @transaction.atomic
-def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=False, _approved=False):
+def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=False, _approved=False, written_files=None):
     from pathlib import Path
     from .models import TrainingTaskAttachment
     plan = TrainingPlan.objects.select_for_update().get(pk=slot.day.training_plan_id)
@@ -753,6 +776,8 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
     if not can_fill(user, slot, create=task is None) and not import_allowed:
         raise PermissionDenied
     creating = task is None
+    if creating and slot.tasks.exclude(status="cancelled").exists():
+        raise ValidationError("该时段已有任务，请编辑已有任务。")
     snapshot = slot_snapshot(slot)
     validate_slot(
         plan, snapshot, publishing=True,
@@ -764,17 +789,52 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
         task = TrainingTask.objects.select_for_update().get(pk=task.pk, schedule_slot=slot)
         if task.status == "cancelled":
             raise ValidationError("已取消任务不可编辑，请新增任务。")
+        if values.get("replace_attachments"):
+            # 填报也锁定执行记录，避免覆盖时并发提交旧子任务清单。
+            list(task.executions.select_for_update().order_by("pk").values_list("pk", flat=True))
     else:
         task = TrainingTask(training_plan=plan, schedule_slot=slot, planned_date=slot.day.date, created_by=user)
     from .checklists import update_subtasks, validate_subtask_change
 
+    peers = matching_day_tasks(slot, values.get("title", task.title)).exclude(pk=task.pk)
+    source = peers.first()
+    joining = creating or task.title != values.get("title", task.title)
+    if source and (joining or source.pk < task.pk):
+        existing_titles = [item["title"] for item in task.subtasks]
+        if not creating and joining and not values.get("confirm_shared_content") and (
+            task.overview != source.overview or task.requirements != source.requirements
+            or existing_titles != [item["title"] for item in source.subtasks]
+            or set(task.skill_links.values_list("skill_id", flat=True)) != set(source.skill_links.values_list("skill_id", flat=True))
+            or task.attachments.exists()
+        ):
+            raise ValidationError("同名任务的扩展信息存在差异，请先核对后再合并。")
+        values = {key: value for key, value in values.items() if key not in SHARED_TASK_FIELDS}
+        values.pop("replace_attachments", None)
+        values.update(
+            overview=source.overview, requirements=source.requirements,
+            subtask_titles=[item["title"] for item in source.subtasks],
+            skills=list(source.skill_links.order_by("order", "pk").values_list("skill_id", flat=True)),
+        )
     titles = values.get("subtask_titles")
-    _approved = _approved or task.status == "draft"
-    if slot.is_locked and not _approved:
+    shared_peers = list(peers.select_related("schedule_slot__day__training_plan")) if source and not joining and source.pk > task.pk else []
+    if shared_peers and any(key in values for key in SHARED_TASK_FIELDS):
+        if any(not can_fill(user, peer.schedule_slot) for peer in shared_peers):
+            raise PermissionDenied
+        for peer in shared_peers:
+            list(peer.executions.select_for_update().order_by("pk").values_list("pk", flat=True))
+    else:
+        shared_peers = []
+    if titles is not None:
+        for peer in shared_peers:
+            validate_subtask_change(peer, titles)
+    approved_change = _approved
+    _approved = _approved or task.status == "draft" or privileged(user)
+    shared_review = any(peer.schedule_slot.is_locked and peer.status == "published" for peer in shared_peers)
+    if (slot.is_locked and not _approved) or (shared_review and not privileged(user) and not approved_change):
         from .change_workflow import request_task_change
         if titles is not None:
             validate_subtask_change(task, titles)
-        return request_task_change(plan, slot, task if task.pk else None, user, values, publish)
+        return request_task_change(plan, slot, task if task.pk else None, user, values, publish, written_files=written_files)
     task._definition_approved = _approved
     before = task_snapshot(task) if task.pk else {}
     if titles is not None:
@@ -800,21 +860,38 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
         require_distinguishable_users(scope, newly_selected)
     task.selected_competitors.set(selected)
     _set_skills(task, values.get("skills", before.get("skills", [])))
+    for peer in shared_peers:
+        previous = task_snapshot(peer)
+        peer.overview, peer.requirements = task.overview, task.requirements
+        if titles is not None:
+            update_subtasks(peer, titles)
+        peer._definition_approved = True
+        peer.save(update_fields=["overview", "requirements", "subtasks", "updated_at"])
+        _set_skills(peer, values.get("skills", before.get("skills", [])))
+        audit(plan, user, "同步同日任务内容", task=peer, before=previous, after=task_snapshot(peer))
     if publish and task.status == "draft":
         publish_slot_task(task, user, _approved=_approved)
         task.refresh_from_db()
     elif not creating and task.status == "published" and (
-        before.get("assign_all") != task.assign_all or before.get("selected_competitors") != sorted(selected)
+        values.get("replace_attachments") or before.get("assign_all") != task.assign_all
+        or before.get("selected_competitors") != sorted(selected)
     ):
         assign_competitors(task, user, selected=None if task.assign_all else selected, reason=values.get("reason", ""), _approved=_approved)
-    audit(plan, user, "保存任务", task=task, before=before, after=task_snapshot(task))
+    audit(plan, user, "保存任务", task=task, before=before, after=task_snapshot(task), reason=values.get("reason", ""))
     attachments = [TrainingTaskAttachment(training_task=task, file=file, uploaded_by=user, original_filename=Path(file.name).name) for file in values.get("attachments", [])]
     if attachments and not user.has_perm("training.add_trainingtaskattachment"):
         raise PermissionDenied
+    if values.get("replace_attachments") and task.attachments.exists():
+        previous_files = list(task.attachments.values_list("original_filename", flat=True))
+        task.attachments.all().delete()
+        audit(plan, user, "替换任务附件", task=task, before={"附件": previous_files})
     for attachment in attachments:
         attachment.full_clean()
     for attachment in attachments:
+        attachment.file.seek(0)
         attachment.save()
+        if written_files is not None:
+            written_files.append((attachment.file.storage, attachment.file.name))
         audit(plan, user, "添加任务附件", task=task, after={"附件": attachment.pk, "文件名": attachment.original_filename})
     return task
 
@@ -840,14 +917,17 @@ def set_task_skills(task, user, skill_ids, *, reason=""):
     )
     if not allowed:
         raise PermissionDenied
-    if task.schedule_slot_id and task.schedule_slot.is_locked and task.status != "draft":
+    if task.schedule_slot_id and matching_day_tasks(task.schedule_slot, task.title).exclude(pk=task.pk).exists():
+        return save_slot_task(task.schedule_slot, user, {"skills": skill_ids, "reason": reason}, task=task)
+    direct = task.status == "draft" or privileged(user)
+    if task.schedule_slot_id and task.schedule_slot.is_locked and not direct:
         from .change_workflow import request_task_change
         return request_task_change(plan, task.schedule_slot, task, user, {"skills": skill_ids, "reason": reason}, False)
-    task._definition_approved = task.status == "draft"
+    task._definition_approved = direct
     before = task_snapshot(task)
     _set_skills(task, skill_ids)
     task.save(update_fields=["updated_at"])
-    audit(plan, user, "修正技能关联", task=task, before=before, after=task_snapshot(task))
+    audit(plan, user, "修正技能关联", task=task, before=before, after=task_snapshot(task), reason=reason)
 
 
 @transaction.atomic
@@ -858,6 +938,7 @@ def assign_competitors(task, user, *, selected=None, _publishing=False, reason="
     import_allowed = _importing and bool(plan.published_at and plan.schedule_published_at) and can_schedule(user, plan) and not task.schedule_slot.is_locked and (privileged(user) or any(coach.pk == user.pk for coach in task.schedule_slot.coaches.all()) or task.schedule_slot.coaches_all)
     if not task.schedule_slot_id or (not can_fill(user, task.schedule_slot) and not import_allowed):
         raise PermissionDenied
+    _approved = _approved or privileged(user)
     if task.schedule_slot.is_locked and not _approved:
         from .change_workflow import request_task_change
         return request_task_change(plan, task.schedule_slot, task, user, {"assign_all": selected is None, "competitors": list(selected or []), "reason": reason}, False)
@@ -877,7 +958,7 @@ def assign_competitors(task, user, *, selected=None, _publishing=False, reason="
         if execution.user_id not in desired and execution.status != "cancelled" and execution.revoked_at is None:
             if execution.started_at or execution.status != "assigned" or execution.progress_records.exists():
                 raise ValidationError("已经开始的执行不能移出。")
-            if not reason.strip():
+            if not reason.strip() and not privileged(user):
                 raise ValidationError("撤销分配必须填写原因。")
             execution.revoked_at, execution.revoked_by, execution.revoke_reason = timezone.now(), user, reason
             execution.save(update_fields=["revoked_at", "revoked_by", "revoke_reason", "updated_at"])
@@ -976,6 +1057,8 @@ def attach_legacy_task(task, slot, user):
         raise ValidationError("只能整理本计划尚未开始且未分时段的历史任务。")
     if slot.kind not in ACTIVE_KINDS:
         raise ValidationError("请选择已发布的训练或活动时段。")
+    if task.status != "cancelled" and slot.tasks.exclude(status="cancelled").exists():
+        raise ValidationError("该时段已有任务，请选择空时段。")
     validate_skills(
         task, list(task.skill_links.values_list("skill_id", flat=True)), slot.domains.values_list("pk", flat=True)
     )

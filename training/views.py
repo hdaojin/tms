@@ -13,6 +13,7 @@ from django.utils.functional import cached_property
 from django.views.decorators.http import require_GET
 from django.views.decorators.vary import vary_on_headers
 from django.utils.decorators import method_decorator
+from django.views.decorators.cache import never_cache
 from django.views.generic import CreateView, DeleteView, DetailView, FormView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
 from django.http import QueryDict
@@ -36,10 +37,8 @@ from core.file_preview import (
 )
 
 from .forms import (
-    CoachFeedbackForm,
     CycleMemberAddForm,
     CycleMemberEditForm,
-    TaskExecutionForm,
     TrainingCycleForm,
     TrainingCycleTreeVersionsForm,
     TrainingLogForm,
@@ -47,7 +46,7 @@ from .forms import (
     TrainingPlanForm,
     TrainingTaskForm,
 )
-from .models import TaskExecution, TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
+from .models import TrainingCycle, TrainingCycleMember, TrainingLog, TrainingPlan, TrainingTask
 from .selectors import (
     log_plan_choices,
     log_plan_is_ongoing,
@@ -61,9 +60,9 @@ from .selectors import (
     visible_training_tasks_for,
 )
 from .services import (
-    build_training_log_archive, record_coach_feedback, update_execution_facts, save_cycle_member, remove_cycle_member,
+    build_training_log_archive, save_cycle_member, remove_cycle_member,
 )
-from .tables import TaskExecutionTable, TrainingCycleTable, TrainingLogTable, TrainingPlanTable, TrainingTaskTable
+from .tables import TrainingCycleTable, TrainingLogTable, TrainingPlanTable, TrainingTaskTable
 
 
 class ListPageMixin:
@@ -437,19 +436,25 @@ class TrainingPlanListView(FilterableListMixin, ListPageMixin, TitleMixin, Permi
     create_label = "新增训练计划"
     table_pagination = {"per_page": 25}
     search_fields = ("title", "training_cycle__code", "training_cycle__name")
+    scope_filter = ListFilterSpec(
+        "scope", "范围", "select", choices=(("all", "全部可见"),), empty_label="我的计划",
+    )
     status_filter = ListFilterSpec(
         "status", "状态", "select",
         choices=(("unpublished", "未发布"), ("published", "已发布"), ("completed", "已完成")),
-        empty_label="全部状态",
+        empty_label="默认状态",
     )
     list_filter_specs = (
         ListFilterSpec("q", "搜索训练计划", "search", placeholder="搜索计划标题或周期代码、名称"),
+        scope_filter,
         status_filter,
     )
 
     def get_base_queryset(self):
-        from .scheduling import visible_plans
+        from .scheduling import my_plans, visible_plans
         queryset = visible_plans(self.request.user).select_related("training_cycle")
+        if not self.get_filter_value(self.scope_filter):
+            queryset = my_plans(queryset, self.request.user)
         if self.request.user.is_active and self.request.user.is_superuser:
             return queryset.annotate(can_edit=Value(True, output_field=BooleanField()))
         # 与 plan_manager 的创建人／排班人员范围一致，避免逐行查询。
@@ -462,6 +467,8 @@ class TrainingPlanListView(FilterableListMixin, ListPageMixin, TitleMixin, Permi
     def apply_custom_filters(self, queryset):
         status = self.get_filter_value(self.status_filter)
         if not status:
+            if not self.get_filter_value(self.scope_filter):
+                return queryset.filter(end_date__gte=timezone.localdate())
             return queryset
         # 与 TrainingPlan.display_status 一致：结束日期过后优先显示已完成。
         today = timezone.localdate()
@@ -472,25 +479,11 @@ class TrainingPlanListView(FilterableListMixin, ListPageMixin, TitleMixin, Permi
         return queryset
 
 
-class MyTrainingPlanListView(TrainingPlanListView):
-    title = "我的计划"
-    create_url_name = None
-    status_filter = ListFilterSpec(
-        "status", "状态", "select",
-        choices=TrainingPlanListView.status_filter.choices,
-        empty_label="进行中及即将开始",
-    )
-    list_filter_specs = (TrainingPlanListView.list_filter_specs[0], status_filter)
-
-    def get_base_queryset(self):
-        from .scheduling import my_plans
-
-        return my_plans(super().get_base_queryset(), self.request.user)
-
-    def apply_custom_filters(self, queryset):
-        if not self.get_filter_value(self.status_filter):
-            return queryset.filter(end_date__gte=timezone.localdate())
-        return super().apply_custom_filters(queryset)
+def my_training_plans_redirect(request):
+    query = request.GET.copy()
+    query.pop("scope", None)
+    url = reverse("training:plan_list")
+    return redirect(f"{url}?{query.urlencode()}" if query else url)
 
 
 class TrainingPlanDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
@@ -582,6 +575,7 @@ class TrainingTaskListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, S
         )
 
 
+@method_decorator(never_cache, name="dispatch")
 class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     model = TrainingTask
     template_name = "training/task_detail.html"
@@ -589,9 +583,32 @@ class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{title}"
     permission_required = "training.view_trainingtask"
 
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+        purpose = " ".join(request.headers.get(key, "") for key in ("Purpose", "Sec-Purpose")).lower()
+        if request.method == "GET" and "prefetch" not in purpose and "prerender" not in purpose:
+            from .daily_progress import mark_task_viewed
+
+            mark_task_viewed(self.object, request.user, response.context_data["all_day_tasks"])
+        return response
+
     def get_context_data(self, **kwargs):
-        from .scheduling import can_fill, task_manager
+        from .scheduling import can_fill, matching_day_tasks, task_manager
         task, user = self.object, self.request.user
+        from .daily_progress import visible_all_day_tasks
+        from .training_return import training_return
+
+        all_day_tasks = visible_all_day_tasks(
+            visible_training_tasks_for(user).filter(status=TrainingTask.Status.PUBLISHED, executions__user=user,
+                executions__revoked_at__isnull=True).exclude(
+                    pk__in=user.task_executions.filter(status="cancelled").values("training_task_id")
+                ), task,
+        ) if task.schedule_slot_id and (training_return(self.request) or not can_fill(user, task.schedule_slot)) else []
+        if all_day_tasks and not any(peer.pk == task.pk for peer in all_day_tasks):
+            all_day_tasks = []
+        content_task = matching_day_tasks(task.schedule_slot, task.title).first() if task.schedule_slot_id and task.status != "cancelled" else task
+        if content_task.status != "published" and content_task.pk != task.pk:
+            content_task = task
         can_edit = bool(task.schedule_slot_id and can_fill(user, task.schedule_slot))
         can_skills = can_fill(user, task.schedule_slot, skills_only=True) if task.schedule_slot_id else task_manager(user, task.training_plan) and user.has_perm("training.change_trainingtask")
         executions = visible_task_executions_for(user).filter(training_task=task).select_related("user")
@@ -615,9 +632,17 @@ class TrainingTaskDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
         )]
         history, _ = decorate_history(history)
         from .process_views import markdown
-        return super().get_context_data(can_edit=can_edit, can_skills=can_skills, visible_executions=executions, task_history=history, description_html=markdown(task.overview), **kwargs)
+        return super().get_context_data(
+            can_edit=can_edit, can_skills=can_skills, visible_executions=executions, task_history=history,
+            description_html=markdown(task.overview), content_task=content_task, all_day_tasks=all_day_tasks,
+            **kwargs,
+        )
 
     def get_breadcrumb_parents(self):
+        from .training_return import training_return
+
+        if origin := training_return(self.request):
+            return [origin]
         if not self.request.user.has_perm("training.view_trainingtask"):
             return []
         return [breadcrumb_link("训练计划", "training:plan_list"), breadcrumb_link(self.object.training_plan.title, "training:plan_detail", args=[self.object.training_plan_id])]
@@ -678,67 +703,6 @@ class TrainingTaskUpdateView(TrainingTaskCreateView, UpdateView):
 
     def get_queryset(self):
         return manageable_training_tasks_for(self.request.user)
-
-
-class TaskExecutionListView(ListPageMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
-    model = TaskExecution
-    table_class = TaskExecutionTable
-    title = "任务执行"
-    permission_required = "training.view_taskexecution"
-    create_url_name = None
-
-    def get_queryset(self):
-        from django.db.models import Q
-        return visible_task_executions_for(self.request.user).annotate(can_edit=Q(user=self.request.user)).select_related("training_task", "user")
-
-
-class TaskExecutionDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
-    model = TaskExecution
-    template_name = "training/execution_detail.html"
-    context_object_name = "execution"
-    title = "任务执行详情"
-    permission_required = "training.view_taskexecution"
-
-    def get_queryset(self):
-        return visible_task_executions_for(self.request.user)
-
-
-class TaskExecutionUpdateView(TitleMixin, PermissionRequiredMixin, UpdateView):
-    model = TaskExecution
-    form_class = TaskExecutionForm
-    template_name = "common/form.html"
-    title = "更新任务执行"
-    permission_required = "training.change_taskexecution"
-
-    def get_queryset(self):
-        return visible_task_executions_for(self.request.user).filter(user=self.request.user)
-
-    def form_valid(self, form):
-        try:
-            self.object = update_execution_facts(self.get_object(), user=self.request.user, **form.cleaned_data)
-        except ValidationError as exc:
-            form.add_error(None, exc)
-            return self.form_invalid(form)
-        return HttpResponse(status=302, headers={"Location": self.get_success_url()})
-
-    def get_success_url(self):
-        return reverse("training:execution_detail", args=[self.object.pk])
-
-
-class CoachFeedbackView(TitleMixin, PermissionRequiredMixin, FormView):
-    form_class = CoachFeedbackForm
-    template_name = "common/form.html"
-    title = "填写教练反馈"
-    permission_required = "training.change_taskexecution"
-
-    def form_valid(self, form):
-        execution = visible_task_executions_for(self.request.user).get(pk=self.kwargs["pk"])
-        record_coach_feedback(execution, user=self.request.user, feedback=form.cleaned_data["coach_feedback"])
-        messages.success(self.request, "教练反馈已保存。")
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse("training:execution_detail", args=[self.kwargs["pk"]])
 
 
 @method_decorator(vary_on_headers("HX-Request"), name="dispatch")
@@ -888,7 +852,14 @@ class TrainingLogDetailView(TitleMixin, PermissionRequiredMixin, DetailView):
     title = "{topic}"
     permission_required = "training.view_traininglog"
 
+    def get_title(self):
+        return super().get_title() or "训练日志详情"
+
     def get_breadcrumb_parents(self):
+        from .training_return import training_return
+
+        if origin := training_return(self.request):
+            return [origin]
         if not self.request.user.has_perm("training.view_traininglog"):
             return []
         return [breadcrumb_link("训练日志", "training:log_list")]
@@ -926,6 +897,20 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
     permission_required = "training.add_traininglog"
     backfill = False
 
+    def get(self, request, *args, **kwargs):
+        from .daily_progress import LOG_COMPLETION_REQUIRED, log_completion_pending
+
+        response = super().get(request, *args, **kwargs)
+        form = response.context_data["form"]
+        selected = form.fixed_day
+        if not selected and not self.backfill and getattr(form, "current_cycle", None):
+            selected = form.current_cycle, timezone.localdate()
+        if selected:
+            cycle, day = selected
+            if log_completion_pending(request.user, cycle.pk, day):
+                response.context_data["completion_required"] = LOG_COMPLETION_REQUIRED
+        return response
+
     def get_form(self, form_class=None):
         from .log_template_views import configure_log_template_form
 
@@ -936,6 +921,7 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         from .log_template_views import log_template_context
+        from .training_return import training_return
 
         context = super().get_context_data(**kwargs)
         if not self.object:
@@ -947,9 +933,15 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
                 context["training_return_url"] = (
                     f"{reverse('training:my_training')}?date={form.fixed_day[1].isoformat()}"
                 )
+            if origin := training_return(self.request):
+                context["training_return_url"] = origin.url
         return context
 
     def get_breadcrumb_parents(self):
+        from .training_return import training_return
+
+        if origin := training_return(self.request):
+            return [origin]
         if not self.request.user.has_perm("training.view_traininglog"):
             return []
         return [breadcrumb_link("训练日志", "training:log_list")]
@@ -972,7 +964,9 @@ class TrainingLogCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
         return kwargs
 
     def get_success_url(self):
-        return reverse("training:log_detail", args=[self.object.pk])
+        from .training_return import return_params, with_training_return
+
+        return with_training_return(reverse("training:log_detail", args=[self.object.pk]), return_params(self.request.GET))
 
     def form_valid(self, form):
         try:

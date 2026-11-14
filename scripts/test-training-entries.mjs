@@ -171,12 +171,14 @@ test("all-duty disables the concrete list and unchecking enables it", () => {
   assert.equal(field.disabled, false);
 });
 
-test("day-wide arrangement fills enabled slot fields and keeps them editable", () => {
+test("day-wide arrangement only fills selected slots and disables apply when none are selected", () => {
   const f = fixture();
   const fields = {
     "unified-domain_choice": { value: "rest" },
     "unified-coaches": { selectedOptions: [{ value: "8" }] },
     "unified-coaches_all": { checked: false },
+    "slot-0-domain_choice": { value: "2" },
+    "slot-1-domain_choice": { value: "3" },
     "slot-0-coaches_all": { checked: true },
     "slot-0-coaches": {
       options: [
@@ -185,11 +187,16 @@ test("day-wide arrangement fills enabled slot fields and keeps them editable", (
       ],
     },
   };
-  const slotDomain = { name: "slot-0-domain_choice", value: "2" };
+  const slotDomain = fields["slot-0-domain_choice"];
+  const unselectedDomain = fields["slot-1-domain_choice"];
+  const first = { value: "slot-0", checked: true };
+  const second = { value: "slot-1", checked: false };
   const form = {
     elements: { namedItem: (name) => fields[name] },
     querySelectorAll: (selector) =>
-      selector.startsWith("select") ? [slotDomain] : [],
+      selector === "[data-apply-slot]:checked" ? [first, second].filter((slot) => slot.checked) : [],
+    querySelector: (selector) =>
+      selector === "[data-apply-day]" ? button : form.querySelectorAll(selector)[0],
     closest: () => f.dialog,
   };
   const button = { closest: () => form };
@@ -199,12 +206,21 @@ test("day-wide arrangement fills enabled slot fields and keeps them editable", (
     },
   });
   assert.equal(slotDomain.value, "rest");
+  assert.equal(unselectedDomain.value, "3");
   assert.equal(fields["slot-0-coaches_all"].checked, false);
   assert.equal(fields["slot-0-coaches"].options[0].selected, true);
   assert.equal(fields["slot-0-coaches"].options[1].selected, false);
   assert.equal(f.dialog.dataset.dirty, "1");
   slotDomain.value = "unused";
-  assert.equal(slotDomain.value, "unused");
+  first.checked = false;
+  const target = { form, matches: (selector) => selector === "[data-apply-slot]", closest: () => f.dialog };
+  f.dialog.dataset.dirty = "";
+  f.dispatch("change", { target });
+  assert.equal(button.disabled, true);
+  assert.equal(f.dialog.dataset.dirty, "");
+  first.checked = true;
+  f.dispatch("change", { target });
+  assert.equal(button.disabled, false);
 });
 
 test("explicit reset reloads saved editor content without discard confirmation", () => {

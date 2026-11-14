@@ -33,11 +33,12 @@ class BreadcrumbTests(SimpleTestCase):
 
     def test_section_uses_only_visible_navigation(self):
         request = self.request(['training.view_trainingplan'])
-        crumbs = build_breadcrumbs(request, '我的计划')
-        self.assertEqual(crumbs[1].url, reverse('training:my_plans'))
-        self.assertEqual([c.label for c in build_breadcrumbs(self.request(), '页面')], ['首页', '页面'])
+        crumbs = build_breadcrumbs(request, '页面')
+        self.assertEqual(crumbs[1].url, reverse('training:plan_list'))
+        public_crumbs = build_breadcrumbs(self.request(), '页面')
+        self.assertEqual(public_crumbs[1].url, reverse('training:board'))
         request.user = AnonymousUser()
-        self.assertEqual([c.label for c in build_breadcrumbs(request, '页面')], ['首页', '页面'])
+        self.assertEqual(build_breadcrumbs(request, '页面')[1].url, reverse('training:board'))
 
     def test_adjacent_duplicates_keep_current_non_clickable(self):
         crumbs = build_breadcrumbs(None, '相同', [Breadcrumb('相同', '/first/'), Breadcrumb('相同', '/last/')])

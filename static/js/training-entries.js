@@ -64,10 +64,16 @@
   }
   document.addEventListener('change', () => { operationFields(); wholeCoachLists(); });
   document.addEventListener('input', event => {
+    if (event.target.matches?.('[data-apply-slot]')) return;
     const dialog = event.target.closest('dialog');
     if (dialog) dialog.dataset.dirty = '1';
   });
   document.addEventListener('change', event => {
+    if (event.target.matches?.('[data-apply-slot]')) {
+      const form = event.target.form;
+      form.querySelector('[data-apply-day]').disabled = !form.querySelector('[data-apply-slot]:checked');
+      return;
+    }
     const dialog = event.target.closest('dialog');
     if (dialog) dialog.dataset.dirty = '1';
   });
@@ -75,16 +81,18 @@
     const applyDay = event.target.closest('[data-apply-day]');
     if (applyDay) {
       const form = applyDay.closest('form');
+      const targets = form.querySelectorAll('[data-apply-slot]:checked');
+      if (!targets.length) return;
       const domain = form.elements.namedItem('unified-domain_choice');
       const coaches = form.elements.namedItem('unified-coaches');
       const all = form.elements.namedItem('unified-coaches_all');
       if (!domain.value) { domain.focus(); return; }
       const selected = new Set(Array.from(coaches.selectedOptions, option => option.value));
       if (!all.checked && !['rest', 'unused'].includes(domain.value) && !selected.size) { coaches.focus(); return; }
-      for (const field of form.querySelectorAll('select[name$="-domain_choice"]')) {
-        if (!field.name.startsWith('slot-')) continue;
+      for (const target of targets) {
+        const prefix = target.value + '-';
+        const field = form.elements.namedItem(`${prefix}domain_choice`);
         field.value = domain.value;
-        const prefix = field.name.replace(/domain_choice$/, '');
         form.elements.namedItem(`${prefix}coaches_all`).checked = all.checked;
         for (const option of form.elements.namedItem(`${prefix}coaches`).options) option.selected = selected.has(option.value);
       }
@@ -142,8 +150,8 @@
     wholeCoachLists(target);
   });
   weekState(document);
+  document.addEventListener('htmx:historyRestore', () => weekState(document));
+  window.addEventListener('pageshow', event => { if (event.persisted) weekState(document); });
   wholeCoachLists();
   operationFields();
 })();
-  document.addEventListener('htmx:historyRestore', () => weekState(document));
-  window.addEventListener('pageshow', event => { if (event.persisted) weekState(document); });

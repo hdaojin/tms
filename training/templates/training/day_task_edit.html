@@ -1,0 +1,70 @@
+{% extends is_fragment|yesno:'layouts/htmx.html,layouts/app.html' %}
+{% load static %}
+{% block content %}
+{% if not is_fragment %}<div id="task-editor">{% endif %}
+<div class="space-y-4">
+  <h2 class="text-xl font-bold">编辑全天任务 · {{ day.date|date:'Y-m-d' }}</h2>
+  {% if saved_message %}<p class="alert alert-success">{{ saved_message }}</p>{% endif %}
+  {% if error %}<p class="alert alert-error">{{ error }}</p>{% endif %}
+  {% if common %}
+    <details class="rounded-box border border-base-300 p-4" {% if common.is_bound %}open{% endif %}>
+      <summary class="cursor-pointer font-semibold">统一任务安排</summary>
+      <form method="post" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="{% url 'training:day_task_edit' plan.pk day.pk %}" hx-target="#task-editor" class="mt-3 space-y-3">
+        {% csrf_token %}
+        <input type="hidden" name="version" value="{{ version }}">
+        <input type="hidden" name="action" value="apply">
+        {% include 'training/day_task_fields.html' with form=common %}
+        <fieldset>
+          <legend>选择时段</legend>
+          <div class="flex flex-wrap gap-3">
+            {% for row in rows %}
+              {% if row.editable %}
+                <label class="inline-flex items-center gap-2">
+                  <input type="checkbox" name="targets" value="{{ row.slot.pk }}" class="checkbox checkbox-sm" {% if row.selected %}checked{% endif %}>
+                  {{ row.slot.get_period_display }}{% if row.task %} · 已有任务{% endif %}
+                </label>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </fieldset>
+        {% if has_existing %}
+          <p class="text-sm">选中已有任务的时段时，将覆盖该任务的内容、附件和选手分配。</p>
+          <ul class="list-disc pl-5">
+            {% for row in rows %}
+              {% if row.editable and row.task %}<li>{{ row.slot.get_period_display }} · {{ row.task.title }}</li>{% endif %}
+            {% endfor %}
+          </ul>
+          <label class="flex items-center gap-2">
+            <input type="checkbox" name="overwrite" class="checkbox checkbox-sm">确认覆盖选中时段的已有任务
+          </label>
+        {% endif %}
+        <button class="btn btn-primary">应用到选定的时段</button>
+      </form>
+    </details>
+  {% endif %}
+  {% for row in rows %}
+    <details class="rounded-box border border-base-300 p-4" {% if row.form.is_bound %}open{% endif %}>
+      <summary class="cursor-pointer font-semibold">
+        {{ row.slot.get_period_display }} · {% if row.task %}{{ row.task.title }}（{{ row.task.get_status_display }}）{% elif not row.slot.is_configured %}未启用{% elif row.editable %}待填写{% else %}{{ row.slot.get_kind_display }}{% endif %}
+      </summary>
+      {% if row.editable %}
+        <form method="post" enctype="multipart/form-data" hx-encoding="multipart/form-data" hx-post="{% url 'training:day_task_edit' plan.pk day.pk %}" hx-target="#task-editor" class="mt-3 space-y-3">
+          {% csrf_token %}
+          <input type="hidden" name="version" value="{{ version }}">
+          <input type="hidden" name="slot" value="{{ row.slot.pk }}">
+          {% include 'training/day_task_fields.html' with form=row.form task=row.task %}
+          <button class="btn btn-primary">{% if row.slot.is_locked and row.task.status == 'published' and not direct_adjustment %}提交调整{% else %}保存{% endif %}</button>
+        </form>
+      {% elif row.task %}
+        <a class="link" href="{% url 'training:task_detail' row.task.pk %}">查看任务</a>
+      {% endif %}
+    </details>
+  {% endfor %}
+  <a class="link" href="{% url 'training:plan_detail' plan.pk %}">返回计划</a>
+</div>
+{% if not is_fragment %}</div>{% endif %}
+{% endblock %}
+{% block extra_js %}
+  <script src="{% static 'js/training-checklist-editor.js' %}" defer></script>
+  <script src="{% static 'meetings/recipients.js' %}" defer></script>
+{% endblock %}

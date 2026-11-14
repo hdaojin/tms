@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.core import signing
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -29,10 +29,14 @@ from core.utils.markdown import render_markdown_text
 
 from . import log_generation
 from .checklists import completion_counts
-from .completion_forms import DailyCompletionForm, TaskCompletionForm
+from .completion_forms import CompletionIssues, DailyCompletionForm, TaskCompletionForm
 from .daily_progress import (
+    LOG_COMPLETION_REQUIRED,
+    completion_groups,
     daily_executions,
     day_fingerprint,
+    expand_completion,
+    log_completion_pending,
     save_day,
     training_day_url,
     training_upload_url,
@@ -46,6 +50,7 @@ from .log_web_references import fetch_reference_pages
 from .models import TrainingLog, TrainingLogDraft, TrainingLogGeneration, TrainingProgressAttachment
 from .scheduling import can_fill, visible_plans
 from .selectors import training_logs_visible_to, visible_training_tasks_for
+from .training_return import return_params, training_return, with_training_return
 
 Status = TrainingLogGeneration.Status
 
@@ -57,7 +62,11 @@ def require_permissions(user, *permissions):
 
 def page(request, template, title, **context):
     parents = []
-    if request.user.has_perm("training.view_traininglog"):
+    origin = training_return(request)
+    if origin:
+        parents.append(origin)
+        context["training_return_url"] = origin.url
+    elif request.user.has_perm("training.view_traininglog"):
         parents.append(breadcrumb_link("训练日志", "training:log_list"))
     return render(
         request,
@@ -112,14 +121,28 @@ def daily_progress(request):
     is_post = request.method == "POST"
     shared_execution_id = min((execution.pk for execution in executions), default=None)
     notes = ""
+    issues = []
     attachments = []
     for execution in executions:
         record = next(iter(execution.daily_records), None)
         if record:
             if execution.pk == shared_execution_id:
                 notes = record.problems
+                issues = record.issues
             attachments.extend(record.attachments.all())
-        editable = user.has_perm("training.change_trainingprogress" if record else "training.add_trainingprogress")
+    for group in completion_groups(executions):
+        execution = group[0]
+        record = next(iter(execution.daily_records), None)
+        editable = all(user.has_perm(
+            "training.change_trainingprogress" if member.daily_records else "training.add_trainingprogress"
+        ) for member in group)
+        masks = [tuple(item["done"] for item in (member.daily_records[0].checklist or ()))
+                 if member.daily_records else () for member in group]
+        previous_counts = [
+            (member.training_task.schedule_slot.get_period_display(),
+             member.daily_records[0].checklist if member.daily_records else None)
+            for member in group
+        ]
         form = TaskCompletionForm(
             request.POST if is_post else None,
             execution=execution,
@@ -129,6 +152,9 @@ def daily_progress(request):
         rows.append(
             {
                 "execution": execution,
+                "group": group,
+                "inconsistent": len(set(masks)) > 1,
+                "previous_counts": previous_counts,
                 "record": record,
                 "counts": completion_counts(record),
                 "previous_problems": record.problems if record and execution.pk != shared_execution_id else "",
@@ -142,22 +168,36 @@ def daily_progress(request):
         request.FILES if is_post else None,
         initial={"problems": notes},
     )
+    issue_forms = CompletionIssues(
+        request.POST if is_post and "issues-TOTAL_FORMS" in request.POST else None,
+        prefix="issues", initial=issues or ([{"description": notes}] if notes else []),
+        form_kwargs={"cycle": cycle, "day": day},
+    )
     fingerprint = day_fingerprint(executions)
     error = ""
     if request.method == "POST":
         if not editable:
             raise PermissionDenied
         valid = [row["form"].is_valid() for row in rows]
-        if day_form.is_valid() and all(valid):
+        if day_form.is_valid() and all(valid) and (not issue_forms.is_bound or issue_forms.is_valid()):
             try:
+                if any(row["inconsistent"] for row in rows) and request.POST.get("confirm_merge") != "on":
+                    raise ValidationError("请确认按本次勾选统一各时段的完成情况。")
                 previous = signing.loads(request.POST.get("version", ""), salt="training.daily_completion")
+                structured = [
+                    {"description": item["description"], "domain": item["domain"].pk if item["domain"] else None,
+                     "skills": [skill.pk for skill in item["skills"]]}
+                     for item in issue_forms.cleaned_data if item and not item.get("DELETE")
+                ] if issue_forms.is_bound else None
                 save_day(
                     user,
                     cycle,
                     day,
                     previous,
-                    {row["execution"].pk: row["form"].cleaned_data["items"] for row in rows},
+                    {key: value for row in rows for key, value in
+                     expand_completion(row["group"], row["form"].cleaned_data["items"]).items()},
                     **day_form.cleaned_data,
+                    issues=structured,
                 )
             except signing.BadSignature:
                 error = "页面已失效，请重新打开后填写。"
@@ -165,7 +205,8 @@ def daily_progress(request):
                 error = "；".join(exc.messages)
             else:
                 messages.success(request, "已保存当天训练完成情况。")
-                return redirect(f"{reverse('training:my_training')}?date={day.isoformat()}")
+                origin = training_return(request)
+                return redirect(origin.url if origin else f"{reverse('training:my_training')}?date={day.isoformat()}")
     return page(
         request,
         "daily_progress",
@@ -174,6 +215,8 @@ def daily_progress(request):
         day=day,
         editable=editable,
         day_form=day_form,
+        issue_forms=issue_forms,
+        needs_merge_confirmation=any(row["inconsistent"] for row in rows),
         attachments=attachments,
         notes=notes,
         show_plan_names=len({execution.training_task.training_plan_id for execution in executions}) > 1,
@@ -182,6 +225,29 @@ def daily_progress(request):
         if request.method == "POST"
         else signing.dumps(fingerprint, salt="training.daily_completion"),
     )
+
+
+@require_GET
+def completion_skill_search(request, cycle_id, day):
+    from standards.models import Skill
+
+    require_permissions(request.user, "training.view_taskexecution", "training.view_trainingprogress")
+    selection = TrainingDayForm({"cycle": cycle_id, "training_date": day}, user=request.user)
+    if not selection.is_valid():
+        raise PermissionDenied
+    cycle, date = selection.cleaned_data["cycle"], selection.cleaned_data["training_date"]
+    if validate_training_day(request.user, cycle, date).role != STUDENT:
+        raise PermissionDenied
+    query = request.GET.get("q", "").strip()[:100]
+    skills = Skill.objects.filter(skill_project=cycle.skill_project, name__icontains=query) if query else Skill.objects.none()
+    domain = request.GET.get("domain", "")
+    if domain.isascii() and domain.isdigit():
+        skills = skills.filter(Q(primary_domain_id=domain) | Q(related_domains=domain)).distinct()
+    page_number = request.GET.get("page", "")
+    index = min(int(page_number), 1000) if page_number.isascii() and page_number.isdigit() and len(page_number) < 6 else 1
+    offset = max(index - 1, 0) * 20
+    rows = list(skills.order_by("name", "pk").values("id", "name")[offset:offset + 21])
+    return JsonResponse({"results": [{"id": row["id"], "label": row["name"]} for row in rows[:20]], "has_more": len(rows) > 20})
 
 
 @never_cache
@@ -207,18 +273,20 @@ def start(request):
             error = "历史训练日请使用补交入口，日常编写仅支持今天。"
         else:
             existing = TrainingLog.objects.filter(author=user, training_cycle=cycle, training_date=day).first()
-            if not existing:
+            if not existing and log_completion_pending(user, cycle.pk, day):
+                error = LOG_COMPLETION_REQUIRED
+            elif not existing:
                 if request.method == "POST" and selecting_history:
-                    return redirect(training_day_url("training:log_ai_start", cycle.pk, day))
+                    return redirect(with_training_return(training_day_url("training:log_ai_start", cycle.pk, day), return_params(request.GET)))
                 lookup = {"author": user, "cycle": cycle, "training_date": day}
                 if request.method == "POST":
                     draft, _ = TrainingLogDraft.objects.get_or_create(**lookup)
                     if not request.POST.get("action"):
-                        return redirect("training:log_ai_draft", pk=draft.pk)
+                        return redirect(with_training_return(reverse("training:log_ai_draft", args=[draft.pk]), return_params(request.GET)))
                     return draft_page(request, draft=draft)
                 draft = TrainingLogDraft.objects.filter(**lookup).first()
                 if draft:
-                    return redirect("training:log_ai_draft", pk=draft.pk)
+                    return redirect(with_training_return(reverse("training:log_ai_draft", args=[draft.pk]), return_params(request.GET)))
                 return draft_page(request, draft=TrainingLogDraft(**lookup))
     if not history and not error and not existing:
         error = "请确认已设置进行中的当前训练周期。"
@@ -228,6 +296,9 @@ def start(request):
         "补交历史训练日志" if history else "编写训练日志",
         day_form=form if selecting_history else None,
         existing=existing,
+        existing_url=with_training_return(
+            reverse("training:log_detail", args=[existing.pk]), return_params(request.GET),
+        ) if existing else "",
         error=error,
     )
 
@@ -342,7 +413,7 @@ def draft_page(request, pk=None, *, draft=None):
     inline_edit = action == "edit" and bool(request.htmx)
     status_poll = request.method == "GET" and request.htmx and request.GET.get("generation_status") == "1"
     if draft.submitted_log_id:
-        url = reverse("training:log_detail", args=[draft.submitted_log_id])
+        url = with_training_return(reverse("training:log_detail", args=[draft.submitted_log_id]), return_params(request.GET))
         return HttpResponse(headers={"HX-Redirect": url}) if inline_edit or status_poll else redirect(url)
     if status_poll and TrainingLogGeneration.objects.filter(
         draft=draft, status__in=log_generation.ACTIVE, status=request.GET.get("seen_status")
@@ -356,7 +427,7 @@ def draft_page(request, pk=None, *, draft=None):
         if inline_edit:
             return render(request, "training/log_ai_draft.html#draft_editor", {"editor_error": error})
         if status_poll:
-            return HttpResponse(headers={"HX-Redirect": request.path})
+            return HttpResponse(headers={"HX-Redirect": with_training_return(request.path, return_params(request.GET))})
         return page(request, "log_ai_start", "AI 辅助编写训练日志", error=error)
     role = current["header"]["role"]
     generation_values = {}
@@ -383,6 +454,7 @@ def draft_page(request, pk=None, *, draft=None):
             error = "；".join(exc.messages) if isinstance(exc, ValidationError) else str(exc)
         else:
             if success_url:
+                success_url = with_training_return(success_url, return_params(request.GET))
                 if action == "image" and generation_values:
                     draft.refresh_from_db()
                     image_form = LogImageForm(available=available_progress_images(draft, current))
@@ -416,7 +488,7 @@ def draft_page(request, pk=None, *, draft=None):
                 result, omitted_images = candidate_sections(job, role, images)
     if status_poll:
         if not job or job.status == Status.REVIEW:
-            return HttpResponse(headers={"HX-Redirect": request.path})
+            return HttpResponse(headers={"HX-Redirect": with_training_return(request.path, return_params(request.GET))})
         return render(
             request,
             "training/log_ai_draft.html#generation_status",

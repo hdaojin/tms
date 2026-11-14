@@ -1,0 +1,19 @@
+{% include 'components/form_errors.html' %}
+{% for field in form.hidden_fields %}{{ field }}{% endfor %}
+{% include 'components/field.html' with field=form.title %}
+{% if form.shared_task %}<p class="text-sm">同一任务只需填写一次。扩展信息沿用已有任务。</p>{% endif %}
+<details {% if form.errors %}open{% endif %}>
+  <summary class="cursor-pointer">扩展选项（可选）</summary>
+  <div class="space-y-3 mt-3">
+    {% for field in form.visible_fields %}
+      {% if field.name != 'title' %}{% include 'components/field.html' %}{% endif %}
+    {% endfor %}
+    {% if perms.training.view_trainingtaskattachment and task.attachments.all %}
+      <ul class="list-disc pl-5">
+        {% for attachment in task.attachments.all %}
+          <li><a class="link" href="{% url 'training:attachment_download' 'task' attachment.pk %}">{{ attachment.original_filename }}</a></li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+</details>

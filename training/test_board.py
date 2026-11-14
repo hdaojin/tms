@@ -16,13 +16,47 @@ from .test_process_refactor import ProcessFixture
 
 
 class TrainingBoardTests(ProcessFixture, TestCase):
+    def test_task_detail_starts_own_execution_and_preserves_training_origin(self):
+        task = self.task()
+        execution = task.executions.get(user=self.student)
+        self.client.force_login(self.student)
+        url = reverse("training:task_detail", args=[task.pk])
+        query = {"return_date": "2026-01-02", "return_scope": "all", "return_plan": self.plan.pk}
+        self.client.get(url, query, HTTP_SEC_PURPOSE="prefetch")
+        execution.refresh_from_db()
+        self.assertEqual(execution.status, "assigned")
+        response = self.client.get(url, query)
+        self.assertEqual(response.context["breadcrumbs"][-2].url,
+                         f"{reverse('training:my_training')}?date=2026-01-02&scope=all&plan={self.plan.pk}")
+        self.client.get(url)
+        execution.refresh_from_db()
+        self.assertIsNotNone(execution.viewed_at)
+        from .daily_progress import displayed_execution_status
+        self.assertEqual(displayed_execution_status(execution, task.schedule_slot, task.schedule_slot.starts_at), "进行中")
+
+    def test_same_day_tasks_share_content_and_one_display_row(self):
+        first = self.task(title="统一任务", overview="共享概述", subtask_titles=["共同步骤"])
+        second = self.task(slot=self.other_slot(), title=first.title, overview="忽略重复内容")
+        self.assertEqual(second.overview, first.overview)
+        self.assertEqual([item["title"] for item in second.subtasks], ["共同步骤"])
+        self.client.force_login(self.student)
+        response = self.client.get(reverse("training:my_training"))
+        self.assertContains(response, "统一任务", count=1)
+        self.assertContains(response, ">全天</td>")
+        self.assertContains(response, "子任务 1 项")
+        self.assertContains(response, '<th scope="col">完成情况</th>', html=True)
+        rows = list(response.context["date_groups"][0]["rows"])
+        self.assertEqual(len(rows[0]["completion"]), 1)
+        for task in (first,):
+            self.assertContains(response, reverse("training:task_detail", args=[task.pk]))
+
     def test_public_board_has_a_training_menu_entry(self):
         menu = get_section_items("training", AnonymousUser())
         self.assertIn(reverse("training:board"), [item.resolved_url for group in menu for item in group.children])
 
     def test_competitors_see_only_own_effective_assignments_and_personal_tasks(self):
         first = self.task(title="选手甲的任务", assign_all=False, competitors=[self.student.pk])
-        second = self.task(title="选手乙的任务", assign_all=False, competitors=[self.student2.pk])
+        second = self.task(slot=self.other_slot(), title="选手乙的任务", assign_all=False, competitors=[self.student2.pk])
         first.executions.filter(user=self.student).update(status=TaskExecution.Status.IN_PROGRESS)
         PersonalTrainingTask.objects.create(
             training_plan=self.plan, user=self.student, date=first.planned_date, title="本人自主任务",
@@ -35,7 +69,7 @@ class TrainingBoardTests(ProcessFixture, TestCase):
         self.assertContains(response, "进行中")
         self.assertContains(response, "本人自主任务")
         self.assertNotContains(response, "选手乙的任务")
-        self.assertContains(response, reverse("training:execution_detail", args=[first.executions.get().pk]))
+        self.assertContains(response, reverse("training:task_detail", args=[first.pk]))
         self.assertNotContains(self.client.get(url, {"date": "2026-01-02"}), "选手甲的任务")
         self.assertContains(self.client.get(url, {"date": "2026-01-02", "scope": "all"}), "选手甲的任务")
 
@@ -56,7 +90,7 @@ class TrainingBoardTests(ProcessFixture, TestCase):
             title="下午负责", status="published", created_by=self.other,
         )
         TrainingTask.objects.create(
-            training_plan=self.plan, schedule_slot=self.slot, planned_date=morning.planned_date,
+            training_plan=self.plan, schedule_slot=self.other_slot("evening"), planned_date=morning.planned_date,
             title="草稿任务", created_by=self.coach,
         )
         legacy = TrainingTask.objects.create(
@@ -90,7 +124,7 @@ class TrainingBoardTests(ProcessFixture, TestCase):
         self.client.force_login(self.student)
         response = self.client.get(reverse("training:my_training"))
         self.assertContains(response, "选手视图")
-        self.assertContains(response, reverse("training:execution_detail", args=[task.executions.get(user=self.student).pk]))
+        self.assertContains(response, reverse("training:task_detail", args=[task.pk]))
 
     def test_public_screen_requires_explicit_listing_and_current_publication(self):
         task = self.task(title="公开任务标题", overview="内部任务正文")
@@ -171,7 +205,8 @@ class TrainingBoardTests(ProcessFixture, TestCase):
             (statuses.BLOCKED, statuses.UNFINISHED),
             (statuses.COMPLETED, statuses.CANCELLED),
         ]):
-            task = self.task(title=f"公开任务 {index}", order=3 - index)
+            period = ("morning", "early", "afternoon", "evening")[index]
+            task = self.task(slot=self.other_slot(period), title=f"公开任务 {index}", order=3 - index)
             published.append(task)
             task.executions.filter(user=self.student).update(status=first, completion_note="保密进度")
             task.executions.filter(user=self.student2).update(status=second, coach_feedback="保密反馈")
@@ -186,7 +221,7 @@ class TrainingBoardTests(ProcessFixture, TestCase):
         tomorrow_slot.kind = "technical"
         tomorrow_slot.save(update_fields=["kind", "updated_at"])
         for state, planned_date, slot in [
-            ("draft", day.date, self.slot),
+            ("draft", day.date, None),
             ("cancelled", day.date, self.slot),
             ("published", self.plan.end_date, tomorrow_slot),
             ("published", day.date, None),
@@ -211,7 +246,7 @@ class TrainingBoardTests(ProcessFixture, TestCase):
             {item["name"]: (item["count"], item["percent"]) for item in stats["distribution"]},
             {self.linux.name: (3, 75), other_domain.name: (1, 25)},
         )
-        self.assertEqual(plan["slots"][1]["tasks"], [task.title for task in reversed(published)])
+        self.assertEqual([slot["tasks"] for slot in plan["slots"]], [[published[index].title] for index in (1, 0, 2, 3)])
         for value in ("隐藏任务", "隐藏自主任务", "保密进度", "保密反馈", self.student.first_name, self.student2.username):
             self.assertNotContains(response, value)
 

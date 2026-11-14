@@ -1,0 +1,12 @@
+<div class="rounded-box border border-base-300 p-3" data-skill-domain-row{% if issue.DELETE.value %} hidden{% endif %}>
+  {% include 'components/form_errors.html' with form=issue %}
+  <div class="flex justify-end">
+    <button type="button" class="btn btn-ghost btn-sm" data-remove-issue aria-label="移除此问题">移除</button>
+  </div>
+  <div class="mt-3 grid items-start gap-3 md:grid-cols-2">
+    {% include 'components/field.html' with field=issue.domain %}
+    {% include 'components/field.html' with field=issue.skills %}
+  </div>
+  {% include 'components/field.html' with field=issue.description %}
+  <div hidden>{{ issue.DELETE }}</div>
+</div>

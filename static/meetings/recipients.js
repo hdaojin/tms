@@ -122,7 +122,10 @@
       status.textContent = "正在搜索…";
       if (nextPage === 1) clearResults();
       try {
-        const response = await fetch(searchURL(root.dataset.searchUrl, window.location.origin, root.dataset.meetingId, text, nextPage), {
+        const url = searchURL(root.dataset.searchUrl, window.location.origin, root.dataset.meetingId, text, nextPage);
+        const domain = root.closest("[data-skill-domain-row]")?.querySelector('select[name$="-domain"]');
+        if (domain?.value) url.searchParams.set("domain", domain.value);
+        const response = await fetch(url, {
           signal: controller.signal,
           headers: { Accept: "application/json" },
           credentials: "same-origin",
@@ -217,5 +220,6 @@
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();
     document.addEventListener("htmx:load", init);
+    document.addEventListener("tms:search-picker-added", init);
   }
 })();

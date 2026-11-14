@@ -6,6 +6,6 @@
   <p>未设置有效的当前周期，请联系管理员。</p>
 {% endif %}
 {% if training_return_url %}<a class="link" href="{{ training_return_url }}">返回所选训练日</a>{% endif %}
-{{ block.super }}
+{% if completion_required %}<p class="alert alert-warning">{{ completion_required }}</p>{% else %}{{ block.super }}{% endif %}
 {% if show_log_templates %}{% include "training/_log_template_links.html" %}{% endif %}
 {% endblock %}
