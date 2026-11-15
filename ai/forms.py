@@ -13,8 +13,8 @@ from meetings.widgets import RecipientSelect
 from .catalog import matching_option, provider_catalog
 from .models import ReasoningEffort, ShareAudience, ThinkingMode
 from .parameters import EFFORT_HELP, SAMPLING_PARAMETERS, THINKING_HELP
-from .providers import PROVIDERS, validate_base_url, validate_model_id
-from .services import normalize_thinking, share_recipients
+from .providers import ADAPTERS, PROVIDERS, adapter_protocol, provider_definition, validate_base_url, validate_model_id
+from .services import share_recipients
 
 
 class ThinkingForm(StyledFormMixin, forms.Form):
@@ -27,7 +27,7 @@ class ThinkingForm(StyledFormMixin, forms.Form):
 
 class AIModelForm(ThinkingForm):
     name = forms.CharField(label="模型名称", max_length=100, help_text="用于在 TMS 中识别这份模型配置。")
-    provider = forms.ChoiceField(label="模型提供商", choices=[(code, item.label) for code, item in PROVIDERS.items()])
+    provider = forms.ChoiceField(label="模型提供商")
     custom_provider_name = forms.CharField(
         label="自定义提供商名称", max_length=100, required=False, help_text="留空时显示为「自定义 API」。",
     )
@@ -71,8 +71,6 @@ class AIModelForm(ThinkingForm):
                 "reasoning_effort": model.reasoning_effort,
                 **model.request_parameters,
             }
-        else:
-            kwargs["initial"] = {"provider": next(iter(PROVIDERS))}
         super().__init__(*args, **kwargs)
         for name, choices in (("thinking", ThinkingMode.choices), ("reasoning_effort", ReasoningEffort.choices)):
             self.fields[name].choices = [("", "使用接口默认值"), *choices]
@@ -80,9 +78,11 @@ class AIModelForm(ThinkingForm):
         configure_sampling_fields(self)
         self.catalog = provider_catalog()
         self.fields["provider"].choices = [
-            (code, item.label) for code, item in PROVIDERS.items()
-            if self.catalog[code]["enabled"] or (model and code == model.provider)
+            (code, entry["label"]) for code, entry in self.catalog.items()
+            if entry["enabled"] or (model and code == model.provider)
         ]
+        if not model and not self.is_bound and self.fields["provider"].choices:
+            self.initial["provider"] = self.fields["provider"].choices[0][0]
         self.preset_providers = [
             (code, self.catalog[code]) for code, _ in self.fields["provider"].choices if code != "custom"
         ]
@@ -154,9 +154,6 @@ class AIModelForm(ThinkingForm):
                 validate_model_id(data["model_id"])
             except ValidationError as exc:
                 self.add_error("model_id", exc)
-        if not (adapter := PROVIDERS.get(data.get("provider"))) or not adapter.thinking:
-            if data.get("thinking") == ThinkingMode.ENABLED:
-                self.add_error("thinking", "此模型提供商目前不开放思考模式设置。")
         for name in ("thinking", "reasoning_effort"):
             if name not in self.data:
                 data.pop(name, None)
@@ -183,9 +180,14 @@ class ModelDiscoveryForm(AIModelForm):
         return self.clean_connection(self.cleaned_data)
 
 
-class ProviderDefaultForm(ThinkingForm):
-    field_order = ("enabled", "default_base_url", "thinking", "reasoning_effort")
-    enabled = forms.BooleanField(label="启用提供商", required=False)
+class ProviderDefaultForm(StyledFormMixin, forms.Form):
+    name = forms.CharField(label="提供商名称", max_length=100)
+    adapter = forms.ChoiceField(
+        label="API 协议",
+        choices=[("", "请选择 API 协议"), *((key, f"{adapter_protocol(key)}（{key}）") for key in ADAPTERS)],
+        help_text="括号内为 LiteLLM 的 Provider Key。保存后不能更换协议。",
+    )
+    enabled = forms.BooleanField(label="启用提供商", required=False, initial=True)
     default_base_url = forms.CharField(label="默认 API 地址", max_length=300, required=False)
     logo = forms.ImageField(
         label="上传 Logo", required=False,
@@ -193,22 +195,37 @@ class ProviderDefaultForm(ThinkingForm):
         validators=AI_PROVIDER_LOGO_UPLOAD_SPEC.validators(),
         help_text="支持 PNG 和 WebP，大小不超过 1 MB，宽高均不超过 2048 像素。建议使用透明背景的方形图片。",
     )
-    remove_logo = forms.BooleanField(label="恢复内置 Logo", required=False)
+    remove_logo = forms.BooleanField(label="移除已上传的 Logo", required=False)
 
-    def __init__(self, *args, provider, **kwargs):
+    def __init__(self, *args, provider=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.provider = provider
+        self.definition = provider_definition(provider) if provider else None
+        if provider:
+            self.fields.pop("adapter")
+        else:
+            self.fields.pop("remove_logo")
+        if provider in PROVIDERS:
+            self.fields.pop("name")
         if provider == "custom":
             self.fields.pop("logo")
             self.fields.pop("remove_logo")
-        if provider != "deepseek":
-            self.fields.pop("thinking")
-            self.fields.pop("reasoning_effort")
-        self.fields["default_base_url"].help_text = f"留空将使用 {PROVIDERS[provider].default_url}。"
+        if provider not in PROVIDERS:
+            self.fields["default_base_url"].required = True
+        if self.definition and self.definition.default_url:
+            self.fields["default_base_url"].help_text = f"留空将使用 {self.definition.default_url}。"
 
-    def clean_default_base_url(self):
-        value = self.cleaned_data["default_base_url"]
-        return validate_base_url(self.provider, value) if value else ""
+    def clean(self):
+        data = super().clean()
+        adapter = self.definition or ADAPTERS.get(data.get("adapter"))
+        if adapter and data.get("default_base_url"):
+            try:
+                data["default_base_url"] = validate_base_url(self.provider, data["default_base_url"], adapter=adapter)
+            except ValidationError as exc:
+                self.add_error("default_base_url", exc)
+        if data.get("logo") and data.get("remove_logo"):
+            self.add_error("logo", "上传新 Logo 时，请取消勾选「移除已上传的 Logo」。")
+        return data
 
     def clean_logo(self):
         logo = self.cleaned_data["logo"]
@@ -219,15 +236,6 @@ class ProviderDefaultForm(ThinkingForm):
             if max(logo.image.size) > 2048:
                 raise ValidationError("Logo 的宽和高均不能超过 2048 像素。")
         return logo
-
-    def clean(self):
-        data = super().clean()
-        if data.get("logo") and data.get("remove_logo"):
-            self.add_error("logo", "上传新 Logo 时，请取消勾选「恢复内置 Logo」。")
-        if "thinking" in data and "reasoning_effort" in data:
-            data["thinking"], data["reasoning_effort"] = normalize_thinking(data["thinking"], data["reasoning_effort"])
-        return data
-
 
 class ModelOptionForm(StyledFormMixin, forms.Form):
     supports_images = forms.BooleanField(label="支持图片输入", required=False)
@@ -242,12 +250,12 @@ class ModelOptionForm(StyledFormMixin, forms.Form):
     temperature = forms.FloatField(required=False, min_value=0, max_value=2)
     show_top_p = forms.BooleanField(label="向用户展示核采样范围", required=False)
     top_p = forms.FloatField(required=False, min_value=0, max_value=1)
-    show_thinking = forms.BooleanField(label="向用户展示思考模式", required=False)
+    show_thinking = forms.BooleanField(label="支持设置思考模式", required=False)
     thinking = forms.ChoiceField(
         label="建议的思考模式", choices=[("", "未指定"), *ThinkingMode.choices],
         required=False, help_text=THINKING_HELP,
     )
-    show_reasoning_effort = forms.BooleanField(label="向用户展示思考强度", required=False)
+    show_reasoning_effort = forms.BooleanField(label="支持设置思考强度", required=False)
     reasoning_effort = forms.ChoiceField(
         label="建议的思考强度", choices=[("", "未指定"), *ReasoningEffort.choices],
         required=False, help_text=EFFORT_HELP,
@@ -267,7 +275,7 @@ class ModelOptionForm(StyledFormMixin, forms.Form):
             }
         super().__init__(*args, **kwargs)
         configure_sampling_fields(self, preset=True)
-        if not PROVIDERS[provider].thinking:
+        if not provider_definition(provider).thinking:
             for name in ("thinking", "reasoning_effort"):
                 self.fields.pop(name)
                 self.fields.pop(f"show_{name}")
@@ -280,7 +288,7 @@ class ModelOptionForm(StyledFormMixin, forms.Form):
         if data.get("is_default") and not data.get("is_active"):
             self.add_error("is_default", "请先勾选「在模型选项中显示」，再设为默认模型。")
         if data.get("show_reasoning_effort") and not data.get("show_thinking"):
-            self.add_error("show_reasoning_effort", "请同时展示思考模式。")
+            self.add_error("show_reasoning_effort", "请同时启用思考模式设置。")
         data["parameter_presets"] = {
             name: data.get(name) for name in (*SAMPLING_PARAMETERS, "thinking", "reasoning_effort")
             if data.get(f"show_{name}")

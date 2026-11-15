@@ -20,7 +20,7 @@ from .catalog import matching_option, provider_catalog
 from .llm.client import GenerationRequest, invoke
 from .models import AIModel, AIModelOption, AIModelPreference, AIProviderSettings, ReasoningEffort, ShareAudience, ThinkingMode
 from .parameters import SAMPLING_PARAMETERS, sampling_arguments, sampling_value, supported_sampling_parameters
-from .providers import PROVIDERS, ProviderError, validate_base_url, validate_model_id
+from .providers import ADAPTERS, PROVIDERS, ProviderError, provider_definition, supports_thinking, validate_base_url, validate_model_id
 
 VIEW = "ai.view_aimodel"
 MANAGE_OWN = "ai.manage_own_aimodel"
@@ -44,10 +44,13 @@ def can_moderate(user):
 def save_model_option(user, provider, data, pk=None):
     if not can_moderate(user):
         raise PermissionDenied
-    if provider not in PROVIDERS:
+    adapter = provider_definition(provider)
+    if not adapter:
         raise Http404
     validate_model_id(data["model_id"])
     presets = data.get("parameter_presets", {})
+    if not adapter.thinking and {"thinking", "reasoning_effort"} & presets.keys():
+        raise ValidationError("当前 API 接入方式不支持设置思考模式或强度。")
     sampling = SAMPLING_PARAMETERS.keys() & presets.keys()
     if sampling:
         unsupported = sampling - supported_sampling_parameters(provider, data["model_id"])
@@ -77,7 +80,8 @@ def own_models(user):
 
 
 def configured_models():
-    return AIModel.objects.filter(provider__in=PROVIDERS).exclude(
+    registered = AIProviderSettings.objects.filter(adapter__in=ADAPTERS).values("provider")
+    return AIModel.objects.filter(Q(provider__in=PROVIDERS) | Q(provider__in=registered)).exclude(
         provider__in=AIProviderSettings.objects.filter(enabled=False).values("provider")
     )
 
@@ -133,7 +137,7 @@ def normalize_thinking(thinking, effort, *, use_interface_defaults=False):
 
 def model_parameters(model, data, base_url):
     same_model = (model.provider, model.base_url, model.model_id) == (data["provider"], base_url, data["model_id"])
-    entry = provider_catalog()[data["provider"]]
+    entry = provider_catalog(data["provider"])[data["provider"]]
     option = matching_option(entry, base_url, data["model_id"])
     presets = option["presets"] if option else {}
     defaults = {}
@@ -179,7 +183,7 @@ def save_model(user, data, pk=None):
     if AIProviderSettings.objects.filter(provider=provider, enabled=False).exists():
         raise ValidationError({"provider": "此提供商已停用。"})
     validate_model_id(data["model_id"])
-    if PROVIDERS[provider].key_required and (pk is None or destination_changed) and not api_key:
+    if provider_definition(provider).key_required and (pk is None or destination_changed) and not api_key:
         raise ValidationError({"api_key": "新增模型或更换提供商、API 地址时，请输入 API Key。"})
     if api_key or destination_changed:
         model.encrypted_api_key = cipher().encrypt(api_key.encode())
@@ -290,8 +294,9 @@ def test_model(user, pk):
         if not configured_models().filter(pk=pk).exists():
             raise ValidationError("此提供商已停用。")
         api_key = model_key(model)
-        thinking = model.thinking if model.provider == "deepseek" else ""
-        may_reason = PROVIDERS[model.provider].thinking and thinking != ThinkingMode.DISABLED
+        supports_reasoning = supports_thinking(model)
+        thinking = model.thinking if supports_reasoning else ""
+        may_reason = supports_reasoning and thinking != ThinkingMode.DISABLED
         request = GenerationRequest(
             messages=[{"role": "user", "content": "请回复：连接成功。"}],
             max_output_tokens=2048 if may_reason else 128,

@@ -3,10 +3,13 @@ from django.views.decorators.debug import sensitive_variables
 
 from .llm.client import GenerationRequest, invoke
 from .models import AIModelPreference
-from .providers import ProviderError, supports_images, supports_thinking
+from .providers import ProviderError, supports_images, supports_reasoning_parameter, supports_thinking
 from .services import model_key, usable_models
 
-__all__ = ["GenerationRequest", "ProviderError", "generate", "generate_text", "supports_images", "supports_thinking"]
+__all__ = [
+    "GenerationRequest", "ProviderError", "generate", "generate_text",
+    "supports_images", "supports_reasoning_parameter", "supports_thinking",
+]
 
 
 @sensitive_variables()

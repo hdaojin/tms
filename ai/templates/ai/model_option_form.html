@@ -4,17 +4,28 @@
   <form method="post" class="space-y-6">
     {% csrf_token %}
     {% include "components/form_errors.html" with form=form %}
+    {% if form.model_id.value %}
+      <p class="break-all text-sm text-base-content/70">LiteLLM 模型标识：<code>{{ provider_key }}/{{ form.model_id.value }}</code></p>
+    {% else %}
+      <p class="text-sm text-base-content/70">Provider Key：<code>{{ provider_key }}</code></p>
+    {% endif %}
     <div class="grid gap-x-4 md:grid-cols-2">
       {% include "components/field.html" with field=form.name %}
       {% include "components/field.html" with field=form.model_id %}
       {% include "components/field.html" with field=form.is_active %}
       {% include "components/field.html" with field=form.is_default %}
-      {% include "components/field.html" with field=form.supports_images %}
-      {% include "components/field.html" with field=form.supports_json %}
     </div>
+    <section class="space-y-3 border-t border-base-300 pt-5" aria-labelledby="ai-model-capabilities">
+      <h2 id="ai-model-capabilities" class="text-lg font-semibold">模型能力</h2>
+      <p class="text-sm text-base-content/70">文本为基础能力。请按该模型实际支持的能力勾选。</p>
+      <div class="grid gap-x-4 md:grid-cols-2">
+        {% include "components/field.html" with field=form.supports_images %}
+        {% include "components/field.html" with field=form.supports_json %}
+      </div>
+    </section>
     <section class="space-y-3 border-t border-base-300 pt-5" aria-labelledby="ai-model-presets">
       <h2 id="ai-model-presets" class="text-lg font-semibold">高级请求参数预设</h2>
-      <p class="text-sm text-base-content/70">勾选要向用户展示的参数。建议值可留空，填写后会在新建配置时预填。</p>
+      <p class="text-sm text-base-content/70">勾选该模型允许用户设置的参数。建议值可留空，填写后会在新建配置时预填。</p>
       <div class="grid gap-x-4 gap-y-3 md:grid-cols-2">
         <div>
           {% include "components/field.html" with field=form.show_temperature %}

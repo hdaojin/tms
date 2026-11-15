@@ -8,7 +8,7 @@ from core.models import TimestampedModel
 from core.uploads import ai_provider_logo_path
 from core.utils.signals import register_file_cleanup_signals
 
-from .providers import PROVIDERS, protocol_label
+from .providers import protocol_label, provider_definition
 
 
 class ThinkingMode(models.TextChoices):
@@ -80,7 +80,7 @@ class AIModel(TimestampedModel):
     def provider_label(self):
         if self.provider == "custom":
             return self.custom_provider_name or "自定义 API"
-        provider = PROVIDERS.get(self.provider)
+        provider = provider_definition(self.provider)
         return provider.label if provider else self.provider
 
     @property
@@ -101,10 +101,10 @@ class AIModelPreference(TimestampedModel):
 class AIProviderSettings(TimestampedModel):
     enabled = models.BooleanField("启用提供商", default=True)
     provider = models.CharField("模型提供商", max_length=32, unique=True)
+    name = models.CharField("提供商名称", max_length=100, blank=True)
+    adapter = models.CharField("LiteLLM 接入方式", max_length=32, blank=True)
     default_base_url = models.URLField("默认 API 地址", max_length=300, blank=True)
     logo = models.ImageField("提供商 Logo", upload_to=ai_provider_logo_path, blank=True)
-    thinking = models.CharField("默认思考模式", max_length=8, choices=ThinkingMode, default=ThinkingMode.DISABLED)
-    reasoning_effort = models.CharField("默认思考强度", max_length=4, choices=ReasoningEffort, blank=True)
 
     class Meta:
         verbose_name = "AI 提供商配置"

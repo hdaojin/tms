@@ -12,6 +12,7 @@ from .providers import ProviderError
 KEY = "synthetic-api-key"
 
 
+@pytest.mark.django_db
 @pytest.mark.parametrize(("provider", "model_id", "base_url", "path"), [
     ("openai", "gpt-test", "https://api.openai.com/v1", "/v1/chat/completions"),
     ("dashscope", "qwen-test", "https://dashscope.aliyuncs.com/compatible-mode/v1", "/compatible-mode/v1/chat/completions"),

@@ -6,7 +6,15 @@ import httpx
 from django.views.decorators.debug import sensitive_variables
 
 from ai.parameters import sampling_arguments
-from ai.providers import PROVIDERS, ProviderError, capability, supports_images, validate_base_url, validate_model_id
+from ai.providers import (
+    ProviderError,
+    capability,
+    provider_definition,
+    supports_images,
+    supports_reasoning_parameter,
+    validate_base_url,
+    validate_model_id,
+)
 
 from .transport import ProviderTransport
 
@@ -40,8 +48,8 @@ def invoke(model, request, key):
     import openai
     from litellm.llms.custom_httpx.http_handler import HTTPHandler
 
-    provider = PROVIDERS[model.provider]
-    base_url = validate_base_url(model.provider, model.base_url)
+    provider = provider_definition(model.provider)
+    base_url = validate_base_url(model.provider, model.base_url, adapter=provider)
     model_id = validate_model_id(model.model_id)
     if not key and provider.key_required:
         raise ProviderError("请先配置 API Key。")
@@ -60,18 +68,18 @@ def invoke(model, request, key):
     ):
         raise ProviderError("图片必须使用受支持的内联格式。")
 
-    parameters = sampling_arguments(model, request.thinking)
-    if model.provider == "deepseek":
-        if request.thinking:
+    parameters = sampling_arguments(model, request.thinking, adapter=provider)
+    if request.thinking:
+        if supports_reasoning_parameter(model, "thinking", adapter=provider):
             parameters["extra_body"] = {"thinking": {"type": request.thinking}}
-        if request.thinking == "enabled" and request.reasoning_effort:
-            parameters["reasoning_effort"] = request.reasoning_effort
-    elif request.thinking == "enabled":
-        raise ProviderError("此模型未配置思考模式。")
+            if request.thinking == "enabled" and request.reasoning_effort:
+                if not supports_reasoning_parameter(model, "reasoning_effort", adapter=provider):
+                    raise ProviderError("此模型未配置思考强度。")
+                parameters["reasoning_effort"] = request.reasoning_effort
+        elif request.thinking == "enabled":
+            raise ProviderError("此模型未配置思考模式。")
     request_messages = request.messages
-    if request.response_mode == "json" and (
-        model.provider == "deepseek" or capability(model, "supports_json")
-    ):
+    if request.response_mode == "json" and capability(model, "supports_json"):
         parameters["response_format"] = {"type": "json_object"}
     elif request.response_mode == "json":
         request_messages = [*request.messages, {"role": "user", "content": "请只返回一个有效的 JSON 对象。"}]

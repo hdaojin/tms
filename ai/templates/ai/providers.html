@@ -1,28 +1,26 @@
 {% extends "layouts/app.html" %}
-{% load static %}
-
-{% block extra_head %}
-  {{ block.super }}
-  <script src="{% static 'js/ai-model-form.js' %}" defer></script>
-{% endblock %}
 
 {% block content %}
   <section class="card border border-base-300 bg-base-100 shadow-sm">
     <div class="card-body">
-      <h2 class="card-title">新建模型的默认设置</h2>
+      <h2 class="card-title">提供商设置</h2>
+      <dl class="grid gap-3 md:grid-cols-2">
+        {% include "ai/detail_value.html" with label="Provider Key" value=provider_key only %}
+        {% include "ai/detail_value.html" with label="API 协议" value=branding.protocol only %}
+      </dl>
       <form method="post" enctype="multipart/form-data" class="space-y-3">
         {% csrf_token %}
         {% include "components/form_errors.html" with form=form %}
         <input type="hidden" name="enabled_present" value="1">
+        {% if form.name %}{% include "components/field.html" with field=form.name %}{% endif %}
         {% include "components/field.html" with field=form.enabled %}
         {% include "components/field.html" with field=form.default_base_url %}
-        {% if form.thinking %}{% include "ai/thinking_fields.html" %}{% endif %}
         {% if form.logo %}
           <section class="space-y-2 border-t border-base-300 pt-3">
             <h3 class="font-semibold">提供商 Logo</h3>
             <div class="flex items-center gap-2">
               {% include "ai/provider_logo.html" with branding=branding only %}
-              <span class="text-sm">{% if branding.logo_url %}当前上传的 Logo{% else %}内置 Logo{% endif %}</span>
+              <span class="text-sm">{% if branding.logo_url %}当前上传的 Logo{% elif branding.logo_icon %}内置 Logo{% else %}未上传 Logo{% endif %}</span>
             </div>
             {% include "components/field.html" with field=form.logo %}
             {% if branding.logo_url %}{% include "components/field.html" with field=form.remove_logo %}{% endif %}

@@ -5,7 +5,7 @@ from django.db.models import Q
 from core.utils.forms import StyledFormMixin
 
 from .models import AIModel
-from .providers import PROVIDERS
+from .providers import provider_names
 
 
 class ModelFilterForm(StyledFormMixin, forms.Form):
@@ -17,9 +17,7 @@ class ModelFilter(django_filters.FilterSet):
     scope = django_filters.ChoiceFilter(
         label="模型范围", choices=[("own", "我的"), ("shared", "共享")], method="scope_filter"
     )
-    provider = django_filters.ChoiceFilter(
-        label="模型提供商", choices=[(code, provider.label) for code, provider in PROVIDERS.items()]
-    )
+    provider = django_filters.ChoiceFilter(label="模型提供商")
     verified = django_filters.ChoiceFilter(
         label="验证状态", choices=[("yes", "已验证"), ("no", "待验证")], method="validation_filter"
     )
@@ -34,8 +32,13 @@ class ModelFilter(django_filters.FilterSet):
         fields = []
         form = ModelFilterForm
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.provider_labels = provider_names()
+        self.filters["provider"].extra["choices"] = list(self.provider_labels.items())
+
     def search(self, queryset, name, value):
-        providers = [code for code, provider in PROVIDERS.items() if value.casefold() in provider.label.casefold()]
+        providers = [code for code, label in self.provider_labels.items() if value.casefold() in label.casefold()]
         return queryset.filter(
             Q(name__icontains=value)
             | Q(model_id__icontains=value)

@@ -227,7 +227,7 @@
         ? [...field.options].find(option => option.value === String(value))?.textContent : value;
       recommendation.textContent = configured && value !== null && value !== "" && label != null
         ? `建议值：${label}` : "";
-      if (name === "temperature" && provider.value === "deepseek" && thinkingEnabled) {
+      if (name === "temperature" && currentEntry().provider_key === "deepseek" && thinkingEnabled) {
         recommendation.textContent = "DeepSeek 开启思考模式时，采样温度不生效。";
       }
     }

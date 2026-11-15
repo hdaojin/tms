@@ -3,7 +3,7 @@ from django.views.decorators.debug import sensitive_variables
 
 import httpx
 
-from ai.providers import PROVIDERS, ProviderError, validate_model_id
+from ai.providers import ProviderError, provider_definition, validate_model_id
 
 from .client import CONCURRENT_REQUESTS, STATUS_MESSAGES
 from .transport import ProviderTransport
@@ -13,13 +13,14 @@ MAX_MODELS = 200
 
 @sensitive_variables()
 def fetch_model_ids(provider, base_url, api_key):
-    is_ollama = provider == "ollama"
-    if not is_ollama and not PROVIDERS[provider].model_list_path:
+    adapter = provider_definition(provider)
+    if not adapter or not adapter.model_list_path:
         raise ProviderError("此提供商暂不支持获取模型列表。")
+    is_ollama = adapter.route == "ollama_chat"
     if is_ollama:
         url = f"{base_url.removesuffix('/api')}/api/tags"
     else:
-        url = f"{base_url}{PROVIDERS[provider].model_list_path}"
+        url = f"{base_url}{adapter.model_list_path}"
     headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     transport = ProviderTransport(base_url, timeout=8, limit=512 * 1024, authenticated=bool(api_key))
     if not CONCURRENT_REQUESTS.acquire(blocking=False):

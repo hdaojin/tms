@@ -2,6 +2,8 @@ from django_tables2 import Column, TemplateColumn
 
 from core.tables import BaseTable
 
+from .providers import provider_display_name
+
 
 class ModelTable(BaseTable):
     class Meta(BaseTable.Meta):
@@ -15,7 +17,7 @@ class ModelTable(BaseTable):
         """,
         verbose_name="模型名称",
     )
-    provider = Column(accessor="provider_label", order_by="provider", verbose_name="模型提供商")
+    provider = Column(verbose_name="模型提供商")
     owner = Column(accessor="owner__display_name", orderable=False, verbose_name="所有者")
     verified = TemplateColumn(
         template_code="""
@@ -37,3 +39,43 @@ class ModelTable(BaseTable):
         verbose_name="默认模型",
         orderable=False,
     )
+
+    def __init__(self, *args, provider_labels, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.provider_labels = provider_labels
+
+    def render_provider(self, value, record):
+        return provider_display_name(value, record.custom_provider_name, self.provider_labels)
+
+
+class ProviderTable(BaseTable):
+    class Meta(BaseTable.Meta):
+        orderable = False
+
+    provider = TemplateColumn(
+        template_code='<a class="link link-hover" href="{% url \'ai:provider\' record.code %}">{{ record.label }}</a>',
+        verbose_name="提供商",
+    )
+    provider_key = Column(verbose_name="Provider Key")
+    protocol = Column(verbose_name="API 协议")
+    default_url = TemplateColumn(
+        template_code='<span class="break-all">{{ record.default_url|default:"未设置" }}</span>',
+        verbose_name="默认 API 地址",
+    )
+    default_model_label = TemplateColumn(
+        template_code="""
+        {{ record.default_model_label|default:"未指定" }}
+        {% if record.default_model_label and record.default_model_label != record.default_model %}
+          <div class="text-sm text-base-content/70 break-all">{{ record.default_model }}</div>
+        {% endif %}
+        """,
+        verbose_name="默认模型",
+    )
+    model_count = Column(verbose_name="可选模型（数量）")
+    enabled = TemplateColumn(
+        template_code="{% if record.enabled %}已启用{% else %}已停用{% endif %}",
+        verbose_name="状态",
+    )
+
+    def render_model_count(self, value):
+        return f"{value} 个"

@@ -1,6 +1,7 @@
 from io import BytesIO
 from unittest.mock import Mock
 
+import httpx
 import pytest
 from cryptography.fernet import Fernet
 from django.contrib.auth.models import Group, Permission
@@ -10,7 +11,7 @@ from PIL import Image
 
 from . import services
 from .models import AIModel, AIModelOption, AIModelPreference, AIProviderSettings, ShareAudience
-from .providers import ProviderError
+from .providers import ProviderError, supports_images, supports_thinking
 
 pytestmark = pytest.mark.django_db
 
@@ -395,10 +396,83 @@ def test_provider_catalog_management_is_superuser_only(client, users):
     provider_url = reverse("ai:provider", args=["deepseek"])
     create_url = reverse("ai:option_create", args=["deepseek"])
     assert client.get(url("providers")).status_code == 403
+    assert client.get(url("provider_create")).status_code == 403
+    assert client.post(url("provider_create"), {}).status_code == 403
     assert client.post(provider_url, {"default_base_url": GATEWAY}).status_code == 403
     assert client.post(create_url, {"base_url": GATEWAY, "model_id": "other"}).status_code == 403
     assert not AIProviderSettings.objects.exists()
     assert not AIModelOption.objects.exists()
+
+
+def test_registered_provider_can_be_configured_discovered_and_used(client, users, monkeypatch):
+    client.force_login(users["admin"])
+    data = {"name": "校内模型网关", "adapter": "openai", "default_base_url": GATEWAY, "enabled": "on"}
+    assert client.post(url("provider_create"), {**data, "adapter": "unknown"}).status_code == 200
+    assert not AIProviderSettings.objects.exists()
+    created = client.post(url("provider_create"), data)
+    registered = AIProviderSettings.objects.get()
+    provider = registered.provider
+    detail = reverse("ai:provider", args=[provider])
+    assert created.url == detail
+    headers = [column.header for column in client.get(url("providers")).context["table"].columns]
+    assert headers == ["提供商", "Provider Key", "API 协议", "默认 API 地址", "默认模型", "可选模型（数量）", "状态"]
+    assert 'name="thinking"' not in client.get(detail).content.decode()
+    assert client.post(detail, {**data, "adapter": "gemini"}).status_code == 302
+    registered.refresh_from_db()
+    assert registered.adapter == "openai"
+
+    option_create = reverse("ai:option_create", args=[provider])
+    assert client.post(option_create, {
+        "name": "网关视觉模型", "model_id": "vendor/vision", "supports_images": "on",
+        "is_active": "on", "is_default": "on",
+    }).status_code == 302
+    option = AIModelOption.objects.get()
+    option_edit = reverse("ai:option_edit", args=[provider, option.pk])
+    assert "openai/vendor/vision" in client.get(option_edit).content.decode()
+
+    def send(transport, request):
+        assert request.headers["authorization"] == f"Bearer {API_KEY}"
+        if request.method == "GET":
+            assert str(request.url) == f"{GATEWAY}/models"
+            return httpx.Response(200, json={"data": [{"id": "vendor/vision"}]})
+        assert str(request.url) == f"{GATEWAY}/chat/completions"
+        assert b'"model":"vendor/vision"' in request.content
+        return httpx.Response(200, json={
+            "id": "test", "model": "vendor/vision", "object": "chat.completion", "created": 0,
+            "choices": [{"index": 0, "message": {"role": "assistant", "content": "连接成功"}, "finish_reason": "stop"}],
+        })
+
+    monkeypatch.setattr("ai.llm.transport.ProviderTransport.handle_request", send)
+    owner = users["owner"]
+    client.force_login(owner)
+    discover = client.post(url("discover"), {**MODEL_DATA, "provider": provider})
+    assert discover.status_code == 200
+    assert "vendor/vision" in discover.content.decode()
+    assert client.post(url("create"), {**MODEL_DATA, "provider": provider, "model_id": option.model_id}).status_code == 302
+    model = AIModel.objects.get()
+    assert model.base_url == GATEWAY
+    assert supports_images(model)
+    assert not supports_thinking(model)
+    services.test_model(owner, model.pk)
+    assert services.usable_models(owner).filter(pk=model.pk).exists()
+    listing = client.get(url("list"), {"provider": provider, "q": "校内模型网关"}).content.decode()
+    assert model.name in listing and "校内模型网关" in listing
+
+    client.force_login(users["admin"])
+    assert client.post(detail, {**data, "enabled_present": "1", "enabled": ""}).status_code == 302
+    assert not services.usable_models(owner).filter(pk=model.pk).exists()
+    assert client.post(detail, data).status_code == 302
+    assert services.usable_models(owner).filter(pk=model.pk).exists()
+
+
+def test_reasoning_presets_do_not_apply_to_other_models_or_addresses(users):
+    owner = users["owner"]
+    flash = services.save_model(owner, MODEL_DATA)
+    other = services.save_model(owner, {**MODEL_DATA, "model_id": "another-model"})
+    alternate = services.save_model(owner, {**MODEL_DATA, "base_url": GATEWAY})
+    assert supports_thinking(flash)
+    assert not supports_thinking(other)
+    assert not supports_thinking(alternate)
 
 
 def test_provider_default_only_applies_to_new_models(client, users):
@@ -414,7 +488,7 @@ def test_provider_default_only_applies_to_new_models(client, users):
     assert client.post(provider_url, {"default_base_url": "file:///etc/passwd"}).status_code == 200
     assert not AIProviderSettings.objects.exists()
     saved = client.post(
-        provider_url, {"default_base_url": GATEWAY, "thinking": "enabled", "reasoning_effort": "max"}, follow=True
+        provider_url, {"default_base_url": GATEWAY}, follow=True
     )
     assert saved.redirect_chain == [(provider_url, 302)]
     assert saved.status_code == 200
@@ -434,7 +508,7 @@ def test_provider_default_only_applies_to_new_models(client, users):
     assert AIModel.objects.count() == 1
     assert client.post(url("create"), {**MODEL_DATA, "shown_default_base_url": GATEWAY}).status_code == 302
     new_model = AIModel.objects.exclude(pk=original.pk).get()
-    assert (new_model.base_url, new_model.thinking, new_model.reasoning_effort) == (GATEWAY, "enabled", "max")
+    assert (new_model.base_url, new_model.thinking, new_model.reasoning_effort) == (GATEWAY, "disabled", "")
 
 
 def test_catalog_is_provider_wide_and_manual_entry_remains_available(client, users):
@@ -515,7 +589,10 @@ def test_fallback_model_can_be_replaced_from_provider_page(client, users):
 
 def test_thinking_override_and_transcript_render_as_plain_text(client, users, upstream):
     owner = users["owner"]
-    AIProviderSettings.objects.create(provider="deepseek", thinking="enabled", reasoning_effort="low")
+    AIModelOption.objects.create(
+        provider="deepseek", model_id="deepseek-flash", name="Flash",
+        parameter_presets={"thinking": "enabled", "reasoning_effort": "low"},
+    )
     client.force_login(owner)
     assert (
         client.post(url("create"), {**MODEL_DATA, "thinking": "enabled", "reasoning_effort": "max"}).status_code == 302

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
 from django.core.exceptions import ValidationError
@@ -20,54 +20,111 @@ class Provider:
     model_list_path: str = ""
 
 
+ADAPTERS = {
+    "deepseek": Provider("", "deepseek", thinking=True, model_list_path="/models"),
+    "openai": Provider("", "openai", openai_client=True, model_list_path="/models"),
+    "anthropic": Provider("", "anthropic"),
+    "gemini": Provider("", "gemini"),
+    "openrouter": Provider("", "openrouter", model_list_path="/models"),
+    "ollama_chat": Provider("", "ollama_chat", key_required=False, model_list_path="/api/tags"),
+}
+
+
+def builtin_provider(route, label, url="", model=""):
+    return replace(ADAPTERS[route], label=label, default_url=url, default_model=model)
+
+
 PROVIDERS = {
-    "deepseek": Provider("DeepSeek", "deepseek", "https://api.deepseek.com", "deepseek-flash", thinking=True, model_list_path="/models"),
-    "openai": Provider("OpenAI", "openai", "https://api.openai.com/v1", openai_client=True, model_list_path="/models"),
-    "anthropic": Provider("Anthropic", "anthropic", "https://api.anthropic.com"),
-    "gemini": Provider("Gemini", "gemini", "https://generativelanguage.googleapis.com/v1beta"),
-    "dashscope": Provider("阿里云百炼 / 通义千问", "openai", "https://dashscope.aliyuncs.com/compatible-mode/v1", openai_client=True, model_list_path="/models"),
-    "openrouter": Provider("OpenRouter", "openrouter", "https://openrouter.ai/api/v1", model_list_path="/models"),
-    "ollama": Provider("Ollama（自托管）", "ollama_chat", key_required=False, model_list_path="/api/tags"),
-    "custom": Provider("自定义（OpenAI 兼容）", "openai", openai_client=True, model_list_path="/models"),
+    "deepseek": builtin_provider("deepseek", "DeepSeek", "https://api.deepseek.com", "deepseek-flash"),
+    "openai": builtin_provider("openai", "OpenAI", "https://api.openai.com/v1"),
+    "anthropic": builtin_provider("anthropic", "Anthropic", "https://api.anthropic.com"),
+    "gemini": builtin_provider("gemini", "Gemini", "https://generativelanguage.googleapis.com/v1beta"),
+    "dashscope": builtin_provider("openai", "阿里云百炼 / 通义千问", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+    "openrouter": builtin_provider("openrouter", "OpenRouter", "https://openrouter.ai/api/v1"),
+    "ollama": builtin_provider("ollama_chat", "Ollama（自托管）"),
+    "custom": builtin_provider("openai", "自定义（OpenAI 兼容）"),
 }
 
 PROTOCOL_LABELS = {
     "anthropic": "Anthropic Messages",
     "gemini": "Gemini API",
-    "ollama": "Ollama API",
+    "ollama_chat": "Ollama API",
 }
 
 
+def provider_definition(provider, settings=None):
+    if provider in PROVIDERS:
+        return PROVIDERS[provider]
+    if settings is None:
+        from .models import AIProviderSettings
+
+        settings = AIProviderSettings.objects.filter(provider=provider).first()
+    if settings and (adapter := ADAPTERS.get(settings.adapter)):
+        return replace(adapter, label=settings.name)
+    return None
+
+
+def provider_names():
+    from .models import AIProviderSettings
+
+    names = {code: adapter.label for code, adapter in PROVIDERS.items()}
+    registered = AIProviderSettings.objects.filter(adapter__in=ADAPTERS).order_by("name", "provider")
+    for code, name in registered.values_list("provider", "name"):
+        names.setdefault(code, name)
+    return names
+
+
+def provider_display_name(code, custom_name, names):
+    if code == "custom":
+        return custom_name or "自定义 API"
+    return names.get(code, code)
+
+
+def adapter_protocol(route):
+    return PROTOCOL_LABELS.get(route, "OpenAI 兼容")
+
+
 def protocol_label(provider):
-    return PROTOCOL_LABELS.get(provider, "OpenAI 兼容") if provider in PROVIDERS else "未知协议"
+    adapter = provider_definition(provider)
+    return adapter_protocol(adapter.route) if adapter else "未知协议"
 
 
 def supports_thinking(model):
-    provider = PROVIDERS.get(model.provider)
-    return bool(provider and provider.thinking)
+    return supports_reasoning_parameter(model, "thinking")
+
+
+BUILTIN_MODEL_PRESETS = {"thinking": "disabled", "reasoning_effort": "high"}
+
+
+def supports_reasoning_parameter(model, parameter, *, adapter=None):
+    from .catalog import matching_option, provider_catalog
+
+    adapter = adapter or provider_definition(model.provider)
+    if not adapter or not adapter.thinking:
+        return False
+    # Continue honoring explicitly saved settings on existing connections.
+    if getattr(model, "thinking", "") == "enabled" and (
+        parameter == "thinking" or getattr(model, "reasoning_effort", "")
+    ):
+        return True
+    option = matching_option(provider_catalog(model.provider).get(model.provider, {}), model.base_url, model.model_id)
+    return bool(option and parameter in option["presets"])
 
 
 def supports_images(model):
-    # An ID alone does not establish that a gateway implements image input.
-    provider = PROVIDERS.get(model.provider)
-    if provider is None:
-        return False
-    return (
-        model.provider == "deepseek" and model.base_url == provider.default_url and model.model_id == provider.default_model
-    ) or capability(model, "supports_images")
+    return capability(model, "supports_images")
 
 
 def capability(model, field):
-    from .models import AIModelOption, AIProviderSettings
+    from .catalog import matching_option, provider_catalog
 
-    trusted_url = AIProviderSettings.objects.filter(provider=model.provider).values_list("default_base_url", flat=True).first()
-    return model.base_url in trusted_addresses(model.provider, trusted_url) and AIModelOption.objects.filter(
-        provider=model.provider, model_id=model.model_id, is_active=True, **{field: True}
-    ).exists()
+    entry = provider_catalog(model.provider).get(model.provider, {})
+    option = matching_option(entry, model.base_url, model.model_id)
+    return bool(option and option[{"supports_images": "images", "supports_json": "json"}[field]])
 
 
-def trusted_addresses(provider, default_url):
-    return {url.rstrip("/") for url in (PROVIDERS[provider].default_url, default_url) if url}
+def trusted_addresses(adapter, default_url):
+    return {url.rstrip("/") for url in (adapter.default_url, default_url) if url}
 
 
 def validate_model_id(value):
@@ -78,8 +135,8 @@ def validate_model_id(value):
     return value
 
 
-def validate_base_url(provider: str, value: str) -> str:
-    adapter = PROVIDERS.get(provider)
+def validate_base_url(provider: str, value: str, *, adapter=None) -> str:
+    adapter = adapter or provider_definition(provider)
     if adapter is None:
         raise ValidationError("请选择已支持的模型提供商。")
     if provider == "custom" and not value:

@@ -2,7 +2,7 @@ from math import isfinite
 
 from django.core.exceptions import ValidationError
 
-from .providers import PROVIDERS
+from .providers import provider_definition
 
 SAMPLING_PARAMETERS = {
     "temperature": (
@@ -30,15 +30,16 @@ def sampling_value(name, value):
 def supported_sampling_parameters(provider, model_id):
     from litellm import get_supported_openai_params
 
-    adapter = PROVIDERS[provider]
+    adapter = provider_definition(provider)
     return set(get_supported_openai_params(
         model=f"{adapter.route}/{model_id}", custom_llm_provider=adapter.route,
     ) or ())
 
 
-def sampling_arguments(model, thinking):
+def sampling_arguments(model, thinking, *, adapter=None):
+    suppress_temperature = thinking == "enabled" and (adapter or provider_definition(model.provider)).thinking
     return {
         name: value for name, value in getattr(model, "request_parameters", {}).items()
         if name in SAMPLING_PARAMETERS
-        and (name != "temperature" or model.provider != "deepseek" or thinking != "enabled")
+        and (name != "temperature" or not suppress_temperature)
     }

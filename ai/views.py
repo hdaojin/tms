@@ -1,3 +1,6 @@
+from functools import cached_property
+from uuid import uuid4
+
 from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.cache import cache
@@ -22,10 +25,17 @@ from .catalog import matching_option, provider_branding, provider_catalog
 from .filters import ModelFilter
 from .forms import AIModelForm, ModelDiscoveryForm, ModelOptionForm, ProviderDefaultForm, ShareModelForm
 from .llm.discovery import fetch_model_ids
-from .models import AIModelOption, AIModelPreference, AIProviderSettings, ReasoningEffort, ThinkingMode
+from .models import AIModelOption, AIModelPreference, AIProviderSettings, ThinkingMode
 from .parameters import SAMPLING_PARAMETERS
-from .providers import PROVIDERS, ProviderError, validate_base_url, validate_model_id
-from .tables import ModelTable
+from .providers import (
+    ProviderError,
+    provider_definition,
+    provider_display_name,
+    provider_names,
+    validate_base_url,
+    validate_model_id,
+)
+from .tables import ModelTable, ProviderTable
 
 
 @method_decorator(never_cache, name="dispatch")
@@ -41,17 +51,15 @@ class ModelListView(FilterableListMixin, ModelPage):
     def get_list_filter_specs(self):
         specs = [ListFilterSpec("q", "搜索", "search", placeholder="搜索模型名称、模型 ID 或提供商")]
         for name in ("scope", "provider", "verified", "sharing"):
-            field = ModelFilter.base_filters[name]
+            field = self.model_filter.filters[name]
             specs.append(ListFilterSpec(name, field.label, "select", choices=field.extra["choices"],
                                         empty_label=f"全部{field.label}"))
         return specs
 
-    def get_context_data(self, **kwargs):
+    @cached_property
+    def model_filter(self):
         user = self.request.user
         can_manage = services.can_manage(user)
-        preference = AIModelPreference.objects.filter(user=user).first()
-        default_id = preference.model_id if preference else None
-        usable_ids = set(services.usable_models(user).values_list("pk", flat=True))
         scope = Q(pk__in=services.shared_models(user).values("pk"))
         if can_manage:
             scope |= Q(owner=user)
@@ -62,8 +70,16 @@ class ModelListView(FilterableListMixin, ModelPage):
                 When(owner=user, then=Value(can_manage)), default=Value(False), output_field=BooleanField()
             ),
         )
-        filters = ModelFilter(self.request.GET, queryset=models, request=self.request)
-        table = ModelTable(filters.qs)
+        return ModelFilter(self.request.GET, queryset=models, request=self.request)
+
+    def get_context_data(self, **kwargs):
+        user = self.request.user
+        can_manage = services.can_manage(user)
+        preference = AIModelPreference.objects.filter(user=user).first()
+        default_id = preference.model_id if preference else None
+        usable_ids = set(services.usable_models(user).values_list("pk", flat=True))
+        filters = self.model_filter
+        table = ModelTable(filters.qs, provider_labels=filters.provider_labels)
         RequestConfig(self.request, paginate={"per_page": 25}).configure(table)
         table.context = {"default_id": default_id, "usable_ids": usable_ids, "request": self.request}
         if can_manage:
@@ -156,10 +172,11 @@ class ModelDiscoveryView(OwnerPage):
         provider = form.cleaned_data["provider"]
         base_url = form.cleaned_data["base_url"]
         key = form.cleaned_data["api_key"]
-        if not form.catalog[provider]["enabled"] or not PROVIDERS[provider].model_list_path:
+        adapter = provider_definition(provider)
+        if not form.catalog[provider]["enabled"] or not adapter.model_list_path:
             return JsonResponse({"error": "此提供商当前不支持获取模型列表。"}, status=400)
         same_destination = model is not None and (provider, base_url) == (model.provider, model.base_url)
-        if not key and not same_destination and PROVIDERS[provider].key_required:
+        if not key and not same_destination and adapter.key_required:
             return JsonResponse({"error": "请输入当前 API 地址的密钥。"}, status=400)
         if not cache.add(f"ai:model-discovery:{request.user.pk}", True, timeout=5):
             return JsonResponse({"error": "查询过于频繁，请稍候再试。"}, status=429)
@@ -325,11 +342,14 @@ class ModerationView(ModelPage):
     template_name = "ai/moderation.html"
 
     def get_context_data(self, **kwargs):
-        models = (
+        models = list(
             services.moderated_models(self.request.user)
             .select_related("owner")
-            .only("name", "provider", "model_id", "owner", "is_delisted")
+            .only("name", "provider", "custom_provider_name", "model_id", "owner", "is_delisted")
         )
+        names = provider_names()
+        for model in models:
+            model.provider_name = provider_display_name(model.provider, model.custom_provider_name, names)
         return super().get_context_data(models=models, **kwargs)
 
 
@@ -344,11 +364,23 @@ class ModerationActionView(View):
 class ProviderPage(SuperuserRequiredMixin, TitleMixin, TemplateView):
     title_icon = "icon-[tabler--settings]"
 
-    def get_provider(self):
+    @cached_property
+    def provider_entry(self):
         code = self.kwargs["provider"]
-        if code not in PROVIDERS:
+        adapter = provider_definition(code)
+        if adapter is None:
             raise Http404
-        return code
+        return code, adapter
+
+    @property
+    def definition(self):
+        return self.provider_entry[1]
+
+    def get_provider(self):
+        return self.provider_entry[0]
+
+    def get_breadcrumb_parents(self):
+        return (breadcrumb_link("AI 模型提供商", "ai:providers"),)
 
 
 class ProviderListView(ProviderPage):
@@ -356,39 +388,68 @@ class ProviderListView(ProviderPage):
     template_name = "ai/provider_list.html"
 
     def get_context_data(self, **kwargs):
-        catalog = provider_catalog()
-        providers = [(code, adapter.label, catalog[code]) for code, adapter in PROVIDERS.items()]
-        return super().get_context_data(providers=providers, **kwargs)
+        rows = [
+            dict(
+                code=code, label=entry["label"], provider_key=entry["provider_key"], protocol=entry["protocol"],
+                default_url=entry["default"], default_model=entry["default_model"],
+                default_model_label=entry.get("default_model_label", ""), model_count=len(entry["models"]),
+                enabled=entry["enabled"],
+            )
+            for code, entry in provider_catalog().items()
+        ]
+        table = ProviderTable(rows)
+        RequestConfig(self.request, paginate={"per_page": 25}).configure(table)
+        kwargs["page_actions"] = [
+            {"href": reverse("ai:provider_create"), "label": "新增模型提供商", "variant_class": "btn-primary"}
+        ]
+        return super().get_context_data(table=table, **kwargs)
+
+    def get_breadcrumb_parents(self):
+        return ()
+
+
+class ProviderCreateView(ProviderPage):
+    title = "新增模型提供商"
+    template_name = "common/form.html"
+
+    def get_context_data(self, **kwargs):
+        kwargs.setdefault("form", ProviderDefaultForm())
+        return super().get_context_data(**kwargs)
+
+    def post(self, request, *args, **kwargs):
+        form = ProviderDefaultForm(request.POST, request.FILES)
+        if form.is_valid():
+            settings = AIProviderSettings.objects.create(provider=uuid4().hex, **form.cleaned_data)
+            messages.success(request, "模型提供商已新增。")
+            return redirect("ai:provider", provider=settings.provider)
+        return self.render_to_response(self.get_context_data(form=form))
 
 
 class ProviderCatalogView(ProviderPage):
     template_name = "ai/providers.html"
 
     def get_title(self):
-        return f"{PROVIDERS[self.get_provider()].label} 配置"
-
-    def get_breadcrumb_parents(self):
-        return (breadcrumb_link("AI 模型提供商", "ai:providers"),)
+        return f"{self.definition.label} 配置"
 
     def get_context_data(self, **kwargs):
         provider = self.get_provider()
         options = AIModelOption.objects.filter(provider=provider)
-        adapter = PROVIDERS[provider]
+        adapter = self.definition
         defaults = AIProviderSettings.objects.filter(provider=provider).first() or AIProviderSettings()
         if "form" not in kwargs:
             kwargs["form"] = ProviderDefaultForm(
                 provider=provider,
                 initial={
                     "enabled": defaults.enabled,
+                    "name": defaults.name,
                     "default_base_url": defaults.default_base_url,
-                    "thinking": defaults.thinking,
-                    "reasoning_effort": defaults.reasoning_effort or ReasoningEffort.HIGH,
                 },
             )
         kwargs.update(
             provider=provider,
             options=options,
-            branding=provider_branding(provider, defaults),
+            branding=provider_branding(provider, defaults, adapter),
+            provider_key=adapter.route,
             builtin_model=adapter.default_model,
             show_builtin=bool(adapter.default_model) and not options.exists(),
         )
@@ -423,20 +484,27 @@ class ProviderOptionView(ProviderPage):
         provider = self.get_provider()
         return (
             breadcrumb_link("AI 模型提供商", "ai:providers"),
-            breadcrumb_link(f"{PROVIDERS[provider].label} 配置", "ai:provider", kwargs={"provider": provider}),
+            breadcrumb_link(f"{self.definition.label} 配置", "ai:provider", kwargs={"provider": provider}),
         )
 
     def get_option(self, provider):
         if "pk" in self.kwargs:
             return get_object_or_404(AIModelOption, pk=self.kwargs["pk"], provider=provider)
+        if self.kwargs.get("fallback") and (
+            not self.definition.default_model or AIModelOption.objects.filter(provider=provider).exists()
+        ):
+            raise Http404
         return None
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(provider_key=self.definition.route, **kwargs)
 
     def get(self, request, *args, **kwargs):
         provider = self.get_provider()
         option = self.get_option(provider)
         if kwargs.get("fallback"):
-            adapter = PROVIDERS[provider]
-            fallback = provider_catalog()[provider]
+            adapter = self.definition
+            fallback = provider_catalog(provider)[provider]
             existing = matching_option(fallback, fallback["default"], adapter.default_model)
             option = AIModelOption(
                 model_id=adapter.default_model,
