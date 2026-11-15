@@ -9,7 +9,8 @@
             <div class="min-w-0 break-words">
               <p class="font-medium">{{ model.name }}</p>
               <p class="text-sm text-base-content/70">
-                {{ model.provider_name }} · {{ model.model_id }} · {{ model.owner.display_name }}
+                {% include "ai/provider_name.html" with branding=model.provider_branding label=model.provider_name only %}
+                · {{ model.model_id }} · {{ model.owner.display_name }}
                 · {% if model.is_delisted %}已下架{% else %}已共享{% endif %}
               </p>
             </div>

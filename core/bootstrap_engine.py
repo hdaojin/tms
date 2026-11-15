@@ -26,6 +26,7 @@ BOOTSTRAP_MODULES = (
     "event_countdown.bootstrap",
     "scoring.bootstrap",
     "training.bootstrap",
+    "ai.bootstrap",
 )
 
 

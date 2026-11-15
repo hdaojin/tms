@@ -156,6 +156,12 @@
     const sameEndpoint = provider.value === savedProvider && currentAddress() === savedAddress;
     document.getElementById("ai-provider-selection").textContent =
       provider.value === "custom" ? "自定义 API" : entry.label || "选择提供商";
+    const selectionLogo = document.getElementById("ai-provider-selection-logo");
+    const providerButton = [...dialog.querySelectorAll("[data-ai-provider]")]
+      .find(button => button.dataset.aiProvider === provider.value);
+    const logo = providerButton?.querySelector("[data-provider-logo]");
+    selectionLogo.replaceChildren(...(logo ? [logo.cloneNode(true)] : []));
+    selectionLogo.hidden = !logo;
     document.getElementById("ai-protocol").textContent = entry.protocol || "—";
     document.getElementById("ai-custom-provider").hidden = provider.value !== "custom";
     document.getElementById("ai-api-default").textContent = shownDefault.value

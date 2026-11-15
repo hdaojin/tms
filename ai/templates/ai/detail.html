@@ -14,7 +14,10 @@
           <h2 class="min-w-0 break-words text-xl font-semibold">{{ model.name }}</h2>
           {% include "ai/connection_badge.html" with model=model only %}
         </div>
-        <p class="break-words text-sm text-base-content/70">{{ model.provider_label }} · {{ model.model_id }}</p>
+        <p class="break-words text-sm text-base-content/70">
+          {% include "ai/provider_name.html" with branding=branding label=model.provider_label only %}
+          · {{ model.model_id }}
+        </p>
         {% if model.notes %}
           <p class="whitespace-pre-wrap break-words">{{ model.notes }}</p>
         {% endif %}

@@ -1,5 +1,7 @@
 {% if branding.logo_url %}
-  <img src="{{ branding.logo_url }}" alt="" width="28" height="28" class="size-7 shrink-0 object-contain">
+  <img data-provider-logo src="{{ branding.logo_url }}" alt="" width="28" height="28"
+       class="{% if compact %}size-4{% else %}size-7{% endif %} shrink-0 object-contain">
 {% elif branding.logo_icon %}
-  <span class="{{ branding.logo_icon }} size-7 shrink-0" aria-hidden="true"></span>
+  <span data-provider-logo class="{{ branding.logo_icon }} {% if compact %}size-4{% else %}size-7{% endif %} shrink-0"
+        aria-hidden="true"></span>
 {% endif %}

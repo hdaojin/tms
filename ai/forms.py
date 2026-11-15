@@ -10,7 +10,7 @@ from core.uploads import AI_PROVIDER_LOGO_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
 from meetings.widgets import RecipientSelect
 
-from .catalog import matching_option, provider_catalog
+from .catalog import MAX_PROVIDER_ORDER, matching_option, provider_catalog
 from .models import ReasoningEffort, ShareAudience, ThinkingMode
 from .parameters import EFFORT_HELP, SAMPLING_PARAMETERS, THINKING_HELP
 from .providers import ADAPTERS, PROVIDERS, adapter_protocol, provider_definition, validate_base_url, validate_model_id
@@ -182,6 +182,10 @@ class ModelDiscoveryForm(AIModelForm):
 
 class ProviderDefaultForm(StyledFormMixin, forms.Form):
     name = forms.CharField(label="提供商名称", max_length=100)
+    display_order = forms.IntegerField(
+        label="显示顺序", min_value=0, max_value=MAX_PROVIDER_ORDER, required=False,
+        help_text="数字越小越靠前。相同序号按提供商名称排序。",
+    )
     adapter = forms.ChoiceField(
         label="API 协议",
         choices=[("", "请选择 API 协议"), *((key, f"{adapter_protocol(key)}（{key}）") for key in ADAPTERS)],
@@ -208,6 +212,7 @@ class ProviderDefaultForm(StyledFormMixin, forms.Form):
         if provider in PROVIDERS:
             self.fields.pop("name")
         if provider == "custom":
+            self.fields.pop("display_order")
             self.fields.pop("logo")
             self.fields.pop("remove_logo")
         if provider not in PROVIDERS:

@@ -3,7 +3,10 @@
 {% block content %}
   <section class="card border border-base-300 bg-base-100 shadow-sm">
     <div class="card-body">
-      <h2 class="card-title">提供商设置</h2>
+      <h2 class="card-title">
+        {% include "ai/provider_logo.html" with branding=branding only %}
+        {{ provider_name }}设置
+      </h2>
       <dl class="grid gap-3 md:grid-cols-2">
         {% include "ai/detail_value.html" with label="Provider Key" value=provider_key only %}
         {% include "ai/detail_value.html" with label="API 协议" value=branding.protocol only %}
@@ -13,6 +16,7 @@
         {% include "components/form_errors.html" with form=form %}
         <input type="hidden" name="enabled_present" value="1">
         {% if form.name %}{% include "components/field.html" with field=form.name %}{% endif %}
+        {% if form.display_order %}{% include "components/field.html" with field=form.display_order %}{% endif %}
         {% include "components/field.html" with field=form.enabled %}
         {% include "components/field.html" with field=form.default_base_url %}
         {% if form.logo %}

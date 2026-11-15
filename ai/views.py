@@ -21,7 +21,14 @@ from core.utils.listing import FilterableListMixin, ListFilterSpec
 from core.utils.mixins import SuperuserRequiredMixin, TitleMixin
 
 from . import services
-from .catalog import matching_option, provider_branding, provider_catalog
+from .catalog import (
+    matching_option,
+    next_provider_display_order,
+    provider_branding,
+    provider_catalog,
+    provider_display_order,
+    provider_logos,
+)
 from .filters import ModelFilter
 from .forms import AIModelForm, ModelDiscoveryForm, ModelOptionForm, ProviderDefaultForm, ShareModelForm
 from .llm.discovery import fetch_model_ids
@@ -228,6 +235,7 @@ class ModelDetailView(OwnerPage):
             **{
                 **model_action_context(self.request.user, model),
                 "model": model,
+                "branding": entry,
                 "capabilities": capabilities,
                 "capability_source": ("内置能力" if option.get("builtin") else "提供商目录") if option else "",
                 "parameters": parameters,
@@ -348,8 +356,10 @@ class ModerationView(ModelPage):
             .only("name", "provider", "custom_provider_name", "model_id", "owner", "is_delisted")
         )
         names = provider_names()
+        logos = provider_logos({model.provider for model in models})
         for model in models:
             model.provider_name = provider_display_name(model.provider, model.custom_provider_name, names)
+            model.provider_branding = logos[model.provider]
         return super().get_context_data(models=models, **kwargs)
 
 
@@ -393,7 +403,7 @@ class ProviderListView(ProviderPage):
                 code=code, label=entry["label"], provider_key=entry["provider_key"], protocol=entry["protocol"],
                 default_url=entry["default"], default_model=entry["default_model"],
                 default_model_label=entry.get("default_model_label", ""), model_count=len(entry["models"]),
-                enabled=entry["enabled"],
+                enabled=entry["enabled"], display_order=entry["display_order"], branding=entry,
             )
             for code, entry in provider_catalog().items()
         ]
@@ -413,12 +423,15 @@ class ProviderCreateView(ProviderPage):
     template_name = "common/form.html"
 
     def get_context_data(self, **kwargs):
-        kwargs.setdefault("form", ProviderDefaultForm())
+        if "form" not in kwargs:
+            kwargs["form"] = ProviderDefaultForm(initial={"display_order": next_provider_display_order()})
         return super().get_context_data(**kwargs)
 
     def post(self, request, *args, **kwargs):
         form = ProviderDefaultForm(request.POST, request.FILES)
         if form.is_valid():
+            if form.cleaned_data["display_order"] is None:
+                form.cleaned_data["display_order"] = next_provider_display_order()
             settings = AIProviderSettings.objects.create(provider=uuid4().hex, **form.cleaned_data)
             messages.success(request, "模型提供商已新增。")
             return redirect("ai:provider", provider=settings.provider)
@@ -443,12 +456,14 @@ class ProviderCatalogView(ProviderPage):
                     "enabled": defaults.enabled,
                     "name": defaults.name,
                     "default_base_url": defaults.default_base_url,
+                    "display_order": provider_display_order(provider, defaults),
                 },
             )
         kwargs.update(
             provider=provider,
             options=options,
             branding=provider_branding(provider, defaults, adapter),
+            provider_name=adapter.label,
             provider_key=adapter.route,
             builtin_model=adapter.default_model,
             show_builtin=bool(adapter.default_model) and not options.exists(),
@@ -460,6 +475,8 @@ class ProviderCatalogView(ProviderPage):
         form = ProviderDefaultForm(request.POST, request.FILES, provider=provider)
         if form.is_valid():
             defaults = form.cleaned_data
+            if defaults.get("display_order") is None:
+                defaults.pop("display_order", None)
             logo = defaults.pop("logo", None)
             if defaults.pop("remove_logo", False):
                 defaults["logo"] = ""

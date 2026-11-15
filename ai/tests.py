@@ -404,6 +404,24 @@ def test_provider_catalog_management_is_superuser_only(client, users):
     assert not AIModelOption.objects.exists()
 
 
+def test_provider_display_order_is_shared_by_admin_list_and_model_picker(client, users):
+    AIProviderSettings.objects.create(
+        provider="xiaomi_mimo", name="小米 MiMo", adapter="openai", default_base_url=GATEWAY,
+    )
+    client.force_login(users["admin"])
+    table = client.get(url("providers")).context["table"]
+    assert [row.record["code"] for row in table.rows][:3] == ["deepseek", "xiaomi_mimo", "dashscope"]
+    detail = reverse("ai:provider", args=["dashscope"])
+    assert client.post(detail, {"display_order": "0", "enabled": "on"}).status_code == 302
+    table = client.get(url("providers")).context["table"]
+    assert [row.record["code"] for row in table.rows][:3] == ["dashscope", "deepseek", "xiaomi_mimo"]
+
+    client.force_login(users["owner"])
+    form = client.get(url("create")).context["form"]
+    assert [code for code, _entry in form.preset_providers][:3] == ["dashscope", "deepseek", "xiaomi_mimo"]
+    assert "custom" not in dict(form.preset_providers)
+
+
 def test_registered_provider_can_be_configured_discovered_and_used(client, users, monkeypatch):
     client.force_login(users["admin"])
     data = {"name": "校内模型网关", "adapter": "openai", "default_base_url": GATEWAY, "enabled": "on"}
@@ -415,7 +433,8 @@ def test_registered_provider_can_be_configured_discovered_and_used(client, users
     detail = reverse("ai:provider", args=[provider])
     assert created.url == detail
     headers = [column.header for column in client.get(url("providers")).context["table"].columns]
-    assert headers == ["提供商", "Provider Key", "API 协议", "默认 API 地址", "默认模型", "可选模型（数量）", "状态"]
+    assert headers == ["显示顺序", "提供商", "Provider Key", "API 协议", "默认 API 地址", "默认模型", "可选模型（数量）", "状态"]
+    assert registered.display_order > 120
     assert 'name="thinking"' not in client.get(detail).content.decode()
     assert client.post(detail, {**data, "adapter": "gemini"}).status_code == 302
     registered.refresh_from_db()

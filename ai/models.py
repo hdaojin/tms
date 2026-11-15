@@ -99,6 +99,7 @@ class AIModelPreference(TimestampedModel):
 
 
 class AIProviderSettings(TimestampedModel):
+    display_order = models.PositiveIntegerField("显示顺序", null=True, blank=True)
     enabled = models.BooleanField("启用提供商", default=True)
     provider = models.CharField("模型提供商", max_length=32, unique=True)
     name = models.CharField("提供商名称", max_length=100, blank=True)

@@ -1,7 +1,9 @@
+from django.template.loader import render_to_string
 from django_tables2 import Column, TemplateColumn
 
 from core.tables import BaseTable
 
+from .catalog import provider_logos
 from .providers import provider_display_name
 
 
@@ -43,8 +45,15 @@ class ModelTable(BaseTable):
     def __init__(self, *args, provider_labels, **kwargs):
         super().__init__(*args, **kwargs)
         self.provider_labels = provider_labels
+        self.provider_logos = provider_logos(provider_labels)
 
     def render_provider(self, value, record):
+        return render_to_string("ai/provider_name.html", {
+            "label": provider_display_name(value, record.custom_provider_name, self.provider_labels),
+            "branding": self.provider_logos.get(value),
+        })
+
+    def value_provider(self, value, record):
         return provider_display_name(value, record.custom_provider_name, self.provider_labels)
 
 
@@ -52,8 +61,11 @@ class ProviderTable(BaseTable):
     class Meta(BaseTable.Meta):
         orderable = False
 
+    display_order = Column(verbose_name="显示顺序")
     provider = TemplateColumn(
-        template_code='<a class="link link-hover" href="{% url \'ai:provider\' record.code %}">{{ record.label }}</a>',
+        template_code="""<a class="link link-hover" href="{% url 'ai:provider' record.code %}">
+          {% include "ai/provider_name.html" with label=record.label branding=record.branding only %}
+        </a>""",
         verbose_name="提供商",
     )
     provider_key = Column(verbose_name="Provider Key")

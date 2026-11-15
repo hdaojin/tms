@@ -22,7 +22,10 @@
           <legend id="ai-provider-label" class="fieldset-legend">模型提供商 <span class="text-error">*</span></legend>
           <button class="btn btn-outline w-full justify-between" type="button" aria-haspopup="dialog"
                   aria-labelledby="ai-provider-label ai-provider-selection">
-            <span id="ai-provider-selection"></span>
+            <span class="inline-flex items-center gap-2">
+              <span id="ai-provider-selection-logo" hidden></span>
+              <span id="ai-provider-selection"></span>
+            </span>
             <span class="icon-[tabler--chevron-down] size-4" aria-hidden="true"></span>
           </button>
         </fieldset>
@@ -156,7 +159,10 @@
         {% for code, label in form.fields.provider.choices %}
           {% if code == "custom" %}
             <button type="button" class="btn btn-outline h-auto w-full justify-start whitespace-normal py-3"
-                    data-ai-provider="custom"><span class="icon-[tabler--plug] size-4" aria-hidden="true"></span>自定义 API</button>
+                    data-ai-provider="custom">
+              {% include "ai/provider_logo.html" with branding=form.catalog.custom compact=True only %}
+              自定义 API
+            </button>
           <p class="text-sm text-base-content/70">接入 OpenAI 兼容的第三方 API、私有部署模型或内部网关。</p>
           {% endif %}
         {% endfor %}
