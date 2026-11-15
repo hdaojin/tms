@@ -37,7 +37,11 @@ class ModelFilter(django_filters.FilterSet):
     def search(self, queryset, name, value):
         providers = [code for code, provider in PROVIDERS.items() if value.casefold() in provider.label.casefold()]
         return queryset.filter(
-            Q(name__icontains=value) | Q(model_id__icontains=value) | Q(provider__icontains=value) | Q(provider__in=providers)
+            Q(name__icontains=value)
+            | Q(model_id__icontains=value)
+            | Q(provider__icontains=value)
+            | Q(provider__in=providers)
+            | Q(custom_provider_name__icontains=value)
         )
 
     def scope_filter(self, queryset, name, value):

@@ -181,7 +181,9 @@ def prepare_generation(
     if missing:
         raise ValidationError(missing)
     model = selected_model(draft.author, model.pk, model.revision)
-    thinking, effort = normalize_thinking(thinking or model.thinking, effort or model.reasoning_effort)
+    thinking, effort = normalize_thinking(
+        thinking or model.thinking, effort or model.reasoning_effort, use_interface_defaults=True,
+    )
     if image_ids is None:
         image_ids = [] if text_only else list(draft.images.order_by("pk").values_list("pk", flat=True))
     images = generation_images(draft, model, image_ids)

@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.ModelListView.as_view(), name="list"),
     path("new/", views.ModelEditView.as_view(), name="create"),
     path("discover/", views.ModelDiscoveryView.as_view(), name="discover"),
+    path("candidate-verification/", views.CandidateVerificationView.as_view(), name="candidate_verification"),
     path("providers/", views.ProviderListView.as_view(), name="providers"),
     path("providers/<slug:provider>/", views.ProviderCatalogView.as_view(), name="provider"),
     path("providers/<slug:provider>/new/", views.ProviderOptionView.as_view(), name="option_create"),

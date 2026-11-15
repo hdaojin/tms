@@ -18,12 +18,13 @@ from core.utils.listing import FilterableListMixin, ListFilterSpec
 from core.utils.mixins import SuperuserRequiredMixin, TitleMixin
 
 from . import services
-from .catalog import provider_catalog
+from .catalog import matching_option, provider_branding, provider_catalog
 from .filters import ModelFilter
 from .forms import AIModelForm, ModelDiscoveryForm, ModelOptionForm, ProviderDefaultForm, ShareModelForm
 from .llm.discovery import fetch_model_ids
-from .models import AIModelOption, AIModelPreference, AIProviderSettings, ReasoningEffort
-from .providers import PROVIDERS, ProviderError
+from .models import AIModelOption, AIModelPreference, AIProviderSettings, ReasoningEffort, ThinkingMode
+from .parameters import SAMPLING_PARAMETERS
+from .providers import PROVIDERS, ProviderError, validate_base_url, validate_model_id
 from .tables import ModelTable
 
 
@@ -122,6 +123,26 @@ class ModelEditView(OwnerPage):
         return self.render_to_response(self.get_context_data(form=form, model=model))
 
 
+class CandidateVerificationView(OwnerPage):
+    http_method_names = ["post"]
+
+    def post(self, request):
+        provider = request.POST.get("provider", "")
+        address = request.POST.get("base_url", "")
+        ids = request.POST.getlist("model_ids")
+        if not address or len(address) > 300 or len(ids) > 400:
+            return JsonResponse({"models": []}, status=400)
+        try:
+            address = validate_base_url(provider, address)
+            models = {validate_model_id(value) for value in ids if len(value) <= 150}
+        except ValidationError:
+            return JsonResponse({"models": []}, status=400)
+        verified = services.configured_models().filter(
+            provider=provider, base_url=address, model_id__in=models, verified=True,
+        ).order_by().values_list("model_id", flat=True).distinct()
+        return JsonResponse({"models": list(verified)})
+
+
 @method_decorator(sensitive_post_parameters("api_key"), name="dispatch")
 class ModelDiscoveryView(OwnerPage):
     http_method_names = ["post"]
@@ -153,16 +174,49 @@ class ModelDiscoveryView(OwnerPage):
         return JsonResponse({"models": ids})
 
 
+def model_action_context(user, model):
+    return {
+        "share_form": ShareModelForm(model=model),
+        "can_set_default": services.usable_models(user).filter(pk=model.pk).exists(),
+        "is_default": AIModelPreference.objects.filter(user=user, model=model).exists(),
+    }
+
+
 class ModelDetailView(OwnerPage):
     title = "AI 模型与连接测试"
     template_name = "ai/detail.html"
 
     def get_context_data(self, **kwargs):
-        if "model" not in kwargs:
-            kwargs["model"] = self.get_model()
-        if "share_form" not in kwargs:
-            kwargs["share_form"] = ShareModelForm(model=kwargs["model"])
-        return super().get_context_data(**kwargs)
+        model = kwargs.get("model") or self.get_model()
+        entry = provider_catalog().get(model.provider, {})
+        option = matching_option(entry, model.base_url, model.model_id)
+        capabilities = []
+        if option:
+            capabilities.append("文本生成")
+            if option["images"] and (not option.get("builtin") or model.base_url == entry["official"]):
+                capabilities.append("图片输入")
+            if option["json"]:
+                capabilities.append("JSON 输出")
+            if "thinking" in option["presets"]:
+                capabilities.append("思考模式")
+        parameters = [
+            (label, model.request_parameters[name])
+            for name, (label, _, _) in SAMPLING_PARAMETERS.items() if name in model.request_parameters
+        ]
+        if model.thinking == ThinkingMode.ENABLED or (option and "thinking" in option["presets"]):
+            parameters.append(("思考模式", model.get_thinking_display() or "使用接口默认值"))
+            if model.reasoning_effort:
+                parameters.append(("思考强度", model.get_reasoning_effort_display()))
+        return super().get_context_data(
+            **{
+                **model_action_context(self.request.user, model),
+                "model": model,
+                "capabilities": capabilities,
+                "capability_source": ("内置能力" if option.get("builtin") else "提供商目录") if option else "",
+                "parameters": parameters,
+                **kwargs,
+            },
+        )
 
 
 class ModelShareView(ModelDetailView):
@@ -239,7 +293,11 @@ class ModelTestView(PermissionRequiredMixin, View):
             error = notice = exc.messages[0]
         if request.htmx:
             model = get_object_or_404(services.own_models(request.user).defer("encrypted_api_key"), pk=pk)
-            return render(request, "ai/detail.html#test_result", {"model": model, "test_notice": notice, "test_failed": bool(error)})
+            return render(request, "ai/detail.html#connection_actions", {
+                "model": model, "test_notice": notice, "test_failed": bool(error),
+                "update_connection_badge": True,
+                **model_action_context(request.user, model),
+            })
         if error:
             messages.error(request, notice)
         else:
@@ -257,6 +315,8 @@ class DefaultModelView(PermissionRequiredMixin, View):
             messages.error(request, exc.messages[0])
         else:
             messages.success(request, "默认 AI 模型已更新。")
+        if request.POST.get("from_detail") and services.can_manage(request.user) and services.own_models(request.user).filter(pk=pk).exists():
+            return redirect("ai:detail", pk=pk)
         return redirect("ai:list")
 
 
@@ -314,8 +374,8 @@ class ProviderCatalogView(ProviderPage):
         provider = self.get_provider()
         options = AIModelOption.objects.filter(provider=provider)
         adapter = PROVIDERS[provider]
+        defaults = AIProviderSettings.objects.filter(provider=provider).first() or AIProviderSettings()
         if "form" not in kwargs:
-            defaults = AIProviderSettings.objects.filter(provider=provider).first() or AIProviderSettings()
             kwargs["form"] = ProviderDefaultForm(
                 provider=provider,
                 initial={
@@ -328,6 +388,7 @@ class ProviderCatalogView(ProviderPage):
         kwargs.update(
             provider=provider,
             options=options,
+            branding=provider_branding(provider, defaults),
             builtin_model=adapter.default_model,
             show_builtin=bool(adapter.default_model) and not options.exists(),
         )
@@ -335,9 +396,14 @@ class ProviderCatalogView(ProviderPage):
 
     def post(self, request, *args, **kwargs):
         provider = self.get_provider()
-        form = ProviderDefaultForm(request.POST, provider=provider)
+        form = ProviderDefaultForm(request.POST, request.FILES, provider=provider)
         if form.is_valid():
             defaults = form.cleaned_data
+            logo = defaults.pop("logo", None)
+            if defaults.pop("remove_logo", False):
+                defaults["logo"] = ""
+            elif logo:
+                defaults["logo"] = logo
             if "enabled_present" not in request.POST and "enabled" not in request.POST:
                 defaults.pop("enabled", None)
             AIProviderSettings.objects.update_or_create(provider=provider, defaults=defaults)
@@ -348,7 +414,7 @@ class ProviderCatalogView(ProviderPage):
 
 class ProviderOptionView(ProviderPage):
     title = "新增 AI 模型选项"
-    template_name = "common/form.html"
+    template_name = "ai/model_option_form.html"
 
     def get_title(self):
         return "编辑 AI 模型选项" if {"pk", "fallback"} & self.kwargs.keys() else super().get_title()
@@ -370,14 +436,23 @@ class ProviderOptionView(ProviderPage):
         option = self.get_option(provider)
         if kwargs.get("fallback"):
             adapter = PROVIDERS[provider]
-            option = AIModelOption(model_id=adapter.default_model, name=adapter.default_model, is_default=True)
-        form = ModelOptionForm(option=option)
+            fallback = provider_catalog()[provider]
+            existing = matching_option(fallback, fallback["default"], adapter.default_model)
+            option = AIModelOption(
+                model_id=adapter.default_model,
+                name=adapter.default_model,
+                is_default=True,
+                supports_images=bool(existing and existing["images"]),
+                supports_json=bool(existing and existing["json"]),
+                parameter_presets=existing["presets"] if existing else {},
+            )
+        form = ModelOptionForm(provider=provider, option=option)
         return self.render_to_response(self.get_context_data(form=form))
 
     def post(self, request, *args, **kwargs):
         provider = self.get_provider()
         option = self.get_option(provider)
-        form = ModelOptionForm(request.POST, option=option)
+        form = ModelOptionForm(request.POST, provider=provider, option=option)
         if form.is_valid():
             try:
                 services.save_model_option(request.user, provider, form.cleaned_data, self.kwargs.get("pk"))

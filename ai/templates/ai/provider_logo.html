@@ -1,0 +1,5 @@
+{% if branding.logo_url %}
+  <img src="{{ branding.logo_url }}" alt="" width="28" height="28" class="size-7 shrink-0 object-contain">
+{% elif branding.logo_icon %}
+  <span class="{{ branding.logo_icon }} size-7 shrink-0" aria-hidden="true"></span>
+{% endif %}

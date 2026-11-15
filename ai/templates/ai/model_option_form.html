@@ -1,0 +1,41 @@
+{% extends "common/form.html" %}
+
+{% block form_content %}
+  <form method="post" class="space-y-6">
+    {% csrf_token %}
+    {% include "components/form_errors.html" with form=form %}
+    <div class="grid gap-x-4 md:grid-cols-2">
+      {% include "components/field.html" with field=form.name %}
+      {% include "components/field.html" with field=form.model_id %}
+      {% include "components/field.html" with field=form.is_active %}
+      {% include "components/field.html" with field=form.is_default %}
+      {% include "components/field.html" with field=form.supports_images %}
+      {% include "components/field.html" with field=form.supports_json %}
+    </div>
+    <section class="space-y-3 border-t border-base-300 pt-5" aria-labelledby="ai-model-presets">
+      <h2 id="ai-model-presets" class="text-lg font-semibold">高级请求参数预设</h2>
+      <p class="text-sm text-base-content/70">勾选要向用户展示的参数。建议值可留空，填写后会在新建配置时预填。</p>
+      <div class="grid gap-x-4 gap-y-3 md:grid-cols-2">
+        <div>
+          {% include "components/field.html" with field=form.show_temperature %}
+          {% include "components/field.html" with field=form.temperature %}
+        </div>
+        <div>
+          {% include "components/field.html" with field=form.show_top_p %}
+          {% include "components/field.html" with field=form.top_p %}
+        </div>
+        {% if form.show_thinking %}
+          <div>
+            {% include "components/field.html" with field=form.show_thinking %}
+            {% include "components/field.html" with field=form.thinking %}
+          </div>
+          <div>
+            {% include "components/field.html" with field=form.show_reasoning_effort %}
+            {% include "components/field.html" with field=form.reasoning_effort %}
+          </div>
+        {% endif %}
+      </div>
+    </section>
+    <button class="btn btn-primary" type="submit">保存模型选项</button>
+  </form>
+{% endblock %}

@@ -5,8 +5,10 @@ from django.db import models
 from django.db.models import Q
 
 from core.models import TimestampedModel
+from core.uploads import ai_provider_logo_path
+from core.utils.signals import register_file_cleanup_signals
 
-from .providers import PROVIDERS
+from .providers import PROVIDERS, protocol_label
 
 
 class ThinkingMode(models.TextChoices):
@@ -28,11 +30,14 @@ class ShareAudience(models.TextChoices):
 class AIModel(TimestampedModel):
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="所有者")
     name = models.CharField("显示名称", max_length=100)
+    notes = models.TextField("备注", blank=True, max_length=2000)
     provider = models.CharField("模型提供商", max_length=32)
+    custom_provider_name = models.CharField("自定义提供商名称", max_length=100, blank=True)
     base_url = models.URLField("API 地址", max_length=300)
     model_id = models.CharField("模型 ID", max_length=150)
-    thinking = models.CharField("思考模式", max_length=8, choices=ThinkingMode, default=ThinkingMode.DISABLED)
+    thinking = models.CharField("思考模式", max_length=8, choices=ThinkingMode, default=ThinkingMode.DISABLED, blank=True)
     reasoning_effort = models.CharField("思考强度", max_length=4, choices=ReasoningEffort, blank=True)
+    request_parameters = models.JSONField("高级请求参数", default=dict, blank=True)
     encrypted_api_key = models.BinaryField("加密 API 密钥", editable=False)
     api_key_preview = models.CharField("API 密钥预览", max_length=11, editable=False)
     revision = models.UUIDField(default=uuid4, editable=False)
@@ -73,8 +78,14 @@ class AIModel(TimestampedModel):
 
     @property
     def provider_label(self):
+        if self.provider == "custom":
+            return self.custom_provider_name or "自定义 API"
         provider = PROVIDERS.get(self.provider)
         return provider.label if provider else self.provider
+
+    @property
+    def protocol_label(self):
+        return protocol_label(self.provider)
 
 
 class AIModelPreference(TimestampedModel):
@@ -91,6 +102,7 @@ class AIProviderSettings(TimestampedModel):
     enabled = models.BooleanField("启用提供商", default=True)
     provider = models.CharField("模型提供商", max_length=32, unique=True)
     default_base_url = models.URLField("默认 API 地址", max_length=300, blank=True)
+    logo = models.ImageField("提供商 Logo", upload_to=ai_provider_logo_path, blank=True)
     thinking = models.CharField("默认思考模式", max_length=8, choices=ThinkingMode, default=ThinkingMode.DISABLED)
     reasoning_effort = models.CharField("默认思考强度", max_length=4, choices=ReasoningEffort, blank=True)
 
@@ -100,7 +112,11 @@ class AIProviderSettings(TimestampedModel):
         default_permissions = ()
 
 
+register_file_cleanup_signals(AIProviderSettings, file_field="logo", delete_on_commit=True)
+
+
 class AIModelOption(TimestampedModel):
+    parameter_presets = models.JSONField("高级请求参数预设", default=dict, blank=True)
     supports_images = models.BooleanField("支持图片输入", default=False)
     supports_json = models.BooleanField("支持 JSON 输出模式", default=False)
     provider = models.CharField("模型提供商", max_length=32)

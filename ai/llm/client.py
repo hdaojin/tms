@@ -5,6 +5,7 @@ from threading import BoundedSemaphore
 import httpx
 from django.views.decorators.debug import sensitive_variables
 
+from ai.parameters import sampling_arguments
 from ai.providers import PROVIDERS, ProviderError, capability, supports_images, validate_base_url, validate_model_id
 
 from .transport import ProviderTransport
@@ -12,7 +13,7 @@ from .transport import ProviderTransport
 CONCURRENT_REQUESTS = BoundedSemaphore(4)
 STATUS_MESSAGES = {
     400: "请求参数与模型或 API 协议不兼容。",
-    401: "认证失败，请检查 API 密钥。",
+    401: "认证失败，请检查 API Key。",
     402: "API 账号余额不足。",
     403: "提供商拒绝访问，请检查密钥权限。",
     404: "未找到模型或接口，请检查模型 ID 和 API 地址。",
@@ -43,7 +44,7 @@ def invoke(model, request, key):
     base_url = validate_base_url(model.provider, model.base_url)
     model_id = validate_model_id(model.model_id)
     if not key and provider.key_required:
-        raise ProviderError("请先配置 API 密钥。")
+        raise ProviderError("请先配置 API Key。")
     image_parts = [
         part
         for message in request.messages if isinstance(message.get("content"), list)
@@ -59,7 +60,7 @@ def invoke(model, request, key):
     ):
         raise ProviderError("图片必须使用受支持的内联格式。")
 
-    parameters = {}
+    parameters = sampling_arguments(model, request.thinking)
     if model.provider == "deepseek":
         if request.thinking:
             parameters["extra_body"] = {"thinking": {"type": request.thinking}}

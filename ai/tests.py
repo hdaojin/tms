@@ -1,9 +1,12 @@
+from io import BytesIO
 from unittest.mock import Mock
 
 import pytest
 from cryptography.fernet import Fernet
 from django.contrib.auth.models import Group, Permission
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
+from PIL import Image
 
 from . import services
 from .models import AIModel, AIModelOption, AIModelPreference, AIProviderSettings, ShareAudience
@@ -55,6 +58,50 @@ def upstream(monkeypatch):
 
 def url(name, model=None):
     return reverse(f"ai:{name}", args=[model.pk] if model else [])
+
+
+def test_provider_logo_upload_replacement_and_reset(client, users, settings, tmp_path, django_capture_on_commit_callbacks):
+    settings.MEDIA_ROOT = tmp_path
+    provider_url = reverse("ai:provider", args=["deepseek"])
+
+    def logo(extension, image_format):
+        buffer = BytesIO()
+        Image.new("RGBA", (32, 32), "blue").save(buffer, format=image_format)
+        return SimpleUploadedFile(f"logo.{extension}", buffer.getvalue())
+
+    client.force_login(users["owner"])
+    assert client.post(provider_url, {"logo": logo("png", "PNG")}).status_code == 403
+    create_page = client.get(url("create")).content.decode()
+    assert "icon-[simple-icons--deepseek]" in create_page
+    assert "OpenAI 兼容" in create_page
+
+    client.force_login(users["admin"])
+    assert client.post(provider_url, {"logo": logo("webp", "PNG")}).status_code == 200
+    assert not AIProviderSettings.objects.exists()
+    assert client.post(provider_url, {"logo": logo("png", "PNG")}).status_code == 302
+    provider = AIProviderSettings.objects.get(provider="deepseek")
+    original = provider.logo.name
+    assert provider.logo.storage.exists(original)
+    client.force_login(users["owner"])
+    assert provider.logo.url in client.get(url("create")).content.decode()
+    client.force_login(users["admin"])
+
+    with django_capture_on_commit_callbacks(execute=True):
+        assert client.post(provider_url, {"logo": logo("webp", "WEBP")}).status_code == 302
+    provider.refresh_from_db()
+    assert provider.logo.name.endswith(".webp")
+    assert not provider.logo.storage.exists(original)
+
+    replacement = provider.logo.name
+    assert client.post(provider_url, {}).status_code == 302
+    provider.refresh_from_db()
+    assert provider.logo.name == replacement
+    with django_capture_on_commit_callbacks(execute=True):
+        assert client.post(provider_url, {"remove_logo": "on"}).status_code == 302
+    provider.refresh_from_db()
+    assert not provider.logo and not provider.logo.storage.exists(replacement)
+    client.force_login(users["owner"])
+    assert "icon-[simple-icons--deepseek]" in client.get(url("create")).content.decode()
 
 
 def test_save_masks_secret_and_never_calls_provider(client, users, settings, upstream):
@@ -158,7 +205,7 @@ def test_sharing_requires_current_test_and_changes_invalidate_it(client, users, 
     model.refresh_from_db()
     assert model.is_shared and model.verified and model.name == "重命名"
     response = client.post(url("edit", model), {**MODEL_DATA, "base_url": GATEWAY, "api_key": ""})
-    assert "更换提供商、API 地址时，请输入 API 密钥" in response.content.decode()
+    assert "更换提供商、API 地址时，请输入 API Key" in response.content.decode()
     client.post(url("edit", model), {**MODEL_DATA, "base_url": GATEWAY, "api_key": "new-test-key"})
     model.refresh_from_db()
     assert model.base_url == GATEWAY
@@ -404,8 +451,9 @@ def test_catalog_is_provider_wide_and_manual_entry_remains_available(client, use
 
     client.force_login(users["owner"])
     response = client.get(url("create"))
-    assert '<option value="gateway-model" selected>网关模型</option>' in response.content.decode()
-    selection = {**MODEL_DATA, "model_id": "", "model_choice": "gateway-model"}
+    assert '<option value="gateway-model">网关模型 · 系统预设</option>' in response.content.decode()
+    assert response.context["form"]["model_id"].value() == "gateway-model"
+    selection = {**MODEL_DATA, "model_id": "gateway-model"}
     assert client.post(url("create"), {**selection, "base_url": "https://api.deepseek.com"}).status_code == 302
     saved_model = AIModel.objects.get()
     assert (saved_model.base_url, saved_model.model_id) == ("https://api.deepseek.com", "gateway-model")
@@ -520,9 +568,9 @@ def test_provider_default_switches_atomically_and_appears_in_summary(client, use
     assert "2 个" in overview
 
     client.force_login(users["owner"])
-    create_page = client.get(url("create")).content.decode()
-    assert '<option value="beta" selected>乙模型</option>' in create_page
-    assert '<option value="alpha">甲模型</option>' in create_page
+    create_page = client.get(url("create"))
+    assert create_page.context["form"]["model_id"].value() == "beta"
+    assert '<option value="alpha">甲模型 · 系统预设</option>' in create_page.content.decode()
 
 
 def test_model_list_filters_and_test_fragment(client, users, upstream):
@@ -548,8 +596,11 @@ def test_model_list_filters_and_test_fragment(client, users, upstream):
     assert response.status_code == 200
     content = response.content.decode()
     assert 'id="ai-test-result"' in content
-    assert "当前配置已验证" in content
-    assert "共享设置" not in content
+    assert "连接已验证" in content
+    assert 'hx-swap-oob="true"' in content
+    assert "设为个人默认模型" in content
+    assert "共享设置" in content
+    assert '<fieldset class="space-y-3" disabled' not in content
 
 
 def test_discovery_uses_form_connection_without_saving(client, users, monkeypatch):
@@ -577,3 +628,125 @@ def test_discovery_reuses_saved_key_only_on_same_owned_endpoint(client, users, m
     fetch.assert_not_called()
     assert client.post(url("discover_saved", model), data).status_code == 200
     fetch.assert_called_once_with("custom", GATEWAY, API_KEY)
+
+
+def test_model_parameter_preset_defaults_and_saved_config_are_independent(client, users, upstream, monkeypatch):
+    support = Mock(return_value={"temperature", "top_p"})
+    monkeypatch.setattr("ai.services.supported_sampling_parameters", support)
+    client.force_login(users["admin"])
+    preset = {
+        "name": "推荐模型", "model_id": "gpt-test", "is_active": "on", "is_default": "on",
+        "show_temperature": "on", "temperature": "0.4", "show_top_p": "on", "top_p": "0.9",
+    }
+    assert client.post(reverse("ai:option_create", args=["openai"]), preset).status_code == 302
+    support.assert_called_once_with("openai", "gpt-test")
+    option = AIModelOption.objects.get()
+    assert option.parameter_presets == {"temperature": 0.4, "top_p": 0.9}
+
+    client.force_login(users["owner"])
+    data = {
+        **MODEL_DATA, "provider": "openai", "base_url": "https://api.openai.com/v1", "model_id": "gpt-test",
+        "notes": "用于训练日志", "temperature": "0", "top_p": "",
+    }
+    assert client.post(url("create"), data).status_code == 302
+    upstream.test.assert_not_called()
+    model = AIModel.objects.get()
+    assert model.request_parameters == {"temperature": 0}
+    assert model.notes == "用于训练日志"
+    assert client.post(url("test", model)).status_code == 302
+    model.refresh_from_db()
+    assert model.test_request["temperature"] == 0
+    assert "top_p" not in model.test_request
+    services.set_shared(users["owner"], model.pk, True)
+    revision = model.revision
+
+    option.parameter_presets = {"temperature": 0.7, "top_p": 0.6}
+    option.save()
+    edit = client.get(url("edit", model))
+    assert edit.context["form"]["temperature"].value() == 0
+    assert edit.context["form"]["top_p"].value() is None
+    assert "回答通常越稳定" in edit.content.decode()
+    assert API_KEY not in edit.content.decode()
+
+    edit_data = {**data, "api_key": ""}
+    assert client.post(url("edit", model), edit_data).status_code == 302
+    model.refresh_from_db()
+    assert model.revision == revision and model.is_shared
+    assert client.post(url("edit", model), {**edit_data, "temperature": ""}).status_code == 302
+    model.refresh_from_db()
+    assert model.request_parameters == {}
+    assert not model.verified and not model.is_shared and model.revision != revision
+
+
+def test_request_parameter_presets_require_a_trusted_address_and_allowed_fields(client, users, monkeypatch):
+    monkeypatch.setattr("ai.services.supported_sampling_parameters", Mock(return_value={"temperature"}))
+    client.force_login(users["admin"])
+    create = reverse("ai:option_create", args=["deepseek"])
+    preset = {
+        "name": "推荐模型", "model_id": "preset", "is_active": "on",
+        "show_temperature": "on", "temperature": "0.4",
+    }
+    rejected = client.post(create, {**preset, "show_top_p": "on"})
+    assert "当前调用适配器未声明支持以下参数" in rejected.content.decode()
+    assert client.post(create, preset).status_code == 302
+
+    client.force_login(users["owner"])
+    data = {**MODEL_DATA, "model_id": "preset", "temperature": "0.4"}
+    untrusted = client.post(url("create"), {**data, "base_url": GATEWAY})
+    assert "当前模型和 API 地址没有配置此参数预设" in untrusted.content.decode()
+    assert client.post(url("create"), {**data, "temperature": "3"}).status_code == 200
+    assert not AIModel.objects.exists()
+    assert client.post(url("create"), data).status_code == 302
+
+
+def test_custom_provider_name_and_manual_id_have_independent_identity(client, users):
+    client.force_login(users["owner"])
+    data = {
+        **MODEL_DATA, "provider": "custom", "base_url": GATEWAY, "model_id": "vendor/new-model",
+        "custom_provider_name": "内部网关",
+    }
+    response = client.post(url("create"), data, follow=True)
+    model = AIModel.objects.get()
+    assert (model.provider, model.provider_label, model.model_id) == ("custom", "内部网关", "vendor/new-model")
+    assert model.protocol_label == "OpenAI 兼容"
+    assert "内部网关" in response.content.decode()
+    assert model.name in client.get(url("list"), {"q": "内部网关"}).content.decode()
+
+
+def test_thinking_preset_can_be_cleared_to_use_the_interface_default(client, users, upstream):
+    AIModelOption.objects.create(
+        provider="deepseek", model_id="deepseek-flash", name="测试预设", is_default=True,
+        parameter_presets={"thinking": "enabled", "reasoning_effort": "max"},
+    )
+    client.force_login(users["owner"])
+    form = client.get(url("create")).context["form"]
+    assert form["thinking"].value() == "enabled"
+    assert form["reasoning_effort"].value() == "max"
+    assert client.post(url("create"), {**MODEL_DATA, "thinking": "", "reasoning_effort": ""}).status_code == 302
+    model = AIModel.objects.get()
+    assert (model.thinking, model.reasoning_effort) == ("", "")
+    assert client.post(url("test", model)).status_code == 302
+    model.refresh_from_db()
+    assert "thinking" not in model.test_request
+    assert "reasoning_effort" not in model.test_request
+    upstream.test.assert_called_once()
+
+
+def test_candidate_verification_matches_endpoint_and_only_returns_requested_ids(client, users):
+    other = users["other"]
+    verified = services.save_model(other, MODEL_DATA)
+    gateway_model = services.save_model(other, {**MODEL_DATA, "base_url": GATEWAY, "model_id": "gateway-only"})
+    unrequested = services.save_model(other, {**MODEL_DATA, "model_id": "private-unrequested"})
+    AIModel.objects.filter(pk__in=[verified.pk, gateway_model.pk, unrequested.pk]).update(verified=True)
+    services.save_model(other, {**MODEL_DATA, "model_id": "pending"})
+
+    endpoint = url("candidate_verification")
+    data = {
+        "provider": "deepseek", "base_url": "https://api.deepseek.com/",
+        "model_ids": [verified.model_id, gateway_model.model_id, "pending"],
+    }
+    client.force_login(users["owner"])
+    assert client.post(endpoint, data).json() == {"models": [verified.model_id]}
+    assert client.post(endpoint, {**data, "provider": "custom"}).json() == {"models": []}
+    client.force_login(users["consumer"])
+    assert client.post(endpoint, data).status_code == 403

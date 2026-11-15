@@ -35,6 +35,9 @@ def test_sdk_routes_through_scoped_transport(monkeypatch, provider, model_id, ba
         body = json.loads(request.content)
         if provider != "gemini":
             assert body["model"] == model_id
+        if provider == "openai":
+            assert body["temperature"] == 0
+            assert body["top_p"] == 0.8
         if provider == "deepseek":
             assert body["thinking"] == {"type": "enabled"}
             assert body["reasoning_effort"] == "high"
@@ -62,6 +65,8 @@ def test_sdk_routes_through_scoped_transport(monkeypatch, provider, model_id, ba
 
     monkeypatch.setattr("ai.llm.transport.ProviderTransport.handle_request", send)
     model = SimpleNamespace(provider=provider, model_id=model_id, base_url=base_url)
+    if provider == "openai":
+        model.request_parameters = {"temperature": 0, "top_p": 0.8}
     if provider != "deepseek":
         monkeypatch.setattr("ai.llm.client.capability", lambda *args: False)
     messages = [{"role": "user", "content": "测试"}]

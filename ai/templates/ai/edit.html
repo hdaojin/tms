@@ -8,47 +8,161 @@
 
 {% block form_content %}
   {{ form.catalog|json_script:"ai-provider-catalog" }}
-  <form method="post" class="space-y-6" id="ai-model-form">
+  <form method="post" class="space-y-6" id="ai-model-form"
+        {% if model %}data-saved-provider="{{ model.provider }}" data-saved-address="{{ model.base_url }}"{% endif %}>
     {% csrf_token %}
     {% include "components/form_errors.html" with form=form %}
-    <fieldset class="space-y-4">
-      <legend class="font-semibold">基本信息</legend>
-      {% include "components/field.html" with field=form.name %}
-      {% include "components/field.html" with field=form.provider %}
-    </fieldset>
-    <fieldset class="space-y-4">
-      <legend class="font-semibold">API 连接</legend>
-      {% include "components/field.html" with field=form.base_url %}
-      <p id="ai-api-default" class="text-sm text-base-content/70">
-        {% if form.effective_default %}留空将使用 {{ form.effective_default }}{% endif %}
-      </p>
-      <input type="hidden" name="shown_default_base_url" value="{{ form.effective_default }}">
-      {% include "components/field.html" with field=form.api_key %}
-      <p class="text-sm text-base-content/70">API 请求和生成素材将发送至所选 API 地址。</p>
-    </fieldset>
-    <fieldset class="space-y-4">
-      <legend class="font-semibold">模型设置</legend>
-      {% include "components/field.html" with field=form.model_choice %}
-      <div id="ai-discovery" hidden>
-        <button type="button" class="btn btn-sm"
-                data-url="{% if model %}{% url 'ai:discover_saved' model.pk %}{% else %}{% url 'ai:discover' %}{% endif %}">
-          获取模型列表
-        </button>
-        <p class="text-sm text-base-content/70 mt-2" role="status"></p>
-        <label class="block mt-2" hidden>
-          API 返回的模型
-          <select class="select w-full"></select>
-        </label>
+
+    <section class="space-y-3" aria-labelledby="ai-basics">
+      <h2 id="ai-basics" class="text-lg font-semibold">基本信息</h2>
+      <div class="grid items-start gap-x-4 md:grid-cols-2">
+        {% include "components/field.html" with field=form.name %}
+        <div id="ai-provider-fallback">{% include "components/field.html" with field=form.provider %}</div>
+        <fieldset id="ai-provider-picker" class="fieldset" hidden>
+          <legend id="ai-provider-label" class="fieldset-legend">模型提供商 <span class="text-error">*</span></legend>
+          <button class="btn btn-outline w-full justify-between" type="button" aria-haspopup="dialog"
+                  aria-labelledby="ai-provider-label ai-provider-selection">
+            <span id="ai-provider-selection"></span>
+            <span class="icon-[tabler--chevron-down] size-4" aria-hidden="true"></span>
+          </button>
+        </fieldset>
+        <div id="ai-custom-provider" class="md:col-span-2">
+          {% include "components/field.html" with field=form.custom_provider_name %}
+        </div>
+        {% include "components/field.html" with field=form.notes %}
       </div>
-      <div id="ai-manual-model">{% include "components/field.html" with field=form.model_id %}</div>
-    </fieldset>
-    <details id="ai-advanced" {% if form.thinking.errors or form.reasoning_effort.errors %}open{% endif %}>
-      <summary class="cursor-pointer font-semibold">高级选项</summary>
-      {% include "ai/thinking_fields.html" %}
+    </section>
+
+    <section class="space-y-3 border-t border-base-300 pt-5" aria-labelledby="ai-connection">
+      <h2 id="ai-connection" class="text-lg font-semibold">API 连接配置</h2>
+      <div class="grid items-start gap-x-4 md:grid-cols-2">
+        <dl class="fieldset">
+          <dt class="fieldset-legend">API 协议</dt>
+          <dd class="input h-auto min-h-10 w-full cursor-default py-2" id="ai-protocol">{{ form.entry.protocol }}</dd>
+        </dl>
+        <div>
+          {% include "components/field.html" with field=form.base_url %}
+          <p id="ai-api-default" class="text-xs text-base-content/60">
+            {% if form.effective_default %}留空将使用 {{ form.effective_default }}{% else %}请输入完整的 API 地址。{% endif %}
+          </p>
+          <p id="ai-address-source" class="text-xs text-base-content/60"></p>
+          <input type="hidden" name="shown_default_base_url" value="{{ form.effective_default }}">
+        </div>
+        {% if model %}
+          <fieldset class="fieldset">
+            <legend class="fieldset-legend">当前 API Key</legend>
+            <p class="input w-full cursor-default">{{ model.api_key_preview|default:"未设置" }}</p>
+          </fieldset>
+        {% endif %}
+        {% include "components/field.html" with field=form.api_key %}
+      </div>
+      <p id="ai-key-required" class="text-sm text-base-content/70"></p>
+    </section>
+
+    <section class="space-y-3 border-t border-base-300 pt-5" aria-labelledby="ai-model-settings">
+      <h2 id="ai-model-settings" class="text-lg font-semibold">模型配置</h2>
+      <div class="grid gap-x-4 md:grid-cols-2">
+        <div>
+          {% include "components/field.html" with field=form.model_id label_badge_id="ai-model-source" %}
+          <datalist id="ai-model-options">
+            {% for option in form.options %}
+              <option value="{{ option.id }}">{{ option.label }} · 系统预设</option>
+            {% endfor %}
+          </datalist>
+          <section id="ai-model-picker" class="mt-2" hidden
+                   data-verification-url="{% url 'ai:candidate_verification' %}" aria-labelledby="ai-candidates-title">
+            <h3 id="ai-candidates-title" class="text-sm font-medium">候选模型</h3>
+            <p class="mt-2 text-xs text-base-content/60">在模型 ID 字段输入名称或 ID 可筛选。</p>
+            <ul class="mt-2 max-h-56 overflow-y-auto rounded-box border border-base-300" id="ai-model-results"></ul>
+            <p class="mt-2 text-xs text-base-content/60" id="ai-model-no-results" role="status" hidden>没有匹配的候选模型。</p>
+          </section>
+        </div>
+        <div class="fieldset">
+          <span class="fieldset-legend">模型能力</span>
+          <div id="ai-model-capabilities" class="flex min-h-10 flex-wrap items-center gap-2" aria-live="polite">
+            <span class="badge badge-ghost">待确认</span>
+          </div>
+        </div>
+      </div>
+      <div id="ai-discovery" hidden>
+        <button type="button" class="btn btn-primary btn-sm" aria-describedby="ai-discovery-help"
+                data-url="{% if model %}{% url 'ai:discover_saved' model.pk %}{% else %}{% url 'ai:discover' %}{% endif %}">
+          在线获取模型列表
+        </button>
+        <p id="ai-discovery-help" class="mt-2 text-sm text-base-content/70">使用当前 API 地址和密钥查询模型 ID，结果会加入候选模型列表。</p>
+        <p class="mt-2 text-sm text-base-content/70" role="status"></p>
+      </div>
+    </section>
+
+    <details id="ai-advanced" class="collapse collapse-arrow border border-base-300"
+             {% if not form.advanced_presets %}hidden{% elif form.advanced_errors %}open{% endif %}>
+      <summary class="collapse-title font-semibold">高级请求参数</summary>
+      <div class="collapse-content">
+        <div class="grid gap-x-4 md:grid-cols-2">
+          {% for name, field, visible in form.sampling_fields %}
+            <div data-ai-parameter="{{ name }}" {% if not visible and not field.errors %}hidden{% endif %}>
+              {% include "components/field.html" with field=field %}
+              <p class="text-xs text-base-content/60" data-ai-recommendation></p>
+            </div>
+          {% endfor %}
+          <div data-ai-parameter="thinking" {% if "thinking" not in form.advanced_presets %}hidden{% endif %}>
+            {% include "components/field.html" with field=form.thinking %}
+            <p class="text-xs text-base-content/60" data-ai-recommendation></p>
+          </div>
+          <div data-ai-parameter="reasoning_effort" {% if "reasoning_effort" not in form.advanced_presets %}hidden{% endif %}>
+            {% include "components/field.html" with field=form.reasoning_effort %}
+            <p class="text-xs text-base-content/60" data-ai-recommendation></p>
+          </div>
+        </div>
+      </div>
     </details>
-    <div class="flex justify-end gap-3">
-      <a class="btn btn-ghost" href="{% if model %}{% url 'ai:detail' model.pk %}{% else %}{% url 'ai:list' %}{% endif %}">取消</a>
-      <button type="submit" class="btn btn-primary">保存模型</button>
+    {% if not form.advanced_presets and form.advanced_errors %}
+      <p class="alert alert-error" role="alert">当前模型没有可编辑的高级请求参数，请刷新页面后重试。</p>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-base-300 pt-5">
+      <p class="text-sm text-base-content/70">保存后可在详情页发起连接测试。</p>
+      <div class="flex gap-3">
+        <a class="btn btn-ghost" href="{% if model %}{% url 'ai:detail' model.pk %}{% else %}{% url 'ai:list' %}{% endif %}">取消</a>
+        <button type="submit" class="btn btn-primary">保存模型</button>
+      </div>
     </div>
   </form>
+
+  <dialog id="ai-provider-dialog" class="modal" aria-labelledby="ai-provider-dialog-title">
+    <div class="modal-box space-y-4">
+      <div class="flex items-center justify-between gap-3">
+        <h2 id="ai-provider-dialog-title" class="text-lg font-semibold">选择模型提供商</h2>
+        <button type="button" class="btn btn-ghost btn-sm" data-ai-close>关闭</button>
+      </div>
+      <input type="search" class="input w-full" aria-label="搜索提供商" placeholder="搜索提供商名称" autofocus>
+      <div data-ai-provider-group class="space-y-2">
+        <h3 class="font-medium">系统预设</h3>
+        <div class="grid gap-2 sm:grid-cols-2">
+          {% for code, branding in form.preset_providers %}
+            <button type="button" class="btn btn-outline h-auto justify-start gap-3 whitespace-normal py-3 text-left"
+                    data-ai-provider="{{ code }}">
+              {% include "ai/provider_logo.html" with branding=branding only %}
+              <span class="min-w-0">
+                <span class="block">{{ branding.label }}</span>
+                <span class="block text-xs font-normal">{{ branding.protocol }}</span>
+              </span>
+            </button>
+          {% endfor %}
+        </div>
+      </div>
+      <div data-ai-provider-group class="space-y-2 border-t border-base-300 pt-4">
+        <h3 class="font-medium">自定义接入</h3>
+        {% for code, label in form.fields.provider.choices %}
+          {% if code == "custom" %}
+            <button type="button" class="btn btn-outline h-auto w-full justify-start whitespace-normal py-3"
+                    data-ai-provider="custom"><span class="icon-[tabler--plug] size-4" aria-hidden="true"></span>自定义 API</button>
+          <p class="text-sm text-base-content/70">接入 OpenAI 兼容的第三方 API、私有部署模型或内部网关。</p>
+          {% endif %}
+        {% endfor %}
+      </div>
+      <p data-ai-provider-empty role="status" hidden>没有匹配的提供商。</p>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>关闭</button></form>
+  </dialog>
 {% endblock %}

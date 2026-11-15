@@ -31,6 +31,16 @@ PROVIDERS = {
     "custom": Provider("自定义（OpenAI 兼容）", "openai", openai_client=True, model_list_path="/models"),
 }
 
+PROTOCOL_LABELS = {
+    "anthropic": "Anthropic Messages",
+    "gemini": "Gemini API",
+    "ollama": "Ollama API",
+}
+
+
+def protocol_label(provider):
+    return PROTOCOL_LABELS.get(provider, "OpenAI 兼容") if provider in PROVIDERS else "未知协议"
+
 
 def supports_thinking(model):
     provider = PROVIDERS.get(model.provider)
@@ -50,11 +60,14 @@ def supports_images(model):
 def capability(model, field):
     from .models import AIModelOption, AIProviderSettings
 
-    provider = PROVIDERS[model.provider]
     trusted_url = AIProviderSettings.objects.filter(provider=model.provider).values_list("default_base_url", flat=True).first()
-    return model.base_url in {provider.default_url, trusted_url} and AIModelOption.objects.filter(
+    return model.base_url in trusted_addresses(model.provider, trusted_url) and AIModelOption.objects.filter(
         provider=model.provider, model_id=model.model_id, is_active=True, **{field: True}
     ).exists()
+
+
+def trusted_addresses(provider, default_url):
+    return {url.rstrip("/") for url in (PROVIDERS[provider].default_url, default_url) if url}
 
 
 def validate_model_id(value):

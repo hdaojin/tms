@@ -103,11 +103,12 @@
     {% if show_label|default:True %}
       <legend class="fieldset-legend">
         {{ field.label }}{% if field.field.required %}<span class="text-error">*</span>{% endif %}
+        {% if label_badge_id %}<span id="{{ label_badge_id }}" class="badge badge-ghost badge-sm" aria-live="polite" hidden></span>{% endif %}
       </legend>
     {% endif %}
     {{ field }}
     {% if show_help|default:True and field.help_text %}
-      <p class="label text-xs text-base-content/60">{{ field.help_text }}</p>
+      <p {% if field.auto_id %}id="{{ field.auto_id }}_helptext"{% endif %} class="label whitespace-normal text-xs text-base-content/60">{{ field.help_text }}</p>
     {% endif %}
   </fieldset>
 {% endif %}

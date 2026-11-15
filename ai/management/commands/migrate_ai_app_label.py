@@ -12,18 +12,13 @@ from django.db.migrations.recorder import MigrationRecorder
 from django.views.decorators.debug import sensitive_variables
 
 from accounts.models import GroupProfile, UserProfile
-from ai.models import AIModel, AIModelOption, AIModelPreference, AIProviderSettings
 from ai.services import cipher
 
 OLD = "ai_models"
 NEW = "ai"
 BUNDLES = {f"{OLD}.{name}": f"{NEW}.{name}" for name in ("manage_own", "use_shared")}
-MODELS = (AIModel, AIModelOption, AIModelPreference, AIProviderSettings)
+MODEL_NAMES = ("AIModel", "AIModelOption", "AIModelPreference", "AIProviderSettings")
 PROFILES = (UserProfile, GroupProfile)
-NEW_FIELDS = {
-    "ai_models_aiprovidersettings": {"enabled"},
-    "ai_models_aimodeloption": {"supports_images", "supports_json"},
-}
 
 
 def digest_table(cursor, table, quote):
@@ -40,21 +35,24 @@ def digest_table(cursor, table, quote):
 @sensitive_variables()
 def inspect_upgrade(connection, cursor):
     quote = connection.ops.quote_name
-    metadata = (*MODELS, AIModel.shared_users.through, AIModel.shared_groups.through)
+    graph = MigrationLoader(None)
+    legacy_leaf = (NEW, "0005_model_share_audience")
+    legacy_apps = graph.project_state([legacy_leaf]).apps
+    models = tuple(legacy_apps.get_model(NEW, name) for name in MODEL_NAMES)
+    model = models[0]
+    metadata = (*models, model.shared_users.through, model.shared_groups.through)
     tables = {f"{OLD}_{model._meta.db_table.removeprefix('ai_')}": model for model in metadata}
     existing = set(connection.introspection.table_names(cursor))
     old_tables = set(tables) & existing
     new_tables = {model._meta.db_table for model in tables.values()}
     history = set(MigrationRecorder(connection).applied_migrations())
-    graph = MigrationLoader(None)
     old_history = {name for app, name in history if app == OLD}
     new_history = {name for app, name in history if app == NEW}
-    legacy_leaf = (NEW, "0005_model_share_audience")
     expected = {name for app, name in graph.graph.forwards_plan(legacy_leaf) if app == NEW}
     content = ContentType.objects.using(connection.alias)
     old_types = set(content.filter(app_label=OLD).values_list("id", "model"))
     new_types = set(content.filter(app_label=NEW).values_list("id", "model"))
-    required_types = {model._meta.model_name for model in MODELS}
+    required_types = {model._meta.model_name for model in models}
     if not any(table.startswith("ai_models_") for table in existing) and not old_history and not old_types:
         if new_tables <= existing and expected <= new_history and required_types <= {name for _, name in new_types}:
             return None
@@ -81,7 +79,7 @@ def inspect_upgrade(connection, cursor):
     for table, model in tables.items():
         columns = {field.name for field in connection.introspection.get_table_description(cursor, table)}
         expected_columns = {field.column for field in model._meta.local_concrete_fields}
-        if columns != expected_columns - NEW_FIELDS.get(table, set()):
+        if columns != expected_columns:
             raise CommandError(f"旧表字段不完整：{table}")
     verify_foreign_keys(connection, cursor, tables)
     cursor.execute(

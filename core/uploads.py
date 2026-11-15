@@ -5,6 +5,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterable
+from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -432,6 +433,13 @@ def format_file_size(size_bytes: int) -> str:
     if size_bytes < 1024 * 1024 * 1024:
         return f"{size_bytes / 1024 / 1024:.2f} MB"
     return f"{size_bytes / 1024 / 1024 / 1024:.2f} GB"
+
+
+AI_PROVIDER_LOGO_UPLOAD_SPEC = UploadSpec(["png", "webp"], 1)
+
+
+def ai_provider_logo_path(instance, filename):
+    return f"ai/provider-logos/{uuid4().hex}{Path(filename).suffix.lower()}"
 
 
 NOTICE_ATTACHMENT_UPLOAD_SPEC = UploadSpec(

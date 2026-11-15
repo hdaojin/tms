@@ -16,8 +16,10 @@ from django.views.decorators.debug import sensitive_variables
 
 from accounts.services.users import require_distinguishable_users
 
+from .catalog import matching_option, provider_catalog
 from .llm.client import GenerationRequest, invoke
 from .models import AIModel, AIModelOption, AIModelPreference, AIProviderSettings, ReasoningEffort, ShareAudience, ThinkingMode
+from .parameters import SAMPLING_PARAMETERS, sampling_arguments, sampling_value, supported_sampling_parameters
 from .providers import PROVIDERS, ProviderError, validate_base_url, validate_model_id
 
 VIEW = "ai.view_aimodel"
@@ -44,6 +46,14 @@ def save_model_option(user, provider, data, pk=None):
         raise PermissionDenied
     if provider not in PROVIDERS:
         raise Http404
+    validate_model_id(data["model_id"])
+    presets = data.get("parameter_presets", {})
+    sampling = SAMPLING_PARAMETERS.keys() & presets.keys()
+    if sampling:
+        unsupported = sampling - supported_sampling_parameters(provider, data["model_id"])
+        if unsupported:
+            labels = "、".join(SAMPLING_PARAMETERS[name][0] for name in sorted(unsupported))
+            raise ValidationError(f"当前调用适配器未声明支持以下参数：{labels}。")
     AIProviderSettings.objects.select_for_update().get_or_create(provider=provider)
     options = AIModelOption.objects.filter(provider=provider)
     option = AIModelOption(provider=provider) if pk is None else get_object_or_404(options, pk=pk)
@@ -56,6 +66,7 @@ def save_model_option(user, provider, data, pk=None):
         siblings.filter(is_default=True).update(is_default=False, updated_at=timezone.now())
     for field in ("model_id", "name", "is_active", "is_default", "supports_images", "supports_json"):
         setattr(option, field, data.get(field, False))
+    option.parameter_presets = presets
     option.save()
 
 
@@ -106,14 +117,54 @@ def cipher():
 
 @sensitive_variables("api_key")
 def key_preview(api_key):
+    if not api_key:
+        return ""
     return f"{api_key[:3]}••••{api_key[-4:]}" if len(api_key) >= 12 else "••••"
 
 
-def normalize_thinking(thinking, effort):
-    thinking = thinking or ThinkingMode.DISABLED
-    if thinking not in ThinkingMode.values or (effort and effort not in ReasoningEffort.values):
+def normalize_thinking(thinking, effort, *, use_interface_defaults=False):
+    thinking = thinking or ("" if use_interface_defaults else ThinkingMode.DISABLED)
+    if (thinking and thinking not in ThinkingMode.values) or (effort and effort not in ReasoningEffort.values):
         raise ValidationError("请选择有效的思考模式和思考强度。")
-    return thinking, (effort or ReasoningEffort.HIGH) if thinking == ThinkingMode.ENABLED else ""
+    if thinking != ThinkingMode.ENABLED:
+        return thinking, ""
+    return thinking, effort or ("" if use_interface_defaults else ReasoningEffort.HIGH)
+
+
+def model_parameters(model, data, base_url):
+    same_model = (model.provider, model.base_url, model.model_id) == (data["provider"], base_url, data["model_id"])
+    entry = provider_catalog()[data["provider"]]
+    option = matching_option(entry, base_url, data["model_id"])
+    presets = option["presets"] if option else {}
+    defaults = {}
+    if same_model:
+        defaults = {"thinking": model.thinking, "reasoning_effort": model.reasoning_effort}
+    elif model.pk is None:
+        defaults = presets
+    thinking, effort = normalize_thinking(
+        data.get("thinking", defaults.get("thinking")),
+        data.get("reasoning_effort", defaults.get("reasoning_effort")),
+        use_interface_defaults=True,
+    )
+    if thinking == ThinkingMode.ENABLED and "thinking" not in presets and not (
+        same_model and model.thinking == ThinkingMode.ENABLED
+    ):
+        raise ValidationError({"thinking": "当前模型和 API 地址没有配置思考模式预设。"})
+    if effort and "reasoning_effort" not in presets and not (
+        same_model and model.thinking == ThinkingMode.ENABLED
+    ):
+        raise ValidationError({"reasoning_effort": "当前模型和 API 地址没有配置思考强度预设。"})
+
+    previous = model.request_parameters if same_model else {}
+    submitted = data.get("request_parameters", {})
+    parameters = {**previous, **submitted}
+    for name, value in parameters.items():
+        if name not in SAMPLING_PARAMETERS:
+            raise ValidationError("存在无效的高级请求参数。")
+        if value is not None and name not in previous and name not in presets:
+            raise ValidationError({name: "当前模型和 API 地址没有配置此参数预设。"})
+    sampling = {name: sampling_value(name, value) for name, value in parameters.items() if value is not None}
+    return thinking, effort, sampling
 
 
 @sensitive_variables()
@@ -124,22 +175,21 @@ def save_model(user, data, pk=None):
     api_key = data["api_key"]
     provider = data["provider"]
     base_url = validate_base_url(provider, data["base_url"])
-    thinking, effort = normalize_thinking(
-        data.get("thinking", model.thinking), data.get("reasoning_effort", model.reasoning_effort)
-    )
     destination_changed = (model.provider, model.base_url) != (provider, base_url)
     if AIProviderSettings.objects.filter(provider=provider, enabled=False).exists():
         raise ValidationError({"provider": "此提供商已停用。"})
     validate_model_id(data["model_id"])
     if PROVIDERS[provider].key_required and (pk is None or destination_changed) and not api_key:
-        raise ValidationError({"api_key": "新增模型或更换提供商、API 地址时，请输入 API 密钥。"})
+        raise ValidationError({"api_key": "新增模型或更换提供商、API 地址时，请输入 API Key。"})
     if api_key or destination_changed:
         model.encrypted_api_key = cipher().encrypt(api_key.encode())
         model.api_key_preview = key_preview(api_key)
-    parameters_changed = (model.model_id, model.thinking, model.reasoning_effort) != (
+    thinking, effort, sampling = model_parameters(model, data, base_url)
+    parameters_changed = (model.model_id, model.thinking, model.reasoning_effort, model.request_parameters) != (
         data["model_id"],
         thinking,
         effort,
+        sampling,
     )
     if destination_changed or parameters_changed or api_key:
         model.revision = uuid4()
@@ -151,11 +201,14 @@ def save_model(user, data, pk=None):
         model.test_request = {}
         model.test_reply = ""
     model.name = data["name"]
+    model.notes = data.get("notes", model.notes)
     model.provider = provider
+    model.custom_provider_name = data.get("custom_provider_name", model.custom_provider_name) if provider == "custom" else ""
     model.base_url = base_url
     model.model_id = data["model_id"]
     model.thinking = thinking
     model.reasoning_effort = effort
+    model.request_parameters = sampling
     model.save()
     return model
 
@@ -238,19 +291,22 @@ def test_model(user, pk):
             raise ValidationError("此提供商已停用。")
         api_key = model_key(model)
         thinking = model.thinking if model.provider == "deepseek" else ""
-        enabled = thinking == ThinkingMode.ENABLED
+        may_reason = PROVIDERS[model.provider].thinking and thinking != ThinkingMode.DISABLED
         request = GenerationRequest(
             messages=[{"role": "user", "content": "请回复：连接成功。"}],
-            max_output_tokens=2048 if enabled else 128,
+            max_output_tokens=2048 if may_reason else 128,
             thinking=thinking,
             reasoning_effort=model.reasoning_effort,
-            timeout=25 if enabled else 10,
+            timeout=25 if may_reason else 10,
             response_limit=65536,
         )
-        payload = {"model": model.model_id, "messages": request.messages, "max_tokens": request.max_output_tokens}
+        payload = {
+            "model": model.model_id, "messages": request.messages, "max_tokens": request.max_output_tokens,
+            **sampling_arguments(model, thinking),
+        }
         if thinking:
             payload["thinking"] = {"type": thinking}
-        if enabled:
+        if thinking == ThinkingMode.ENABLED and request.reasoning_effort:
             payload["reasoning_effort"] = request.reasoning_effort
         reply = invoke(model, request, api_key)
         reply = (reply.replace(api_key, "[已隐藏]") if api_key else reply)[:4096]
@@ -280,7 +336,7 @@ def model_key(model):
     try:
         return cipher().decrypt(bytes(model.encrypted_api_key)).decode()
     except (InvalidToken, UnicodeError):
-        raise ValidationError("无法读取 API 密钥，请检查系统加密配置或重新保存密钥。") from None
+        raise ValidationError("无法读取 API Key，请检查系统加密配置或重新保存密钥。") from None
 
 def generate_text(user, model_id, revision, payload):
     from .dispatcher import generate_text as dispatch_text
