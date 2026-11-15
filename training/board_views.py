@@ -1,5 +1,6 @@
 from collections import Counter, defaultdict
 from datetime import date, timedelta
+from urllib.parse import urlencode
 
 from django.contrib.auth.decorators import login_not_required
 from django.contrib.auth.mixins import PermissionRequiredMixin
@@ -68,6 +69,8 @@ class MyTrainingView(TitleMixin, PermissionRequiredMixin, TemplateView):
         except (ValueError, OverflowError) as exc:
             raise Http404("无效的训练日期") from exc
         all_dates = self.request.GET.get("scope") == "all"
+        show_history = self.request.GET.get("history") == "1"
+        today = timezone.localdate()
 
         own_executions = active_executions().filter(user=user)
         visible = visible_training_tasks_for(user)
@@ -97,8 +100,12 @@ class MyTrainingView(TitleMixin, PermissionRequiredMixin, TemplateView):
                 Q(pk__in=related_plans.values("pk")) | Q(pk__in=own_plans.values("pk"))
                 | Q(pk__in=personal.order_by().values("training_plan_id"))
             )
-        plan_choices = list(related_plans.order_by("-start_date", "pk"))
+        related_plans = list(related_plans.order_by("-start_date", "pk"))
         requested_plan = self.request.GET.get("plan")
+        plan_choices = [
+            plan for plan in related_plans if show_history or plan.end_date >= today
+            or plan.start_date <= day <= plan.end_date or str(plan.pk) == requested_plan
+        ]
         selected_plan = next((plan for plan in plan_choices if str(plan.pk) == requested_plan), None)
         if selected_plan is None:
             selected_plan = next((plan for plan in plan_choices if plan.start_date <= day <= plan.end_date), None)
@@ -108,11 +115,22 @@ class MyTrainingView(TitleMixin, PermissionRequiredMixin, TemplateView):
             tasks = tasks.filter(training_plan=selected_plan)
             if personal is not None:
                 personal = personal.filter(training_plan=selected_plan)
+        elif related_plans:
+            tasks = tasks.none()
+            if personal is not None:
+                personal = personal.none()
         origin = {"date": day.isoformat()}
         if all_dates:
             origin["scope"] = "all"
+        if show_history:
+            origin["history"] = "1"
+        plan_query = urlencode(origin)
         if selected_plan:
             origin["plan"] = selected_plan.pk
+        history_query = urlencode(
+            {key: value for key, value in origin.items() if key != "history"}
+            if show_history else {**origin, "history": "1"},
+        )
         if personal is not None:
             personal = personal.select_related("domain")
             personal = list(personal.filter(date=day) if not all_dates else personal)
@@ -159,7 +177,6 @@ class MyTrainingView(TitleMixin, PermissionRequiredMixin, TemplateView):
         members = {member.training_cycle_id: member for member in user.training_cycle_memberships.select_related(
             "training_cycle",
         )}
-        today = timezone.localdate()
         can_view_progress = user.has_perms(("training.view_taskexecution", "training.view_trainingprogress"))
         can_add_log = user.has_perm("training.add_traininglog")
         can_view_log = user.has_perm("training.view_traininglog")
@@ -246,8 +263,11 @@ class MyTrainingView(TitleMixin, PermissionRequiredMixin, TemplateView):
                         action[key] = with_training_return(action[key], origin)
             date_groups.append({"day": current_day, "rows": rows.values(), "actions": actions})
         context.update(
-            tasks=tasks, date_groups=date_groups, coach_view=coach_view, day=day, previous_day=previous_day, next_day=next_day,
+            tasks=tasks, date_groups=date_groups, coach_view=coach_view, day=day, today=today,
+            previous_day=previous_day, next_day=next_day,
             all_dates=all_dates, personal_tasks=personal, plan_choices=plan_choices, selected_plan=selected_plan,
+            show_history=show_history, plan_query=plan_query, history_query=history_query,
+            has_history=any(plan.end_date < today for plan in related_plans),
             personal_plans=own_plans.filter(pk__in=current_plans, pk=selected_plan.pk) if selected_plan else own_plans.none(),
         )
         return context

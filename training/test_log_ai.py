@@ -642,6 +642,9 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         url = reverse("training:slot_task_create", args=[slot.pk])
         response = self.client.get(url)
         self.assertContains(response, "添加子任务")
+        self.assertContains(response, "详细内容")
+        self.assertContains(response, "上移子任务")
+        self.assertLess(response.content.index(b'name="subtask_titles"'), response.content.index(b'name="requirements"'))
         self.assertNotIn("priority", response.context["form"].fields)
         self.assertNotIn("estimated_minutes", response.context["form"].fields)
         self.assertEqual(
@@ -653,6 +656,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
                     "skills": [matching.pk],
                     "assign_all": "on",
                     "assignment_configured": "on",
+                    "coach_link": "/notes/training/",
                     "action": "publish",
                 },
             ).status_code,
@@ -660,8 +664,28 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         )
         task = slot.tasks.get(title="动态子任务")
         self.assertEqual([item["title"] for item in task.subtasks], ["配置地址", "测试路由"])
+        self.assertEqual(task.coach_link, "/notes/training/")
         self.assertTrue(task.assign_all)
         self.assertEqual(task.executions.count(), 2)
+        detail = reverse("training:task_detail", args=[task.pk])
+        edit = reverse("training:task_edit", args=[task.pk])
+        for invalid in ("javascript:alert(1)", "//example.com/notes", "/\\example.com/notes"):
+            self.assertContains(
+                self.client.post(edit, {"title": task.title, "coach_link": invalid}),
+                "请输入以 / 开头的站内路径",
+            )
+        self.assertEqual(self.client.post(
+            edit,
+            {"title": task.title, "subtask_titles": ["测试路由", "配置地址"], "coach_link": "https://example.com/notes"},
+        ).status_code, 302)
+        task.refresh_from_db()
+        self.assertEqual([item["title"] for item in task.subtasks], ["测试路由", "配置地址"])
+        self.client.force_login(self.student)
+        self.assertContains(self.client.get(detail), 'href="https://example.com/notes"')
+        from .daily_progress import training_day_url
+
+        progress = training_day_url("training:daily_progress", self.cycle_obj.pk, task.planned_date)
+        self.assertContains(self.client.get(progress), 'href="https://example.com/notes"')
 
     def test_early_training_is_in_material_but_has_no_module_label(self):
         from .scheduling import save_slot_task

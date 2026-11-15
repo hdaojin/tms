@@ -32,6 +32,8 @@ LABELS = {
     "subtasks": "子任务",
     "subtask_titles": "子任务",
     "requirements": "训练目标",
+    "coach_link": "教练任务链接",
+    "show_task_details": "公开任务详细内容",
     "estimated_minutes": "预计分钟",
     "priority": "优先级",
     "order": "顺序",

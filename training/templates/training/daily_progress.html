@@ -24,6 +24,7 @@
                 {% endif %}
                 {% if row.counts %}<span class="text-sm text-base-content/70">{{ row.counts.0 }}/{{ row.counts.1 }}</span>{% endif %}
               </div>
+              {% if task.coach_link %}<p><a class="link" href="{{ task.coach_link }}" target="_blank" rel="noopener noreferrer">打开教练任务链接</a></p>{% endif %}
               {% if editable %}
                 {% if row.inconsistent %}
                   <p class="text-sm">各时段原有填报不同，保存会按本次勾选统一更新。</p>

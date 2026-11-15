@@ -4,7 +4,7 @@ from pathlib import Path
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, URLValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -20,6 +20,15 @@ from .log_files import TrainingLogStorage
 
 
 training_storage = PrivateMediaStorage("training")
+
+
+def validate_coach_task_link(value):
+    message = "请输入以 / 开头的站内路径，或完整的 HTTP(S) 地址。"
+    if len(value) > 2000 or any(char.isspace() or ord(char) < 32 or char == "\\" for char in value):
+        raise ValidationError(message)
+    if value.startswith("/") and not value.startswith("//"):
+        return
+    URLValidator(schemes=["http", "https"], message=message)(value)
 
 
 def log_template_upload_path(instance, filename):
@@ -609,6 +618,7 @@ class TrainingTask(models.Model):
     overview = models.TextField("训练内容概述", blank=True)
     subtasks = models.JSONField("子任务", default=list, blank=True, editable=False)
     requirements = models.TextField("训练目标", blank=True)
+    coach_link = models.CharField("教练任务链接", max_length=2000, blank=True)
     estimated_minutes = models.PositiveIntegerField("预计用时（分钟）", null=True, blank=True)
     priority = models.CharField("优先级", max_length=20, choices=Priority.choices, default=Priority.NORMAL)
     status = models.CharField("状态", max_length=20, choices=Status.choices, default=Status.DRAFT)
@@ -656,6 +666,11 @@ class TrainingTask(models.Model):
             and not (self.training_plan.start_date <= self.planned_date <= self.training_plan.end_date)
         ):
             raise ValidationError({"planned_date": "计划日期必须位于训练计划范围内。"})
+        if self.coach_link:
+            try:
+                validate_coach_task_link(self.coach_link)
+            except ValidationError as exc:
+                raise ValidationError({"coach_link": exc}) from exc
         if self.pk and self.is_locked and not getattr(self, "_definition_approved", False):
             previous = type(self).objects.get(pk=self.pk)
             protected = (
@@ -664,6 +679,7 @@ class TrainingTask(models.Model):
                 "title",
                 "overview",
                 "requirements",
+                "coach_link",
                 "estimated_minutes",
             )
             if any(getattr(previous, field) != getattr(self, field) for field in protected):
@@ -1204,6 +1220,7 @@ class TrainingBoardPlan(TimestampedModel):
         TrainingPlan, on_delete=models.CASCADE, related_name="screen_listing", verbose_name="训练计划",
         help_text="免登录训练大屏公开计划名称、当天排班、教练姓名、已发布任务标题和选手任务执行的匿名汇总。",
     )
+    show_task_details = models.BooleanField("公开任务详细内容", default=False)
 
     class Meta:
         verbose_name = verbose_name_plural = "训练大屏展示计划"

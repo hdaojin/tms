@@ -187,7 +187,7 @@ def task_snapshot(task):
     } | {
         "skills": sorted(link.skill_id for link in task.skill_links.all()),
         "selected_competitors": sorted(person.pk for person in task.selected_competitors.all()),
-    }
+    } | ({"coach_link": task.coach_link} if task.coach_link else {})
 
 
 
@@ -368,16 +368,30 @@ def publish_plan(plan, user):
 
 
 @transaction.atomic
-def set_board_listing(plan, user, *, enabled):
+def set_board_listing(plan, user, *, enabled, show_task_details=None):
     if not privileged(user):
         raise PermissionDenied
     plan = TrainingPlan.objects.select_for_update().get(pk=plan.pk)
     if not plan.published_at:
         raise ValidationError("只有已发布的训练计划可设置上屏。")
+    listing = TrainingBoardPlan.objects.filter(training_plan=plan)
+    if show_task_details is not None:
+        entry = listing.first()
+        if entry is None:
+            raise ValidationError("请先将训练计划加入大屏。")
+        if entry.show_task_details != show_task_details:
+            before = entry.show_task_details
+            entry.show_task_details = show_task_details
+            entry.save(update_fields=["show_task_details", "updated_at"])
+            audit(
+                plan, user, "调整大屏公开内容",
+                before={"show_task_details": before}, after={"show_task_details": show_task_details},
+            )
+        return
     if enabled:
         _, changed = TrainingBoardPlan.objects.get_or_create(training_plan=plan)
     else:
-        changed, _ = TrainingBoardPlan.objects.filter(training_plan=plan).delete()
+        changed, _ = listing.delete()
     if changed:
         audit(plan, user, "加入训练大屏" if enabled else "移出训练大屏")
 
@@ -760,7 +774,7 @@ def matching_day_tasks(slot, title):
     ).exclude(status="cancelled").order_by("pk")
 
 
-SHARED_TASK_FIELDS = ("overview", "requirements", "subtask_titles", "skills", "attachments")
+SHARED_TASK_FIELDS = ("overview", "requirements", "subtask_titles", "skills", "attachments", "coach_link")
 
 
 @transaction.atomic
@@ -803,15 +817,16 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
         existing_titles = [item["title"] for item in task.subtasks]
         if not creating and joining and not values.get("confirm_shared_content") and (
             task.overview != source.overview or task.requirements != source.requirements
+            or task.coach_link != source.coach_link
             or existing_titles != [item["title"] for item in source.subtasks]
             or set(task.skill_links.values_list("skill_id", flat=True)) != set(source.skill_links.values_list("skill_id", flat=True))
             or task.attachments.exists()
         ):
-            raise ValidationError("同名任务的扩展信息存在差异，请先核对后再合并。")
+            raise ValidationError("同名任务的详细内容存在差异，请先核对后再合并。")
         values = {key: value for key, value in values.items() if key not in SHARED_TASK_FIELDS}
         values.pop("replace_attachments", None)
         values.update(
-            overview=source.overview, requirements=source.requirements,
+            overview=source.overview, requirements=source.requirements, coach_link=source.coach_link,
             subtask_titles=[item["title"] for item in source.subtasks],
             skills=list(source.skill_links.order_by("order", "pk").values_list("skill_id", flat=True)),
         )
@@ -839,7 +854,7 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
     before = task_snapshot(task) if task.pk else {}
     if titles is not None:
         update_subtasks(task, titles)
-    for field in ("title", "overview", "requirements", "estimated_minutes", "priority", "order", "assign_all"):
+    for field in ("title", "overview", "requirements", "coach_link", "estimated_minutes", "priority", "order", "assign_all"):
         if field in values:
             setattr(task, field, values[field])
     task.full_clean(exclude=["selected_competitors"])
@@ -863,10 +878,11 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
     for peer in shared_peers:
         previous = task_snapshot(peer)
         peer.overview, peer.requirements = task.overview, task.requirements
+        peer.coach_link = task.coach_link
         if titles is not None:
             update_subtasks(peer, titles)
         peer._definition_approved = True
-        peer.save(update_fields=["overview", "requirements", "subtasks", "updated_at"])
+        peer.save(update_fields=["overview", "requirements", "coach_link", "subtasks", "updated_at"])
         _set_skills(peer, values.get("skills", before.get("skills", [])))
         audit(plan, user, "同步同日任务内容", task=peer, before=previous, after=task_snapshot(peer))
     if publish and task.status == "draft":

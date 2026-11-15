@@ -1,7 +1,8 @@
 from collections import Counter, defaultdict
 
 from django.contrib.auth import get_user_model
-from django.db.models import Count, F, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Case, Count, F, OuterRef, Prefetch, Q, Subquery, When
+from django.utils.text import Truncator
 
 from accounts.services.users import get_user_display_name
 
@@ -17,7 +18,7 @@ def _coach_names(coaches, all_coaches):
     return ["全体"] if all_coaches else [get_user_display_name(coach) for coach in coaches.all()]
 
 
-def _slot_display(period, label, slot, now, tasks):
+def _slot_display(period, label, slot, now, task):
     kind = TrainingScheduleSlot.Kind
     start, end = (slot.starts_at, slot.ends_at) if slot else (None, None)
     state, state_label = "unknown", "时间未设置"
@@ -44,7 +45,7 @@ def _slot_display(period, label, slot, now, tasks):
     return {
         "period": period, "label": label, "start": start, "end": end, "state": state,
         "state_label": state_label, "empty_label": empty_label, "domains": domains,
-        "coaches": coaches, "tasks": tasks,
+        "coaches": coaches, "task": task,
     }
 
 
@@ -101,13 +102,14 @@ def public_board_plans(*, today, now):
     if not schedule:
         return []
 
-    tasks_by_slot = defaultdict(list)
+    tasks_by_slot = {}
     tasks_by_plan = defaultdict(list)
     status = TaskExecution.Status
     effective = Q(executions__revoked_at__isnull=True) & ~Q(executions__status=status.CANCELLED)
     primary_domain = TrainingTaskDomain.objects.filter(
         training_task_id=OuterRef("pk"), role=TrainingTaskDomain.Role.PRIMARY,
     ).values("technical_domain__name")
+    details_allowed = Q(training_plan__screen_listing__show_task_details=True)
     tasks = TrainingTask.objects.filter(
         status=TrainingTask.Status.PUBLISHED,
         planned_date=today,
@@ -121,11 +123,19 @@ def public_board_plans(*, today, now):
         completed=Count("executions", filter=effective & Q(executions__status=status.COMPLETED)),
         in_progress=Count("executions", filter=effective & Q(executions__status=status.IN_PROGRESS)),
         assigned=Count("executions", filter=effective & Q(executions__status=status.ASSIGNED)),
+        public_subtasks=Case(When(details_allowed, then=F("subtasks"))),
+        public_overview=Case(When(details_allowed, then=F("overview"))),
+        public_requirements=Case(When(details_allowed, then=F("requirements"))),
     ).order_by("order", "pk")
     slots_by_id = {slot.pk: slot for day in schedule for slot in day.slots.all()}
     for task in tasks:
         if task["schedule_slot_id"] in slots_by_id:
-            tasks_by_slot[task["schedule_slot_id"]].append(task["title"])
+            tasks_by_slot[task["schedule_slot_id"]] = {
+                "title": task["title"],
+                "subtitles": [item["title"] for item in task["public_subtasks"] or []],
+                "overview": Truncator(" ".join((task["public_overview"] or "").split())).chars(64),
+                "requirements": Truncator(" ".join((task["public_requirements"] or "").split())).chars(48),
+            }
             tasks_by_plan[task["training_plan_id"]].append(task)
 
     plans = []
@@ -134,7 +144,7 @@ def public_board_plans(*, today, now):
         display_slots = []
         for period, label in TrainingScheduleSlot.Period.choices:
             slot = by_period.get(period)
-            display_slots.append(_slot_display(period, label, slot, now, tasks_by_slot[slot.pk] if slot else []))
+            display_slots.append(_slot_display(period, label, slot, now, tasks_by_slot.get(slot.pk) if slot else None))
         plans.append({
             "id": day.training_plan_id, "title": day.training_plan.title,
             "duty_coaches": _coach_names(day.duty_coaches, day.duty_all),

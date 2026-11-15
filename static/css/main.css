@@ -1045,8 +1045,7 @@
   }
 
   .training-board-task-box {
-    /* Three single-line tasks, their separators, and the overflow hint. */
-    block-size: calc(8.3em + 4px);
+    block-size: clamp(8.3em, 24vh, 13em);
     flex: 0 1 auto;
     min-height: 0;
     overflow: hidden;
@@ -1084,6 +1083,13 @@
         overflow-wrap: anywhere;
       }
     }
+  }
+
+  .training-board-summary {
+    margin-block-start: 0.35em;
+    color: var(--board-muted);
+    font-size: 0.82em;
+    overflow-wrap: anywhere;
   }
 
   .training-board-no-tasks {

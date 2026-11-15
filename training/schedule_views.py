@@ -163,7 +163,7 @@ class PlanDetailView(TrainingPlanDetailView):
         if self.object.published_at and service.privileged(self.request.user):
             context["can_withdraw_plan"] = True
             context["can_manage_board"] = True
-            context["board_listed"] = TrainingBoardPlan.objects.filter(training_plan=self.object).exists()
+            context["board_listing"] = TrainingBoardPlan.objects.filter(training_plan=self.object).first()
             context["withdraw_plan_reason"] = _reason(
                 withdrawal_state, self.object, self.request.user, "plan", preview=False
             )
@@ -196,13 +196,20 @@ def set_board_listing(request, pk):
         raise PermissionDenied
     plan = get_plan(request.user, pk)
     action = request.POST.get("action")
-    if action not in {"add", "remove"}:
+    actions = {
+        "add": ({"enabled": True}, "已加入训练大屏。"),
+        "remove": ({"enabled": False}, "已移出训练大屏。"),
+        "show_details": ({"enabled": True, "show_task_details": True}, "大屏已公开任务详细内容。"),
+        "hide_details": ({"enabled": True, "show_task_details": False}, "大屏已停止公开任务详细内容。"),
+    }
+    if action not in actions:
         return _error(request, plan, ValidationError("请选择有效的上屏操作。"))
+    options, message = actions[action]
     try:
-        service.set_board_listing(plan, request.user, enabled=action == "add")
+        service.set_board_listing(plan, request.user, **options)
     except ValidationError as exc:
         return _error(request, plan, exc)
-    return _success(request, plan, "已加入训练大屏。" if action == "add" else "已移出训练大屏。")
+    return _success(request, plan, message)
 
 
 @require_POST

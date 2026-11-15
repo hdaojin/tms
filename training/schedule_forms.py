@@ -9,7 +9,7 @@ from meetings.widgets import RecipientSelect
 from standards.models import Skill, TechnicalDomain
 
 from . import scheduling
-from .models import TrainingTask, TrainingScheduleSlot
+from .models import TrainingTask, TrainingScheduleSlot, validate_coach_task_link
 from accounts.services.users import annotate_identity_labels, get_user_full_info
 
 
@@ -125,13 +125,14 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
         label="指定选手", queryset=get_user_model().objects.none(), required=False, widget=TrainingRecipientSelect
     )
     field_order = [
-        "title", "requirements", "overview", "subtask_titles", "attachments", "skills",
+        "title", "subtask_titles", "requirements", "overview", "attachments", "coach_link", "skills",
         "order", "assign_all", "competitors", "reason",
     ]
 
     class Meta:
         model = TrainingTask
-        fields = ["title", "requirements", "overview", "order", "assign_all"]
+        fields = ["title", "requirements", "overview", "coach_link", "order", "assign_all"]
+        help_texts = {"coach_link": "可填以 / 开头的站内路径，或完整的 HTTP(S) 地址。"}
         widgets = {
             "requirements": forms.Textarea(attrs={"rows": 3}),
             "overview": forms.Textarea(attrs={"rows": 3}),
@@ -148,13 +149,14 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
                 self.shared_task = source
                 if self.instance.pk and title != self.instance.title:
                     self.fields["confirm_shared_content"] = forms.BooleanField(
-                        label="确认采用已有同名任务的扩展信息", required=False,
+                        label="确认采用已有同名任务的详细内容", required=False,
                     )
                 for field_name in scheduling.SHARED_TASK_FIELDS:
                     self.fields[field_name].disabled = True
                 self.initial.update(
                     overview=source.overview,
                     requirements=source.requirements,
+                    coach_link=source.coach_link,
                     subtask_titles=[item["title"] for item in source.subtasks],
                     skills=list(source.skill_links.values_list("skill_id", flat=True)),
                 )
@@ -229,6 +231,12 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
         if len(titles) > 100 or any(len(title) > 240 for title in titles):
             raise forms.ValidationError("每项子任务最多 240 字，最多填写 100 项。")
         return titles
+
+    def clean_coach_link(self):
+        value = self.cleaned_data["coach_link"]
+        if value:
+            validate_coach_task_link(value)
+        return value
 
 
 class SkillCorrectionForm(StyledFormMixin, forms.Form):

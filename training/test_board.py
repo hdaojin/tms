@@ -16,6 +16,18 @@ from .test_process_refactor import ProcessFixture
 
 
 class TrainingBoardTests(ProcessFixture, TestCase):
+    def test_task_detail_loads_subtask_editor_for_edit_dialog(self):
+        task = self.task()
+        self.client.force_login(self.coach)
+        edit_url = reverse("training:task_edit", args=[task.pk])
+
+        detail = self.client.get(reverse("training:task_detail", args=[task.pk]))
+        self.assertContains(detail, f'hx-get="{edit_url}" hx-target="#schedule-editor"')
+        self.assertContains(detail, "js/training-checklist-editor.js")
+
+        dialog = self.client.get(edit_url, HTTP_HX_REQUEST="true", HTTP_HX_TARGET="schedule-editor")
+        self.assertContains(dialog, "data-subtask-add")
+
     def test_task_detail_starts_own_execution_and_preserves_training_origin(self):
         task = self.task()
         execution = task.executions.get(user=self.student)
@@ -125,6 +137,30 @@ class TrainingBoardTests(ProcessFixture, TestCase):
         response = self.client.get(reverse("training:my_training"))
         self.assertContains(response, "选手视图")
         self.assertContains(response, reverse("training:task_detail", args=[task.pk]))
+
+    def test_my_training_hides_ended_plans_and_keeps_historical_access(self):
+        from .models import TrainingPlanParticipant
+
+        task = self.task(title="历史训练任务")
+        current = type(self.plan).objects.create(
+            training_cycle=self.cycle_obj, title="当前训练计划",
+            start_date=self.plan.end_date.replace(day=3), end_date=self.plan.end_date.replace(day=4),
+            published_at=timezone.now(), created_by=self.admin,
+        )
+        TrainingPlanParticipant.objects.create(training_plan=current, user=self.student)
+        self.client.force_login(self.student)
+        url = reverse("training:my_training")
+        with patch("django.utils.timezone.localdate", return_value=current.start_date):
+            response = self.client.get(url)
+            self.assertEqual(response.context["plan_choices"], [current])
+            self.assertContains(response, "显示历史计划")
+            self.assertEqual(self.client.get(url, {"history": 1}).context["plan_choices"], [current, self.plan])
+            by_date = self.client.get(url, {"date": task.planned_date.isoformat()})
+            self.assertEqual(by_date.context["selected_plan"], self.plan)
+            self.assertContains(by_date, task.title)
+            explicit = self.client.get(url, {"plan": self.plan.pk, "scope": "all"})
+            self.assertEqual(explicit.context["selected_plan"], self.plan)
+            self.assertContains(explicit, task.title)
 
     def test_public_screen_requires_explicit_listing_and_current_publication(self):
         task = self.task(title="公开任务标题", overview="内部任务正文")
@@ -246,7 +282,7 @@ class TrainingBoardTests(ProcessFixture, TestCase):
             {item["name"]: (item["count"], item["percent"]) for item in stats["distribution"]},
             {self.linux.name: (3, 75), other_domain.name: (1, 25)},
         )
-        self.assertEqual([slot["tasks"] for slot in plan["slots"]], [[published[index].title] for index in (1, 0, 2, 3)])
+        self.assertEqual([slot["task"]["title"] for slot in plan["slots"]], [published[index].title for index in (1, 0, 2, 3)])
         for value in ("隐藏任务", "隐藏自主任务", "保密进度", "保密反馈", self.student.first_name, self.student2.username):
             self.assertNotContains(response, value)
 
@@ -312,6 +348,34 @@ class TrainingBoardTests(ProcessFixture, TestCase):
         response = self.client.post(url, {"action": "add"}, follow=True)
         self.assertContains(response, "只有已发布的训练计划可设置上屏")
         self.assertFalse(TrainingBoardPlan.objects.filter(training_plan=self.plan).exists())
+
+    def test_public_board_details_require_separate_authorization(self):
+        task = self.task(
+            subtask_titles=["先做第一步", "再做第二步"], overview="公开概述" + "文" * 80 + "概述尾部",
+            requirements="公开目标" + "目" * 60 + "目标尾部", coach_link="/private-training-material/",
+        )
+        TrainingBoardPlan.objects.create(training_plan=self.plan)
+        board = reverse("training:board")
+        setting = reverse("training:plan_board_listing", args=[self.plan.pk])
+        self.assertContains(self.client.get(board), task.title)
+        self.assertNotContains(self.client.get(board), "先做第一步")
+        self.client.force_login(self.coach)
+        self.assertEqual(self.client.post(setting, {"action": "show_details"}).status_code, 403)
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.post(setting, {"action": "show_details"}).status_code, 302)
+        self.client.logout()
+        for params in ({}, {"fragment": 1}):
+            response = self.client.get(board, params)
+            self.assertContains(response, "先做第一步")
+            self.assertLess(response.content.index("先做第一步".encode()), response.content.index("再做第二步".encode()))
+            for label in ("公开概述", "公开目标"):
+                self.assertContains(response, label)
+            for hidden in ("概述尾部", "目标尾部", task.coach_link):
+                self.assertNotContains(response, hidden)
+        self.client.force_login(self.admin)
+        self.client.post(setting, {"action": "hide_details"})
+        self.client.logout()
+        self.assertNotContains(self.client.get(board, {"fragment": 1}), "先做第一步")
 
     def test_withdrawing_plan_removes_listing_until_explicitly_added_again(self):
         type(self.plan).objects.filter(pk=self.plan.pk).update(schedule_published_at=None)

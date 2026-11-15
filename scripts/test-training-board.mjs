@@ -205,37 +205,38 @@ test("刷新按计划 ID 保留当前计划，失去授权后切换，失败清�
   assert.equal(board.active().controls.hidden, true);
 });
 
-test("只显示完整任务行，并为省略提示留出空间", () => {
+test("优先显示按序排列的子任务，剩余空间展示概述和目标", () => {
   const { fit } = setup([]);
   const tasks = [30, 60, 90].map((bottom) => ({
     getBoundingClientRect: () => ({ bottom }),
   }));
   const more = { getBoundingClientRect: () => ({ height: 16 }) };
+  const summaries = [112, 140].map((bottom) => ({
+    getBoundingClientRect: () => ({ bottom }),
+  }));
   let bottom = 75;
   const box = {
     getBoundingClientRect: () => ({ bottom }),
     querySelector: (selector) =>
-      selector === "[data-screen-tasks]" ? { children: tasks } : more,
+      selector === "[data-screen-subtasks]" ? { children: tasks } : more,
+    querySelectorAll: () => summaries,
   };
   fit(box);
   assert.deepEqual(
     tasks.map((task) => task.hidden),
     [false, true, true],
   );
-  assert.equal(more.textContent, "… 还有 2 项任务");
-  bottom = 100;
+  assert.equal(more.textContent, "还有 2 项子任务");
+  assert.deepEqual(summaries.map((item) => item.hidden), [true, true]);
+  bottom = 120;
   fit(box);
   assert.deepEqual(
     tasks.map((task) => task.hidden),
     [false, false, false],
   );
   assert.equal(more.hidden, true);
-  tasks.push({ getBoundingClientRect: () => ({ bottom: 120 }) });
+  assert.deepEqual(summaries.map((item) => item.hidden), [false, true]);
   bottom = 150;
   fit(box);
-  assert.deepEqual(
-    tasks.map((task) => task.hidden),
-    [false, false, false, true],
-  );
-  assert.equal(more.textContent, "… 还有 1 项任务");
+  assert.deepEqual(summaries.map((item) => item.hidden), [false, false]);
 });

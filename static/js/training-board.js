@@ -1,33 +1,30 @@
 function fitTaskBox(box) {
-  const tasks = Array.from(box.querySelector("[data-screen-tasks]").children);
-  const candidates = tasks.slice(0, 3);
+  const subtasks = Array.from(box.querySelector("[data-screen-subtasks]").children);
+  const summaries = box.querySelectorAll("[data-screen-summary]");
   const more = box.querySelector("[data-screen-more]");
-  for (const [index, task] of tasks.entries()) {
-    task.hidden = index >= candidates.length;
-  }
+  for (const subtask of subtasks) subtask.hidden = false;
+  for (const summary of summaries) summary.hidden = true;
   more.hidden = true;
 
-  const bottom =
-    box.getBoundingClientRect().bottom -
-    parseFloat(getComputedStyle(box).borderBottomWidth) -
-    parseFloat(getComputedStyle(box).paddingBottom);
-  if (
-    tasks.length === candidates.length &&
-    candidates.at(-1).getBoundingClientRect().bottom <= bottom
-  )
-    return;
+  const style = getComputedStyle(box);
+  const bottom = box.getBoundingClientRect().bottom -
+    parseFloat(style.borderBottomWidth) - parseFloat(style.paddingBottom);
+  const fits = (element) => element.getBoundingClientRect().bottom <= bottom + 0.5;
 
-  more.textContent = `… 还有 ${tasks.length} 项任务`;
-  more.hidden = false;
-  const hintHeight =
-    more.getBoundingClientRect().height +
-    parseFloat(getComputedStyle(more).marginTop);
-  const firstHidden = candidates.findIndex(
-    (task) => task.getBoundingClientRect().bottom > bottom - hintHeight,
-  );
-  const visible = firstHidden === -1 ? candidates.length : firstHidden;
-  for (const task of candidates.slice(visible)) task.hidden = true;
-  more.textContent = `… 还有 ${tasks.length - visible} 项任务`;
+  if (subtasks.length && !fits(subtasks.at(-1))) {
+    more.textContent = `还有 ${subtasks.length} 项子任务`;
+    more.hidden = false;
+    const hintHeight = more.getBoundingClientRect().height + parseFloat(getComputedStyle(more).marginTop);
+    const firstHidden = subtasks.findIndex((item) => item.getBoundingClientRect().bottom > bottom - hintHeight);
+    for (const item of subtasks.slice(firstHidden)) item.hidden = true;
+    more.textContent = `还有 ${subtasks.length - firstHidden} 项子任务`;
+    return;
+  }
+
+  for (const summary of summaries) {
+    summary.hidden = false;
+    if (!fits(summary)) summary.hidden = true;
+  }
 }
 
 const screen = document.querySelector("[data-training-screen]");

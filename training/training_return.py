@@ -14,6 +14,8 @@ def return_params(params):
     query = {"date": day.isoformat()}
     if params.get("return_scope") == "all":
         query["scope"] = "all"
+    if params.get("return_history") == "1":
+        query["history"] = "1"
     if params.get("return_plan", "").isascii() and params.get("return_plan", "").isdigit():
         query["plan"] = params["return_plan"]
     return query

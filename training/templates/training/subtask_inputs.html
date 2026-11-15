@@ -1,21 +1,27 @@
 <div class="space-y-2" data-subtask-editor>
   <div class="space-y-2" data-subtask-rows>
     {% for value in widget.value %}
-    <div class="flex gap-2" data-subtask-row>
-      <input class="input w-full" type="text" name="{{ widget.name }}" value="{{ value }}" maxlength="240" aria-label="子任务" {% if widget.attrs.disabled %}disabled{% endif %}>
-      {% if not widget.attrs.disabled %}<button class="btn btn-ghost" type="button" data-subtask-remove>移除</button>{% endif %}
-    </div>
+      {% partial subtask_row %}
     {% endfor %}
   </div>
   {% if widget.attrs.disabled %}
     <p class="text-sm">已有选手填报，子任务清单已固定。</p>
   {% else %}
     <template data-subtask-template>
-      <div class="flex gap-2" data-subtask-row>
-        <input class="input w-full" type="text" name="{{ widget.name }}" maxlength="240" aria-label="子任务">
-        <button class="btn btn-ghost" type="button" data-subtask-remove>移除</button>
-      </div>
+      {% partial subtask_row %}
     </template>
     <button class="btn btn-outline btn-sm" type="button" data-subtask-add>添加子任务</button>
   {% endif %}
 </div>
+{% partialdef subtask_row %}
+  <div class="group flex flex-wrap items-center gap-2" data-subtask-row>
+    <input class="input min-w-36 flex-1" type="text" name="{{ widget.name }}" value="{{ value|default:'' }}" maxlength="240" aria-label="子任务"{% if widget.attrs.disabled %} disabled{% endif %}>
+    {% if not widget.attrs.disabled %}
+      <div class="flex shrink-0">
+        <button class="btn btn-ghost btn-sm group-first:invisible" type="button" data-subtask-move="up" aria-label="上移子任务">上移</button>
+        <button class="btn btn-ghost btn-sm group-last:invisible" type="button" data-subtask-move="down" aria-label="下移子任务">下移</button>
+        <button class="btn btn-ghost btn-sm" type="button" data-subtask-remove aria-label="移除子任务">移除</button>
+      </div>
+    {% endif %}
+  </div>
+{% endpartialdef %}

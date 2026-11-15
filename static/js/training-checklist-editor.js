@@ -13,10 +13,21 @@
   });
 
   document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-subtask-add], [data-subtask-remove]");
+    const button = event.target.closest("[data-subtask-add], [data-subtask-remove], [data-subtask-move]");
     if (!button) return;
+    const row = button.closest("[data-subtask-row]");
+    if (button.dataset.subtaskMove) {
+      const up = button.dataset.subtaskMove === "up";
+      const neighbor = up ? row.previousElementSibling : row.nextElementSibling;
+      if (!neighbor) return;
+      if (up) neighbor.before(row);
+      else neighbor.after(row);
+      if (up ? row.previousElementSibling : row.nextElementSibling) button.focus();
+      else row.querySelector("input").focus();
+      return;
+    }
     if (button.hasAttribute("data-subtask-remove")) {
-      button.closest("[data-subtask-row]").remove();
+      row.remove();
       return;
     }
     const editor = button.closest("[data-subtask-editor]");

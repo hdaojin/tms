@@ -43,11 +43,16 @@
   {% endif %}
   {% if can_manage_board %}
     <div class="flex flex-wrap items-center gap-2">
-      <span>训练大屏 · {% if board_listed %}已加入{% else %}未加入{% endif %}</span>
+      <span>训练大屏 · {% if board_listing %}已加入{% else %}未加入{% endif %}</span>
       <form method="post" action="{% url 'training:plan_board_listing' plan.pk %}">
         {% csrf_token %}
-        {% if board_listed %}
+        {% if board_listing %}
           <button class="btn btn-outline btn-sm" type="submit" name="action" value="remove">移出大屏</button>
+          {% if board_listing.show_task_details %}
+            <button class="btn btn-outline btn-sm" type="submit" name="action" value="hide_details">停止公开任务详细内容</button>
+          {% else %}
+            <button class="btn btn-outline btn-sm" type="submit" name="action" value="show_details" aria-describedby="board-details-help">公开任务详细内容</button>
+          {% endif %}
         {% else %}
           <button class="btn btn-outline btn-sm" type="submit" name="action" value="add">加入大屏</button>
         {% endif %}
@@ -55,6 +60,7 @@
       <a class="btn btn-ghost btn-sm" href="{% url 'training:board' %}">打开大屏</a>
     </div>
     <p class="text-sm text-base-content/70">加入后，任何能打开大屏的人都可查看计划名称、当天已发布的时段、领域、任务标题、负责教练和值班教练姓名，以及选手任务执行的匿名汇总。撤回计划发布时会自动移出大屏。</p>
+    {% if board_listing %}<p id="board-details-help" class="text-sm text-base-content/70">{% if board_listing.show_task_details %}当前还公开已发布任务的子任务标题，以及限字的训练内容概述和训练目标。{% else %}开启后，任何能打开大屏的人还可查看已发布任务的子任务标题，以及限字的训练内容概述和训练目标。{% endif %}</p>{% endif %}
   {% endif %}
 </div></section>
 {% if can_see_management %}

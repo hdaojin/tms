@@ -119,7 +119,7 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         create_url = reverse("training:slot_task_create", args=[self.slot.pk])
         response = self.client.get(create_url)
         self.assertEqual(list(response.context["form"].fields), [
-            "title", "requirements", "overview", "subtask_titles", "attachments", "skills",
+            "title", "subtask_titles", "requirements", "overview", "attachments", "coach_link", "skills",
             "order", "assign_all", "competitors", "assignment_configured",
         ])
         self.assertIs(response.context["form"]["assign_all"].value(), True)

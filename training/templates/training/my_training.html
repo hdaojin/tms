@@ -5,31 +5,44 @@
     <div class="card-body gap-3">
       <div class="text-sm font-semibold text-primary">{% if coach_view %}教练视图{% else %}选手视图{% endif %}</div>
       <h2 class="text-2xl font-bold">{% if all_dates %}全部任务{% else %}{{ day|date:"Y年n月j日 · l" }}{% endif %}</h2>
-      {% if selected_plan and plan_choices|length == 1 %}<p class="font-semibold">{{ selected_plan.title }}</p>{% endif %}
-      {% if plan_choices|length > 1 %}
-        <form method="get" class="flex flex-wrap items-center gap-2">
-          <input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
-          {% if all_dates %}<input type="hidden" name="scope" value="all">{% endif %}
-          <label for="training-plan">训练计划</label>
-          <select class="select select-sm" id="training-plan" name="plan">
-            {% for plan in plan_choices %}<option value="{{ plan.pk }}" {% if plan == selected_plan %}selected{% endif %}>{{ plan.title }}</option>{% endfor %}
-          </select>
-          <button class="btn btn-sm">切换计划</button>
-        </form>
+      {% if selected_plan or has_history %}
+        <div class="flex flex-wrap items-start gap-2">
+          {% if plan_choices|length > 1 %}
+            <details class="w-fit max-w-full">
+              <summary class="btn btn-sm h-auto min-h-8 max-w-full justify-start py-1 text-left whitespace-normal">
+                <span class="sr-only">切换训练计划，当前为</span>
+                <span class="min-w-0 wrap-anywhere">{{ selected_plan.title }}</span>
+                <span class="icon-[tabler--chevron-down] shrink-0" aria-hidden="true"></span>
+              </summary>
+              <ul aria-label="训练计划" class="mt-1 space-y-1 rounded-box border border-base-300 p-1">
+                {% for plan in plan_choices %}
+                  <li><a class="btn btn-ghost btn-sm h-auto min-h-8 w-full justify-start py-1 text-left whitespace-normal" href="?{{ plan_query }}&amp;plan={{ plan.pk }}"{% if plan == selected_plan %} aria-current="true"{% endif %}><span class="min-w-0 wrap-anywhere">{{ plan.title }}</span></a></li>
+                {% endfor %}
+              </ul>
+            </details>
+          {% elif selected_plan %}
+            <p class="min-w-0 self-center wrap-anywhere font-semibold">{{ selected_plan.title }}</p>
+          {% endif %}
+          {% if has_history %}
+            <a class="btn btn-ghost btn-sm" href="?{{ history_query }}">{% if show_history %}收起历史计划{% else %}显示历史计划{% endif %}</a>
+          {% endif %}
+        </div>
       {% endif %}
       <nav class="flex flex-wrap items-end gap-2" aria-label="训练日期">
-        <a class="btn btn-sm" href="?date={{ previous_day|date:'Y-m-d' }}{% if selected_plan %}&amp;plan={{ selected_plan.pk }}{% endif %}">上一天</a>
-        <a class="btn btn-sm" href="{% url 'training:my_training' %}{% if selected_plan %}?plan={{ selected_plan.pk }}{% endif %}">今天</a>
-        <a class="btn btn-sm" href="?date={{ next_day|date:'Y-m-d' }}{% if selected_plan %}&amp;plan={{ selected_plan.pk }}{% endif %}">下一天</a>
-        {% if not all_dates %}<a class="btn btn-sm" href="?scope=all&amp;date={{ day|date:'Y-m-d' }}{% if selected_plan %}&amp;plan={{ selected_plan.pk }}{% endif %}">全部任务</a>{% endif %}
+        <a class="btn btn-sm" href="?date={{ previous_day|date:'Y-m-d' }}{% partial plan_filters %}">上一天</a>
+        <a class="btn btn-sm" href="?date={{ today|date:'Y-m-d' }}{% partial plan_filters %}">今天</a>
+        <a class="btn btn-sm" href="?date={{ next_day|date:'Y-m-d' }}{% partial plan_filters %}">下一天</a>
+        {% if not all_dates %}<a class="btn btn-sm" href="?scope=all&amp;date={{ day|date:'Y-m-d' }}{% partial plan_filters %}">全部任务</a>{% endif %}
         <form method="get" class="flex flex-wrap items-center gap-2">
           {% if selected_plan %}<input type="hidden" name="plan" value="{{ selected_plan.pk }}">{% endif %}
+          {% if show_history %}<input type="hidden" name="history" value="1">{% endif %}
           <input class="input input-sm w-40" aria-label="训练日期" type="date" name="date" required value="{{ day|date:'Y-m-d' }}">
           <button class="btn btn-sm" type="submit">查看日期</button>
         </form>
       </nav>
     </div>
   </section>
+  {% partialdef plan_filters %}{% if selected_plan %}&amp;plan={{ selected_plan.pk }}{% endif %}{% if show_history %}&amp;history=1{% endif %}{% endpartialdef %}
 
   <section class="space-y-3">
     <h2 class="text-xl font-bold">{% if coach_view %}我负责的任务{% else %}分配给我的官方任务{% endif %}</h2>
