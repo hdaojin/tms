@@ -32,7 +32,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install PostgreSQL client library
         run: |
@@ -105,7 +105,7 @@ jobs:
           apt-get install -y --no-install-recommends ca-certificates git libpq5 fontconfig fonts-noto-cjk libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 poppler-utils
 
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -141,7 +141,7 @@ jobs:
       SAMBA_INTEGRATION_ENABLED: "False"
       SAMBA_ASYNC_OPERATIONS_ENABLED: "False"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
@@ -181,7 +181,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
