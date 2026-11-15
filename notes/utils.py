@@ -8,8 +8,11 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import unquote, urlsplit, urlunsplit
 
+from bs4 import BeautifulSoup
+
 from core.utils.markdown import DEFAULT_MARKDOWN_EXTRAS, render_markdown_text
 
+from .html import NOTE_HTML_CLEANER
 from .paths import (
     InvalidNotePathError,
     NoteNotFoundError,
@@ -40,6 +43,12 @@ class ReadmeNavigation:
 class NoteDetailsParseError(ValueError):
     """讲义中的 details 折叠块结构不完整或发生嵌套。"""
 
+
+class NoteMarkdownRenderError(ValueError):
+    """笔记正文未能完成 Markdown 渲染。"""
+
+
+_NOTE_RENDER_ERROR = "无法显示笔记正文，请联系管理员。"
 
 NOTE_MARKDOWN_EXTRAS = (*DEFAULT_MARKDOWN_EXTRAS, "mermaid")
 NOTE_DETAILS_BODY_EXTRAS = tuple(
@@ -101,19 +110,23 @@ def resolve_note_markdown_path(repo_root: Path, slug: str | None) -> Path:
     raise NoteNotFoundError("Note file not found")
 
 
-def _is_external_url(url: str) -> bool:
-    return url.lower().startswith(("http://", "https://", "//", "mailto:", "tel:", "ftp:", "data:"))
-
-
 def _rewrite_url(url: str | None, repo: str, repo_root: Path, current_dir: str) -> str | None:
     if not url:
         return url
-    if url.startswith(("#", "?", "/")) or _is_external_url(url):
+    url = url.strip()
+    if url.startswith("//") or "\\" in url or any(ord(char) < 32 for char in url):
+        return None
+    if url.startswith(("#", "?", "/")):
         return url
 
-    split = urlsplit(url)
-    if split.scheme or split.netloc:
+    try:
+        split = urlsplit(url)
+    except ValueError:
         return None
+    if split.scheme:
+        if split.scheme in {"http", "https", "ftp"}:
+            return url if split.hostname else None
+        return url if split.scheme in {"mailto", "tel"} and not split.netloc else None
     if not split.path and (split.query or split.fragment):
         return url
 
@@ -144,14 +157,11 @@ def rewrite_relative_urls(
 ) -> str:
     """改写仓库内链接，并移除任何逃逸配置根目录的链接目标。"""
 
-    try:
-        from bs4 import BeautifulSoup
-    except Exception:  # pragma: no cover - dependency is required in production
-        return html
-
     soup = BeautifulSoup(html, "lxml")
     root = soup.body or soup
     for tag in list(root.find_all(href=True)):
+        if tag.decomposed:
+            continue
         href = tag.get("href")
         rewritten = _rewrite_url(href if isinstance(href, str) else None, repo, repo_root, current_dir)
         if rewritten is None:
@@ -289,16 +299,13 @@ def get_readme_navigation(repo_root: Path, repo: str, max_depth: int = 3) -> Rea
         omit_unsafe_list_items=True,
     )
 
-    try:
-        from bs4 import BeautifulSoup
-    except Exception:  # pragma: no cover
-        return ReadmeNavigation(html=limit_navigation_depth(rewritten, max_depth=max_depth), items=[])
-
     rewritten_soup = BeautifulSoup(rewritten, "lxml")
     rewritten_root = rewritten_soup.body or rewritten_soup
     note_prefix = f"/notes/{repo}/"
     asset_prefix = f"/notes-files/{repo}/"
     for anchor in list(rewritten_root.find_all("a", href=True)):
+        if anchor.decomposed:
+            continue
         href = anchor.get("href")
         if not isinstance(href, str):
             continue
@@ -322,7 +329,7 @@ def get_readme_navigation(repo_root: Path, repo: str, max_depth: int = 3) -> Rea
                 anchor.decompose()
 
     rewritten = rewritten_root.decode_contents() if rewritten_root is rewritten_soup.body else str(rewritten_root)
-    navigation_html = limit_navigation_depth(rewritten, max_depth=max_depth)
+    navigation_html = NOTE_HTML_CLEANER.clean(limit_navigation_depth(rewritten, max_depth=max_depth))
 
     soup = BeautifulSoup(navigation_html, "lxml")
     items: list[dict[str, str]] = []
@@ -398,13 +405,15 @@ def _render_details_block(inner: str, attrs: str) -> str:
         body,
         extensions=NOTE_DETAILS_BODY_EXTRAS,
         lower_meta_keys=False,
-    ).html
+    )
+    if rendered_body.failed:
+        raise NoteMarkdownRenderError
     open_attribute = " open" if _OPEN_ATTRIBUTE_RE.search(attrs) else ""
     return (
         '<details class="note-details collapse collapse-arrow border border-base-300 '
         f'bg-base-100"{open_attribute}>'
         f'<summary class="collapse-title font-semibold">{html.escape(summary)}</summary>'
-        f'<div class="collapse-content">{rendered_body}</div>'
+        f'<div class="collapse-content">{rendered_body.html}</div>'
         "</details>"
     )
 
@@ -455,11 +464,6 @@ def _postprocess_note_html(
     repo_root: Path,
     current_dir: str,
 ) -> str:
-    try:
-        from bs4 import BeautifulSoup
-    except Exception:  # pragma: no cover
-        return rewrite_relative_urls(rendered_html, repo, repo_root, current_dir=current_dir)
-
     soup = BeautifulSoup(rendered_html, "lxml")
     root = soup.body or soup
     for placeholder in list(root.find_all(attrs={"data-note-details-placeholder": True})):
@@ -472,10 +476,12 @@ def _postprocess_note_html(
         if fragment is not None:
             placeholder.replace_with(fragment)
 
-    for diagram in root.select("pre.mermaid-pre > .mermaid"):
+    for diagram in root.select("[data-mermaid-diagram]"):
+        del diagram["data-mermaid-diagram"]
+    for diagram in root.select("pre.mermaid-pre > div.mermaid"):
         diagram["data-mermaid-diagram"] = ""
     merged_html = root.decode_contents() if root is soup.body else str(root)
-    return rewrite_relative_urls(merged_html, repo, repo_root, current_dir=current_dir)
+    return NOTE_HTML_CLEANER.clean(rewrite_relative_urls(merged_html, repo, repo_root, current_dir=current_dir))
 
 
 def _render_details_parse_error(content: str, error: NoteDetailsParseError) -> str:
@@ -500,9 +506,9 @@ def render_note_markdown(path: Path, repo: str, repo_root: Path, slug: str) -> N
 
     try:
         content = path.read_text(encoding="utf-8")
-    except Exception as exc:  # noqa: BLE001
+    except (OSError, UnicodeError):
         rendered_html = ""
-        meta = {"_parse_error": True, "_parse_error_message": str(exc)}
+        meta = {"_parse_error": True, "_parse_error_message": "无法读取笔记，请联系管理员。"}
         toc_html = ""
     else:
         try:
@@ -510,6 +516,10 @@ def render_note_markdown(path: Path, repo: str, repo_root: Path, slug: str) -> N
         except NoteDetailsParseError as exc:
             rendered_html = _render_details_parse_error(content, exc)
             meta = {"_parse_error": True, "_parse_error_message": str(exc)}
+            toc_html = ""
+        except NoteMarkdownRenderError:
+            rendered_html = f'<p role="alert">{_NOTE_RENDER_ERROR}</p>'
+            meta = {}
             toc_html = ""
         else:
             rendered = render_markdown_text(
@@ -523,7 +533,7 @@ def render_note_markdown(path: Path, repo: str, repo_root: Path, slug: str) -> N
                     current_dir,
                 ),
             )
-            rendered_html = rendered.html
+            rendered_html = f'<p role="alert">{_NOTE_RENDER_ERROR}</p>' if rendered.failed else rendered.html
             meta = rendered.meta
             toc_html = build_note_outline(rendered_html)
 

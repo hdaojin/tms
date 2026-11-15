@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group, Permission
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -772,10 +773,17 @@ class AssessmentWorkspaceTests(TestCase):
             "V2",
             "未知",
             self.owner.display_name,
-            timezone.localtime(newer_document.created_at).strftime("%Y-%m-%d %H:%M"),
         ]:
             self.assertContains(response, text)
         self.assertContains(response, "icon-[tabler--file-type-pdf]")
+        uploaded = timezone.localtime(newer_document.created_at)
+        soup = BeautifulSoup(response.content, "html.parser")
+        self.assertTrue(any(
+            part.get_text(strip=True) == uploaded.strftime("%Y-%m-%d")
+            and part.find_next_sibling(class_="date-part") is not None
+            and part.find_next_sibling(class_="date-part").get_text(strip=True) == uploaded.strftime("%H:%M")
+            for part in soup.select(".date-part")
+        ))
         self.assertContains(response, "icon-[tabler--file-type-doc]")
         self.assertContains(response, "icon-[tabler--upload]")
         self.assertContains(response, "上传模块资料")

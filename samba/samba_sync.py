@@ -1,4 +1,5 @@
 import logging
+import re
 import subprocess
 
 from django.conf import settings
@@ -6,12 +7,19 @@ from django.conf import settings
 from accounts.models import GroupProfile
 
 logger = logging.getLogger(__name__)
+_UNIX_NAME = re.compile(r"[A-Za-z0-9_.@+][A-Za-z0-9_.@+-]*\$?")
 
 
-def _resolve_unix_group_for_django_group(django_group) -> str | None:
+def _checked_unix_name(value: str, label: str) -> str:
+    if not isinstance(value, str) or not _UNIX_NAME.fullmatch(value) or value in {".", ".."} or value.isdecimal():
+        raise RuntimeError(f"{label}不符合 Samba 系统命令的命名要求。")
+    return value
+
+
+def _resolve_unix_group_for_django_group(django_group) -> str:
     try:
         mapping = GroupProfile.objects.get(group=django_group)
-        return mapping.codename
+        return _checked_unix_name(mapping.codename, "Samba 组标识")
     except GroupProfile.DoesNotExist:
         raise RuntimeError(f"组 '{django_group.name}' 未配置组的codename, 请联系管理员。")
 
@@ -82,21 +90,21 @@ def _set_samba_user_password(username: str, password: str, create_if_missing: bo
 
 
 def enable_samba_for_user(user, password:str) -> dict:
-    username = user.username
+    username = _checked_unix_name(user.username, "Samba 用户名")
 
     django_groups = list(user.groups.all())
     unix_groups = [_resolve_unix_group_for_django_group(g) for g in django_groups]
     primary_group = unix_groups[0] if unix_groups else None
 
     for ug in unix_groups:
-        __create_unix_group(ug)  # type: ignore
+        __create_unix_group(ug)
 
     pre_exists = _exists_unix_user(username)
     _create_unix_user(username, password, primary_group, create_home=False, shell="/sbin/nologin")
 
 
     extend_groups = unix_groups[1:] if primary_group else unix_groups
-    _ensure_user_in_groups(username, extend_groups)  # type: ignore
+    _ensure_user_in_groups(username, extend_groups)
 
     _set_samba_user_password(username, password, create_if_missing=True)
     return {
@@ -105,11 +113,11 @@ def enable_samba_for_user(user, password:str) -> dict:
     }
 
 def is_samba_enabled(user) -> bool:
-    return _exists_samba_user(user.username)
+    return _exists_samba_user(_checked_unix_name(user.username, "Samba 用户名"))
 
 
 def change_samba_password(user, new_password: str) -> None:
-    username = user.username
+    username = _checked_unix_name(user.username, "Samba 用户名")
     if not _exists_unix_user(username):
         raise RuntimeError(f"Unix user '{username}' does not exist")
     if not _exists_samba_user(username):
@@ -118,6 +126,6 @@ def change_samba_password(user, new_password: str) -> None:
 
 
 def disable_samba_for_user(user) -> None:
-    username = user.username
+    username = _checked_unix_name(user.username, "Samba 用户名")
     if _exists_samba_user(username):
         _run_checked(["smbpasswd", "-x", username])

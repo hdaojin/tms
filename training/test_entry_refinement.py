@@ -161,7 +161,9 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
             initial={"date": self.day.date},
         )
         self.assertFalse(duty.is_valid())
-        self.assertIn("张教练(zhang)", DayScheduleForm(plan=self.plan).as_p())
+        rendered = DayScheduleForm(plan=self.plan).as_p()
+        self.assertIn("张教练", rendered)
+        self.assertNotIn("zhang", rendered)
 
     def test_disabled_endpoints_and_compact_day_columns(self):
         self.client.force_login(self.admin)

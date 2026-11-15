@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from bs4 import BeautifulSoup
 from django.urls import reverse
 from django.utils import timezone
 
@@ -43,16 +44,18 @@ class SearchAndUnreadTests(ForumTestCase):
             [control["name"] for control in response.context["list_filter_controls"]],
             ["year", "module", "category", "tag", "post_type", "status", "importance", "q"],
         )
-        self.assertContains(
-            response,
-            'hx-trigger="submit, change from:.list-filter-select, input changed delay:400ms '
-            'from:.list-filter-search, search from:.list-filter-search"',
-            html=False,
-        )
+        toolbar = BeautifulSoup(response.content, "html.parser").select_one("form[hx-trigger]")
+        self.assertIsNotNone(toolbar)
+        self.assertEqual(toolbar["hx-get"], response.wsgi_request.path)
+        triggers = {trigger.strip() for trigger in toolbar["hx-trigger"].split(",")}
+        self.assertTrue({
+            "submit", "change from:.list-filter-select",
+            "input changed delay:400ms from:.list-filter-search", "search from:.list-filter-search",
+        } <= triggers)
         self.assertNotContains(response, "hx-indicator=", html=False)
         self.assertNotContains(response, "loading-spinner", html=False)
         self.assertContains(response, 'class="list-filter-select select w-full md:select-sm"', html=False)
-        self.assertContains(response, 'class="list-filter-search input w-full md:input-sm"', html=False)
+        self.assertIsNotNone(toolbar.select_one('input.list-filter-search[name="q"]'))
         self.assertContains(response, '<option value="2026" selected>', html=False)
         self.assertNotContains(response, ">筛选</button>", html=False)
         self.assertContains(response, f'href="{reverse("worldskills_forum:topic_list")}">重置</a>', html=False)

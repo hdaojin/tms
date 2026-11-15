@@ -589,6 +589,8 @@ sudo tms-update status
 
 用 `systemctl status tms-training-log-worker.service` 检查进程，用 `journalctl -u tms-training-log-worker.service` 查看错误。后台进程重启后会继续领取等待中的任务。已经开始调用并中断的任务在五分钟后标为失败，作者可重新确认后重试。开发环境可运行 `uv run manage.py run_training_log_worker` 启动队列，也可加 `--once` 仅处理一条。
 
+AI 生成的 4 个并发名额按 Python 进程计算。默认 `TMS_WORKERS=2` 的 Gunicorn 使用同步 worker，每个同时处理一个请求；单独的训练日志 worker 逐条领用任务，有自己的进程和名额。模型发现的 5 秒限速按用户和进程计算：默认 Django 本地内存缓存不会跨 worker 合并计数。增加 worker 或实例会扩大总并发，部署时按上游模型配额和出站策略配置，不应把上述限制视为全站限额。
+
 如果发布已完成、训练日志停在「等待生成」，且 systemd 显示后台服务为 `not-found`，先同步第 3 节的稳定入口和模板。常规恢复可重新计划并发布已审阅版本。若当前 release 已含 worker 命令且数据库迁移已完成，可按以下步骤单独恢复后台进程，继续处理积压任务。示例使用默认应用账号和组 `tms`，自定义部署先用 `systemctl show tms.service -p User -p Group` 确认并替换。若服务文件已存在，先检查和备份现有配置。
 
 ```bash

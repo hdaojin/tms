@@ -86,7 +86,7 @@ class TrainingCycleDetailsTests(TrainingFixtureMixin, TestCase):
 
     def test_detail_respects_member_permissions_and_has_three_sections(self):
         cycle = self.cycle()
-        member_user = User.objects.create_user(username="private-member", first_name="成员")
+        member_user = User.objects.create_user(username="private-member", first_name="李教练")
         TrainingCycleMember.objects.create(training_cycle=cycle, user=member_user, role="coach")
         viewer = User.objects.create_user(username="cycle-viewer")
         viewer.user_permissions.add(Permission.objects.get(codename="view_trainingcycle", content_type__app_label="training"))
@@ -96,6 +96,7 @@ class TrainingCycleDetailsTests(TrainingFixtureMixin, TestCase):
         html = response.content.decode()
         self.assertLess(html.index("训练周期信息"), html.index("周期成员列表"))
         self.assertLess(html.index("周期成员列表"), html.index("领域技能树版本快照"))
+        self.assertNotContains(response, "李教练")
         self.assertNotContains(response, "private-member")
         self.assertNotContains(response, reverse("training:cycle_members", args=[cycle.pk]))
         self.assertEqual(self.client.get(reverse("training:cycle_tree_versions", args=[cycle.pk])).status_code, 403)
@@ -103,7 +104,8 @@ class TrainingCycleDetailsTests(TrainingFixtureMixin, TestCase):
         viewer.user_permissions.add(Permission.objects.get(codename="view_trainingcyclemember", content_type__app_label="training"))
         self.client.force_login(User.objects.get(pk=viewer.pk))
         response = self.client.get(url)
-        self.assertContains(response, "private-member")
+        self.assertContains(response, "李教练")
+        self.assertNotContains(response, "private-member")
         self.assertContains(response, "教练")
         self.assertContains(response, reverse("training:cycle_members", args=[cycle.pk]))
         self.assertNotContains(response, "编辑成员")

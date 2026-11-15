@@ -502,7 +502,8 @@ class MobileNavigationTemplateTests(TestCase):
 
         self.assertIn("当前位于“训练”", html)
         self.assertIn("训练日志", html)
-        self.assertIn("新增训练日志", html)
+        self.assertNotIn("新增训练日志", html)
+        self.assertIn(reverse("training:log_list"), html)
 
     def test_render_mobile_navigation_hides_notice_create_without_permission(self):
         user = User.objects.create_user(username="notice-nav-user", password="testpass123")
@@ -587,8 +588,8 @@ class MobileNavigationTemplateTests(TestCase):
         )
 
         self.assertNotIn("新增训练周期", html)
+        self.assertNotIn("新增训练日志", html)
         for label in [
-            "新增训练日志",
             "长期赛事人员",
             "赛事角色配置",
             "标准技能树",

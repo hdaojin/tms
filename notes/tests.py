@@ -1,5 +1,7 @@
+from io import BytesIO
 from pathlib import Path
-import shutil
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
@@ -9,6 +11,7 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
+from PIL import Image
 
 from notes.models import NoteRepo
 from notes.paths import (
@@ -118,10 +121,7 @@ class NotePermissionTests(TestCase):
 
 class NotePathBoundaryTests(TestCase):
     def setUp(self):
-        self.temp_dir = Path.cwd() / ".tmp-test-note-paths"
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-        self.addCleanup(lambda: shutil.rmtree(self.temp_dir, ignore_errors=True))
-        self.temp_dir.mkdir(parents=True)
+        self.temp_dir = Path(self.enterContext(TemporaryDirectory(prefix="tms-note-paths-")))
         self.settings_override = override_settings(NOTES_ROOT=self.temp_dir)
         self.settings_override.enable()
         self.addCleanup(self.settings_override.disable)
@@ -136,10 +136,7 @@ class NotePathBoundaryTests(TestCase):
             resolve_repo_relative_path(repo_root, "", "../outside.md")
 
     def test_configured_repo_symlink_cannot_escape_notes_root(self):
-        outside = self.temp_dir.parent / ".tmp-test-note-paths-outside"
-        shutil.rmtree(outside, ignore_errors=True)
-        outside.mkdir(parents=True)
-        self.addCleanup(lambda: shutil.rmtree(outside, ignore_errors=True))
+        outside = Path(self.enterContext(TemporaryDirectory(prefix="tms-note-outside-")))
         link = self.temp_dir / "escaped"
         try:
             link.symlink_to(outside, target_is_directory=True)
@@ -191,12 +188,10 @@ class NoteViewTests(TestCase):
         )
         self.note_repo.allowed_groups.add(self.allowed_group)
 
-        self.temp_dir = Path.cwd() / ".tmp-test-notes"
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-        self.addCleanup(lambda: shutil.rmtree(self.temp_dir, ignore_errors=True))
+        self.temp_dir = Path(self.enterContext(TemporaryDirectory(prefix="tms-notes-")))
         self.repo_root = self.temp_dir / "container" / "debian-basics"
         (self.repo_root / "assets").mkdir(parents=True)
-        (self.repo_root / "assets" / "diagram.png").write_bytes(b"fake-image-bytes")
+        Image.new("RGB", (1, 1)).save(self.repo_root / "assets" / "diagram.png")
         (self.temp_dir / "container" / "outside.md").write_text("# Outside", encoding="utf-8")
         (self.repo_root / "README.md").write_text(
             """# Course
@@ -248,7 +243,115 @@ class NoteViewTests(TestCase):
             reverse("note_asset", kwargs={"repo": "course", "asset_path": "assets/diagram.png"})
         )
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertTrue(response["Content-Disposition"].startswith("inline;"))
         response.close()
+
+    def test_asset_content_and_headers(self):
+        self.client.force_login(self.allowed_user)
+        files = [
+            ("guide.pdf", b"%PDF-1.4\n", "application/pdf"),
+            ("unsafe.html", b"<script>alert(1)</script>", None),
+            ("unsafe.svg", b'<svg onload="alert(1)"/>', None),
+            ("unsafe.xml", b"<xml/>", None),
+            ("fake.png", b"<html>not an image</html>", None),
+            ("empty.pdf", b"", None),
+            ("unknown", b"unknown", None),
+        ]
+        for ext, fmt in [("jpg", "JPEG"), ("gif", "GIF"), ("webp", "WEBP")]:
+            image = BytesIO()
+            Image.new("RGB", (1, 1)).save(image, format=fmt)
+            files.append((f"image.{ext}", image.getvalue(), f"image/{fmt.lower()}"))
+        for name, content, inline_type in files:
+            with self.subTest(name=name):
+                (self.repo_root / "assets" / name).write_bytes(content)
+                url = reverse("note_asset", kwargs={"repo": "course", "asset_path": f"assets/{name}"})
+                response = self.client.get(url)
+                self.addCleanup(response.close)
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+                self.assertEqual(response["Cache-Control"], "private, no-store")
+                self.assertEqual(response["Content-Type"], inline_type or "application/octet-stream")
+                disposition = "inline;" if inline_type else "attachment;"
+                self.assertTrue(response["Content-Disposition"].startswith(disposition))
+                if name == "guide.pdf":
+                    self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
+
+    def test_teaching_markup_preserves_safe_links_code_and_table(self):
+        path = self.repo_root / "one.md"
+        path.write_text(
+            "## Lesson\n\n![Diagram](assets/diagram.png)\n\n[Next](two.md)\n\n"
+            "| Key | Value |\n| --- | --- |\n| x | 1 |\n\n"
+            "```python\nprint('hello')\n```\n\n.. note::\n   练习提醒\n\n- [x] 已完成\n",
+            encoding="utf-8",
+        )
+        note = render_note_markdown(path, "course", self.repo_root, "one")
+        soup = BeautifulSoup(note.html, "html.parser")
+        self.assertEqual(soup.select_one("img")["src"], "/notes-files/course/assets/diagram.png")
+        self.assertEqual(soup.select_one("a")["href"], "/notes/course/two/")
+        self.assertEqual(soup.select_one("table td").text, "x")
+        self.assertIn("print", soup.select_one("pre code.language-python").text)
+        self.assertIn("练习提醒", soup.select_one("aside.admonition.note").text)
+        self.assertTrue(soup.select_one('input[type="checkbox"]').has_attr("disabled"))
+        self.assertIn(f'#{soup.h2["id"]}"', note.toc_tokens)
+
+    def test_note_and_print_strip_active_content_including_details(self):
+        (self.repo_root / "one.md").write_text(
+            """## 安全示例
+
+<script>script_payload()</script>
+<iframe src="https://example.com/"></iframe>
+<svg onload="alert(1)"><a href="javascript:alert(1)">svg</a></svg>
+<img src="data:text/html,evil" onerror="alert(1)">
+<a href="jAvA&#x73;cript:alert(1)" hx-get="/accounts/">危险链接</a>
+
+<details open>
+<summary>教学折叠内容</summary>
+
+<img src="assets/diagram.png" onerror="alert(1)">
+</details>
+""",
+            encoding="utf-8",
+        )
+        self.client.force_login(self.allowed_user)
+        for route in ("notes:note_detail", "notes:note_print"):
+            with self.subTest(route=route):
+                response = self.client.get(reverse(route, kwargs={"repo": "course", "slug": "one"}))
+                self.assertContains(response, "教学折叠内容")
+                for marker in ("script_payload", "<iframe", 'onerror="alert', 'onload="alert',
+                               "data:text/html", "javascript:alert", 'hx-get="/accounts/"'):
+                    self.assertNotContains(response, marker)
+
+    def test_note_render_failure_is_visible_without_logging_input(self):
+        (self.repo_root / "README.md").write_text("# Course", encoding="utf-8")
+        self.client.force_login(self.allowed_user)
+        url = reverse("notes:note_detail", kwargs={"repo": "course", "slug": "one"})
+        with (
+            patch("core.utils.markdown.markdown2.markdown", side_effect=ValueError("private-source-canary")),
+            self.assertLogs("core.utils.markdown", level="WARNING") as logs,
+        ):
+            response = self.client.get(url)
+        self.assertContains(response, "无法显示笔记正文")
+        self.assertNotContains(response, "private-source-canary")
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn("ValueError", logs.output[0])
+        self.assertNotIn("private-source-canary", logs.output[0])
+
+    def test_asset_rejects_missing_directory_and_parent_traversal(self):
+        self.client.force_login(self.allowed_user)
+        for path in ("assets/missing.png", "assets", "%2e%2e/outside.md"):
+            with self.subTest(path=path):
+                url = reverse("note_asset", kwargs={"repo": "course", "asset_path": path})
+                self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_asset_symlink_cannot_escape_its_repository(self):
+        self.client.force_login(self.allowed_user)
+        try:
+            (self.repo_root / "assets" / "escape.md").symlink_to(self.temp_dir / "container" / "outside.md")
+        except OSError:
+            self.skipTest("当前环境无法创建符号链接")
+        url = reverse("note_asset", kwargs={"repo": "course", "asset_path": "assets/escape.md"})
+        self.assertEqual(self.client.get(url).status_code, 404)
 
     def test_readme_navigation_supports_three_levels_and_omits_escape(self):
         navigation = get_readme_navigation(self.repo_root, "course")

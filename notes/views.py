@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import mimetypes
 from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import unquote
@@ -14,10 +13,11 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.decorators import permission_required
 from django.core.cache import cache
 from django.db.models import Prefetch
-from django.http import FileResponse, Http404, HttpRequest, HttpResponse, HttpResponseForbidden
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import render
 from django.urls import reverse
 
+from core.file_preview import build_inline_preview_response
 from core.utils.breadcrumbs import breadcrumb_link, build_breadcrumbs
 
 from .models import NoteRepo
@@ -322,5 +322,4 @@ def note_asset_view(request: HttpRequest, repo: str, asset_path: str) -> HttpRes
     if not resolved.is_relative_to(repo_root.resolve()) or not resolved.is_file():
         raise Http404("File not found")
 
-    mime_type, _ = mimetypes.guess_type(str(resolved))
-    return FileResponse(open(resolved, "rb"), content_type=mime_type or "application/octet-stream")  # noqa: SIM115
+    return build_inline_preview_response(resolved, resolved.name, download_unsupported=True)

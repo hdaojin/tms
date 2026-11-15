@@ -313,15 +313,30 @@ class TrainingLogWorkflowTests(TrainingFixtureMixin, TestCase):
         log = self.create_log()
         response = self.client.get(reverse("training:log_detail", args=[log.pk]))
         self.assertTemplateUsed(response, "common/file_preview_detail.html")
-        self.assertContains(response, "PDF 预览")
+        preview_url = reverse("training:log_preview", args=[log.pk])
+        self.assertContains(response, f'data-pdf-url="{preview_url}"')
+        self.assertContains(response, reverse("training:log_download", args=[log.pk]))
         for route in ("log_preview", "log_download"):
             response = self.client.get(reverse(f"training:{route}", args=[log.pk]))
             self.assertEqual(response.status_code, 200)
+            self.assertTrue(response["Content-Disposition"].startswith("inline;" if route == "log_preview" else "attachment;"))
             response.close()
         self.grant(self.coach, "view_traininglog")
         self.client.force_login(self.coach)
         for route in ("log_detail", "log_preview", "log_download"):
             self.assertEqual(self.client.get(reverse(f"training:{route}", args=[log.pk])).status_code, 404)
+
+    def test_pdf_signature_mismatch_has_download_but_no_preview(self):
+        log = self.create_log()
+        with log.document.storage.open(log.document.name, "wb") as file:
+            file.write(b"not a PDF")
+        detail = self.client.get(reverse("training:log_detail", args=[log.pk]))
+        self.assertNotContains(detail, "data-pdf-url")
+        self.assertEqual(self.client.get(reverse("training:log_preview", args=[log.pk])).status_code, 404)
+        download = self.client.get(reverse("training:log_download", args=[log.pk]))
+        self.addCleanup(download.close)
+        self.assertEqual(download.status_code, 200)
+        self.assertTrue(download["Content-Disposition"].startswith("attachment;"))
 
     def test_delete_requires_permission_and_confirmation_and_cleans_file(self):
         self.publish_log_plan()

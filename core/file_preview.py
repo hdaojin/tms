@@ -199,9 +199,11 @@ def _apply_private_file_headers(response: FileResponse) -> FileResponse:
     return response
 
 
-def build_inline_preview_response(file, filename: str) -> FileResponse:
+def build_inline_preview_response(file, filename: str, *, download_unsupported: bool = False) -> FileResponse:
     inline_type = _verified_inline_type(file, filename)
     if inline_type is None:
+        if download_unsupported:
+            return build_download_response(file, filename, content_type="application/octet-stream")
         raise Http404("该文件不支持在线预览。")
     preview_kind, content_type = inline_type
     response = FileResponse(
@@ -215,6 +217,6 @@ def build_inline_preview_response(file, filename: str) -> FileResponse:
     return _apply_private_file_headers(response)
 
 
-def build_download_response(file, filename: str) -> FileResponse:
-    response = FileResponse(_open_file(file), as_attachment=True, filename=filename)
+def build_download_response(file, filename: str, *, content_type: str | None = None) -> FileResponse:
+    response = FileResponse(_open_file(file), as_attachment=True, filename=filename, content_type=content_type)
     return _apply_private_file_headers(response)

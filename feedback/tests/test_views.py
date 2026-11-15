@@ -1,3 +1,4 @@
+from bs4 import BeautifulSoup
 from django.urls import reverse
 
 from feedback.models import FeedbackStatus
@@ -49,16 +50,19 @@ class FeedbackViewTests(FeedbackTestCase):
             '<span class="icon-[tabler--message-plus] size-4" aria-hidden="true"></span>',
             html=False,
         )
-        self.assertContains(
-            response,
-            'hx-trigger="submit, change from:.list-filter-select, input changed delay:400ms '
-            'from:.list-filter-search, search from:.list-filter-search"',
-            html=False,
-        )
+        toolbar = BeautifulSoup(response.content, "html.parser").select_one("form[hx-trigger]")
+        self.assertIsNotNone(toolbar)
+        self.assertEqual(toolbar["hx-get"], response.wsgi_request.path)
+        triggers = {trigger.strip() for trigger in toolbar["hx-trigger"].split(",")}
+        self.assertTrue({
+            "submit", "change from:.list-filter-select",
+            "input changed delay:400ms from:.list-filter-search", "search from:.list-filter-search",
+        } <= triggers)
         self.assertNotContains(response, "hx-indicator=", html=False)
         self.assertNotContains(response, "loading-spinner", html=False)
         self.assertContains(response, 'class="list-filter-select select w-full md:select-sm"', html=False)
-        self.assertContains(response, 'class="list-filter-search input w-full md:input-sm"', html=False)
+        search = toolbar.select_one('input.list-filter-search[name="q"]')
+        self.assertEqual(search["value"], "登录")
         self.assertContains(response, '<option value="bug" selected>', html=False)
         self.assertContains(response, '<option value="open" selected>', html=False)
         self.assertContains(response, '<option value="my" selected>', html=False)
@@ -170,6 +174,8 @@ class FeedbackViewTests(FeedbackTestCase):
         self.assertNotContains(response, 'x-on:paste="handlePaste"', html=False)
 
     def test_manager_can_update_status_and_detail_shows_resolution(self):
+        self.manager.first_name = "王教练"
+        self.manager.save(update_fields=["first_name"])
         feedback = self.make_feedback()
         self.client.force_login(self.manager)
         response = self.client.post(
@@ -179,7 +185,8 @@ class FeedbackViewTests(FeedbackTestCase):
         self.assertEqual(response.status_code, 302)
         detail_response = self.client.get(reverse("feedback:detail", args=[feedback.pk]))
         self.assertContains(detail_response, "已经修复")
-        self.assertContains(detail_response, "处理人：manager")
+        self.assertContains(detail_response, "处理人：王教练")
+        self.assertNotContains(detail_response, "处理人：manager")
 
     def test_closed_feedback_rejects_normal_user_reply(self):
         feedback = self.make_feedback(status=FeedbackStatus.CLOSED, resolution="已关闭")

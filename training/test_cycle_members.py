@@ -78,7 +78,7 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
         self.assertContains(self.client.get(url), "周期成员")
         self.assertEqual(self.client.post(url, {}).status_code, 403)
         self.grant("add_trainingcyclemember")
-        new_user = User.objects.create_user("new")
+        new_user = User.objects.create_user("new", last_name="李", first_name="新")
         url += "?mode=add"
         parameters = self.client.post(url, {"users": [new_user.pk], "operation": "add", "selection": "selected"})
         self.assertEqual(parameters.status_code, 200)
@@ -87,8 +87,10 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
                                          "role": "coach", "is_current": "on"})
         self.assertFalse(TrainingCycleMember.objects.filter(user=new_user).exists())
         response = self.client.post(url, {"stage": "confirm", "token": preview.context["token"]})
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(TrainingCycleMember.objects.get(user=new_user).is_current)
+        self.assertRedirects(response, url)
+        added = TrainingCycleMember.objects.get(user=new_user, training_cycle=self.cycle2)
+        self.assertEqual(added.role, "coach")
+        self.assertFalse(added.is_current)
         edit = reverse("training:member_edit", args=[self.cycle2.pk, self.other.pk])
         self.assertEqual(self.client.post(edit, {"role": "competitor", "is_current": "on"}).status_code, 403)
         self.grant("change_trainingcyclemember")
@@ -99,7 +101,7 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
 
     def test_bulk_add_rolls_back_if_any_member_fails(self):
         self.grant("view_trainingcyclemember", "add_trainingcyclemember", "change_trainingcyclemember")
-        users = [User.objects.create_user(f"bulk{i}") for i in range(2)]
+        users = [User.objects.create_user(f"bulk{i}", first_name=f"测试成员{i}") for i in range(2)]
         url = reverse("training:cycle_members", args=[self.cycle2.pk])
         original = TrainingCycleMember.save
 
@@ -113,6 +115,8 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
                                              "operation": "add", "selection": "selected"})
         preview = self.client.post(url, {"stage": "parameters", "token": parameters.context["token"],
                                          "role": "coach", "is_current": "on"})
+        self.assertTemplateUsed(preview, "training/member_add_confirm.html")
+        self.assertFalse(TrainingCycleMember.objects.filter(user__in=users).exists())
         with patch.object(TrainingCycleMember, "save", fail_second):
             self.assertContains(self.client.post(url, {
                 "stage": "confirm", "token": preview.context["token"],
@@ -168,7 +172,9 @@ class CycleMemberTests(TrainingFixtureMixin, TestCase):
             "_save": "保存",
         })
         self.assertEqual(response.status_code, 302)
-        self.assertFalse(TrainingCycleMember.objects.get(user=new_user).is_current)
+        added = TrainingCycleMember.objects.get(user=new_user, training_cycle=self.cycle2)
+        self.assertEqual(added.role, "coach")
+        self.assertFalse(added.is_current)
 
     @patch("django.utils.timezone.localdate", return_value=date(2026, 1, 2))
     def test_service_rechecks_status_after_form_validation(self, mock_today):

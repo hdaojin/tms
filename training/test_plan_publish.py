@@ -56,6 +56,27 @@ class PlanPublishTests(ProcessFixture, TestCase):
             plan_publish.publish(self.plan, self.admin, result["digest"])
         self.assertFalse(self.plan.tasks.filter(status="published").exists())
 
+    def test_confirmation_rechecks_actor_and_schedule_publication(self):
+        task = self.draft("待确认任务")
+        result = plan_publish.preview(self.plan, self.admin)
+        history_count = self.plan.change_records.count()
+        cases = (
+            ("没有排班权限", self.other, self.plan.published_at, self.plan.schedule_published_at, PermissionDenied),
+            ("训练计划未发布", self.admin, None, None, ValidationError),
+            ("整份排班未发布", self.admin, self.plan.published_at, None, ValidationError),
+        )
+        for label, actor, plan_published, schedule_published, expected in cases:
+            with self.subTest(label=label):
+                type(self.plan).objects.filter(pk=self.plan.pk).update(
+                    published_at=plan_published, schedule_published_at=schedule_published,
+                )
+                with self.assertRaises(expected):
+                    plan_publish.publish(self.plan, actor, result["digest"])
+                task.refresh_from_db()
+                self.assertEqual(task.status, "draft")
+                self.assertFalse(task.executions.exists())
+                self.assertEqual(self.plan.change_records.count(), history_count)
+
     def test_failed_commit_rolls_back_every_task(self):
         first = self.draft("第一项")
         second = self.draft("第二项", slot=self.other_slot())
@@ -77,6 +98,7 @@ class PlanPublishTests(ProcessFixture, TestCase):
         second.refresh_from_db()
         self.assertEqual((first.status, second.status), ("draft", "draft"))
         self.assertFalse(first.executions.exists())
+        self.assertFalse(second.executions.exists())
 
     def test_permissions_and_page_confirmation(self):
         self.draft("待发布任务")

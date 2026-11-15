@@ -1,9 +1,11 @@
+import logging
 from dataclasses import dataclass
 from typing import Any
 from collections.abc import Callable, Sequence
 
 import markdown2
 
+logger = logging.getLogger(__name__)
 
 DEFAULT_MARKDOWN_EXTRAS: list[str] = [
     "code-friendly",           # Disable _ and __ for em and strong
@@ -33,7 +35,8 @@ class RenderedMarkdown:
 
     html: str
     meta: dict[str, Any]
-    toc: str | None 
+    toc: str | None
+    failed: bool = False
 
 
 def _lower_meta_keys(meta: dict[str, Any]) -> dict[str, Any]:
@@ -57,12 +60,12 @@ def render_markdown_text(
         if lower_meta_keys:
             meta_data = _lower_meta_keys(meta_data)
 
-    except Exception:
+    except Exception as exc:
         if strict:
             raise
-        rendered_html = ""
-        meta_data = {}
-        toc_content = None
+        # Exception messages and tracebacks can contain snippets of the input.
+        logger.warning("Markdown 渲染失败（%s）", type(exc).__name__)
+        return RenderedMarkdown(html="", meta={}, toc=None, failed=True)
 
     if html_postprocessor is not None:
         rendered_html = html_postprocessor(rendered_html)

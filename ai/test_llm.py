@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-from .llm.client import GenerationRequest, invoke
+from .llm.client import CONCURRENT_REQUESTS, GenerationRequest, invoke
 from .llm.transport import resolve_target
 from .providers import ProviderError
 
@@ -95,6 +95,38 @@ def test_sdk_does_not_expose_error_body(monkeypatch, status, message):
     with pytest.raises(ProviderError, match=message) as error:
         invoke(model, GenerationRequest([{"role": "user", "content": "测试"}], 64), KEY)
     assert KEY not in str(error.value)
+
+
+def test_generation_capacity_and_timeout_release(monkeypatch):
+    import litellm
+
+    calls = []
+
+    def complete(**kwargs):
+        calls.append(kwargs["timeout"])
+        raise TimeoutError(KEY)
+
+    monkeypatch.setattr(litellm, "completion", complete)
+    model = SimpleNamespace(provider="custom", model_id="test", base_url="https://api.example.test/v1")
+    request = GenerationRequest([{"role": "user", "content": "测试"}], max_output_tokens=64, timeout=3)
+    acquired = 0
+    try:
+        for _ in range(4):
+            assert CONCURRENT_REQUESTS.acquire(blocking=False)
+            acquired += 1
+        with pytest.raises(ProviderError, match="请求较多"):
+            invoke(model, request, KEY)
+        assert calls == []
+        CONCURRENT_REQUESTS.release()
+        acquired -= 1
+        for _ in range(2):
+            with pytest.raises(ProviderError, match="请求超时") as error:
+                invoke(model, request, KEY)
+            assert KEY not in str(error.value)
+        assert calls == [3, 3]
+    finally:
+        for _ in range(acquired):
+            CONCURRENT_REQUESTS.release()
 
 
 def test_mixed_dns_results_blocked(monkeypatch, settings):

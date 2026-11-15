@@ -1,5 +1,6 @@
 from datetime import date
 from io import StringIO
+from unittest.mock import patch
 
 import pytest
 from cryptography.fernet import Fernet
@@ -17,6 +18,7 @@ from standards.models import SkillProject
 from training.models import TrainingCycle, TrainingLogDraft, TrainingLogGeneration
 
 from .models import AIModel, AIModelPreference
+from .management.commands import migrate_ai_app_label
 
 pytestmark = pytest.mark.django_db(transaction=True)
 LEGACY_HEAD = ("ai", "0005_model_share_audience")
@@ -78,6 +80,23 @@ def test_app_rename_preserves_rows_and_grants(settings, django_user_model):
                 call_command("migrate_ai_app_label", "--apply", stdout=StringIO())
         call_command("migrate_ai_app_label", "--dry-run", stdout=StringIO())
         assert any(app == "ai_models" for app, _ in MigrationRecorder(connection).applied_migrations())
+        verify_foreign_keys = migrate_ai_app_label.verify_foreign_keys
+
+        def fail_after_rename(connection, cursor, tables, *, renamed=False):
+            if renamed:
+                raise CommandError("模拟转换后校验失败")
+            return verify_foreign_keys(connection, cursor, tables)
+
+        with patch.object(migrate_ai_app_label, "verify_foreign_keys", side_effect=fail_after_rename):
+            with pytest.raises(CommandError, match="模拟转换后校验失败"):
+                call_command("migrate_ai_app_label", "--apply", stdout=StringIO())
+        table_names = set(connection.introspection.table_names())
+        assert all("ai_models_" + meta.db_table.removeprefix("ai_") in table_names for meta in metadata)
+        assert not any(meta.db_table in table_names for meta in metadata)
+        assert ContentType.objects.get(pk=content_type.pk).app_label == "ai_models"
+        assert (LEGACY_HEAD[0], LEGACY_HEAD[1]) not in MigrationRecorder(connection).applied_migrations()
+        profile.refresh_from_db()
+        assert "ai_models.manage_own" in profile.selected_permission_bundles
     finally:
         call_command("migrate_ai_app_label", "--apply", stdout=StringIO())
         MigrationExecutor(connection).migrate(latest)

@@ -1,3 +1,7 @@
+# TMS 历史代码分析
+
+> 历史记录。下文保留当时的代码分析和路径，部分链接、模块与建议已过时。现行约束见 [AGENTS.md](../../AGENTS.md)，AI 现行设计见 [多模型 V1.2](../design/tms-ai-multimodel-design-v1.2.md)。
+
 我只做了只读分析，没有改代码。已读项目规范、README、核心 app 和主要业务 app，并跑了 `uv run manage.py check`，结果是 `System check identified no issues`。
 
 **总体判断**

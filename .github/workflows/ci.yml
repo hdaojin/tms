@@ -58,6 +58,18 @@ jobs:
       - name: Run Django system checks
         run: uv run manage.py check
 
+      - name: Check production security settings
+        env:
+          SECRET_KEY: ci-only-deployment-check-placeholder-with-sufficient-length-42
+          CSRF_TRUSTED_ORIGINS: https://localhost
+          SECURE_SSL_REDIRECT: "True"
+          SESSION_COOKIE_SECURE: "True"
+          CSRF_COOKIE_SECURE: "True"
+          SECURE_HSTS_SECONDS: "31536000"
+          SECURE_HSTS_INCLUDE_SUBDOMAINS: "True"
+          SECURE_HSTS_PRELOAD: "True"
+        run: uv run manage.py check --deploy --fail-level WARNING
+
       - name: Verify migrations are up to date
         run: uv run manage.py makemigrations --check --dry-run
 
@@ -105,6 +117,63 @@ jobs:
         run: |
           uv run manage.py check_document_pdf
           uv run pytest -o django_debug_mode=keep core/test_document_export.py demo/test_documents.py training/test_log_ai.py
+
+  postgresql:
+    name: PostgreSQL migrations and transaction tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci-only-postgres-password
+          POSTGRES_DB: tms
+        ports:
+          - 5432/tcp
+        options: >-
+          --health-cmd "pg_isready -U postgres -d tms"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      SECRET_KEY: ci-only-postgresql-test-placeholder
+      DEBUG: "False"
+      ALLOWED_HOSTS: localhost,127.0.0.1
+      SAMBA_INTEGRATION_ENABLED: "False"
+      SAMBA_ASYNC_OPERATIONS_ENABLED: "False"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Create an unprivileged test role
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: ${{ job.services.postgres.ports[5432] }}
+          PGUSER: postgres
+          PGPASSWORD: ci-only-postgres-password
+          PGDATABASE: tms
+        run: |
+          psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE tms_ci WITH LOGIN CREATEDB PASSWORD 'ci-only-test-role-password';
+          ALTER DATABASE tms OWNER TO tms_ci;
+          SQL
+      - name: Check migrations and exercise PostgreSQL write paths
+        env:
+          DATABASE_URL: postgresql://tms_ci:ci-only-test-role-password@127.0.0.1:${{ job.services.postgres.ports[5432] }}/tms
+        run: |
+          uv run manage.py makemigrations --check --dry-run
+          uv run manage.py migrate --noinput
+          uv run pytest accounts/test_password_reset.py accounts/tests.py ai/test_app_rename.py \
+            training/test_cycle_members.py training/test_plan_publish.py training/test_plan_stages.py \
+            training/test_plan_members.py training/test_plan_clear.py
 
   frontend:
     name: Frontend build

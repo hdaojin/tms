@@ -72,16 +72,16 @@ class UserDisplayNameServiceTests(TestCase):
 		self.assertEqual(get_user_display_name(user), '张三')
 		self.assertEqual(user.display_name, '张三')
 
-	def test_display_name_falls_back_to_username(self):
+	def test_display_name_uses_placeholder_when_name_missing(self):
 		user = User.objects.create_user(
 			username='display-user',
 			password='testpass123',
 		)
 
-		self.assertEqual(get_user_display_name(user), 'display-user')
-		self.assertEqual(user.display_name, 'display-user')
+		self.assertEqual(get_user_display_name(user), '未填写姓名')
+		self.assertEqual(user.display_name, '未填写姓名')
 
-	def test_full_info_appends_username_when_name_exists(self):
+	def test_full_info_does_not_expose_username(self):
 		user = User.objects.create_user(
 			username='student001',
 			password='testpass123',
@@ -89,17 +89,17 @@ class UserDisplayNameServiceTests(TestCase):
 			last_name='张',
 		)
 
-		self.assertEqual(get_user_full_info(user), '张三(student001)')
-		self.assertEqual(user.full_info, '张三(student001)')
+		self.assertEqual(get_user_full_info(user), '张三')
+		self.assertEqual(user.full_info, '张三')
 
-	def test_full_info_returns_username_when_name_missing(self):
+	def test_full_info_uses_placeholder_when_name_missing(self):
 		user = User.objects.create_user(
 			username='student001',
 			password='testpass123',
 		)
 
-		self.assertEqual(get_user_full_info(user), 'student001')
-		self.assertEqual(user.full_info, 'student001')
+		self.assertEqual(get_user_full_info(user), '未填写姓名')
+		self.assertEqual(user.full_info, '未填写姓名')
 
 
 class AccountHomeTestCase(TestCase):
@@ -218,7 +218,7 @@ class UserListTableTemplateRegressionTest(TestCase):
 
 class UserListRoleColumnTests(TestCase):
 	def setUp(self):
-		self.admin = User.objects.create_superuser('role-table-admin', password='testpass123')
+		self.admin = User.objects.create_superuser('role-table-admin', password='testpass123', first_name='管理员甲')
 		self.coach_group = Group.objects.create(name='教练')
 		self.competitor_group = Group.objects.create(name=TEST_GROUP_NAME)
 
@@ -267,6 +267,7 @@ class UserListRoleColumnTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '李教练')
+		self.assertNotContains(response, 'role-table-admin')
 		self.assertContains(response, '张多角')
 		self.assertContains(response, '赵未分配')
 		self.assertContains(response, '未分配')
@@ -306,7 +307,7 @@ class UserListRoleColumnTests(TestCase):
 
 		admin_row = next(
 			row for row in soup.select('tbody tr')
-			if 'role-table-admin' in row.get_text(' ', strip=True)
+			if '管理员甲' in row.get_text(' ', strip=True)
 		)
 		admin_text = admin_row.get_text(' ', strip=True)
 		self.assertNotIn('工作人员', admin_text)
@@ -340,7 +341,7 @@ class UserListRoleColumnTests(TestCase):
 		]
 		multi_role_index = next(index for index, text in enumerate(row_texts) if '张多角' in text)
 		coach_index = next(index for index, text in enumerate(row_texts) if '李教练' in text)
-		admin_index = next(index for index, text in enumerate(row_texts) if 'role-table-admin' in text)
+		admin_index = next(index for index, text in enumerate(row_texts) if '管理员甲' in text)
 		inactive_index = next(index for index, text in enumerate(row_texts) if '赵未分配' in text)
 
 		self.assertLess(multi_role_index, coach_index)
@@ -356,7 +357,7 @@ class UserListRoleColumnTests(TestCase):
 			row.get_text(' ', strip=True)
 			for row in soup.select('tbody tr')
 		]
-		admin_index = next(index for index, text in enumerate(row_texts) if 'role-table-admin' in text)
+		admin_index = next(index for index, text in enumerate(row_texts) if '管理员甲' in text)
 		self.assertEqual(admin_index, len(row_texts) - 1)
 
 	def test_role_sort_uses_stable_role_key_without_duplicate_rows(self):

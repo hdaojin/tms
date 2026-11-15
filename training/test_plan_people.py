@@ -15,7 +15,7 @@ class PlanPeopleTests(TrainingFixtureMixin, TestCase):
         super().setUp()
         configure_test_periods()
         self.admin = User.objects.create_superuser("people-manager", password="test")
-        self.people = [User.objects.create_user(f"staff-candidate-{number:02d}") for number in range(23)]
+        self.people = [User.objects.create_user(f"staff-candidate-{number:02d}", last_name="李", first_name=f"教练{number:02d}") for number in range(23)]
         permissions = Permission.objects.filter(content_type__app_label="training", codename__in=["schedule_trainingplan", "approve_trainingplan"])
         for person in self.people:
             person.user_permissions.add(*permissions)
@@ -36,6 +36,7 @@ class PlanPeopleTests(TrainingFixtureMixin, TestCase):
         response = self.client.get(reverse("training:plan_create"))
         self.assertContains(response, "data-plan-people", count=2)
         self.assertContains(response, "js/training-plan-people.js")
+        self.assertNotContains(response, "李教练00")
         self.assertNotContains(response, "staff-candidate-00")
         for name in ("schedulers", "approvers"):
             self.assertIsInstance(response.context["form"].fields[name].widget, PlanStaffSelect)
@@ -77,15 +78,16 @@ class PlanPeopleTests(TrainingFixtureMixin, TestCase):
 
     def test_search_requires_input_and_paginates(self):
         self.assertEqual(self.client.get(self.search_url, {"role": "schedulers"}).json(), {"results": [], "has_more": False})
-        first = self.client.get(self.search_url, {"q": "staff-candidate", "role": "schedulers"})
+        first = self.client.get(self.search_url, {"q": "lijiaolian", "role": "schedulers"})
         self.assertEqual(len(first.json()["results"]), 20)
         self.assertTrue(first.json()["has_more"])
         self.assertEqual(first.headers["Cache-Control"], "private, no-store")
-        second = self.client.get(self.search_url, {"q": "staff-candidate", "page": 2, "role": "schedulers"}).json()
+        second = self.client.get(self.search_url, {"q": "lijiaolian", "page": 2, "role": "schedulers"}).json()
         self.assertEqual(len(second["results"]), 3)
         self.assertFalse(second["has_more"])
+        self.assertEqual(self.client.get(self.search_url, {"q": "staff-candidate", "role": "schedulers"}).json()["results"], [])
 
-    def test_search_picker_submission_saves_all_three_person_lists(self):
+    def test_search_picker_submission_saves_schedulers_and_approvers(self):
         response = self.client.post(
             reverse("training:plan_create"),
             {
@@ -114,6 +116,16 @@ class PlanPeopleTests(TrainingFixtureMixin, TestCase):
         person.save()
         result = self.client.get(self.search_url, {"q": "张三", "role": "schedulers"}).json()["results"]
         self.assertEqual([row["id"] for row in result], [person.pk])
+
+    def test_search_marks_undistinguished_names_and_ignores_nameless_accounts(self):
+        first, second, nameless = self.people[:3]
+        User.objects.filter(pk__in=[first.pk, second.pk]).update(last_name="杜", first_name="教练")
+        User.objects.filter(pk=nameless.pk).update(last_name="", first_name="")
+        rows = self.client.get(self.search_url, {"q": "djl", "role": "schedulers"}).json()["results"]
+        self.assertEqual({row["id"] for row in rows}, {first.pk, second.pk})
+        self.assertTrue(all(row["invalid"] and row["label"] == "杜教练" for row in rows))
+        rows = self.client.get(self.search_url, {"q": "未填写姓名", "role": "schedulers"}).json()["results"]
+        self.assertEqual(rows, [])
 
     def test_search_checks_create_permission_and_plan_management_scope(self):
         viewer = self.people[0]
