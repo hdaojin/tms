@@ -5,7 +5,9 @@ from django import forms
 from django.conf import settings
 from django.template import Context, Engine
 from django.template.loader import render_to_string
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
+
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 
 
 class ListPageTemplateTests(SimpleTestCase):
@@ -16,6 +18,7 @@ class ListPageTemplateTests(SimpleTestCase):
             "common/table_page.html": (Path(settings.BASE_DIR) / "templates/common/table_page.html").read_text(
                 encoding="utf-8"
             ),
+            "components/list_filter_tabs.html": "",
             "components/table_wrapper.html": '<section data-test-table>结果</section>',
             "components/list_filter_toolbar.html": '<form method="get" data-test-filters>筛选</form>',
             "legacy.html": '{% extends "common/table_page.html" %}{% block content %}<a>新增</a>{{ block.super }}{% endblock %}',
@@ -69,6 +72,34 @@ class FilterToolbarTests(SimpleTestCase):
         }), "html.parser")
         self.assertNotIn("md:min-w-64", compact.select_one('input[name="q"]').parent["class"])
         self.assertIn("md:flex-1", compact.select_one('select[name="role"]').parent["class"])
+
+
+class ListFilterMixinTests(SimpleTestCase):
+    def test_search_first_and_more_than_one_search_rejected(self):
+        view = FilterableListMixin()
+        dropdown = ListFilterSpec("role", "角色", "select")
+        search = ListFilterSpec("q", "搜索", "search")
+        view.list_filter_specs = (dropdown, search)
+        self.assertEqual(view.resolved_list_filter_specs, (search, dropdown))
+
+        duplicate = FilterableListMixin()
+        duplicate.list_filter_specs = (search, ListFilterSpec("name", "名称", "search"))
+        with self.assertRaisesMessage(ValueError, "最多支持一个搜索控件"):
+            duplicate.resolved_list_filter_specs
+
+    def test_links_preserve_only_declared_filters_and_clear_pagination(self):
+        view = FilterableListMixin()
+        view.list_filter_specs = (
+            ListFilterSpec("q", "搜索", "search"),
+            ListFilterSpec("status", "状态", "select", choices=(("open", "待处理"),)),
+            ListFilterSpec("year", "年份", "select", choices=(("2026", "2026"),), advanced=True),
+        )
+        view.list_filter_status_param = "status"
+        view.request = RequestFactory().get("/records/", {
+            "q": "target", "status": "open", "year": "2026", "page": "3", "unknown": "ignored",
+        })
+        self.assertEqual(view.get_list_filter_tabs()[0]["href"], "/records/?q=target&year=2026")
+        self.assertEqual(view.get_list_filter_active_items()[-1]["href"], "/records/?q=target&status=open")
 
 
 class BulkToolbarTests(SimpleTestCase):

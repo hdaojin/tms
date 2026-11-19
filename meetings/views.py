@@ -81,8 +81,8 @@ class MeetingListView(FilterableListMixin, PermissionRequiredMixin, TitleMixin, 
     permission_required = "meetings.view_meeting"
     list_filter_specs = (
         ListFilterSpec("q", "搜索会议", "search", placeholder="搜索会议名称、文件名、上传者姓名或拼音"),
-        ListFilterSpec("date_from", "会议起日", "date"),
-        ListFilterSpec("date_to", "会议止日", "date"),
+        ListFilterSpec("date_from", "会议起日", "date", advanced=True),
+        ListFilterSpec("date_to", "会议止日", "date", advanced=True),
     )
 
     def get_base_queryset(self):

@@ -32,7 +32,11 @@ class TrainingListPageTests(TrainingFixtureMixin, TestCase):
                 self.assertTemplateUsed(response, "common/table_page.html")
                 self.assertTemplateUsed(response, "components/list_filter_toolbar.html")
                 self.assertContains(response, 'name="q"')
-                self.assertContains(response, 'name="status"')
+                if list_name == "plan_list":
+                    self.assertContains(response, 'aria-label="按状态筛选"')
+                    self.assertContains(response, "?status=completed")
+                else:
+                    self.assertContains(response, 'name="status"')
                 self.assertContains(response, reverse(f"training:{create_name}"))
 
     def test_creation_buttons_respect_permissions(self):
@@ -139,6 +143,8 @@ class TrainingListPageTests(TrainingFixtureMixin, TestCase):
                 self.assertContains(response, "<table")
                 self.assertNotContains(response, "<!doctype html>")
                 self.assertNotContains(response, 'class="list-filter-search')
+                if list_name == "plan_list":
+                    self.assertContains(response, 'hx-swap-oob="true"')
 
     def test_pagination_preserves_cycle_filters(self):
         TrainingCycle.objects.bulk_create([

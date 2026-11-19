@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.77
+* FilePond v5.0.0-beta.78
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com

@@ -4,53 +4,30 @@
 {% endcomment %}
 <form class="rounded-box border border-base-300 bg-base-100 p-3 shadow-sm"
       method="get"
-      action="{{ list_filter_url }}"
+      action="{{ list_filter_url }}"{% if not list_filter_htmx_disabled %}
       hx-get="{{ list_filter_url }}"
-      hx-trigger="{{ list_filter_trigger }}"
+      hx-trigger="{% if list_filter_submit or list_filter_advanced_controls %}submit{% else %}{{ list_filter_trigger }}{% endif %}"
       hx-target="#{{ list_filter_target_id }}"
       hx-push-url="true"
-      hx-sync="this:replace">
+      hx-sync="this:replace"{% endif %}>
   {% for field in list_filter_hidden_fields %}<input type="hidden" name="{{ field.name }}" value="{{ field.value }}">{% endfor %}
   <div class="grid grid-cols-2 gap-2 md:flex {% if list_filter_compact %}md:items-center{% else %}md:flex-wrap md:items-center{% endif %}">
     {% for control in list_filter_controls %}
-      {% if control.type == "select" %}
-        <label class="min-w-0 {% if list_filter_compact %}md:flex-1{% else %}md:w-36 md:shrink-0{% endif %}">
-          <span class="sr-only">{{ control.label }}</span>
-          <select class="list-filter-select select w-full md:select-sm" name="{{ control.name }}">
-            <option value="">{{ control.empty_label }}</option>
-            {% for option in control.choices %}
-              <option value="{{ option.value }}"{% if control.value == option.value %} selected{% endif %}>{{ option.label }}</option>
-            {% endfor %}
-          </select>
-        </label>
-      {% elif control.type == "checkboxes" %}
-        <details class="dropdown">
-          <summary class="btn btn-outline md:btn-sm">{{ control.label }}（多选）</summary>
-          <fieldset class="dropdown-content z-20 rounded-box border border-base-300 bg-base-100 p-3 shadow-sm min-w-36">
-            <legend class="sr-only">{{ control.label }}</legend><p class="text-xs text-base-content/60">不勾选表示全部</p>
-            {% for option in control.choices %}<label class="flex items-center gap-2 py-1"><input type="checkbox" class="checkbox checkbox-sm list-filter-select" name="{{ control.name }}" value="{{ option.value }}"{% if option.value in control.values %} checked{% endif %}>{{ option.label }}</label>{% endfor %}
-          </fieldset>
-        </details>
-      {% elif control.type == "search" %}
-        <label class="col-span-2 min-w-0 {% if not list_filter_compact %}md:min-w-64{% endif %} md:flex-1">
-          <span class="sr-only">{{ control.label }}</span>
-          <input class="list-filter-search input {% if list_filter_compact %}min-w-0{% endif %} w-full md:input-sm"
-                 type="search"
-                 name="{{ control.name }}"
-                 value="{{ control.value }}"
-                 placeholder="{{ control.placeholder }}">
-        </label>
-      {% elif control.type == "date" %}
-        <label class="flex min-w-0 items-center gap-1 {% if list_filter_compact %}md:flex-1{% else %}md:w-44{% endif %}">
-          <span class="shrink-0 text-sm">{{ control.placeholder|default:control.label }}</span>
-          <input class="list-filter-date input min-w-0 w-full md:input-sm"
-                 type="date" name="{{ control.name }}" value="{{ control.value }}"
-                 aria-label="{{ control.label }}">
-        </label>
-      {% endif %}
+      {% include "components/list_filter_control.html" with control=control list_filter_compact=list_filter_compact only %}
     {% endfor %}
     <div class="col-span-2 flex shrink-0 items-center justify-end gap-1 md:ml-auto">
+      {% if list_filter_submit or list_filter_advanced_controls %}<button class="btn btn-primary md:btn-sm" type="submit">查询</button>{% endif %}
       <a class="btn btn-ghost px-3 md:btn-sm" href="{{ list_filter_reset_url|default:list_filter_url }}">重置</a>
     </div>
   </div>
+  {% if list_filter_advanced_controls %}
+    <details class="collapse collapse-arrow mt-2 border border-base-300" {% if list_filter_advanced_expanded %}open{% endif %}>
+      <summary class="collapse-title">高级筛选</summary>
+      <div class="collapse-content grid grid-cols-2 gap-2 md:flex md:flex-wrap">
+        {% for control in list_filter_advanced_controls %}
+          {% include "components/list_filter_control.html" with control=control only %}
+        {% endfor %}
+      </div>
+    </details>
+  {% endif %}
 </form>

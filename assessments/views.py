@@ -17,6 +17,7 @@ from core.file_preview import (
     build_inline_preview_response,
 )
 from core.utils.breadcrumbs import breadcrumb_link
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 from core.utils.mixins import TitleMixin
 from evidence.selectors import visible_evidences_for
 from scoring.selectors import (
@@ -46,6 +47,7 @@ from .models import (
     AssessmentFinalResult,
     AssessmentModule,
     AssessmentParticipant,
+    AssessmentType,
     CompetitionPerson,
     CompetitionRole,
 )
@@ -88,12 +90,27 @@ WORKSPACE_DOCUMENT_KINDS = {
 }
 
 
-class AssessmentListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
+class AssessmentListView(FilterableListMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = Assessment
     table_class = AssessmentTable
     template_name = "assessments/assessment_list.html"
     title = "竞赛与考核"
     permission_required = "assessments.view_assessment"
+
+    list_filter_submit = True
+    list_filter_htmx = False
+    list_filter_status_param = "status"
+
+    def get_list_filter_specs(self):
+        return (
+            ListFilterSpec("q", "搜索名称", "search", placeholder="搜索竞赛或考核名称"),
+            ListFilterSpec(
+                "type", "类型", "select",
+                choices=tuple(AssessmentType.objects.values_list("code", "name")),
+                empty_label="全部类型",
+            ),
+            ListFilterSpec("status", "状态", "select", choices=Assessment.Status.choices, empty_label="全部状态"),
+        )
 
     def get_queryset(self):
         queryset = visible_assessments_for(self.request.user).select_related(
@@ -108,13 +125,17 @@ class AssessmentListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
         return queryset.annotate(can_edit=Exists(manageable_assessments_for(self.request.user).filter(pk=OuterRef("pk"))))
 
 
-class CompetitionPersonListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
+class CompetitionPersonListView(FilterableListMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = CompetitionPerson
     table_class = CompetitionPersonTable
     template_name = "assessments/competition_person_list.html"
     title = "长期赛事人员"
     title_icon = "icon-[tabler--address-book]"
     permission_required = "assessments.view_competitionperson"
+
+    list_filter_submit = True
+    list_filter_htmx = False
+    list_filter_specs = (ListFilterSpec("q", "搜索姓名", "search", placeholder="按姓名搜索"),)
 
     def get_queryset(self):
         queryset = super().get_queryset()

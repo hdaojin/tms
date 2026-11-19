@@ -1,52 +1,52 @@
 /*!
-* FilePond v5.0.0-beta.77
+* FilePond v5.0.0-beta.78
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { onDestroy as qt } from "../../vendor/svelte/src/index-client.js";
+import { onDestroy as kt } from "../../vendor/svelte/src/index-client.js";
 import { user_effect as h, template_effect as z } from "../../vendor/svelte/src/internal/client/reactivity/effects.js";
-import { push as Ft, pop as jt } from "../../vendor/svelte/src/internal/client/context.js";
+import { push as qt, pop as Ft } from "../../vendor/svelte/src/internal/client/context.js";
 import { get as t } from "../../vendor/svelte/src/internal/client/runtime.js";
-import { child as b, first_child as kt, only_child as At, sibling as O } from "../../vendor/svelte/src/internal/client/dom/operations.js";
+import { child as b, first_child as jt, only_child as At, sibling as O } from "../../vendor/svelte/src/internal/client/dom/operations.js";
 import { state as p, set as a } from "../../vendor/svelte/src/internal/client/reactivity/sources.js";
 import { set_text as It } from "../../vendor/svelte/src/internal/client/render.js";
-import { user_derived as l } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
-import { from_html as I, append as j } from "../../vendor/svelte/src/internal/client/dom/template.js";
+import { user_derived as s } from "../../vendor/svelte/src/internal/client/reactivity/deriveds.js";
+import { from_html as H, append as j } from "../../vendor/svelte/src/internal/client/dom/template.js";
 import { if_block as nt } from "../../vendor/svelte/src/internal/client/dom/blocks/if.js";
 import { attach as it } from "../../vendor/svelte/src/internal/client/dom/elements/attachments.js";
 import { set_attribute as Ht } from "../../vendor/svelte/src/internal/client/dom/elements/attributes.js";
 import { delegate as Vt, event as at, delegated as Xt } from "../../vendor/svelte/src/internal/client/dom/elements/events.js";
-import { set_style as st } from "../../vendor/svelte/src/internal/client/dom/elements/style.js";
+import { set_style as lt } from "../../vendor/svelte/src/internal/client/dom/elements/style.js";
 import { proxy as Yt } from "../../vendor/svelte/src/internal/client/proxy.js";
 import { bind_this as G } from "../../vendor/svelte/src/internal/client/dom/elements/bindings/this.js";
-import { prop as y, spread_props as k } from "../../vendor/svelte/src/internal/client/reactivity/props.js";
+import { prop as y, spread_props as A } from "../../vendor/svelte/src/internal/client/reactivity/props.js";
 import { Spring as J } from "../../vendor/svelte/src/motion/spring.js";
-import lt from "../components/NodeList/index-svelte.js";
+import st from "../components/NodeList/index-svelte.js";
 import { withResources as K } from "../common/string.js";
 import "../components/Button/index.js";
 import "../components/ElementPane/index.js";
 import { measurable as dt } from "../attachments/measurable.js";
 import { rectFromBounds as ut, rectContainsPoint as zt } from "../../utils/rect.js";
 import { vectorCreate as Gt } from "../../utils/vector.js";
-import { supportsDisplayTransition as ct } from "../../utils/support.js";
+import { supportsDialogCloseTransition as ct } from "../../utils/support.js";
 import { passthrough as Jt, noop as Kt } from "../../utils/placeholder.js";
-import A from "../components/SpringElement/index-svelte.js";
+import I from "../components/SpringElement/index-svelte.js";
 import { dispatchCustomEvent as Qt, addListener as Ut } from "../../utils/dom.js";
 import { createMotionStateObserver as Wt, shouldReduceMotion as Zt } from "../common/motionState-svelte.js";
 import Q from "../components/Button/index-svelte.js";
 import $t from "../components/ElementPane/index-svelte.js";
-var te = I('<p part="dialog-title"> </p>'), ee = I("<element-pane-wrapper><!></element-pane-wrapper>", 2), re = I('<dialog part="dialog" closedby="closerequest"><form method="dialog" part="dialog-form"><div part="dialog-header"><!> <!></div> <div part="dialog-content"><!></div> <div part="dialog-footer"><!> <!></div></form> <!></dialog> <!>', 1), oe = I('<div class="root"><!></div>');
-function Fe(pt, n) {
-  Ft(n, !0);
-  let gt = y(n, "disabled", 3, !1), H = y(n, "sources", 19, () => []), x = y(n, "assets", 19, () => ({})), M = y(n, "locale", 19, () => ({})), R = y(n, "propResourceMap", 19, () => ({ title: "locale", label: "locale", icon: "assets" })), U = y(n, "beforeRenderNode", 3, Jt);
-  const W = Wt(), g = l(() => Zt(W.current, n.reducedMotionPreference));
-  let Z = p(Yt({})), $ = p(0), E = p(void 0);
+var te = H('<p part="dialog-title"> </p>'), ee = H("<element-pane-wrapper><!></element-pane-wrapper>", 2), re = H('<dialog part="dialog" closedby="closerequest"><form method="dialog" part="dialog-form"><div part="dialog-header"><!> <!></div> <div part="dialog-content"><!></div> <div part="dialog-footer"><!> <!></div></form> <!></dialog> <!>', 1), oe = H('<div class="root"><!></div>');
+function qe(pt, n) {
+  qt(n, !0);
+  let gt = y(n, "disabled", 3, !1), V = y(n, "sources", 19, () => []), x = y(n, "assets", 19, () => ({})), M = y(n, "locale", 19, () => ({})), C = y(n, "propResourceMap", 19, () => ({ title: "locale", label: "locale", icon: "assets" })), U = y(n, "beforeRenderNode", 3, Jt);
+  const W = Wt(), g = s(() => Zt(W.current, n.reducedMotionPreference));
+  let Z = p(Yt({})), $ = p(0), N = p(void 0);
   h(() => {
-    t(E) && Qt(t(E), "sourceschange", { detail: H().length });
+    t(N) && Qt(t(N), "sourceschange", { detail: V().length });
   });
-  let d = p(void 0), m = p(void 0), w = p(!1);
-  const mt = l(() => K({ icon: "close", label: "close" }, R(), { locale: M(), assets: x() })), ft = l(() => K({ label: "cancel" }, R(), { locale: M(), assets: x() })), ht = l(() => K({ label: "import" }, R(), { locale: M(), assets: x() }));
+  let d = p(void 0), m = p(void 0), R = p(!1);
+  const mt = s(() => K({ icon: "close", label: "close" }, C(), { locale: M(), assets: x() })), ft = s(() => K({ label: "cancel" }, C(), { locale: M(), assets: x() })), ht = s(() => K({ label: "import" }, C(), { locale: M(), assets: x() }));
   let tt = p("");
   function vt(e) {
     e.command === "show-modal" && _t(e);
@@ -68,19 +68,19 @@ function Fe(pt, n) {
     e.propertyName !== "display" || t(d)?.open || et();
   }
   function et() {
-    a(f, null), s.set(null, { instant: !0 }), a(_, null), S.set(null, { instant: !0 }), N.set(0, { instant: !0 }), a(w, !1);
+    a(f, null), l.set(null, { instant: !0 }), a(_, null), w.set(null, { instant: !0 }), P.set(0, { instant: !0 }), a(R, !1);
   }
-  let f = p(null), s = new J(null);
+  let f = p(null), l = new J(null);
   h(() => {
-    t(f) && s.set(t(f), { instant: t(g) });
+    t(f) && l.set(t(f), { instant: t(g) });
   }), h(() => {
-    Object.assign(s, n.springOptions);
+    Object.assign(l, n.springOptions);
   });
   function Mt(e) {
     if (!t(d)?.open || !t(m)?.children.length)
       return;
     const r = ut(e);
-    if (t(w)) {
+    if (t(R)) {
       a(f, r, !0);
       return;
     }
@@ -95,35 +95,35 @@ function Fe(pt, n) {
       },
       !0
     ), requestAnimationFrame(() => {
-      a(f, r, !0), a(w, !0);
+      a(f, r, !0), a(R, !0);
     });
   }
-  let N = new J(0);
+  let P = new J(0);
   h(() => {
-    Object.assign(N, n.springOptions);
+    Object.assign(P, n.springOptions);
   });
-  let _ = p(null), S = new J(null);
+  let _ = p(null), w = new J(null);
   h(() => {
-    t(_) && (S.set(t(_), { instant: t(g) }), N.set(1, { instant: t(g) }));
+    t(_) && (w.set(t(_), { instant: t(g) }), P.set(1, { instant: t(g) }));
   }), h(() => {
-    Object.assign(S, n.springOptions);
+    Object.assign(w, n.springOptions);
   });
-  const Rt = l(() => {
-    if (!t(_) || !S.current)
+  const Ct = s(() => {
+    if (!t(_) || !w.current)
       return;
-    const { x: e, y: r, width: i, height: X } = t(_), { x: C, y: D, width: T, height: B } = S.current, L = D - r, v = e + i - (C + T), q = r + X - (D + B), F = C - e;
-    if (!(L === 0 && v === 0 && q === 0 && F === 0))
-      return `${L}px ${v}px ${q}px ${F}px`;
+    const { x: e, y: r, width: i, height: S } = t(_), { x: D, y: E, width: B, height: L } = w.current, k = E - r, v = e + i - (D + B), q = r + S - (E + L), F = D - e;
+    if (!(k === 0 && v === 0 && q === 0 && F === 0))
+      return `${k}px ${v}px ${q}px ${F}px`;
   });
-  function wt(e) {
+  function Rt(e) {
     !t(d)?.open || !t(m)?.children.length || a(_, ut(e), !0);
   }
-  function St() {
+  function wt() {
     t(m)?.querySelector("[autofocus]")?.focus(), t(m)?.querySelectorAll("button[command=close]").forEach((r) => {
       r.commandForElement = t(d);
     });
   }
-  function Ct(e, r) {
+  function St(e, r) {
     a(Z, { data: r, nodes: e }, !0);
   }
   function Dt(e) {
@@ -137,29 +137,31 @@ function Fe(pt, n) {
       e();
     };
   });
-  const P = l(() => t(g) || !t(w)), rt = new MutationObserver((e) => {
-    for (const r of e) {
-      const [i] = r.addedNodes;
-      !i || i.nodeType !== Node.ELEMENT_NODE || St();
-    }
+  const T = s(() => t(g) || !t(R)), rt = new MutationObserver((e) => {
+    let r = !1;
+    for (const i of e)
+      for (const S of i.addedNodes)
+        if (S.nodeType === Node.ELEMENT_NODE && (r = !0, r))
+          break;
+    r && wt();
   });
   h(() => {
     if (t(m))
       return rt.observe(t(m), { childList: !0 }), () => {
         rt.disconnect();
       };
-  }), qt(() => {
+  }), kt(() => {
     W.destroy();
   });
-  var V = oe(), Et = b(V);
+  var X = oe(), Et = b(X);
   {
     var Nt = (e) => {
-      var r = re(), i = kt(r), X = l(() => ct() ? xt : Kt);
-      let C;
-      var D = b(i), T = b(D), B = b(T);
-      A(B, {
+      var r = re(), i = jt(r), S = s(() => ct() ? xt : Kt);
+      let D;
+      var E = b(i), B = b(E), L = b(B);
+      I(L, {
         get reduceMotion() {
-          return t(P);
+          return t(T);
         },
         class: "dialog-title-spring",
         get springOptions() {
@@ -171,17 +173,17 @@ function Fe(pt, n) {
         },
         $$slots: { default: !0 }
       });
-      var L = O(B, 2);
-      A(L, {
+      var k = O(L, 2);
+      I(k, {
         class: "dialog-button-close-spring",
         get reduceMotion() {
-          return t(P);
+          return t(T);
         },
         get springOptions() {
           return n.springOptions;
         },
         children: (o, u) => {
-          Q(o, k(() => t(mt), {
+          Q(o, A(() => t(mt), {
             part: "dialog-button-close",
             command: "close",
             get commandfor() {
@@ -191,13 +193,13 @@ function Fe(pt, n) {
         },
         $$slots: { default: !0 }
       });
-      var v = O(T, 2), q = b(v);
+      var v = O(B, 2), q = b(v);
       {
-        let o = l(() => ({
+        let o = s(() => ({
           reduceMotion: t(g),
           springOptions: n.springOptions
-        })), u = l(() => ({ locale: M(), assets: x() }));
-        lt(q, k(() => t(Z), {
+        })), u = s(() => ({ locale: M(), assets: x() }));
+        st(q, A(() => t(Z), {
           get context() {
             return t(o);
           },
@@ -211,25 +213,25 @@ function Fe(pt, n) {
             return t(u);
           },
           get propResourceMap() {
-            return R();
+            return C();
           },
           get beforeRenderNode() {
             return U();
           }
         }));
       }
-      G(v, (o) => a(m, o), () => t(m)), it(v, () => dt({ onmeasure: wt }));
+      G(v, (o) => a(m, o), () => t(m)), it(v, () => dt({ onmeasure: Rt }));
       var F = O(v, 2), ot = b(F);
-      A(ot, {
+      I(ot, {
         class: "dialog-button-cancel-spring",
         get reduceMotion() {
-          return t(P);
+          return t(T);
         },
         get springOptions() {
           return n.springOptions;
         },
         children: (o, u) => {
-          Q(o, k(() => t(ft), {
+          Q(o, A(() => t(ft), {
             part: "dialog-button-cancel",
             get commandfor() {
               return t(d);
@@ -240,18 +242,18 @@ function Fe(pt, n) {
         $$slots: { default: !0 }
       });
       var Pt = O(ot, 2);
-      A(Pt, {
+      I(Pt, {
         class: "dialog-button-import-spring",
         get reduceMotion() {
-          return t(P);
+          return t(T);
         },
         get springOptions() {
           return n.springOptions;
         },
         children: (o, u) => {
           {
-            let c = l(() => ({ counter: t($) }));
-            Q(o, k(() => t(ht), {
+            let c = s(() => ({ counter: t($) }));
+            Q(o, A(() => t(ht), {
               get dataset() {
                 return t(c);
               },
@@ -262,7 +264,7 @@ function Fe(pt, n) {
         },
         $$slots: { default: !0 }
       });
-      var Tt = O(D, 2);
+      var Tt = O(E, 2);
       {
         var Bt = (o) => {
           var u = ee();
@@ -270,33 +272,33 @@ function Fe(pt, n) {
           var Y = b(u);
           $t(Y, {
             get width() {
-              return s.current.width;
+              return l.current.width;
             },
             get height() {
-              return s.current.height;
+              return l.current.height;
             }
-          }), z(() => c = st(u, "", c, {
-            left: s.target ? `${-s.target.x}px` : void 0,
-            top: s.target ? `${-s.target.y}px` : void 0,
-            translate: s.current ? `${s.current.x}px ${s.current.y}px` : void 0
+          }), z(() => c = lt(u, "", c, {
+            left: l.target ? `${-l.target.x}px` : void 0,
+            top: l.target ? `${-l.target.y}px` : void 0,
+            translate: l.current ? `${l.current.x}px ${l.current.y}px` : void 0
           })), j(o, u);
         };
         nt(Tt, (o) => {
-          s.current && o(Bt);
+          l.current && o(Bt);
         });
       }
       G(i, (o) => a(d, o), () => t(d)), it(i, () => dt({ onmeasure: Mt }));
       var Lt = O(i, 2);
       {
-        let o = l(() => ({ locale: M(), assets: x() })), u = l(() => ({ items: H() })), c = l(() => ({
+        let o = s(() => ({ locale: M(), assets: x() })), u = s(() => ({ items: V() })), c = s(() => ({
           disabled: gt(),
           dialog: t(d),
           reduceMotion: t(g),
           springOptions: n.springOptions,
-          setDialogContentTemplate: Ct,
+          setDialogContentTemplate: St,
           setDialogImportButtonCount: Dt
         }));
-        lt(Lt, {
+        st(Lt, {
           get reduceMotion() {
             return t(g);
           },
@@ -307,7 +309,7 @@ function Fe(pt, n) {
             return t(o);
           },
           get propResourceMap() {
-            return R();
+            return C();
           },
           get nodes() {
             return n.template;
@@ -324,21 +326,21 @@ function Fe(pt, n) {
         });
       }
       z(() => {
-        Ht(i, "data-visible", t(w) ? "" : void 0), C = st(i, "", C, {
-          "--dialog-content-clip-path": t(Rt),
-          "--dialog-transition": N.current
+        Ht(i, "data-visible", t(R) ? "" : void 0), D = lt(i, "", D, {
+          "--dialog-content-clip-path": t(Ct),
+          "--dialog-transition": P.current
         });
       }), at("transitionend", i, function(...o) {
-        t(X)?.apply(this, o);
+        t(S)?.apply(this, o);
       }), Xt("click", i, yt), at("toggle", i, bt), j(e, r);
     };
     nt(Et, (e) => {
-      H().length && e(Nt);
+      V().length && e(Nt);
     });
   }
-  G(V, (e) => a(E, e), () => t(E)), j(pt, V), jt();
+  G(X, (e) => a(N, e), () => t(N)), j(pt, X), Ft();
 }
 Vt(["click"]);
 export {
-  Fe as default
+  qe as default
 };

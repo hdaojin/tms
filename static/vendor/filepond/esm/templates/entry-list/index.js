@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.77
+* FilePond v5.0.0-beta.78
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -232,6 +232,8 @@ function W() {
         "STORE_RESTORE_ERROR"
       ]);
       return {
+        // this is so entry is accessible in file info (for file rename purposes)
+        entry: e,
         name: e.name,
         size: e.size,
         isWaiting: r,
@@ -516,7 +518,7 @@ function K(t) {
   const { key: e = "file-rename", extensionAction: r = "renameFile" } = t ?? {};
   return {
     if: {
-      test: ({ entry: n }) => b(n.name) && L(n, r),
+      test: ({ entry: n }) => b(n?.name) && L(n, r),
       then: {
         key: e,
         component: N,

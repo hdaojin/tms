@@ -107,7 +107,9 @@ class TrainingLogListManagementTests(TrainingFixtureMixin, TestCase):
         self.assertIsNone(toolbar.find("button", string="筛选"))
         self.assertEqual(len(toolbar.select("input.list-filter-date")), 2)
         self.assertEqual(toolbar.select_one('input[name="date_from"]')["value"], "2026-01-02")
-        self.assertIn("change from:.list-filter-date", toolbar["hx-trigger"])
+        self.assertEqual(toolbar["hx-trigger"], "submit")
+        self.assertIsNotNone(toolbar.select_one('details[open] input[name="date_from"]'))
+        self.assertIsNotNone(toolbar.select_one('button[type="submit"]'))
         self.assertEqual(self.ids(self.client.get(self.url, {"date_from": "2026-01-03", "date_to": "2026-01-03"})),
                          {self.coach_log.pk})
         self.membership.role = "coach"

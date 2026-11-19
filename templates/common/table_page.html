@@ -3,7 +3,9 @@
 
 {% block content %}
   {% block list_filters %}
-    {% if list_filter_controls %}{% include "components/list_filter_toolbar.html" %}{% endif %}
+    {% include "components/list_filter_tabs.html" %}
+    {% if list_filter_controls or list_filter_advanced_controls %}{% include "components/list_filter_toolbar.html" %}{% endif %}
+    {% if list_filter_advanced_controls %}{% include "components/list_filter_active_items.html" %}{% endif %}
   {% endblock %}
   <div id="{{ list_filter_target_id|default:'list-results' }}" class="mt-4">
     {% block list_results %}

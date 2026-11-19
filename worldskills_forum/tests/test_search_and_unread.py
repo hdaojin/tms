@@ -42,16 +42,19 @@ class SearchAndUnreadTests(ForumTestCase):
         self.assertNotContains(response, other.translated_title)
         self.assertEqual(
             [control["name"] for control in response.context["list_filter_controls"]],
-            ["year", "module", "category", "tag", "post_type", "status", "importance", "q"],
+            ["q", "module", "category"],
         )
         toolbar = BeautifulSoup(response.content, "html.parser").select_one("form[hx-trigger]")
         self.assertIsNotNone(toolbar)
         self.assertEqual(toolbar["hx-get"], response.wsgi_request.path)
-        triggers = {trigger.strip() for trigger in toolbar["hx-trigger"].split(",")}
-        self.assertTrue({
-            "submit", "change from:.list-filter-select",
-            "input changed delay:400ms from:.list-filter-search", "search from:.list-filter-search",
-        } <= triggers)
+        self.assertEqual(toolbar["hx-trigger"], "submit")
+        self.assertEqual(toolbar.select_one("input, select")["name"], "q")
+        self.assertIsNotNone(toolbar.select_one('details[open] select[name="year"]'))
+        self.assertIsNotNone(toolbar.select_one('button[type="submit"]'))
+        summary = BeautifulSoup(response.content, "html.parser").select_one("#forum-topic-list-active-filters")
+        remove_year = summary.select_one('a[aria-label="移除年份：2026"]')
+        self.assertNotIn("year=", remove_year["href"])
+        self.assertIn("q=", remove_year["href"])
         self.assertNotContains(response, "hx-indicator=", html=False)
         self.assertNotContains(response, "loading-spinner", html=False)
         self.assertContains(response, 'class="list-filter-select select w-full md:select-sm"', html=False)
@@ -68,8 +71,34 @@ class SearchAndUnreadTests(ForumTestCase):
         self.assertEqual(htmx_response.status_code, 200)
         self.assertNotContains(htmx_response, "<!doctype html>", html=False)
         self.assertNotContains(htmx_response, "全部年份")
+        self.assertContains(htmx_response, 'hx-swap-oob="true"')
         self.assertContains(htmx_response, target.translated_title)
         self.assertNotContains(htmx_response, other.translated_title)
+
+    def test_feed_classification_keeps_search_and_clears_page(self):
+        self.client.force_login(self.reader)
+        response = self.client.get(reverse("worldskills_forum:feed"), {"view": "important", "q": "target"})
+        soup = BeautifulSoup(response.content, "html.parser")
+        toolbar = soup.select_one('form[method="get"]')
+        self.assertEqual(toolbar.select_one('input[name="view"]')["value"], "important")
+        self.assertFalse(toolbar.has_attr("hx-get"))
+        nav = soup.select_one('nav[aria-label="按状态筛选"]')
+        self.assertIn("view=important", nav.select_one('[aria-current="true"]')["href"])
+        official = nav.select_one('a[href*="view=official"]')
+        self.assertIn("q=target", official["href"])
+        self.assertNotIn("page=", official["href"])
+
+    def test_topic_list_history_restore_returns_full_toolbar(self):
+        self.client.force_login(self.reader)
+        response = self.client.get(
+            reverse("worldskills_forum:topic_list"),
+            HTTP_HX_REQUEST="true",
+            HTTP_HX_HISTORY_RESTORE_REQUEST="true",
+        )
+        self.assertContains(response, "<!doctype html>")
+        self.assertContains(response, "高级筛选")
+        self.assertNotContains(response, 'hx-swap-oob="true"')
+
 
     def test_unread_uses_translation_publish_time(self):
         viewed_at = timezone.now() - timedelta(days=1)

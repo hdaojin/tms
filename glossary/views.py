@@ -12,6 +12,7 @@ from django.views import View
 from django.views.generic import CreateView, DetailView, FormView, TemplateView, UpdateView
 from django_tables2 import SingleTableView
 
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 from core.utils.mixins import TitleMixin
 from standards.models import SkillProject
 
@@ -26,7 +27,14 @@ from .forms import (
     StudyAnswerForm,
     StudyStartForm,
 )
-from .models import GlossaryEntry, GlossaryEntryProposal, GlossaryImport, ProfessionalGlossary, StudyAttempt, StudySession
+from .models import (
+    GlossaryEntry,
+    GlossaryEntryProposal,
+    GlossaryImport,
+    ProfessionalGlossary,
+    StudyAttempt,
+    StudySession,
+)
 from .services import (
     approve_proposal,
     confirm_glossary_import,
@@ -44,7 +52,6 @@ from .tables import (
     ProposalTable,
     StudySessionTable,
 )
-
 
 MANAGE_PERMISSION = "glossary.change_professionalglossary"
 ALL_STATS_PERMISSION = "glossary.view_all_study_statistics"
@@ -100,7 +107,7 @@ def _statistics_rows(attempts):
     return rows
 
 
-class GlossaryBrowseView(TitleMixin, PermissionRequiredMixin, SingleTableView):
+class GlossaryBrowseView(FilterableListMixin, TitleMixin, PermissionRequiredMixin, SingleTableView):
     model = GlossaryEntry
     table_class = GlossaryBrowseTable
     template_name = "glossary/browse.html"
@@ -108,6 +115,31 @@ class GlossaryBrowseView(TitleMixin, PermissionRequiredMixin, SingleTableView):
     title = "专业词条浏览"
     title_icon = "icon-[tabler--language]"
     permission_required = "glossary.view_glossaryentry"
+
+    list_filter_submit = True
+    list_filter_htmx = False
+
+    def get_list_filter_specs(self):
+        return (
+            ListFilterSpec("q", "搜索词条", "search", placeholder="英文、中文或 Acronym"),
+            ListFilterSpec(
+                "skill_project",
+                "技能项目",
+                "select",
+                choices=tuple((item.pk, str(item)) for item in SkillProject.objects.filter(is_active=True)),
+                empty_label="全部技能项目",
+            ),
+            ListFilterSpec(
+                "glossary",
+                "专业词库",
+                "select",
+                choices=tuple(
+                    (item.pk, str(item))
+                    for item in ProfessionalGlossary.objects.filter(is_active=True).select_related("skill_project")
+                ),
+                empty_label="全部专业词库",
+            ),
+        )
 
     def get_queryset(self):
         queryset = GlossaryEntry.objects.filter(is_active=True, glossary__is_active=True).select_related(
@@ -118,28 +150,13 @@ class GlossaryBrowseView(TitleMixin, PermissionRequiredMixin, SingleTableView):
         skill_project_id = self.request.GET.get("skill_project", "").strip()
         if query:
             queryset = queryset.filter(
-                Q(english_term__icontains=query)
-                | Q(acronym__icontains=query)
-                | Q(chinese_translation__icontains=query)
+                Q(english_term__icontains=query) | Q(acronym__icontains=query) | Q(chinese_translation__icontains=query)
             )
         if glossary_id.isdigit():
             queryset = queryset.filter(glossary_id=glossary_id)
         if skill_project_id.isdigit():
             queryset = queryset.filter(glossary__skill_project_id=skill_project_id)
         return queryset
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(
-            {
-                "query": self.request.GET.get("q", ""),
-                "selected_glossary": self.request.GET.get("glossary", ""),
-                "selected_skill_project": self.request.GET.get("skill_project", ""),
-                "glossaries": ProfessionalGlossary.objects.filter(is_active=True).select_related("skill_project"),
-                "skill_projects": SkillProject.objects.filter(is_active=True),
-            }
-        )
-        return context
 
 
 class ProfessionalGlossaryListView(TitleMixin, PermissionRequiredMixin, SingleTableView):

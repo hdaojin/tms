@@ -1,11 +1,11 @@
 /*!
-* FilePond v5.0.0-beta.77
+* FilePond v5.0.0-beta.78
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
 import "../../elements/components/Button/index.js";
-import { supportsDisplayTransition as s } from "../../utils/support.js";
+import { supportsDialogCloseTransition as p } from "../../utils/support.js";
 import { getAsButtonProps as y } from "../common/index.js";
 import b from "../../elements/components/Button/index-svelte.js";
 function w() {
@@ -24,7 +24,7 @@ function w() {
         },
         children: {
           component: b,
-          props: (l, t) => {
+          props: (s, t) => {
             let {
               disabled: a,
               icon: m,
@@ -36,14 +36,14 @@ function w() {
               onopen: f,
               onopened: d,
               onclose: g,
-              onclosed: p
-            } = l;
+              onclosed: l
+            } = s;
             const { dialog: o } = t;
             return e || (i = i || "show-modal", n = n || o, e = function(h) {
               o.ontransitionend = function(r) {
                 if (r.target === o) {
-                  if (s() && !o.open && r.propertyName === "display") {
-                    p?.(t);
+                  if (p() && !o.open && r.propertyName === "display") {
+                    l?.(t);
                     return;
                   }
                   if (r.propertyName === "opacity" && r.pseudoElement === "" && o.open) {
@@ -52,7 +52,7 @@ function w() {
                   }
                 }
               }, o.ontoggle = function() {
-                o.open ? f?.(t) : (g?.(t), s() || p?.(t));
+                o.open ? f?.(t) : (g?.(t), p() || l?.(t));
               };
             }), {
               ...y({

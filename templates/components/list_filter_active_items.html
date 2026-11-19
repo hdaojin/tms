@@ -1,0 +1,9 @@
+<div id="{{ list_filter_target_id }}-active-filters" {% if filter_summary_oob %}hx-swap-oob="true"{% endif %}>
+  {% if list_filter_active_items %}
+    <ul class="mt-2 flex flex-wrap gap-2" aria-label="当前筛选条件">
+      {% for item in list_filter_active_items %}
+        <li><a class="btn btn-ghost btn-xs" href="{{ item.href }}" aria-label="移除{{ item.label }}">{{ item.label }} <span aria-hidden="true">×</span></a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</div>

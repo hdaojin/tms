@@ -32,12 +32,10 @@ from .selectors import get_published_post_feed, get_topic_list_queryset, get_top
 from .services import add_post_attachments, create_published_post, mark_topic_viewed, update_published_post
 
 
-FILTER_KEYS = ("q", "year", "module", "category", "tag", "post_type", "importance", "view")
 
 
-def _filter_context(request):
+def _feed_filter_options():
     return {
-        "filters": {key: request.GET.get(key, "") for key in FILTER_KEYS},
         "years": ForumTopic.objects.filter(posts__translation__isnull=False)
         .values_list("competition_year", flat=True)
         .distinct()
@@ -57,7 +55,7 @@ def _visible_topic_queryset(user):
     return queryset.filter(Q(posts__translation__isnull=False) | Q(created_by=user)).distinct()
 
 
-class ForumFeedView(TitleMixin, PermissionRequiredMixin, ListView):
+class ForumFeedView(FilterableListMixin, TitleMixin, PermissionRequiredMixin, ListView):
     template_name = "worldskills_forum/feed.html"
     context_object_name = "posts"
     paginate_by = 20
@@ -68,10 +66,68 @@ class ForumFeedView(TitleMixin, PermissionRequiredMixin, ListView):
     def get_queryset(self):
         return get_published_post_feed(self.request.user, self.request.GET)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update(_filter_context(self.request))
-        return context
+    list_filter_target_id = "forum-feed"
+    list_filter_status_param = "view"
+    list_filter_htmx = False
+
+    def get_list_filter_specs(self):
+        options = _feed_filter_options()
+        return (
+            ListFilterSpec(
+                "view",
+                "动态范围",
+                "select",
+                choices=(("important", "重要信息"), ("official", "官方信息"), ("unread", "未读信息")),
+                empty_label="全部",
+            ),
+            ListFilterSpec("q", "关键字", "search", placeholder="搜索中英文、作者、标签和附件名称"),
+            ListFilterSpec(
+                "module",
+                "模块",
+                "select",
+                choices=[(item.pk, item.name) for item in options["modules"]],
+                empty_label="全部模块",
+            ),
+            ListFilterSpec(
+                "category",
+                "分类",
+                "select",
+                choices=[(item.pk, item.name) for item in options["categories"]],
+                empty_label="全部分类",
+            ),
+            ListFilterSpec(
+                "year",
+                "年份",
+                "select",
+                choices=[(year, year) for year in options["years"]],
+                empty_label="全部年份",
+                advanced=True,
+            ),
+            ListFilterSpec(
+                "tag",
+                "标签",
+                "select",
+                choices=[(item.pk, item.name) for item in options["tags"]],
+                empty_label="全部标签",
+                advanced=True,
+            ),
+            ListFilterSpec(
+                "post_type",
+                "信息类型",
+                "select",
+                choices=tuple(options["post_types"]),
+                empty_label="全部类型",
+                advanced=True,
+            ),
+            ListFilterSpec(
+                "importance",
+                "重要程度",
+                "select",
+                choices=options["importance_choices"],
+                empty_label="全部程度",
+                advanced=True,
+            ),
+        )
 
 
 class FilterShortcutView(PermissionRequiredMixin, View):
@@ -132,6 +188,7 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixi
         return (
             ListFilterSpec(
                 name="year",
+                advanced=True,
                 label="年份",
                 control="select",
                 lookup="competition_year",
@@ -156,6 +213,7 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixi
             ),
             ListFilterSpec(
                 name="tag",
+                advanced=True,
                 label="标签",
                 control="select",
                 lookup="tags__id",
@@ -164,6 +222,7 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixi
             ),
             ListFilterSpec(
                 name="post_type",
+                advanced=True,
                 label="信息类型",
                 control="select",
                 lookup="posts__post_type__code",
@@ -172,6 +231,7 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixi
             ),
             ListFilterSpec(
                 name="status",
+                advanced=True,
                 label="状态",
                 control="select",
                 lookup="status",
@@ -180,6 +240,7 @@ class ForumTopicListView(TitleMixin, PermissionRequiredMixin, FilterableListMixi
             ),
             ListFilterSpec(
                 name="importance",
+                advanced=True,
                 label="重要程度",
                 control="select",
                 lookup="importance",

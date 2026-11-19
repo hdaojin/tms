@@ -127,6 +127,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 - View 负责 HTTP、权限、service/selector 调用和响应选择；尽量保持薄，不复制核心业务逻辑。
 - 类视图复用 `TitleMixin`，设置 `title` 和 `title_icon`。
 - 列表页优先复用 `BaseTable`、`BaseDateColumn`、`BaseDateTimeColumn`、`ActionsColumn` 和 django-tables2 `SingleTableView`/现有封装。
+- 列表页搜索、状态分类、高级筛选和批量操作遵循 `docs/developer/ui.md`。新增列表优先复用公共工具栏，专用布局在对应代码中说明业务原因。
 - 列表采用“搜索筛选区 → 批量操作区 → 结果列表区”的统一顺序，优先扩展 `common/table_page.html`；筛选区与批量 POST 表单分离，复用现有筛选组件。无筛选、无批量业务或当前用户无相应授权时省略对应区块，不放空占位；无可用批量动作时不显示勾选列。卡片、树、统计矩阵和详情内小列表按适用部分遵循，不强制转表格或新增批量能力。
 - `common/table_page.html` 默认使用流式宽容器，表格内部允许横向滚动；表单和阅读页保留适合内容的限宽。桌面左侧导航可收起并在浏览器中记忆，移动端继续使用导航抽屉。
 - 批量操作栏复用 `components/list_bulk_actions.html` 与 `static/js/list-bulk-actions.js`，采用操作下拉框、执行按钮、已选计数和表头当前页全选；额外参数进入固定名单中间页，跨页全匹配仅在业务后端明确支持时开放。筛选、翻页、排序后清空旧选择，完成或取消恢复原列表条件和有效页码。

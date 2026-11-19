@@ -435,6 +435,7 @@ class TrainingPlanListView(FilterableListMixin, ListPageMixin, TitleMixin, Permi
     create_url_name = "training:plan_create"
     create_label = "新增训练计划"
     table_pagination = {"per_page": 25}
+    list_filter_status_param = "status"
     search_fields = ("title", "training_cycle__code", "training_cycle__name")
     scope_filter = ListFilterSpec(
         "scope", "范围", "select", choices=(("all", "全部可见"),), empty_label="我的计划",
@@ -778,10 +779,10 @@ class TrainingLogListView(FilterableListMixin, ListPageMixin, TitleMixin, Permis
             ListFilterSpec("plan", "训练计划", "select",
                            choices=self.filter_form.fields["plan"].choices[1:],
                            empty_label=self.filter_form.fields["plan"].choices[0][1]),
-            ListFilterSpec("date_from", "训练日期从", "date", placeholder="从"),
-            ListFilterSpec("date_to", "训练日期至", "date", placeholder="至"),
+            ListFilterSpec("date_from", "训练日期从", "date", placeholder="从", advanced=True),
+            ListFilterSpec("date_to", "训练日期至", "date", placeholder="至", advanced=True),
             ListFilterSpec("member_role", "周期身份", "select", choices=TrainingCycleMember.Role.choices,
-                           empty_label="全部周期身份"),
+                           empty_label="全部周期身份", advanced=True),
         )
 
     def get_queryset(self):

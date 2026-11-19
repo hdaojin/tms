@@ -10,7 +10,7 @@
     "@tailwindcss/cli": "^4.3.5",
     "@tailwindcss/typography": "^0.5.20",
     "daisyui": "^5.8.1",
-    "filepond": "beta",
+    "filepond": "^5.0.0-beta.78",
     "mermaid": "^12.3.0",
     "pdfjs-dist": "^6.4.299",
     "prettier": "^3.10.1",

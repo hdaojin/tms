@@ -1,5 +1,5 @@
 /*!
-* FilePond v5.0.0-beta.77
+* FilePond v5.0.0-beta.78
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
@@ -7,9 +7,9 @@
 import { arrayRemoveFalsy as q } from "../../utils/array.js";
 import { addListener as h } from "../../utils/dom.js";
 import { pubsub as P } from "../../utils/pubsub.js";
-import { isFunction as R } from "../../utils/test.js";
+import { isFunction as j, isObject as R } from "../../utils/test.js";
 import { createExtension as V } from "./createExtension.js";
-function B(y) {
+function G(y) {
   const { name: g, props: v, factory: x } = y;
   return V({
     name: g,
@@ -53,14 +53,14 @@ function B(y) {
         }
       );
       let d, a, b;
-      w(({ sourceIcon: e, sourceLabel: t, sourceType: r, disabled: n }) => {
+      w(({ sourceIcon: e, sourceLabel: t, sourceType: n, disabled: o }) => {
         I({
           // is adds source button
           source: {
-            type: r,
+            type: n,
             label: t,
             icon: e,
-            disabled: n,
+            disabled: o,
             onopen: T,
             onopened: C,
             onclosed: N
@@ -68,7 +68,7 @@ function B(y) {
         });
       });
       function O(e) {
-        const { inputAttributes: t, insertIndex: r, beforeInsertSource: n } = i, { target: l } = e, f = l ? new FormData(l) : null;
+        const { inputAttributes: t, insertIndex: n, beforeInsertSource: o } = i, { target: l } = e, f = l ? new FormData(l) : null;
         if (!f)
           throw e.preventDefault(), new Error("No form reference");
         const s = f.getAll(t.name);
@@ -78,9 +78,9 @@ function B(y) {
           );
         const p = q(
           s.map((u) => {
-            if (R(n)) {
-              let o = n(u, i);
-              return o ? { src: o } : void 0;
+            if (j(o)) {
+              let r = o(u, i);
+              return r ? R(r) && "src" in r ? r : { src: r } : void 0;
             }
             return { src: u };
           })
@@ -89,23 +89,23 @@ function B(y) {
           e.preventDefault();
           return;
         }
-        D(p, r);
+        D(p, n);
       }
       function T({
         dialog: e,
         setDialogContentTemplate: t,
-        setDialogImportButtonCount: r
+        setDialogImportButtonCount: n
       }) {
-        const { inputAttributes: n } = i;
-        d = d || F(n), t(d, i), m("dialogOpen", e), a = h(e, "submit", O), b = h(
+        const { inputAttributes: o } = i;
+        d = d || F(o), t(d, i), m("dialogOpen", e), a = h(e, "submit", O), b = h(
           e,
           "change",
           (l) => {
             const { target: f } = l, { name: s, validity: p, value: u } = f;
-            if (s !== n.name)
+            if (s !== o.name)
               return;
-            let o = 0;
-            p.valid && (u instanceof FormData ? o = u.getAll(s).length : o = 1), r(o);
+            let r = 0;
+            p.valid && (u instanceof FormData ? r = u.getAll(s).length : r = 1), n(r);
           }
         );
       }
@@ -115,9 +115,9 @@ function B(y) {
       function N({
         dialog: e,
         setDialogContentTemplate: t,
-        setDialogImportButtonCount: r
+        setDialogImportButtonCount: n
       }) {
-        m("dialogClosed", e), a?.(), a = null, b?.(), b = null, e?.querySelector("form")?.reset(), t(null), r(0);
+        m("dialogClosed", e), a?.(), a = null, b?.(), b = null, e?.querySelector("form")?.reset(), t(null), n(0);
       }
       return {
         destroy() {
@@ -128,5 +128,5 @@ function B(y) {
   });
 }
 export {
-  B as createSourceExtension
+  G as createSourceExtension
 };

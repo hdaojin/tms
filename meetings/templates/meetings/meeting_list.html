@@ -7,6 +7,7 @@
 {% endblock %}
 {% block list_results %}
   {% partialdef results inline %}
+    {% if request.htmx and not request.htmx.history_restore_request %}{% include "components/list_filter_active_items.html" with filter_summary_oob=True %}{% endif %}
     {% if filter_form.errors %}<div class="alert alert-error mb-3" role="alert">{{ filter_form.errors }}</div>{% endif %}
     {% include "components/table_wrapper.html" with table=table %}
   {% endpartialdef %}

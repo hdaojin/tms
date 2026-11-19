@@ -2,6 +2,7 @@
 
 {% block list_results %}
   {% partialdef results inline %}
+    {% if request.htmx and not request.htmx.history_restore_request %}{% include "components/list_filter_tabs.html" with filter_tabs_oob=True %}{% endif %}
     {% include "components/table_wrapper.html" with table=table %}
   {% endpartialdef %}
 {% endblock %}

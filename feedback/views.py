@@ -78,6 +78,7 @@ class FeedbackListView(TitleMixin, LoginRequiredMixin, PermissionRequiredMixin, 
         ),
     )
     list_filter_target_id = "feedback-list"
+    list_filter_status_param = "status"
 
     def get_list_filter_specs(self):
         category_choices = tuple(FeedbackCategory.objects.values_list("code", "name"))

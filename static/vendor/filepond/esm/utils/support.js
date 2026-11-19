@@ -1,27 +1,28 @@
 /*!
-* FilePond v5.0.0-beta.77
+* FilePond v5.0.0-beta.78
 * Copyright (c) 2017-2026 Pqina B.V.
 * Released under the MIT License
 * https://filepond.com
 */
-import { createTest as t } from "./test.js";
-const r = t(
+import { createTest as s, isSafari as n } from "./test.js";
+const l = s(
   () => "requestFullscreen" in document.documentElement
-), d = t(() => "requestVideoFrameCallback" in document.createElement("video")), l = t(
+), d = s(() => "requestVideoFrameCallback" in document.createElement("video")), c = s(
   // @ts-ignore
   () => !!globalThis.scheduler?.yield
-), c = t(() => "CommandEvent" in window), i = t(() => {
+), a = s(() => "CommandEvent" in window), r = s(() => {
   const e = document.createElement("div");
   e.style.transition = "display 1s allow-discrete", document.body.append(e);
-  const s = getComputedStyle(e);
-  s.display, e.style.display = "none";
-  const o = s.display !== "none";
+  const t = getComputedStyle(e);
+  t.display, e.style.display = "none";
+  const o = t.display !== "none";
   return e.remove(), o;
-});
+}), u = s(() => r() && !n());
 export {
-  i as supportsDisplayTransition,
-  c as supportsInvokerCommands,
-  r as supportsRequestFullscreen,
+  u as supportsDialogCloseTransition,
+  r as supportsDisplayTransition,
+  a as supportsInvokerCommands,
+  l as supportsRequestFullscreen,
   d as supportsRequestVideoFrameCallback,
-  l as supportsYieldScheduler
+  c as supportsYieldScheduler
 };

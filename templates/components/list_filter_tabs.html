@@ -1,0 +1,7 @@
+{% if list_filter_tabs %}
+  <nav id="{{ list_filter_target_id }}-status-tabs"{% if filter_tabs_oob %} hx-swap-oob="true"{% endif %} aria-label="按状态筛选" class="tabs tabs-box mb-3 flex-wrap">
+    {% for tab in list_filter_tabs %}
+      <a class="tab{% if tab.active %} tab-active{% endif %}" href="{{ tab.href }}"{% if tab.active %} aria-current="true"{% endif %}>{{ tab.label }}</a>
+    {% endfor %}
+  </nav>
+{% endif %}

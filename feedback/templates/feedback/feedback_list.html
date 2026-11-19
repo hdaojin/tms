@@ -2,6 +2,7 @@
 {% load feedback_tags %}
 
 {% partialdef results %}
+  {% if request.htmx and not request.htmx.history_restore_request %}{% include "components/list_filter_tabs.html" with filter_tabs_oob=True %}{% endif %}
   <div class="space-y-4">
     {% for feedback in page_obj %}
       <article class="card border border-base-300 bg-base-100 shadow-sm">
@@ -38,6 +39,7 @@
 
 {% block content %}
 <div class="space-y-4">
+  {% include "components/list_filter_tabs.html" %}
   {% include "components/list_filter_toolbar.html" %}
   <div id="feedback-list">
     {% partial results %}

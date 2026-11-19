@@ -407,6 +407,12 @@ class AssessmentFormViewTests(TestCase):
 
         self.assertContains(response, self.assessment.name)
         self.assertNotContains(response, other_assessment.name)
+        soup = BeautifulSoup(response.content, "html.parser")
+        toolbar = soup.select_one('form[method="get"]')
+        self.assertEqual(toolbar.select_one("input, select")["name"], "q")
+        self.assertEqual(toolbar.select_one("option[selected]")["value"], get_mock_assessment_type().code)
+        state_link = soup.select_one('nav[aria-label="按状态筛选"] a[href*="status=draft"]')
+        self.assertIn(f"type={get_mock_assessment_type().code}", state_link["href"])
 
 
 class AssessmentScopeSelectorTests(TestCase):
@@ -896,6 +902,9 @@ class CompetitionCatalogViewTests(TestCase):
 
         self.assertEqual(people_response.status_code, 200)
         self.assertContains(people_response, "长期专家")
+        toolbar = BeautifulSoup(people_response.content, "html.parser").select_one('form[method="get"]')
+        self.assertEqual(toolbar.select_one('input[type="search"]')["value"], "长期")
+        self.assertIsNotNone(toolbar.select_one('a[href="' + reverse("assessments:competition_person_list") + '"]'))
         self.assertContains(people_response, "新增长期赛事人员")
         self.assertEqual(role_response.status_code, 200)
         self.assertContains(role_response, "catalog-expert")
