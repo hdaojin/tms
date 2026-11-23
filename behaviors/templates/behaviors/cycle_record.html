@@ -1,0 +1,38 @@
+{% extends "behaviors/cycle_base.html" %}
+{% block cycle_content %}
+<div class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body">
+  <dl class="grid gap-4 md:grid-cols-2">
+    {% include "components/detail_field.html" with label="训练周期" value=cycle|default:"未关联周期" %}
+    {% include "components/detail_field.html" with label="学员" value=record.student.display_name %}
+    {% include "components/detail_field.html" with label="奖惩分类" value=record.category_label %}
+    {% include "components/detail_field.html" with label="奖惩事项" value=record.item_label %}
+    {% include "components/detail_field.html" with label="程度或分档" value=record.severity_label|default:"—" %}
+    {% include "components/detail_field.html" with label="实际积分" value=record.score_formula %}
+    {% include "components/detail_field.html" with label="发生日期" value=record.occurred_date|date:"Y-m-d" %}
+    {% include "components/detail_field.html" with label="状态" value=record.get_status_display %}
+    {% include "components/detail_field.html" with label="具体事实" value=record.reason multiline=True full_width=True %}
+    {% if record.recorded_by %}{% include "components/detail_field.html" with label="录入人" value=record.recorded_by.display_name %}{% endif %}
+    {% if record.reviewed_at %}<div><dt>审核</dt><dd>{{ record.reviewed_by.display_name }} · {{ record.reviewed_at|date:"Y-m-d H:i:s" }}<br>{{ record.review_note|linebreaksbr }}</dd></div>{% endif %}
+    {% if record.voided_at %}<div><dt>作废</dt><dd>{{ record.voided_by.display_name }} · {{ record.voided_at|date:"Y-m-d H:i:s" }}<br>{{ record.void_note|linebreaksbr }}</dd></div>{% endif %}
+    {% include "components/record_timestamps.html" with created_at=record.recorded_at updated_at=record.updated_at %}
+  </dl>
+  {% if record.rule_id %}
+    <p><a class="link" href="{% url 'behaviors:policy_rules' cycle.pk record.rule.policy_item.policy_id %}#rule-{{ record.rule_id }}">查看适用条例分档</a></p>
+  {% endif %}
+  {% if record.attachment %}<p><a class="link" href="{% url 'behaviors:conduct_attachment' record.pk %}">下载附件</a></p>{% endif %}
+  {% if editable %}<p><a class="btn" href="{% url 'behaviors:record_edit' record.pk %}">编辑待审记录</a></p>{% endif %}
+  {% if can_copy %}<p><a class="btn" href="{% url 'behaviors:cycle_entry' cycle.pk %}?copy={{ record.pk }}">复制重报</a></p>{% endif %}
+  {% if review_pending or can_void %}
+    <form method="post" class="space-y-3">
+      {% csrf_token %}<input type="hidden" name="revision" value="{{ revision }}">
+      <label class="form-control"><span>{% if can_void %}作废原因{% else %}审核意见（驳回时必填）{% endif %}</span>
+        <textarea class="textarea w-full" name="note"{% if can_void %} required{% endif %}></textarea>
+      </label>
+      {% if review_pending %}
+        <button class="btn btn-primary" name="action" value="approve" type="submit">通过</button>
+        <button class="btn btn-error btn-outline" name="action" value="reject" type="submit">驳回</button>
+      {% else %}<button class="btn btn-error btn-outline" name="action" value="void" type="submit">确认作废并撤回积分</button>{% endif %}
+    </form>
+  {% endif %}
+</div></div>
+{% endblock %}

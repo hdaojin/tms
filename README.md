@@ -464,6 +464,9 @@ sudo tms-deploy manage bootstrap_tms --dry-run
 日常代码更新可使用独立 `tms-update plan/apply/verify/status`；开发端依赖更新可运行
 `uv run --locked --no-sync scripts/update_dependencies.py all --dry-run`，详见手册第 13 节。
 升级默认完整备份；本次无需备份时，可在 `tms-deploy apply` 或 `tms-update apply` 后显式添加 `--skip-backup`，其余校验、迁移和验收照常执行。
+
+奖惩账本升级会合并重名目录、转换条例分档，并将周期记录迁入统一账本。请在维护窗口使用默认备份流程，升级后核对记录数、已通过积分及旧附件入口。需要恢复合并前的目录和周期分工时，从升级前的数据库备份恢复。
+
 可配置 `TMS_BASIC_AUTH_TRUSTED_CIDRS="10.21.57.0/24"` 让可信来源网段跳过 Caddy Basic Auth，其他客户端仍需认证；
 默认值为空，要求全站认证。此设置不跳过 Django 登录和权限，适用的源地址判断与代理限制见手册第 7 节。
 

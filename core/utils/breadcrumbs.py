@@ -33,7 +33,7 @@ def build_breadcrumbs(request, title, parents=()):
         section_key = resolve_current_section(request)
         user = getattr(request, "user", AnonymousUser())
         section = next((item for item in get_sections() if item.get("key") == section_key), None)
-        items = get_section_items(section_key, user) if section else []
+        items = get_section_items(section_key, user, request=request) if section else []
         if items and (not section.get("login_required", True) or user.is_authenticated):
             url = next((item.resolved_url for item in items if item.resolved_url != "#"), None)
             crumbs.append(Breadcrumb(section["label"], url))

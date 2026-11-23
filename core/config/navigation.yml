@@ -312,26 +312,42 @@ sections:
     description: 学生奖惩管理
     icon_class: icon-[tabler--gavel] size-5 text-secondary
     items:
-      - key: behavior_group
-        label: 奖惩管理
-        icon_class: icon-[tabler--gavel] size-5 text-secondary
+      - key: behaviors
+        label: 奖惩记录
+        url_name: behaviors:conductrecord_list
+        icon_class: icon-[tabler--list] size-5
+        visibility: conduct_records
+      - key: behavior_summary
+        label: 积分汇总
+        url_name: behaviors:conductsummary_list
+        icon_class: icon-[tabler--chart-bar] size-5
+        visibility: conduct_summaries
+      - key: behavior_policy
+        label: 班级条例
+        url_name: behaviors:policy_index
+        active_url_names: [behaviors:cycle_policies, behaviors:cycle_policy, behaviors:cycle_policy_new, behaviors:cycle_policy_edit, behaviors:policy_rules, behaviors:policy_item_new, behaviors:policy_item_edit, behaviors:cycle_rule_new, behaviors:cycle_rule_edit]
+        icon_class: icon-[tabler--file-text] size-5
+        visibility: conduct_policies
+      - key: behavior_assignment
+        label: 经办分工
+        url_name: behaviors:assignment_index
+        active_url_names: [behaviors:cycle_assignment, behaviors:cycle_assignment_edit]
+        icon_class: icon-[tabler--users] size-5
+        superuser_required: true
+      - key: behavior_config
+        label: 奖惩配置
+        icon_class: icon-[tabler--settings] size-5
         children:
-          - key: behaviors
-            label: 奖惩记录
-            url_name: behaviors:conductrecord_list
-            icon_class: icon-[tabler--gavel] size-5 text-secondary
-            permissions: [behaviors.view_conductrecord]
-          - key: behavior_create
-            label: 录入奖惩记录
-            url_name: behaviors:conductrecord_create
-            icon_class: icon-[tabler--plus] size-5 text-secondary
-            permissions:
-              - behaviors.add_conduct_record
-          - key: behavior_summary
-            label: 操行汇总
-            url_name: behaviors:conductsummary_list
-            icon_class: icon-[tabler--chart-donut] size-5 text-info
-            permissions: [behaviors.view_conductsummary]
+          - key: behavior_categories
+            label: 奖惩分类
+            url_name: behaviors:catalog_categories
+            icon_class: icon-[tabler--list] size-5
+            permissions: [behaviors.manage_global_conduct_catalog]
+          - key: behavior_rates
+            label: 程度与倍率
+            url_name: behaviors:catalog_rates
+            icon_class: icon-[tabler--adjustments] size-5
+            permissions: [behaviors.manage_global_conduct_catalog]
 
   - key: account
     label: 账户

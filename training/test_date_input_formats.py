@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.utils import timezone, translation
 
 from assessments.forms import AssessmentModuleForm
-from behaviors.forms import ConductRecordForm
+from behaviors.cycle_forms import EntryDateForm
 from glossary.forms import StatisticsFilterForm
 from meetings.forms import MeetingUploadForm
 from training.forms import TrainingPlanForm, TrainingTaskForm
@@ -15,7 +15,7 @@ class DateInputFormatTests(TestCase):
         cases = (
             (TrainingPlanForm, ("start_date", "end_date")),
             (TrainingTaskForm, ("planned_date",)),
-            (ConductRecordForm, ("occurred_date",)),
+            (EntryDateForm, ("occurred_date",)),
             (MeetingUploadForm, ("date",)),
             (StatisticsFilterForm, ("date_from", "date_to")),
         )

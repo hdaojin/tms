@@ -1,0 +1,30 @@
+{% extends "behaviors/cycle_base.html" %}
+{% block cycle_content %}
+<div class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body">
+  {% if not record %}
+    <form method="get" class="flex flex-wrap gap-2">
+      {% if request.GET.copy %}<input type="hidden" name="copy" value="{{ request.GET.copy }}">{% endif %}
+      {% include "components/field.html" with field=date_form.occurred_date %}
+      <button class="btn" type="submit">按日期加载计分规则</button>
+    </form>
+  {% endif %}
+  {% if entry_date %}<p>发生日期 {{ entry_date|date:"Y-m-d" }}{% if policy %} · <a class="link" href="{% url 'behaviors:cycle_policy' cycle.pk policy.pk %}">适用条例 {{ policy.effective_date|date:"Y-m-d" }}</a>{% endif %}</p>{% endif %}
+  {% if preview %}
+    <h2 class="card-title">确认本次奖惩</h2>
+    <p>{{ preview.rule.item_label }} · {{ preview.rule.condition }} · {{ preview.rule.policy_item.base_score }} × {{ preview.rule.multiplier }} × {{ preview.quantity }} = 每人 {{ preview.points }} 分</p>
+    <ul>{% for student in preview.students %}<li>{{ student.full_info }}</li>{% endfor %}</ul>
+  {% endif %}
+  {% if form %}
+    <form method="post" enctype="multipart/form-data" class="space-y-4">
+      {% csrf_token %}
+      {% include "components/form_errors.html" with form=form %}
+      {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+      {% for field in form.visible_fields %}
+        {% if field.name != "attachment" or preview or form.confirmation.value %}{% include "components/field.html" with field=field use_fancy_upload=True %}{% endif %}
+      {% endfor %}
+      <button type="submit" name="action" value="preview" class="btn">预览分值和名单</button>
+      {% if preview or form.confirmation.value %}<button type="submit" name="action" value="confirm" class="btn btn-primary">确认提交</button>{% endif %}
+    </form>
+  {% elif entry_date %}<p>该发生日期没有适用的条例，请联系条例管理者。</p>{% endif %}
+</div></div>
+{% endblock %}

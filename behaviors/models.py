@@ -5,8 +5,6 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
-from django.db.models.signals import post_delete, post_save
-from django.dispatch import receiver
 from django.utils import timezone
 
 from core.models import AuditedModel
@@ -25,7 +23,9 @@ def format_conduct_score(value):
     if value == 0:
         return '0.00'
 
-    return f'{value:+.2f}'
+    result = f'{value:+.4f}'
+    whole, fraction = result.split('.')
+    return f'{whole}.{fraction.rstrip('0').ljust(2, '0')}'
 
 
 class ConductSeverity(models.Model):
@@ -70,6 +70,10 @@ class ConductCategory(AuditedModel):
     class Meta:
         verbose_name = '奖惩分类'
         verbose_name_plural = '奖惩分类'
+        permissions = [
+            ('change_conductcatalog', '可以维护奖惩目录（原周期授权）'),
+            ('manage_global_conduct_catalog', '可以维护全局奖惩配置'),
+        ]
         ordering = ['nature', 'order', 'name']
         constraints = [
             models.UniqueConstraint(
@@ -107,10 +111,11 @@ class ConductSeverityRule(AuditedModel):
         '系数',
         max_digits=4,
         decimal_places=2,
-        help_text='当前分值 = 事项默认分值 × 严重程度系数。',
+        help_text='供条例草稿选用。',
     )
     order = models.IntegerField('排序', default=0, help_text='数字越小越靠前')
     is_default = models.BooleanField('默认程度', default=False)
+    is_active = models.BooleanField('启用状态', default=True)
 
     class Meta:
         verbose_name = '严重程度系数规则'
@@ -125,6 +130,10 @@ class ConductSeverityRule(AuditedModel):
                 fields=['nature'],
                 condition=Q(is_default=True),
                 name='uniq_default_conduct_severity_rule_per_nature',
+            ),
+            models.CheckConstraint(
+                condition=Q(is_default=False) | Q(is_active=True),
+                name='conduct_default_rate_active',
             ),
             models.CheckConstraint(
                 condition=Q(multiplier__gte=0),
@@ -148,48 +157,20 @@ class ConductSeverityRule(AuditedModel):
     def clean(self):
         if self.multiplier is not None and self.multiplier < 0:
             raise ValidationError({'multiplier': '严重程度系数不能为负数。'})
-        if self.is_default and self.severity_id and not self.severity.is_active:
+        if self.is_default and self.severity_id and not (self.is_active and self.severity.is_active):
             raise ValidationError({'severity': '默认规则必须关联已启用的严重程度。'})
 
-    @classmethod
-    def get_multiplier(cls, nature, severity):
-        severity_id = getattr(severity, 'pk', severity)
-        if not nature or not severity_id:
-            return None
-
-        return cls.objects.filter(
-            nature=nature,
-            severity_id=severity_id,
-        ).values_list('multiplier', flat=True).first()
 
 
-def get_conduct_severity_rules(nature, *, current_severity_id=None):
-    queryset = ConductSeverityRule.objects.filter(nature=nature).select_related('severity')
-    if current_severity_id is None:
-        queryset = queryset.filter(severity__is_active=True)
-    else:
-        queryset = queryset.filter(Q(severity__is_active=True) | Q(severity_id=current_severity_id))
-    return queryset.order_by('order', 'severity__code')
-
-
-def get_conduct_severity_choices(nature, *, current_severity_id=None):
-    return [
-        (rule.severity.code, rule.label)
-        for rule in get_conduct_severity_rules(nature, current_severity_id=current_severity_id)
-    ]
-
-
-def get_conduct_severity_choices_with_multiplier(nature, *, current_severity_id=None):
-    return [
-        (rule.severity.code, f'{rule.label}（×{rule.multiplier:.2f}）')
-        for rule in get_conduct_severity_rules(nature, current_severity_id=current_severity_id)
-    ]
+def get_conduct_severity_rules(nature):
+    return ConductSeverityRule.objects.filter(
+        nature=nature, is_active=True, severity__is_active=True,
+    ).select_related('severity').order_by('order', 'severity__code')
 
 
 def get_default_conduct_severity(nature):
     return (
-        ConductSeverityRule.objects.select_related('severity')
-        .filter(nature=nature, is_default=True, severity__is_active=True)
+        get_conduct_severity_rules(nature).filter(is_default=True)
         .first()
     )
 
@@ -206,10 +187,10 @@ class ConductItem(AuditedModel):
     code = models.CharField('事项代码', max_length=64)
     name = models.CharField('事项名称', max_length=100)
     default_score = models.DecimalField(
-        '默认分值',
+        '基准分',
         max_digits=6,
         decimal_places=2,
-        help_text='一般情形下的基础分值。当前分值 = 默认分值 × 严重程度系数。',
+        help_text='作为新增条例事项的初始基准分。',
     )
     description = models.TextField('说明', blank=True)
     is_active = models.BooleanField('启用状态', default=True)
@@ -234,7 +215,7 @@ class ConductItem(AuditedModel):
 
     def clean(self):
         """验证默认分值符合事项性质。"""
-        if not self.category_id:
+        if not self.category_id or self.default_score is None:
             return
 
         if self.category.nature == ConductNature.REWARD and self.default_score <= 0:
@@ -273,27 +254,31 @@ class ConductRecord(models.Model):
         PENDING = 'PENDING', '待审核'
         APPROVED = 'APPROVED', '已通过'
         REJECTED = 'REJECTED', '已驳回'
+        VOID = 'VOID', '已作废'
 
+    cycle = models.ForeignKey(
+        'training.TrainingCycle', models.PROTECT, null=True, blank=True, verbose_name='训练周期',
+    )
     student = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='conduct_records',
-        verbose_name='学生',
+        settings.AUTH_USER_MODEL, models.PROTECT, related_name='conduct_records', verbose_name='学员',
     )
     item = models.ForeignKey(
-        ConductItem,
-        on_delete=models.PROTECT,
-        related_name='records',
-        verbose_name='奖惩事项',
-        limit_choices_to={'is_active': True}
+        ConductItem, models.PROTECT, related_name='records', verbose_name='奖惩事项',
     )
     severity = models.ForeignKey(
-        ConductSeverity,
-        verbose_name='严重程度',
-        on_delete=models.PROTECT,
-        related_name='records',
-        help_text='当前分值 = 事项默认分值 × 严重程度系数',
+        ConductSeverity, models.PROTECT, null=True, blank=True, related_name='records', verbose_name='程度',
     )
+    rule = models.ForeignKey(
+        'ConductPolicyRule', models.PROTECT, null=True, blank=True, verbose_name='条例分档',
+    )
+    source_cycle_record_id = models.PositiveBigIntegerField(null=True, unique=True, editable=False)
+    submission_key = models.UUIDField(null=True, editable=False)
+    quantity = models.PositiveIntegerField('计分数量', default=1)
+    frozen_points = models.DecimalField('实际积分', max_digits=16, decimal_places=4, editable=False)
+    frozen_nature = models.CharField('奖惩性质', max_length=20, blank=True, editable=False)
+    category_label = models.CharField('记录时分类名称', max_length=100, editable=False)
+    item_label = models.CharField('记录时事项名称', max_length=255, editable=False)
+    severity_label = models.CharField('记录时程度或分档', max_length=255, blank=True, editable=False)
     occurred_date = models.DateField(
         '事件发生日期',
         default=timezone.localdate,
@@ -348,139 +333,55 @@ class ConductRecord(models.Model):
     )
     reviewed_at = models.DateTimeField('审核时间', null=True, blank=True)
     review_note = models.TextField('审核意见', blank=True)
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, models.SET_NULL, null=True, related_name='+', verbose_name='作废人',
+    )
+    voided_at = models.DateTimeField('作废时间', null=True)
+    void_note = models.TextField('作废原因', blank=True)
 
     class Meta:
         verbose_name = '奖惩记录'
         verbose_name_plural = '奖惩记录'
-        ordering = ['-occurred_date', '-recorded_at']
+        ordering = ['-occurred_date', '-recorded_at', '-pk']
         permissions = [
             ('be_conduct_subject', '可作为奖惩对象'),
             ('add_conduct_record', '录入奖惩记录'),
             ('review_conduct_record', '审核奖惩记录'),
             ('view_all_conduct_records', '查看所有奖惩记录'),
         ]
+        indexes = [models.Index(fields=['cycle', 'status', 'student'], name='conduct_ledger_cycle_status')]
+        constraints = [
+            models.CheckConstraint(condition=Q(quantity__gt=0), name='conduct_ledger_positive_quantity'),
+            models.UniqueConstraint(fields=['submission_key', 'student'], name='conduct_ledger_submission_student'),
+            models.CheckConstraint(
+                condition=Q(cycle__isnull=True, rule__isnull=True, submission_key__isnull=True)
+                | Q(cycle__isnull=False, rule__isnull=False, submission_key__isnull=False),
+                name='conduct_ledger_cycle_fields',
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.student.display_name} - {self.item.name} - {self.severity_label} - {self.occurred_date}"
+        return f'{self.student.display_name} · {self.item_label} · {self.occurred_date}'
 
     @property
-    def severity_label(self):
-        if not self.severity_id:
-            return ''
-
-        nature = self.item.category.nature if self.item_id else None
-        prefetched_rules = getattr(self.severity, '_conduct_rules', None)
-        if prefetched_rules is not None:
-            rule = next((candidate for candidate in prefetched_rules if candidate.nature == nature), None)
-        else:
-            rule = ConductSeverityRule.objects.filter(
-                nature=nature,
-                severity_id=self.severity_id,
-            ).first()
-        return rule.label if rule is not None else self.severity.name
-
-    def clean(self):
-        """验证学生范围与审核状态流。"""
-        errors = {}
-
-        if self.student_id:
-            is_subject = self.student.user_permissions.filter(
-                content_type__app_label="behaviors",
-                codename="be_conduct_subject",
-            ).exists() or self.student.groups.filter(
-                permissions__content_type__app_label="behaviors",
-                permissions__codename="be_conduct_subject",
-            ).exists()
-            if not is_subject:
-                errors['student'] = '该用户未获“可作为奖惩对象”权限。'
-
-        if self.item_id and self.severity_id:
-            has_rule = ConductSeverityRule.objects.filter(
-                nature=self.item.category.nature,
-                severity_id=self.severity_id,
-            ).exists()
-            if not has_rule:
-                errors['severity'] = '当前事项性质下未配置该严重程度的系数规则。'
-
-        if self.status == self.Status.PENDING:
-            if self.review_note.strip():
-                errors['review_note'] = '待审核记录不能填写审核意见。'
-            if self.reviewed_by or self.reviewed_at:
-                errors['status'] = '待审核记录不能包含审核信息。'
-
-        if self.status == self.Status.REJECTED and not self.review_note.strip():
-            errors['review_note'] = '驳回时必须填写审核意见。'
-
-        if self.pk:
-            original_status = type(self).objects.filter(pk=self.pk).values_list('status', flat=True).first()
-            if (
-                original_status
-                and original_status != self.status
-                and original_status != self.Status.PENDING
-            ):
-                errors['status'] = '已审核记录不允许再次变更状态。'
-
-        if errors:
-            raise ValidationError(errors)
-    
-    @property
-    def filename(self):
-        """返回去掉路径的文件名"""
-        return Path(self.attachment.name).name if self.attachment else ''
-
-    def get_multiplier(self, rule_map=None):
-        """根据事项性质和严重程度解析当前系数。"""
-        if not self.item_id:
-            return Decimal('0')
-
-        if not self.severity_id:
-            return Decimal('1')
-
-        nature = self.item.category.nature
-        if rule_map is not None:
-            return rule_map.get((nature, self.severity_id), Decimal('0'))
-
-        prefetched_rules = getattr(self.severity, '_conduct_rules', None)
-        if prefetched_rules is not None:
-            rule = next((candidate for candidate in prefetched_rules if candidate.nature == nature), None)
-            return rule.multiplier if rule is not None else Decimal('0')
-
-        multiplier = ConductSeverityRule.get_multiplier(nature, self.severity_id)
-        return multiplier if multiplier is not None else Decimal('0')
-
-    def get_score(self, rule_map=None):
-        """根据默认分值和严重程度系数计算当前分值。"""
-        if not self.item_id:
-            return Decimal('0')
-
-        base_score = self.item.default_score
-        if not self.severity_id:
-            return base_score
-
-        score = base_score * self.get_multiplier(rule_map=rule_map)
-        return Decimal('0') if score == 0 else score
+    def nature_label(self):
+        return ConductNature(self.frozen_nature).label if self.frozen_nature in ConductNature else self.frozen_nature
 
     @property
     def score_formula(self):
-        """返回用于展示的计分公式。"""
-        if not self.item_id:
-            return ''
+        if not self.rule_id or self.rule.points * self.quantity != self.frozen_points:
+            return format_conduct_score(self.frozen_points)
+        return (
+            f'{format_conduct_score(self.rule.policy_item.base_score)} × {self.rule.multiplier:.2f}'
+            f' × {self.quantity} = {format_conduct_score(self.frozen_points)}'
+        )
 
-        base_score = self.item.default_score
-        if not self.severity_id:
-            return format_conduct_score(base_score)
 
-        multiplier = self.get_multiplier()
-        return f'{format_conduct_score(base_score)} x {multiplier:.2f} = {format_conduct_score(self.score)}'
-    
-    @property
-    def score(self):
-        """返回当前默认分值和严重程度系数对应的分值。"""
-        return self.get_score()
+register_file_cleanup_signals(ConductRecord, 'attachment', delete_on_commit=True)
 
 
 class ConductSummary(models.Model):
-    """学生奖惩汇总模型"""
+    """旧汇总表保留用于升级兼容，当前汇总直接查询奖惩账本。"""
     
     student = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -506,75 +407,115 @@ class ConductSummary(models.Model):
     def __str__(self):
         return f"{self.student.display_name} - 总分: {self.total_score:+.1f}"
     
-    def update_summary(self):
-        """更新汇总信息（仅统计已通过的记录）。"""
-        from .services import recalculate_conduct_summary
-
-        return recalculate_conduct_summary(self)
 
 
-def refresh_conduct_summary(student_id):
-    """重算单个学生的奖惩汇总。"""
-    from .services import refresh_conduct_summary as refresh_conduct_summary_service
+class ConductCycleAssignment(AuditedModel):
+    cycle = models.ForeignKey('training.TrainingCycle', models.PROTECT, verbose_name='训练周期')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, models.PROTECT, verbose_name='经办人')
+    can_enter = models.BooleanField('录入', default=False)
+    can_review = models.BooleanField('审核', default=False)
+    can_write = models.BooleanField('编写条例', default=False)
+    can_publish = models.BooleanField('发布条例', default=False)
 
-    return refresh_conduct_summary_service(student_id)
-
-
-def refresh_conduct_summaries(student_ids):
-    """批量重算多个学生的奖惩汇总。"""
-    from .services import refresh_conduct_summaries as refresh_conduct_summaries_service
-
-    return refresh_conduct_summaries_service(student_ids)
-
-
-# 注册文件清理信号
-register_file_cleanup_signals(ConductRecord, 'attachment')
+    class Meta:
+        verbose_name = '周期奖惩分工'
+        constraints = [
+            models.UniqueConstraint(fields=['cycle', 'user'], name='unique_conduct_cycle_assignment'),
+        ]
 
 
-# 自动更新汇总表的信号处理
-@receiver(post_save, sender=ConductRecord)
-def update_conduct_summary_on_save(sender, instance, **kwargs):
-    """当记录状态变为已通过或已驳回时，更新汇总表"""
-    from .services import sync_conduct_summary_after_record_save
+class ConductPolicy(AuditedModel):
+    cycle = models.ForeignKey('training.TrainingCycle', models.PROTECT, verbose_name='训练周期')
+    title = models.CharField('条例标题', max_length=200)
+    issuer = models.CharField('发布单位', max_length=150)
+    body = models.TextField('正文', help_text='支持 Markdown 章节、条款和表格。')
+    change_note = models.TextField('变更说明', blank=True)
+    effective_date = models.DateField('生效日期')
+    published_at = models.DateTimeField('发布时间', null=True, editable=False)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, models.SET_NULL, null=True, editable=False,
+        related_name='+', verbose_name='发布人',
+    )
 
-    sync_conduct_summary_after_record_save(instance)
+    class Meta:
+        verbose_name = '班级管理条例版本'
+        ordering = ['-effective_date', '-pk']
+        permissions = [('publish_conductpolicy', '可以发布班级管理条例')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cycle', 'effective_date'], condition=models.Q(published_at__isnull=False),
+                name='unique_published_conduct_policy_date',
+            ),
+        ]
 
+    @property
+    def rules(self):
+        return ConductPolicyRule.objects.filter(policy_item__policy=self)
 
-@receiver(post_delete, sender=ConductRecord)
-def update_conduct_summary_on_delete(sender, instance, **kwargs):
-    """当记录被删除时，更新汇总表"""
-    from .services import sync_conduct_summary_after_record_delete
-
-    sync_conduct_summary_after_record_delete(instance)
-
-
-@receiver(post_save, sender=ConductItem)
-def update_conduct_summary_on_item_save(sender, instance, **kwargs):
-    """事项或所属分类变化后，重算受影响学生汇总。"""
-    from .services import sync_conduct_summaries_for_item
-
-    sync_conduct_summaries_for_item(instance)
-
-
-@receiver(post_save, sender=ConductCategory)
-def update_conduct_summary_on_category_save(sender, instance, **kwargs):
-    """分类性质变化后，重算受影响学生汇总。"""
-    from .services import sync_conduct_summaries_for_category
-
-    sync_conduct_summaries_for_category(instance)
-
-
-@receiver(post_save, sender=ConductSeverityRule)
-def update_conduct_summary_on_rule_save(sender, instance, **kwargs):
-    """分值规则变化后，重算受影响学生汇总。"""
-    from .services import sync_conduct_summaries_for_rule
-
-    sync_conduct_summaries_for_rule(instance)
+    def __str__(self):
+        return self.title
 
 
-@receiver(post_delete, sender=ConductSeverityRule)
-def update_conduct_summary_on_rule_delete(sender, instance, **kwargs):
-    """分值规则删除后，重算受影响学生汇总。"""
-    from .services import sync_conduct_summaries_for_rule
+class ConductPolicyItem(AuditedModel):
+    policy = models.ForeignKey(ConductPolicy, models.PROTECT, related_name='policy_items', verbose_name='条例版本')
+    item = models.ForeignKey(ConductItem, models.PROTECT, verbose_name='奖惩事项')
+    base_score = models.DecimalField('基准分', max_digits=8, decimal_places=2)
 
-    sync_conduct_summaries_for_rule(instance)
+    class Meta:
+        verbose_name = '条例事项'
+        verbose_name_plural = '条例事项'
+        constraints = [models.UniqueConstraint(fields=['policy', 'item'], name='conduct_policy_unique_item')]
+
+    def clean(self):
+        if self.item_id and self.base_score is not None:
+            nature = self.item.category.nature
+            if not (
+                (nature == ConductNature.REWARD and self.base_score > 0)
+                or (nature == ConductNature.PENALTY and self.base_score < 0)
+            ):
+                raise ValidationError({'base_score': '基准分的正负必须与事项性质一致。'})
+
+    def __str__(self):
+        return f'{self.item.category.name} · {self.item.name}'
+
+
+class ConductPolicyRule(AuditedModel):
+    class Section(models.TextChoices):
+        COMPETITION = 'competition', '竞赛奖励'
+        MANAGEMENT = 'management', '日常管理'
+        LEARNING = 'learning', '日常学习'
+
+    policy_item = models.ForeignKey(ConductPolicyItem, models.PROTECT, related_name='rules', verbose_name='条例事项')
+    severity = models.ForeignKey(
+        ConductSeverity, models.PROTECT, null=True, blank=True, verbose_name='通用程度',
+    )
+    section = models.CharField('积分板块', max_length=12, choices=Section.choices)
+    condition = models.CharField('程度或分档名称', max_length=255)
+    multiplier = models.DecimalField('倍率', max_digits=8, decimal_places=2)
+    unit = models.CharField('计分单位', max_length=30, blank=True, help_text='留空表示每次固定分值。')
+    order = models.PositiveIntegerField('排序', default=0)
+    item_label = models.CharField('发布时事项名称', max_length=255, editable=False)
+    category_label = models.CharField('发布时分类名称', max_length=100, editable=False)
+
+    class Meta:
+        verbose_name = '条例计分分档'
+        verbose_name_plural = '条例计分分档'
+        ordering = ['order', 'pk']
+        constraints = [models.CheckConstraint(condition=Q(multiplier__gte=0), name='conduct_policy_nonnegative_rate')]
+
+    @property
+    def points(self):
+        return self.policy_item.base_score * self.multiplier
+
+    def __str__(self):
+        name = self.item_label or self.policy_item.item.name
+        return f'{name} · {self.condition}（{format_conduct_score(self.points)}分）'
+
+    def clean(self):
+        if self.multiplier is not None and self.multiplier < 0:
+            raise ValidationError({'multiplier': '倍率不能为负数。'})
+        if (
+            self.section == self.Section.COMPETITION and self.policy_item_id
+            and self.multiplier is not None and self.points < 0
+        ):
+            raise ValidationError({'section': '竞赛奖励积分不能为负数。'})

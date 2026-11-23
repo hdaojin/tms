@@ -452,9 +452,9 @@ class NavigationConfigCacheTests(TestCase):
         config = navigation._load_config()
 
         self.assertEqual(config, {"themes": ["light"]})
-        mock_cache_get.assert_called_once_with("tms:navigation:v1:config")
+        mock_cache_get.assert_called_once_with(f"{navigation.CACHE_NS}:config")
         mock_cache_set.assert_called_once_with(
-            "tms:navigation:v1:config",
+            f"{navigation.CACHE_NS}:config",
             {"themes": ["light"]},
             timeout=10,
         )
@@ -578,7 +578,7 @@ class MobileNavigationTemplateTests(TestCase):
             "standards.view_skillproject",
             "standards.view_skilltreeversion",
             "meetings.add_meeting",
-            "behaviors.add_conduct_record",
+            "behaviors.view_conductrecord",
         )
 
         html = self._render_menu_tag(
@@ -596,7 +596,7 @@ class MobileNavigationTemplateTests(TestCase):
             "技能树版本",
             "技能项目",
             "上传会议记录",
-            "录入奖惩记录",
+            "奖惩记录",
         ]:
             self.assertIn(label, html)
 
@@ -1087,7 +1087,7 @@ class MultipleFileFieldTests(TestCase):
 class UploadSpecAdoptionTests(TestCase):
     def test_upload_forms_use_upload_spec_accept_attrs(self):
         from assessments.forms import AssessmentDocumentForm
-        from behaviors.forms import ConductRecordForm
+        from behaviors.cycle_forms import EntryForm
         from meetings.forms import MeetingUploadForm
         from notices.forms import NoticeForm
         from training.forms import TrainingLogForm
@@ -1099,7 +1099,7 @@ class UploadSpecAdoptionTests(TestCase):
         )
         self.assertIn("accept", TrainingLogForm().fields["document"].widget.attrs)
         self.assertEqual(
-            ConductRecordForm().fields["attachment"].widget.attrs["accept"],
+            EntryForm.base_fields["attachment"].widget.attrs["accept"],
             CONDUCT_ATTACHMENT_UPLOAD_SPEC.accept,
         )
         self.assertEqual(

@@ -131,12 +131,29 @@ bundles:
     permissions: [behaviors.add_conduct_record, behaviors.view_conductrecord, behaviors.view_conductsummary]
   - code: behaviors.review_conduct
     name: 学生奖惩管理 | 审核奖惩记录
-    description: 在后台审核奖惩记录，并可查看全体记录与汇总；现有审核操作还需后台访问资格。
+    description: 审核获指定周期的奖惩，并查看该周期记录与汇总。
     permissions: [behaviors.review_conduct_record, behaviors.view_conductrecord, behaviors.view_conductsummary]
   - code: behaviors.view_all_conduct_records
     name: 学生奖惩管理 | 查看全部奖惩记录
     description: 将奖惩记录范围扩大到全部人员。
     permissions: [behaviors.view_conductrecord, behaviors.view_conductsummary, behaviors.view_all_conduct_records]
+
+  - code: behaviors.manage_conduct_catalog
+    name: 学生奖惩管理 | 维护奖惩目录
+    description: 保留既有周期目录授权的配置记录。
+    permissions: [behaviors.change_conductcatalog]
+  - code: behaviors.manage_global_conduct_catalog
+    name: 学生奖惩管理 | 维护全局奖惩配置
+    description: 维护跨周期共享的奖惩分类、事项、程度与倍率。
+    permissions: [behaviors.manage_global_conduct_catalog]
+  - code: behaviors.write_conduct_policy
+    name: 学生奖惩管理 | 编写班级条例
+    description: 编写获指定周期的条例草稿与计分附表。
+    permissions: [behaviors.change_conductpolicy]
+  - code: behaviors.publish_conduct_policy
+    name: 学生奖惩管理 | 发布班级条例
+    description: 预览并发布获指定周期的班级条例。
+    permissions: [behaviors.publish_conductpolicy]
 
   - code: standards.view_standard
     name: 标准体系 | 查看标准体系

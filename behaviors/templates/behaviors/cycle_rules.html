@@ -1,0 +1,37 @@
+{% extends "behaviors/cycle_base.html" %}
+{% block cycle_content %}
+{% if capabilities.write and not policy.published_at %}
+  <a class="btn btn-primary" href="{% url 'behaviors:policy_item_new' cycle.pk policy.pk %}">添加条例事项</a>
+{% endif %}
+{% for group in groups %}
+<section class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body">
+  {% with first=group.rules.all.0 %}
+  <h2 class="card-title">{{ first.category_label|default:group.item.category.name }} · {{ first.item_label|default:group.item.name }}</h2>
+  {% endwith %}
+  <p>基准分 {{ group.base_score }}</p>
+  {% if capabilities.write and not policy.published_at %}
+  <div class="flex flex-wrap gap-2">
+    <a class="btn btn-sm" href="{% url 'behaviors:cycle_rule_new' cycle.pk policy.pk group.pk %}">新增分档</a>
+    <a class="btn btn-sm" href="{% url 'behaviors:policy_item_edit' cycle.pk policy.pk group.pk %}">编辑事项基准分</a>
+  </div>
+  {% endif %}
+  <div class="overflow-x-auto">
+    <table class="table">
+      <thead><tr><th>积分板块</th><th>程度或分档</th><th>倍率</th><th>每单位分值</th><th>单位</th>
+        {% if capabilities.write and not policy.published_at %}<th>操作</th>{% endif %}
+      </tr></thead>
+      <tbody>
+      {% for rule in group.rules.all %}
+        <tr id="rule-{{ rule.pk }}"><td>{{ rule.get_section_display }}</td><td>{{ rule.condition }}</td>
+        <td>×{{ rule.multiplier }}</td><td>{{ rule.points }}</td><td>{{ rule.unit|default:"次" }}</td>
+        {% if capabilities.write and not policy.published_at %}
+        <td><a class="link" href="{% url 'behaviors:cycle_rule_edit' cycle.pk policy.pk rule.pk %}">编辑</a></td>
+        {% endif %}
+        </tr>
+      {% empty %}<tr><td colspan="6">暂无分档。</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div></section>
+{% empty %}<p>暂无条例事项。</p>{% endfor %}
+{% endblock %}

@@ -6,14 +6,14 @@ CONDUCT_SEVERITIES = [
 ]
 
 CONDUCT_SEVERITY_RULES = [
-    {"nature": "REWARD", "severity": "MINOR", "label": "鼓励", "multiplier": "0.00", "order": 10, "is_default": False},
-    {"nature": "REWARD", "severity": "MODERATE", "label": "表扬", "multiplier": "1.00", "order": 20, "is_default": True},
-    {"nature": "REWARD", "severity": "SEVERE", "label": "嘉奖", "multiplier": "2.00", "order": 30, "is_default": False},
-    {"nature": "REWARD", "severity": "CRITICAL", "label": "特别嘉奖", "multiplier": "3.00", "order": 40, "is_default": False},
-    {"nature": "PENALTY", "severity": "MINOR", "label": "轻微", "multiplier": "0.00", "order": 10, "is_default": False},
-    {"nature": "PENALTY", "severity": "MODERATE", "label": "一般", "multiplier": "1.00", "order": 20, "is_default": True},
-    {"nature": "PENALTY", "severity": "SEVERE", "label": "严重", "multiplier": "2.00", "order": 30, "is_default": False},
-    {"nature": "PENALTY", "severity": "CRITICAL", "label": "特别严重", "multiplier": "3.00", "order": 40, "is_default": False},
+    {"nature": "REWARD", "severity": "MINOR", "label": "鼓励", "multiplier": "0.00", "order": 10, "is_default": False, "is_active": True},
+    {"nature": "REWARD", "severity": "MODERATE", "label": "表扬", "multiplier": "1.00", "order": 20, "is_default": True, "is_active": True},
+    {"nature": "REWARD", "severity": "SEVERE", "label": "嘉奖", "multiplier": "2.00", "order": 30, "is_default": False, "is_active": True},
+    {"nature": "REWARD", "severity": "CRITICAL", "label": "特别嘉奖", "multiplier": "3.00", "order": 40, "is_default": False, "is_active": True},
+    {"nature": "PENALTY", "severity": "MINOR", "label": "轻微", "multiplier": "0.00", "order": 10, "is_default": False, "is_active": True},
+    {"nature": "PENALTY", "severity": "MODERATE", "label": "一般", "multiplier": "1.00", "order": 20, "is_default": True, "is_active": True},
+    {"nature": "PENALTY", "severity": "SEVERE", "label": "严重", "multiplier": "2.00", "order": 30, "is_default": False, "is_active": True},
+    {"nature": "PENALTY", "severity": "CRITICAL", "label": "特别严重", "multiplier": "3.00", "order": 40, "is_default": False, "is_active": True},
 ]
 
 CONDUCT_CATEGORIES = [

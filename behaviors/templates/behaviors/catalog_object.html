@@ -1,0 +1,19 @@
+{% extends "behaviors/cycle_base.html" %}
+{% block cycle_content %}
+<section class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body">
+  {% if form %}
+    {% include "components/form.html" with submit_label="保存" grid_class="grid gap-4 md:grid-cols-2" %}
+  {% else %}
+    <dl class="grid gap-4 md:grid-cols-2">
+      {% for label, value in fields %}
+        {% if label == "说明" %}
+          {% include "components/detail_field.html" with label=label value=value multiline=True %}
+        {% else %}
+          {% include "components/detail_field.html" with label=label value=value %}
+        {% endif %}
+      {% endfor %}
+      {% include "components/record_timestamps.html" with created_at=obj.created_at updated_at=obj.updated_at %}
+    </dl>
+  {% endif %}
+</div></section>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% extends "behaviors/cycle_base.html" %}
+{% block cycle_content %}
+<div class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body">
+  {% include "components/form.html" with submit_label="保存" %}
+  {% if deletable %}<form method="post">{% csrf_token %}<button class="btn btn-error btn-outline" type="submit" name="action" value="delete">从草稿中移除</button></form>{% endif %}
+</div></div>
+{% endblock %}

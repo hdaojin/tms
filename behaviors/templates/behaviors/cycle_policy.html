@@ -1,0 +1,20 @@
+{% extends "behaviors/cycle_base.html" %}
+{% block cycle_content %}
+<section class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body">
+  <p>{{ policy.issuer }} · {% if policy.published_at %}版本 {{ policy.effective_date|date:"Y-m-d" }}{% else %}草稿{% endif %} · 生效日期 {{ policy.effective_date|date:"Y-m-d" }}</p>
+  {% if policy.change_note %}<p>{{ policy.change_note|linebreaksbr }}</p>{% endif %}
+  {% if policy.published_at %}<p>发布于 {{ policy.published_at|date:"Y-m-d H:i:s" }} · {{ policy.published_by.display_name }}</p>{% endif %}
+  <div class="flex flex-wrap gap-2">
+    <a class="btn" href="{% url 'behaviors:policy_rules' cycle.pk policy.pk %}">查看计分附表</a>
+    {% if capabilities.write %}
+      {% if policy.published_at %}<a class="btn" href="{% url 'behaviors:cycle_policy_new' cycle.pk %}?copy={{ policy.pk }}">复制为新草稿</a>
+      {% else %}<a class="btn" href="{% url 'behaviors:cycle_policy_edit' cycle.pk policy.pk %}">编辑正文</a>{% endif %}
+    {% endif %}
+    {% if capabilities.publish and not policy.published_at %}
+    <form method="post">{% csrf_token %}<input type="hidden" name="revision" value="{{ revision }}"><button class="btn btn-primary" type="submit">确认发布此版本</button></form>
+    {% endif %}
+  </div>
+  {% if toc %}<nav class="prose max-w-none" aria-label="条例目录">{{ toc }}</nav>{% endif %}
+  <div class="prose max-w-none overflow-x-auto">{{ body }}</div>
+</div></section>
+{% endblock %}

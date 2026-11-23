@@ -1,147 +1,140 @@
 from pathlib import Path
 
-from django.contrib.auth.decorators import permission_required
-from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.http import FileResponse, Http404, HttpResponse
-from django.shortcuts import get_object_or_404
-from django.urls import reverse_lazy
-from django.utils.html import escape
-from django.views.generic import CreateView
+from django.core.exceptions import PermissionDenied
+from django.http import FileResponse, Http404
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.utils.dateparse import parse_date
+from django.views.decorators.http import require_safe
 from django_tables2 import SingleTableView
 
+from core.utils.listing import FilterableListMixin, ListFilterSpec
 from core.utils.mixins import TitleMixin
-from .forms import ConductRecordForm
-from .models import (
-    ConductItem,
-    ConductNature,
-    ConductRecord,
-    ConductSummary,
-    get_conduct_severity_choices_with_multiplier,
-    get_default_conduct_severity,
+
+from .cycle_services import cycle_scope
+from .models import ConductNature, ConductRecord
+from .selectors import (
+    can_view_records, can_view_summaries, ledger_cycles, legacy_permission, search_students, summarize_records,
+    visible_records,
 )
-from .permissions import ADD_CONDUCT_RECORD_PERMISSION
-from .selectors import get_conduct_record_list_queryset, get_conduct_summary_list_queryset
-from .services import prepare_conduct_record_for_save
 from .tables import ConductRecordTable, ConductSummaryTable
 
 
-class ConductRecordCreateView(TitleMixin, PermissionRequiredMixin, CreateView):
-    model = ConductRecord
-    form_class = ConductRecordForm
-    template_name = 'behaviors/conductrecord_create.html'
-    success_url = reverse_lazy('behaviors:conductrecord_list')
-    permission_required = ADD_CONDUCT_RECORD_PERMISSION
-    raise_exception = True
-    title = "录入奖惩记录"
-    title_icon = "icon-[tabler--plus]"
-
-    def form_valid(self, form):
-        prepare_conduct_record_for_save(form.instance, actor=self.request.user, change=False)
-        return super().form_valid(form)
-
-
-class ConductRecordListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
-    model = ConductRecord
-    table_class = ConductRecordTable
+class LedgerList(FilterableListMixin, TitleMixin, SingleTableView):
     template_name = 'behaviors/conductrecord_list.html'
-    table_pagination = {"per_page": 20}
-    title = "奖惩记录列表"
-    title_icon = "icon-[tabler--list]"
-    permission_required = "behaviors.view_conductrecord"
+    table_pagination = {'per_page': 25}
+    list_filter_htmx = False
+    summary = False
 
-    def get_queryset(self):
-        qs = super().get_queryset().select_related(
-            'student', 'item__category', 'severity', 'recorded_by',
+    def dispatch(self, request, *args, **kwargs):
+        access = can_view_summaries if self.summary else can_view_records
+        if not access(request.user):
+            raise PermissionDenied
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_list_filter_specs(self):
+        cycles = ledger_cycles(self.request.user, summary=self.summary)
+        choices = [(cycle.pk, str(cycle)) for cycle in cycles]
+        if legacy_permission(self.request.user, summary=self.summary):
+            choices.append(('unassigned', '未关联周期'))
+        return (
+            ListFilterSpec('q', '学员', 'search', placeholder='学员姓名、全拼或首字母'),
+            ListFilterSpec('cycle', '训练周期', 'select', choices=choices, empty_label='全部周期'),
+            *self.list_filter_specs,
         )
-        return get_conduct_record_list_queryset(qs, self.request.user)
+
+    def get_base_queryset(self):
+        return visible_records(self.request.user, summary=self.summary)
+
+    def apply_search(self, queryset):
+        query = self.get_search_query()
+        return search_students(queryset, query) if query else queryset
+
+    def apply_custom_filters(self, queryset):
+        spec = next(spec for spec in self.resolved_list_filter_specs if spec.name == 'cycle')
+        cycle = self.get_filter_value(spec)
+        if not cycle:
+            return queryset.none() if self.request.GET.get('cycle') else queryset
+        if cycle == 'unassigned':
+            return queryset.filter(cycle__isnull=True)
+        return queryset.filter(cycle_id=cycle)
 
 
-class ConductSummaryListView(TitleMixin, PermissionRequiredMixin, SingleTableView):
-    model = ConductSummary
+class ConductRecordListView(LedgerList):
+    table_class = ConductRecordTable
+    title = '奖惩记录'
+    title_icon = 'icon-[tabler--list]'
+    list_filter_status_param = 'status'
+    list_filter_specs = (
+        ListFilterSpec('status', '状态', 'select', lookup='status', choices=ConductRecord.Status.choices, empty_label='全部状态'),
+        ListFilterSpec('nature', '奖惩性质', 'select', lookup='frozen_nature', choices=ConductNature.choices),
+        ListFilterSpec('date_from', '起始日期', 'date', advanced=True),
+        ListFilterSpec('date_to', '结束日期', 'date', advanced=True),
+    )
+
+    def get_base_queryset(self):
+        return super().get_base_queryset().select_related('cycle', 'student')
+
+    def apply_custom_filters(self, queryset):
+        queryset = super().apply_custom_filters(queryset)
+        for key, lookup in (('date_from', 'occurred_date__gte'), ('date_to', 'occurred_date__lte')):
+            if raw := self.request.GET.get(key):
+                try:
+                    date = parse_date(raw)
+                except ValueError:
+                    return queryset.none()
+                if date is None:
+                    return queryset.none()
+                queryset = queryset.filter(**{lookup: date})
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        cycles = cycle_scope(self.request.user, 'enter')
+        if cycles.exists():
+            context['page_actions'] = [
+                {'label': '录入奖惩', 'href': reverse('behaviors:conductrecord_create'), 'variant_class': 'btn-primary'},
+            ]
+        return context
+
+
+class ConductSummaryListView(LedgerList):
     table_class = ConductSummaryTable
-    template_name = 'behaviors/conductsummary_list.html'
-    table_pagination = {"per_page": 20}
-    title = "奖惩汇总"
-    title_icon = "icon-[tabler--chart-bar]"
-    permission_required = "behaviors.view_conductsummary"
+    title = '积分汇总'
+    title_icon = 'icon-[tabler--chart-bar]'
+    summary = True
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('student')
-        return get_conduct_summary_list_queryset(qs, self.request.user)
+        return summarize_records(super().get_queryset())
 
 
-@permission_required("behaviors.view_conductrecord", raise_exception=True)
-def conduct_attachment_view(request, pk):
-    record = get_object_or_404(
-        get_conduct_record_list_queryset(
-            ConductRecord.objects.select_related("student", "recorded_by"),
-            request.user,
-        ),
-        pk=pk,
+def ledger_record(user, **lookup):
+    return get_object_or_404(
+        visible_records(user).select_related('cycle', 'student', 'rule__policy_item__policy', 'rule__policy_item__item',
+                                             'recorded_by', 'reviewed_by', 'voided_by'),
+        **lookup,
     )
+
+
+def find_old_cycle_record(user, cycle_pk, pk):
+    return ledger_record(user, cycle_id=cycle_pk, source_cycle_record_id=pk)
+
+
+@require_safe
+def conduct_attachment_view(request, pk):
+    if not can_view_records(request.user):
+        raise PermissionDenied
+    record = ledger_record(request.user, pk=pk)
     if not record.attachment:
         raise Http404
-    return FileResponse(
-        record.attachment.open("rb"),
-        as_attachment=True,
-        filename=Path(record.attachment.name).name,
-    )
+    try:
+        stream = record.attachment.open('rb')
+    except FileNotFoundError as exc:
+        raise Http404 from exc
+    return FileResponse(stream, as_attachment=True, filename=Path(record.attachment.name).name)
 
 
-@permission_required("behaviors.add_conduct_record", raise_exception=True)
-def item_choices_view(request):
-    """HTMX endpoint: 根据选中的奖惩性质返回对应事项选项。"""
-    nature = request.GET.get('nature')
-
-    if nature not in ConductNature.values:
-        return HttpResponse(
-            '<option value="" selected>---------</option>',
-        )
-
-    items = ConductItem.objects.filter(
-        is_active=True,
-        category__is_active=True,
-        category__nature=nature,
-    ).select_related('category')
-
-    options = ['<option value="" selected>---------</option>']
-    for item in items:
-        options.append(f'<option value="{item.pk}">{escape(item)}</option>')
-    return HttpResponse(''.join(options))
-
-
-@permission_required("behaviors.add_conduct_record", raise_exception=True)
-def severity_choices_view(request):
-    """HTMX endpoint: 根据选中的奖惩事项返回对应严重程度选项。"""
-    item_id = request.GET.get('item')
-    nature = None
-
-    if item_id:
-        item = ConductItem.objects.filter(
-            pk=item_id,
-            is_active=True,
-            category__is_active=True,
-            category__nature__in=ConductNature.values,
-        ).select_related('category').first()
-        if item:
-            nature = item.category.nature
-
-    if nature is None:
-        return HttpResponse(
-            '<option value="" disabled selected>请先选择奖惩事项</option>',
-        )
-
-    choices = get_conduct_severity_choices_with_multiplier(nature)
-    default_rule = get_default_conduct_severity(nature)
-    default_code = default_rule.severity.code if default_rule is not None else None
-    options = []
-    if not choices:
-        return HttpResponse(
-            '<option value="" disabled selected>当前性质未配置严重程度规则</option>',
-        )
-    if default_code is None:
-        options.append('<option value="" selected>请选择程度（未配置默认项）</option>')
-    for value, label in choices:
-        selected = ' selected' if value == default_code else ''
-        options.append(f'<option value="{escape(value)}"{selected}>{escape(label)}</option>')
-    return HttpResponse(''.join(options))
+@require_safe
+def old_cycle_attachment(request, pk, record_pk):
+    record = find_old_cycle_record(request.user, pk, record_pk)
+    return redirect('behaviors:conduct_attachment', record.pk)

@@ -1,0 +1,17 @@
+{% extends "behaviors/cycle_base.html" %}
+{% block cycle_content %}
+<div class="card border border-base-300 bg-base-100 shadow-sm"><div class="card-body">
+  <h2 class="card-title">{{ cycle }}</h2>
+  <ul class="space-y-2">
+    {% for assignment in assignments %}
+      <li><a class="link" href="{% url 'behaviors:cycle_assignment_edit' cycle.pk assignment.pk %}">{{ assignment.user.display_name }}</a>
+      {% if assignment.can_enter %} · 录入{% endif %}{% if assignment.can_review %} · 审核{% endif %}
+      {% if assignment.can_write %} · 编写条例{% endif %}
+      {% if assignment.can_publish %} · 发布条例{% endif %}
+      </li>
+    {% empty %}<li>暂无分工。</li>{% endfor %}
+  </ul>
+  <p>经办人同时需要对应的功能权限。取消勾选可撤销该周期的分工。</p>
+  {% include "components/form.html" with submit_label="保存分工" %}
+</div></div>
+{% endblock %}

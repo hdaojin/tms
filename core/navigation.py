@@ -9,12 +9,18 @@ from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.urls import NoReverseMatch, reverse
+from django.utils.module_loading import import_string
 
 from core.config_loader import ConfigurationError, load_yaml_mapping
 from core.permissions.registry import get_declared_permission_labels
 
 
-CACHE_NS = "tms:navigation:v1"
+CACHE_NS = "tms:navigation:v2"
+SCOPED_VISIBILITY = {
+    "conduct_records": "behaviors.selectors.can_view_records",
+    "conduct_summaries": "behaviors.selectors.can_view_summaries",
+    "conduct_policies": "behaviors.selectors.can_view_policies",
+}
 
 
 @dataclass
@@ -27,6 +33,8 @@ class NavigationItem:
     section: str | None = None
     permissions: list[str] = field(default_factory=list)
     active_app_names: list[str] = field(default_factory=list)
+    active_url_names: list[str] = field(default_factory=list)
+    visibility: str | None = None
     children: list["NavigationItem"] = field(default_factory=list)
     external: bool = False
     debug_only: bool = False
@@ -75,6 +83,12 @@ def _validate_config(data: dict) -> None:
         active_app_names = raw.get("active_app_names") or []
         if not isinstance(active_app_names, list) or any(not isinstance(value, str) for value in active_app_names):
             raise ConfigurationError(f"{location}.active_app_names 必须是字符串列表。")
+        active_url_names = raw.get("active_url_names") or []
+        if not isinstance(active_url_names, list) or any(not isinstance(value, str) for value in active_url_names):
+            raise ConfigurationError(f"{location}.active_url_names 必须是字符串列表。")
+        visibility = raw.get("visibility")
+        if visibility is not None and (not isinstance(visibility, str) or visibility not in SCOPED_VISIBILITY):
+            raise ConfigurationError(f"{location}.visibility 引用了未知的可见范围。")
         children = raw.get("children") or []
         is_leaf = not children and bool(raw.get("url") or raw.get("url_name"))
         explicit_login_required = raw.get("login_required") is True and "login_required" in raw
@@ -86,6 +100,7 @@ def _validate_config(data: dict) -> None:
                 permissions,
                 raw.get("staff_required"),
                 raw.get("superuser_required"),
+                visibility,
             )
         )
         if is_leaf and modes != 1:
@@ -145,6 +160,8 @@ def _build_item(raw: dict, section_slug: str | None = None) -> NavigationItem:
         section=raw.get("section") or section_slug,
         permissions=list(raw.get("permissions") or []),
         active_app_names=list(raw.get("active_app_names") or []),
+        active_url_names=list(raw.get("active_url_names") or []),
+        visibility=raw.get("visibility"),
         children=children,
         external=bool(raw.get("external", False)),
         debug_only=bool(raw.get("debug_only", False)),
@@ -157,7 +174,7 @@ def _build_item(raw: dict, section_slug: str | None = None) -> NavigationItem:
     return item
 
 
-def _filter_item(item: NavigationItem, user) -> NavigationItem | None:
+def _filter_item(item: NavigationItem, user, visibility_cache: dict) -> NavigationItem | None:
     if item.debug_only and not settings.DEBUG:
         return None
     if item.login_required and isinstance(user, AnonymousUser):
@@ -169,9 +186,16 @@ def _filter_item(item: NavigationItem, user) -> NavigationItem | None:
     if item.permissions and (isinstance(user, AnonymousUser) or not user.has_perms(item.permissions)):
         return None
 
+    if item.visibility:
+        if item.visibility not in visibility_cache:
+            check = import_string(SCOPED_VISIBILITY[item.visibility])
+            visibility_cache[item.visibility] = user.is_authenticated and check(user)
+        if not visibility_cache[item.visibility]:
+            return None
+
     filtered_children: list[NavigationItem] = []
     for child in item.children:
-        filtered = _filter_item(child, user)
+        filtered = _filter_item(child, user, visibility_cache)
         if filtered is not None:
             filtered_children.append(filtered)
     item.children = filtered_children
@@ -213,7 +237,7 @@ def _mark_active(items: list[NavigationItem], request) -> None:
 
     def item_score(item: NavigationItem) -> int:
         score = path_match_score(item.resolved_url) if item.has_own_url else 0
-        if item.url_name and view_name == item.url_name:
+        if view_name and (view_name == item.url_name or view_name in item.active_url_names):
             score = max(score, 1_000_000 + len(item.resolved_url or ""))
         if app_name in item.active_app_names:
             score = max(score, 10)
@@ -254,8 +278,13 @@ def get_section_items(section_slug: str, user, request=None) -> list[NavigationI
     if not section:
         return []
     items: list[NavigationItem] = []
+    visibility_cache = {}
+    if request is not None and getattr(request, "user", None) == user:
+        if not hasattr(request, "_tms_nav_visibility"):
+            request._tms_nav_visibility = {}
+        visibility_cache = request._tms_nav_visibility
     for raw_item in section.get("items", []) or []:
-        item = _filter_item(_build_item(raw_item, section_slug), user)
+        item = _filter_item(_build_item(raw_item, section_slug), user, visibility_cache)
         if item is not None:
             items.append(item)
     if request is not None:

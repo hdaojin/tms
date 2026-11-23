@@ -8,6 +8,7 @@ from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections, transaction
+from django.db.migrations.loader import MigrationLoader
 
 from behaviors.models import (
     ConductCategory,
@@ -145,10 +146,11 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             description = connection.introspection.get_table_description(cursor, plan.old_name)
         actual_columns = {column.name for column in description}
-        required_columns = {
-            field.column
-            for field in plan.model._meta.local_concrete_fields
-        }
+        # This app-label cutover can run before the ledger migrations.
+        historical = MigrationLoader(connection).project_state(
+            [('behaviors', '0019_alter_conductrecord_attachment')],
+        ).apps.get_model(NEW_APP_LABEL, plan.label)
+        required_columns = {field.column for field in historical._meta.local_concrete_fields}
         missing_columns = sorted(required_columns - actual_columns)
         if missing_columns:
             missing_display = '、'.join(missing_columns)

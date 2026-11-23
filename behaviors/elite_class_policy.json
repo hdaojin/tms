@@ -1,0 +1,471 @@
+{
+  "title": "网络系统管理项目精英班班级管理条例",
+  "issuer": "网络系统管理项目教练组",
+  "body": "## 第一章 学习性质与学籍管理\n\n第一条【全脱产学习】  在精英班学习属于全脱产学习，日常作息时间按照精英班相关规定执行。\n\n第二条【学籍与缴费】  学员学籍以及学费等缴费仍在原班级，缴费按原渠道办理。\n\n第三条【实习与毕业】  学员后续实习、毕业均按照原本时间节点进行。\n\n第四条【校规与仪容】  学员应遵守学校规章制度，穿校服，注意仪容仪表。\n\n## 第二章 训练时间与作息\n\n第五条【训练周期】  精英班一周训练6天，为周一至周六。\n\n第六条【日常作息】  早读 8:10—8:50；上午训练9:00—12:00；下午训练14:00—16:30；16:30—17:30运动；晚自习18:30—20:30。\n\n第七条【周五安排】  周五下午训练自13:30开始。\n\n第八条【周六安排】  周六下午16:00放学。\n\n第九条【作息一览】  精英班每周作息时间见下表。表中\"至\"表示该时段按本条规定结束时间执行。\n\n表 1    精英班每周作息时间表\n\n| 时    段 | 周一至周四 | 周    五 | 周    六 |\n| --- | --- | --- | --- |\n| 早    读 | 8:10—8:50 | 8:10—8:50 | 8:10—8:50 |\n| 上午训练 | 9:00—12:00 | 9:00—12:00 | 9:00—12:00 |\n| 下午训练 | 14:00—16:30 | 13:30—16:30 | 14:00—16:00 |\n| 运    动 | 16:30—17:30 | 16:30—17:30 | — |\n| 晚自习 | 18:30—20:30 | 18:30—20:30 | — |\n\n第十条【打卡与迟到】  严禁迟到。学员到基地上下课须打卡，上课、下课各打卡一次。\n\n第十一条【运动要求】  运动每日跑步2km，每月跑步50km。\n\n第十二条【晚归请假】  晚上10:30后回宿舍，需提前向班主任请晚归假，并在回宿舍时找宿管老师签到。\n\n## 第三章 宿舍管理\n\n第十三条【宿舍长制度】  学员宿舍实行宿舍长制度。\n\n第十四条【卫生要求】  宿舍按照学校的卫生安排以及卫生要求严格落实。\n\n第十五条【作息与秩序】  宿舍内日常按时作息，不允许打扰他人。\n\n第十六条【定期外宿】  周六下午回家，须签定期外宿单。\n\n## 第四章 基地与工位管理\n\n第十七条【主人翁意识】  学员在基地要有主人翁意识。\n\n第十八条【通风与设备】  日常开窗通风；离开工作关闭电脑屏幕。\n\n第十九条【离场断电】  离开基地关闭水电开关和电闸。\n\n第二十条【工位整洁】  保持个人工位整洁，工位上不要摆放与学习无关物品，及时倒垃圾。\n\n## 第五章 资产借用管理\n\n第二十一条【领取范围】  学员可根据学习需要领取基地资产，例如计算机、显示屏等。\n\n第二十二条【借用登记】  基地资产借用实行登记制度，学员对所借资产全权负责。\n\n第二十三条【禁止事项】  严禁私用、交换、外借、拆装机器；珍惜物品，不许损坏。\n\n## 第六章 保密要求\n\n第二十四条【保密范围】  对于训练计划、训练资源、比赛相关文件等，不得以任何形式泄露和传播。\n\n第二十五条【信息发布】  不允许在互联网、通讯媒体上发表本项目及精英班相关内容或资讯。\n\n## 第七章 积分管理\n\n第二十六条【积分制度】  精英班管理实行积分制度，对学员的竞赛表现、日常管理和日常学习情况进行量化积分；积分作为学员排名、评优评先以及竞赛选拔等的参考。积分的加、减分项目与分值，按照附表《精英班学员加减分一览表》执行。\n\n第二十七条【竞赛奖励积分】  竞赛奖励积分为加分项，加分无上限。学员参加世界级、国家级、省级、市级竞赛并获得奖励的，按附表标准加分；因创作、发明、制作、行为等获得学校表彰，提高精英班声誉的，每次奖励10分。竞赛奖励积分可抵扣日常管理积分、学习成绩积分的扣分。\n\n第二十八条【日常管理积分】  日常管理积分初始为0分，实行加减分并行。宿舍管理、运动达标等达到要求的，按附表标准加分；出现旷课、迟到早退、仪容仪表不符合要求、品行操行失范、设备使用与管理违规、考核纪律违规、严重违纪以及破坏学校或精英班声誉的校外行为等情形，按附表标准扣分。\n\n第二十九条【日常学习扣分】  日常学习方面，未按时提交作业、未提交训练日志以及单科考核成绩低于60分的，按附表标准扣分。\n\n第三十条【附表】  学员积分的加、减分项目与分值见下表。",
+  "rules": [
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "世界级",
+      "condition": "一等奖",
+      "points": "+30",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "世界级",
+      "condition": "二等奖",
+      "points": "+25",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "世界级",
+      "condition": "三等奖",
+      "points": "+20",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "世界级",
+      "condition": "优胜奖",
+      "points": "+15",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "国家级",
+      "condition": "一等奖",
+      "points": "+25",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "国家级",
+      "condition": "二等奖",
+      "points": "+20",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "国家级",
+      "condition": "三等奖",
+      "points": "+15",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "国家级",
+      "condition": "优胜奖",
+      "points": "+10",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "省级",
+      "condition": "一等奖",
+      "points": "+20",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "省级",
+      "condition": "二等奖",
+      "points": "+15",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "省级",
+      "condition": "三等奖",
+      "points": "+10",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "市级",
+      "condition": "一等奖",
+      "points": "+15",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "市级",
+      "condition": "二等奖",
+      "points": "+10",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "竞赛获奖",
+      "item": "市级",
+      "condition": "三等奖",
+      "points": "+5",
+      "unit": ""
+    },
+    {
+      "section": "competition",
+      "category": "学校表彰",
+      "item": "学校表彰",
+      "condition": "因创作、发明、制作、行为等获得学校表彰，提高精英班声誉",
+      "points": "+10",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "宿舍管理",
+      "item": "宿舍管理",
+      "condition": "每月宿舍卫生检查未被批评（宿舍每人）",
+      "points": "+3",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "宿舍管理",
+      "item": "宿舍管理",
+      "condition": "每月宿舍卫生检查被表扬（宿舍每人）",
+      "points": "+5",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "运动达标",
+      "item": "运动达标",
+      "condition": "每月运动达标",
+      "points": "+3",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "运动达标",
+      "item": "运动达标",
+      "condition": "每月运动达标率超出基准20%以上",
+      "points": "+5",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "班级管理",
+      "item": "班级管理",
+      "condition": "担任班级管理干部并认真履职，关心团结同学，起到模范带头作用（每学期一次）",
+      "points": "+10",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "旷课与请假",
+      "item": "公假",
+      "condition": "公假：因参加学校组织或派遣的竞赛、考试、活动请假",
+      "points": "0",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "旷课与请假",
+      "item": "特假",
+      "condition": "特假：特别重要事件须在工作日处理（含严重病假），经基地负责人批准请假",
+      "points": "0",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "旷课与请假",
+      "item": "病假",
+      "condition": "病假（以0.5天为单位）",
+      "points": "-0.5",
+      "unit": "半天"
+    },
+    {
+      "section": "management",
+      "category": "旷课与请假",
+      "item": "事假",
+      "condition": "事假（以0.5天为单位）",
+      "points": "-1",
+      "unit": "半天"
+    },
+    {
+      "section": "management",
+      "category": "旷课与请假",
+      "item": "无故离班",
+      "condition": "无故离班不上课、先旷课后补假、请假未获批准仍离班，以旷课论（以0.5天为单位）",
+      "points": "-2",
+      "unit": "半天"
+    },
+    {
+      "section": "management",
+      "category": "旷课与请假",
+      "item": "请假不符合规程",
+      "condition": "请假不符合规程：未提前请假、请假超过三天无家长签名或证明文件、无法到校未先电话请假且事后未补请假单",
+      "points": "-1",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "迟到早退",
+      "item": "迟到早退",
+      "condition": "按精英班作息时间参加上课、训练，早、中、晚三次考勤，考勤迟早或早退",
+      "points": "-1",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "仪容仪表",
+      "item": "仪容仪表",
+      "condition": "未按校规要求着装、整理仪容",
+      "points": "-1",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "仪容仪表",
+      "item": "仪容仪表",
+      "condition": "在基地检查、参观、竞赛、活动期间未按要求统一着装、整理仪容",
+      "points": "-1",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "品行操行",
+      "item": "品行操行",
+      "condition": "破坏校园环境",
+      "points": "-2",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "品行操行",
+      "item": "品行操行",
+      "condition": "不按要求整理工位、工位不整洁",
+      "points": "-2",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "品行操行",
+      "item": "品行操行",
+      "condition": "未按时完成宿舍卫生清洁任务",
+      "points": "-2",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "品行操行",
+      "item": "品行操行",
+      "condition": "每月宿舍卫生检查被批评（宿舍每人）",
+      "points": "-3",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "品行操行",
+      "item": "品行操行",
+      "condition": "每月运动量显著低于平均值（月跑步＜20km）",
+      "points": "-3",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "品行操行",
+      "item": "品行操行",
+      "condition": "不尊重老师、不服从老师管理以及顶撞老师",
+      "points": "-5",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "品行操行",
+      "item": "品行操行",
+      "condition": "不讲礼貌、语言粗俗、态度恶劣",
+      "points": "-2",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "品行操行",
+      "item": "品行操行",
+      "condition": "无正当理由与同学发生冲突",
+      "points": "-2",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "设备管理",
+      "item": "设备管理",
+      "condition": "私自拆装工位训练设备、乱接电源电线",
+      "points": "-2",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "设备管理",
+      "item": "设备管理",
+      "condition": "未经许可，将训练设备或配件带离基地",
+      "points": "-1",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "设备管理",
+      "item": "设备管理",
+      "condition": "未经领用登记或未经批准，使用基地设备",
+      "points": "-2",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "设备管理",
+      "item": "设备管理",
+      "condition": "操作不当导致设备损坏（个人承担相应损失外另再扣分）",
+      "points": "-1",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "设备管理",
+      "item": "设备管理",
+      "condition": "个人领用设备、物品遗失（个人承担相应损失外另再扣分）",
+      "points": "-1",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "设备管理",
+      "item": "设备管理",
+      "condition": "不遵守设备安全使用守则，导致基地资料丢失、外泄",
+      "points": "-5",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "考核纪律",
+      "item": "考核纪律",
+      "condition": "无故缺考",
+      "points": "-3",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "考核纪律",
+      "item": "考核纪律",
+      "condition": "考试作弊",
+      "points": "-5",
+      "unit": "次"
+    },
+    {
+      "section": "management",
+      "category": "严重违纪",
+      "item": "严重违纪",
+      "condition": "侮辱师长、打架斗殴、涉及赌博、抽烟喝酒、涉及色情活动、欺骗行为、偷窃抢夺、恐吓霸凌、涉及非法聚会或非法组织、男女交往导致严重后果、持有危险违禁物品、危险举动等，视情节轻重（21 分档）",
+      "points": "-21",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "严重违纪",
+      "item": "严重违纪",
+      "condition": "侮辱师长、打架斗殴、涉及赌博、抽烟喝酒、涉及色情活动、欺骗行为、偷窃抢夺、恐吓霸凌、涉及非法聚会或非法组织、男女交往导致严重后果、持有危险违禁物品、危险举动等，视情节轻重（50 分档）",
+      "points": "-50",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "严重违纪",
+      "item": "严重违纪",
+      "condition": "因违反校规被记大过处理",
+      "points": "-21",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "严重违纪",
+      "item": "严重违纪",
+      "condition": "因违反校规被勒令退学",
+      "points": "-50",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "严重违纪",
+      "item": "严重违纪",
+      "condition": "触犯法律法规",
+      "points": "-50",
+      "unit": ""
+    },
+    {
+      "section": "management",
+      "category": "校外行为",
+      "item": "校外行为",
+      "condition": "校外破坏学校或精英班声誉",
+      "points": "-50",
+      "unit": ""
+    },
+    {
+      "section": "learning",
+      "category": "学习管理",
+      "item": "精英班月度考核成绩优异",
+      "condition": "排名第一",
+      "points": "+7",
+      "unit": ""
+    },
+    {
+      "section": "learning",
+      "category": "学习管理",
+      "item": "精英班月度考核成绩优异",
+      "condition": "排名第二",
+      "points": "+5",
+      "unit": ""
+    },
+    {
+      "section": "learning",
+      "category": "学习管理",
+      "item": "精英班月度考核成绩优异",
+      "condition": "排名第三",
+      "points": "+3",
+      "unit": ""
+    },
+    {
+      "section": "learning",
+      "category": "学习管理",
+      "item": "精英班月度考核成绩优异",
+      "condition": "进步超过5名",
+      "points": "+5",
+      "unit": ""
+    },
+    {
+      "section": "learning",
+      "category": "作业完成",
+      "item": "作业完成",
+      "condition": "未按时提交作业",
+      "points": "-2",
+      "unit": "次"
+    },
+    {
+      "section": "learning",
+      "category": "训练日志",
+      "item": "训练日志",
+      "condition": "未按要求提交训练日志",
+      "points": "-2",
+      "unit": "次"
+    },
+    {
+      "section": "learning",
+      "category": "考核成绩",
+      "item": "考核成绩",
+      "condition": "单科考核成绩低于60分",
+      "points": "-5",
+      "unit": "科"
+    }
+  ]
+}
