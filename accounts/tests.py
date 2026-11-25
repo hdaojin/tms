@@ -203,6 +203,16 @@ class UserListTableTemplateRegressionTest(TestCase):
 		self.assertContains(response, '选手21')
 		self.assertContains(response, '?page=2')
 
+	def test_profile_viewer_sees_accounts_in_list_and_detail(self):
+		viewer = User.objects.create_user('profile-viewer', first_name='查看者')
+		viewer.user_permissions.add(Permission.objects.get(codename='view_all_profiles'))
+		target = User.objects.get(username='competitor-21')
+		self.client.force_login(viewer)
+		response = self.client.get(reverse('accounts:user_list'), {'q': '选手21'})
+		self.assertContains(response, 'competitor-21')
+		response = self.client.get(reverse('accounts:user_detail', args=[target.pk]))
+		self.assertContains(response, 'value="competitor-21"')
+
 	def test_user_list_renders_indistinguishable_users_without_selection(self):
 		first = User.objects.create_user('duplicate-first', first_name='同名用户')
 		second = User.objects.create_user('duplicate-second', first_name='同名用户')
@@ -267,7 +277,7 @@ class UserListRoleColumnTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		self.assertContains(response, '李教练')
-		self.assertNotContains(response, 'role-table-admin')
+		self.assertContains(response, 'role-table-admin')
 		self.assertContains(response, '张多角')
 		self.assertContains(response, '赵未分配')
 		self.assertContains(response, '未分配')
@@ -275,7 +285,7 @@ class UserListRoleColumnTests(TestCase):
 		soup = BeautifulSoup(response.content, 'html.parser')
 		headers = [th.get_text(strip=True) for th in soup.select('thead th')]
 		name_index = headers.index('姓名')
-		self.assertEqual(headers[name_index:name_index + 2], ['姓名', '角色'])
+		self.assertEqual(headers[name_index:name_index + 3], ['姓名', '账号', '角色'])
 		sortable_headers = {a.get_text(strip=True) for a in soup.select('thead th a')}
 		self.assertSetEqual(
 			sortable_headers,

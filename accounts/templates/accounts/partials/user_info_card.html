@@ -10,10 +10,10 @@
     </h2>
 
     <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-      {% if target_user.pk == request.user.pk %}<label class="input">
+      <label class="input">
         <span class="label">账号</span>
         <input type="text" value="{{ target_user.username }}" disabled />
-      </label>{% endif %}
+      </label>
 
       <label class="input">
         <span class="label">姓名</span>

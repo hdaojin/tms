@@ -5,6 +5,7 @@ from threading import Barrier
 from urllib.parse import urlsplit
 from uuid import uuid4
 
+from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import DisallowedHost, PermissionDenied
@@ -90,6 +91,12 @@ class PasswordResetTests(TestCase):
         self.assertEqual(grant.token_digest, hashlib.sha256(link.fragment.encode()).hexdigest())
         self.assertEqual((grant.issued_by, grant.user, grant.reason), (self.issuer, self.user, "当面核验"))
         self.assertAlmostEqual((grant.expires_at - grant.created_at).total_seconds(), 1800, delta=1)
+        soup = BeautifulSoup(response.content, "html.parser")
+        copy_text = soup.select_one('textarea#password-reset-link').get_text()
+        self.assertIn(response.context["reset_link"], copy_text)
+        self.assertIn(timezone.localtime(grant.expires_at).strftime("%Y-%m-%d %H:%M:%S"), copy_text)
+        self.assertIn("链接仅可使用一次，请勿转发给他人。", copy_text)
+        self.assertIsNotNone(soup.select_one('button[data-copy-target="#password-reset-link"]'))
         self.assertNotContains(self.client.get(reverse("accounts:user_detail", args=[self.user.pk])), link.fragment)
         self.assertNotIn(link.fragment, repr(dict(self.client.session)))
 

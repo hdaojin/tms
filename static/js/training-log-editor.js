@@ -34,7 +34,8 @@ if (editor) {
   const preview = document.createElement("form");
   preview.method = "post";
   preview.enctype = "multipart/form-data";
-  preview.action = editor.action;
+  // The editor's submit buttons named "action" shadow its DOM action property.
+  preview.action = editor.getAttribute("action") || window.location.href;
   preview.target = "training-log-preview";
   preview.hidden = true;
   document.body.append(preview);

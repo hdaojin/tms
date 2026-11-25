@@ -8,6 +8,63 @@ const source = readFileSync(
   "utf8",
 );
 
+test("实时预览向当前草稿地址发送未保存的正文", () => {
+  const draftUrl = "https://tms.example/training/logs/ai/7/?return_plan=3";
+  const field = {
+    name: "notes",
+    value: "**未保存的正文**",
+    matches: () => true,
+  };
+  const editor = {
+    action: { toString: () => "[object RadioNodeList]" },
+    getAttribute: () => null,
+    elements: {
+      csrfmiddlewaretoken: { value: "token" },
+      revision: { value: "3" },
+    },
+    querySelector: () => null,
+    querySelectorAll: () => [field],
+    addEventListener: (_type, listener) => (editor.onInput = listener),
+  };
+  const requests = [];
+  const preview = {
+    replaceChildren: () => (preview.fields = []),
+    append: (input) => preview.fields.push([input.name, input.value]),
+    submit: () =>
+      requests.push([
+        String(preview.action),
+        Object.fromEntries(preview.fields),
+      ]),
+  };
+  vm.runInNewContext(source, {
+    document: {
+      querySelector: (selector) =>
+        selector === "[data-log-editor]"
+          ? editor
+          : { hasAttribute: () => true },
+      createElement: (tag) => (tag === "form" ? preview : {}),
+      body: { append() {} },
+    },
+    window: { location: { href: draftUrl } },
+    setTimeout: (callback) => callback(),
+    clearTimeout() {},
+  });
+
+  assert.deepEqual(requests, []);
+  editor.onInput({ target: field });
+  assert.deepEqual(requests, [
+    [
+      draftUrl,
+      {
+        action: "preview",
+        csrfmiddlewaretoken: "token",
+        revision: "3",
+        notes: field.value,
+      },
+    ],
+  ]);
+});
+
 test("训练日志按模型和实际思考模式启用参数并清除旧值", () => {
   const settings = {
     1: { effort: true, default_thinking: "enabled" },

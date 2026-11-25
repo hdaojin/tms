@@ -77,6 +77,7 @@ def admin_password_reset_issue(request, pk):
     )
     path = reverse("accounts:password_reset_grant", kwargs={"grant_id": grant.pk})
     context["reset_link"] = f"{request.build_absolute_uri(path)}#{raw_token}"
+    context["reset_expires_at"] = grant.expires_at
     return _private_render(request, "accounts/password_reset_link.html", context)
 
 

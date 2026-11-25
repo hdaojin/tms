@@ -43,6 +43,7 @@ class UserListTable(BaseTable):
         order_by=("last_name", "first_name", "pk"),
         attrs={"td": {"class": "min-w-20 whitespace-nowrap text-center align-middle"}},
     )
+    username = tables.Column(verbose_name="账号", orderable=False)
     roles = tables.Column(
         verbose_name="角色",
         empty_values=(),
@@ -156,6 +157,7 @@ class UserListTable(BaseTable):
             "selection",
             "row_number",
             "first_name",
+            "username",
             "roles",
             "gender",
             "birth_date",

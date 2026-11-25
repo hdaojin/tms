@@ -493,8 +493,27 @@ def draft_page(request, pk=None, *, draft=None):
     saved = False
     error = ""
     if action:
+        success_url = None
         try:
-            if editor:
+            if editor and action == "submit":
+                if body_form.is_valid():
+                    data = body_form.cleaned_data.copy()
+                    revision = data.pop("revision")
+                    # Keep the draft even if submission validation or PDF generation fails.
+                    with transaction.atomic():
+                        draft = save_editor_body(draft, revision, data)
+                    saved = draft.revision != revision
+                    if saved:
+                        values = request.POST.copy()
+                        values["revision"] = str(draft.revision)
+                        body_form = DraftBodyForm(values, role=role, draft=draft, source=current)
+                    log = submit_draft(
+                        draft, draft.revision, request.POST.get("source_digest", ""),
+                        request.POST.get("accept_changes") == "on", origin=request.build_absolute_uri("/"),
+                    )
+                    messages.success(request, "已提交训练日志并归档 PDF。")
+                    success_url = reverse("training:log_detail", args=[log.pk])
+            elif editor:
                 success_url = handle_editor_action(request, draft, action, generation_form, image_form, body_form, section)
             elif action in {"note_manual", "note_summary", "note_rebuild"}:
                 success_url = note_action(request, draft)
@@ -624,6 +643,7 @@ def draft_page(request, pk=None, *, draft=None):
         ),
         running=bool(job and job.status in log_generation.ACTIVE),
         can_preview=can_preview,
+        saved=saved,
         can_view_job=can_view_job,
         changes=changes,
         source_digest=source_digest(current),
@@ -682,6 +702,20 @@ def note_candidates(request, draft, current, available):
     )
 
 
+def save_editor_body(draft, revision, data, *, force=False):
+    locked = log_generation.lock_draft(draft)
+    if locked.revision != revision:
+        raise ValidationError("草稿已更新，请重新加载后编辑。")
+    current, _, _ = log_generation.source_for(locked, note_assets=False)
+    role = current["header"]["role"]
+    if force or not locked.source.get("editor") or data != {
+        key: locked.body.get(key, "") for key, _ in editor_fields(role)
+    }:
+        log_generation.edit_draft(locked, revision, data, editor=True)
+        locked.refresh_from_db()
+    return locked
+
+
 def handle_editor_action(request, draft, action, generation_form, image_form, body_form, section):
     if not body_form.is_valid():
         return None
@@ -696,26 +730,7 @@ def handle_editor_action(request, draft, action, generation_form, image_form, bo
         if action == "prepare":
             reference_text = fetch_reference_pages(generation_form.cleaned_data["references"])
     with transaction.atomic():
-        locked = log_generation.lock_draft(draft)
-        if locked.revision != revision:
-            raise ValidationError("草稿已更新，请重新加载后编辑。")
-        current, _, _ = log_generation.source_for(locked, note_assets=False)
-        role = current["header"]["role"]
-        source = locked.source or current
-        if action == "submit":
-            try:
-                validate_editor_body(role, data, source)
-            except ValidationError as exc:
-                if hasattr(exc, "error_dict"):
-                    for key, errors in exc.error_dict.items():
-                        body_form.add_error(key, ValidationError(errors))
-                    return None
-                raise
-        if action == "edit" or not locked.source.get("editor") or data != {
-            key: locked.body.get(key, "") for key, _ in editor_fields(role)
-        }:
-            log_generation.edit_draft(locked, revision, data, editor=True)
-            locked.refresh_from_db()
+        locked = save_editor_body(draft, revision, data, force=action == "edit")
         if action == "edit":
             messages.success(request, "已保存草稿正文。")
         elif action == "prepare":
@@ -736,13 +751,6 @@ def handle_editor_action(request, draft, action, generation_form, image_form, bo
                 locked, form.cleaned_data["generation"], apply=True, revision=locked.revision,
                 sections=request.POST.getlist("candidate_sections"),
             )
-        elif action == "submit":
-            log = submit_draft(
-                locked, locked.revision, request.POST.get("source_digest", ""), request.POST.get("accept_changes") == "on",
-                origin=request.build_absolute_uri("/"),
-            )
-            messages.success(request, "已提交训练日志并归档 PDF。")
-            return reverse("training:log_detail", args=[log.pk])
         else:
             return handle_action(request, locked, action, generation_form, image_form, body_form)
     return reverse("training:log_ai_draft", args=[draft.pk])

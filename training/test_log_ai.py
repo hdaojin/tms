@@ -193,19 +193,78 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertEqual(draft.body["goals_md"], "")
         url = reverse("training:log_ai_draft", args=[draft.pk])
         data.update(action="submit", revision=draft.revision, source_digest=response.context["source_digest"])
+        data["process"] = "**补充自主复盘**"
         incomplete = self.client.post(url, data)
         self.assertContains(incomplete, "请填写「训练目标」")
         rendered = BeautifulSoup(incomplete.content, "html.parser")
         self.assertIsNotNone(rendered.select_one("#id_goals_md_error"))
         self.assertIsNone(rendered.select_one("#site-messages .alert-error"))
         self.assertFalse(TrainingLog.objects.exists())
-        data.update(goals_md="复核运行状态", outline_md="- 自主检查", achievement="待核实",
+        draft.refresh_from_db()
+        self.assertEqual(draft.body["process"], data["process"])
+        data.update(revision=incomplete.context["body_form"]["revision"].value(),
+                    goals_md="复核运行状态", outline_md="- 自主检查", achievement="待核实",
                     shortcomings="待核实", improvement="复核记录")
         with patch("training.log_documents.generate_document_pdf", return_value=b"%PDF-1.4\n"):
             self.assertEqual(self.client.post(url, data).status_code, 302)
         log = TrainingLog.objects.get(author=self.other)
         self.assertEqual(log.online_document["source"]["tasks"], [])
-        self.assertEqual(log.online_document["body"]["process"], "**自主复盘**")
+        self.assertEqual(log.online_document["body"], {key: data[key] for key, _ in editor_fields(COACH)})
+
+    def test_direct_submission_saves_new_draft_before_pdf_rendering_and_can_retry(self):
+        self.client.force_login(self.other)
+        start = reverse("training:log_ai_start")
+        page = self.client.get(start)
+        self.assertFalse(TrainingLogDraft.objects.exists())
+        body = {key: f"**最新{label}**" for key, label in editor_fields(COACH)}
+        data = {**body, "editor": "1", "action": "submit", "revision": 0,
+                "source_digest": page.context["source_digest"]}
+
+        with patch("training.log_documents.generate_document_pdf", side_effect=DocumentRenderError("PDF 生成失败")):
+            failed = self.client.post(start, data)
+        self.assertContains(failed, "PDF 生成失败")
+        self.assertContains(failed, "草稿已保存")
+        self.assertFalse(TrainingLog.objects.exists())
+        draft = TrainingLogDraft.objects.get(author=self.other)
+        self.assertEqual(draft.body, body)
+        self.assertEqual(draft.revision, 1)
+        self.assertContains(self.client.get(start, follow=True), body["process"])
+
+        data.update(
+            revision=failed.context["body_form"]["revision"].value(), source_digest=failed.context["source_digest"],
+        )
+        with patch("training.log_documents.generate_document_pdf", return_value=b"%PDF-1.4\n") as render:
+            response = self.client.post(start, data)
+        log = TrainingLog.objects.get(author=self.other)
+        self.assertRedirects(response, reverse("training:log_detail", args=[log.pk]), fetch_redirect_response=False)
+        self.assertIn("<strong>最新过程记录</strong>", render.call_args.args[0].content)
+        self.assertEqual(log.online_document["body"], body)
+        draft.refresh_from_db()
+        self.assertEqual(draft.submitted_log, log)
+        self.assertEqual(draft.revision, 1)
+
+    def test_direct_submission_rejects_draft_changed_during_pdf_rendering(self):
+        self.client.force_login(self.other)
+        start = reverse("training:log_ai_start")
+        page = self.client.get(start)
+        body = {key: f"已审阅{label}" for key, label in editor_fields(COACH)}
+
+        def render(_document):
+            draft = TrainingLogDraft.objects.get(author=self.other)
+            updated = {**body, "process": "另一页面保存的过程记录"}
+            log_generation.edit_draft(draft, draft.revision, updated, editor=True)
+            return b"%PDF-1.4\n"
+
+        with patch("training.log_documents.generate_document_pdf", side_effect=render):
+            response = self.client.post(start, {
+                **body, "editor": "1", "action": "submit", "revision": 0,
+                "source_digest": page.context["source_digest"],
+            })
+        self.assertContains(response, "草稿或训练素材已变化")
+        self.assertFalse(TrainingLog.objects.exists())
+        self.assertFalse(list(Path(self.media.name).rglob("*.pdf")))
+        draft = TrainingLogDraft.objects.get(author=self.other)
+        self.assertEqual(draft.body["process"], "另一页面保存的过程记录")
 
     def test_generate_all_from_author_material_and_apply_only_selected_sections(self):
         self.model.owner = self.other
