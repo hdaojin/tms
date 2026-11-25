@@ -1,5 +1,5 @@
-document.getElementById("log-generation-form").addEventListener("submit", (event) => {
-  if (event.submitter?.value !== "prepare") return;
+document.getElementById("log-generation-form")?.addEventListener("submit", (event) => {
+  if (event.submitter?.name !== "generate_section") return;
 
   const form = event.currentTarget;
   const data = new FormData(form);

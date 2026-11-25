@@ -64,6 +64,7 @@
           {% if action.submitted %}<a class="btn btn-primary btn-sm" href="{{ action.submitted }}">查看训练日志</a>{% endif %}
         {% endfor %}
       </div>
+      {% if date_group.rows %}
       <div class="overflow-x-auto">
         <table class="table">
           <thead class="sr-only"><tr><th scope="col">时段</th><th scope="col">领域</th><th scope="col">任务</th><th scope="col">完成情况</th></tr></thead>
@@ -98,6 +99,9 @@
           </tbody>
         </table>
       </div>
+      {% else %}
+        <p class="text-base-content/70">{% if coach_view %}当天没有你负责的已发布任务{% else %}当天没有分配给你的官方任务{% endif %}。</p>
+      {% endif %}
       </article>
     {% empty %}
       <p class="rounded-box border border-base-300 p-4 text-base-content/70">

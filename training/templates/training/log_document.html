@@ -22,7 +22,8 @@
 </tbody></table>
 {% if coach %}
 <div id="log-goals"><h3>训练目标</h3><div>
-  {% if compact_layout %}
+  {% if source.teaching_notes or source.editor %}{{ sections.goals_md }}
+  {% elif compact_layout %}
     {% for title, goal, suggested in goals %}{% if goal %}<p>{{ goal|linebreaksbr }}</p>{% endif %}{% endfor %}
   {% else %}
     {% for title, goal, suggested in goals %}<p><strong>{{ title }}</strong><br>{% if goal and suggested %}建议目标 · {% endif %}{{ goal|linebreaksbr }}</p>{% endfor %}
@@ -30,7 +31,8 @@
 </div></div>
 {% endif %}
 <div id="log-outline"><h3>训练内容</h3><div>
-  {% if new_layout %}<ol>
+  {% if source.teaching_notes or source.editor %}{{ sections.outline_md }}
+  {% elif new_layout %}<ol>
     {% for task in source.tasks %}{% for item in task.outline %}<li>{{ item }}</li>{% endfor %}{% endfor %}
     {% for item in suggested_items %}<li>{{ item }}</li>{% endfor %}
   </ol>{% else %}

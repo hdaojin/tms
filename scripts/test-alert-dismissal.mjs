@@ -8,7 +8,7 @@ const source = readFileSync(
   "utf8",
 );
 
-function setup(t, autoDismissLevels) {
+function setup(t, autoDismissLevels, { initiallyRendered = true } = {}) {
   t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: 0 });
   const document = new EventTarget();
   document.body = new EventTarget();
@@ -29,7 +29,7 @@ function setup(t, autoDismissLevels) {
   });
   document.querySelector = () => null;
   document.querySelectorAll = (selector) =>
-    selector === "[data-dismiss-alert]"
+    selector === "[data-dismiss-alert]" && initiallyRendered
       ? alerts.map((alert) => alert.button)
       : [];
   vm.runInNewContext(source, {
@@ -73,5 +73,19 @@ test("悬停与焦点均离开后继续剩余计时", (t) => {
   t.mock.timers.tick(3999);
   assert.equal(alert.removed, undefined);
   t.mock.timers.tick(1);
+  assert.equal(alert.removed, true);
+});
+
+test("HTMX 插入的全局错误可以关闭", (t) => {
+  const { alerts: [alert], document } = setup(t, [false], { initiallyRendered: false });
+  const event = new Event("htmx:oobAfterSwap");
+  event.detail = {
+    target: {
+      id: "site-messages",
+      querySelectorAll: () => [alert.button],
+    },
+  };
+  document.body.dispatchEvent(event);
+  alert.button.dispatchEvent(new Event("click"));
   assert.equal(alert.removed, true);
 });

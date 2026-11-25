@@ -11,11 +11,17 @@ from .renderer import render_pdf, render_slot
 from .types import DocumentError, DocumentInput, DocumentRenderError, DocumentTemplate
 
 TEMPLATES = {
-    "standard": DocumentTemplate("standard", "标准文档", ("css/documents/base.css", "css/documents/standard.css")),
-    "formal": DocumentTemplate("formal", "正式文档", ("css/documents/base.css", "css/documents/formal.css")),
+    "standard": DocumentTemplate("standard", "标准文档", (
+        "css/documents/base.css", "css/documents/content.css", "css/documents/standard.css",
+    )),
+    "formal": DocumentTemplate("formal", "正式文档", (
+        "css/documents/base.css", "css/documents/content.css", "css/documents/formal.css",
+    )),
 }
 TRAINING_LOG_TEMPLATE = DocumentTemplate(
-    "training-log", "训练日志", ("css/documents/base.css", "css/documents/training-log.css"),
+    "training-log", "训练日志", (
+        "css/documents/base.css", "css/documents/content.css", "css/documents/training-log.css",
+    ),
 )
 
 

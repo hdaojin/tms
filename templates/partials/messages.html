@@ -1,8 +1,9 @@
-{% if messages %}
+{% if messages or not messages_oob %}
   <div
-    class="toast toast-end toast-top top-20 z-40 max-h-[calc(100dvh-6rem)] w-96 overflow-y-auto overscroll-contain print:hidden"
-  >
-    {% for message in messages %}
+    id="site-messages"
+    class="toast toast-end toast-top top-20 z-40 max-h-[calc(100dvh-6rem)] w-96 overflow-y-auto overscroll-contain empty:hidden print:hidden"
+    {% if messages_oob %}hx-swap-oob="beforeend"{% endif %}
+  >{% for message in messages %}
       {% with title=None dismissible=True auto_dismiss=False extra_class="alert-horizontal shrink-0 wrap-anywhere" %}
         {% if message.level == DEFAULT_MESSAGE_LEVELS.SUCCESS %}
           {% include "components/alert.html" with variant_class="alert-success" icon="icon-[tabler--circle-check]" auto_dismiss=True %}
@@ -14,6 +15,5 @@
           {% include "components/alert.html" with variant_class="alert-info" icon="icon-[tabler--info-circle]" auto_dismiss=True %}
         {% endif %}
       {% endwith %}
-    {% endfor %}
-  </div>
+    {% endfor %}</div>
 {% endif %}

@@ -684,6 +684,10 @@
   document.body.addEventListener("htmx:afterSwap", function (event) {
     initAll(event.target);
   });
+  document.body.addEventListener("htmx:oobAfterSwap", function (event) {
+    const target = event.detail?.target;
+    if (target?.id === "site-messages") initDismissibleAlerts(target);
+  });
   document.body.addEventListener("skillCreated", function (event) {
     const dialog = document.querySelector("[data-skill-create-dialog]");
     if (!dialog) return;

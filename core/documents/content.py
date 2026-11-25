@@ -1,11 +1,11 @@
 import re
 from io import BytesIO
 
-import nh3
 from bs4 import BeautifulSoup
 from PIL import Image, ImageOps
+from pillow_heif import register_heif_opener
 
-from core.utils.markdown import render_markdown_text
+from .markdown import CONTENT_MARKDOWN_EXTRAS, DOCUMENT_HTML_CLEANER, render_content_markdown
 
 from .limits import (
     MAX_CONTENT_BYTES,
@@ -15,82 +15,35 @@ from .limits import (
     MAX_IMAGE_PIXELS,
     MAX_IMAGE_TOTAL_BYTES,
     MAX_IMAGE_TOTAL_PIXELS,
-    MAX_IMAGES,
     MAX_METADATA_LENGTH,
 )
 from .types import DocumentAsset, DocumentError, DocumentInput
+from .svg import SVG_MIME, normalize_svg
 
-MARKDOWN_EXTRAS = ("fenced-code-blocks", "tables", "header-ids")
+MARKDOWN_EXTRAS = tuple(extra for extra in CONTENT_MARKDOWN_EXTRAS if extra != "metadata")
 ASSET_ID = re.compile(r"[a-zA-Z0-9_-]{1,64}")
-IMAGE_FORMATS = {"image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP"}
-CLEANER = nh3.Cleaner(
-    tags={
-        "h1",
-        "h2",
-        "h3",
-        "h4",
-        "h5",
-        "h6",
-        "p",
-        "div",
-        "em",
-        "strong",
-        "b",
-        "i",
-        "ul",
-        "ol",
-        "li",
-        "blockquote",
-        "table",
-        "thead",
-        "tbody",
-        "tr",
-        "th",
-        "td",
-        "pre",
-        "code",
-        "br",
-        "hr",
-        "a",
-        "img",
-    },
-    clean_content_tags={
-        "script",
-        "style",
-        "iframe",
-        "object",
-        "embed",
-        "form",
-        "svg",
-        "math",
-        "template",
-    },
-    attributes={
-        "*": {"id"},
-        "a": {"href"},
-        "img": {"src", "alt"},
-        "th": {"colspan", "rowspan"},
-        "td": {"colspan", "rowspan"},
-        "ol": {"start"},
-    },
-    url_schemes={"http", "https", "mailto", "tms-asset"},
-    link_rel=None,
-)
+IMAGE_FORMATS = {
+    "image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP",
+    "image/gif": "GIF", "image/bmp": "BMP", "image/tiff": "TIFF", "image/avif": "AVIF",
+    "image/heic": "HEIF", "image/heif": "HEIF", "image/x-icon": "ICO",
+}
+CLEANER = DOCUMENT_HTML_CLEANER
+register_heif_opener(thumbnails=False, depth_images=False, decode_threads=1)
 
 
 def normalize_document_image(asset: DocumentAsset, image_id: str) -> tuple[bytes, str, int]:
+    if asset.media_type == SVG_MIME:
+        return normalize_svg(asset.content, image_id)
     expected = IMAGE_FORMATS.get(asset.media_type)
     if not expected:
-        raise DocumentError(f"图片「{image_id}」只支持 PNG、JPEG 或 WebP。")
+        raise DocumentError(f"图片「{image_id}」的格式不受支持。")
     try:
-        with Image.open(BytesIO(asset.content), formats=tuple(IMAGE_FORMATS.values())) as source:
+        with Image.open(BytesIO(asset.content), formats=(expected,)) as source:
             if source.format != expected:
                 raise DocumentError(f"图片「{image_id}」的文件格式与声明不一致。")
             pixels = source.width * source.height
             if pixels > MAX_IMAGE_PIXELS:
                 raise DocumentError(f"图片「{image_id}」的像素数超过限制。")
-            if getattr(source, "is_animated", False) or getattr(source, "n_frames", 1) != 1:
-                raise DocumentError(f"图片「{image_id}」须为静态图片。")
             source.load()
             oriented = ImageOps.exif_transpose(source)
             mode = "RGBA" if oriented.has_transparency_data else "RGB"
@@ -100,7 +53,9 @@ def normalize_document_image(asset: DocumentAsset, image_id: str) -> tuple[bytes
             # Keep photographic assets compact. Lossless encoding preserves diagrams and transparency.
             output_format = "JPEG" if expected == "JPEG" else "PNG"
             normalized.save(output, format=output_format, quality=90)
-    except (OSError, SyntaxError, Image.DecompressionBombError) as exc:
+    except DocumentError:
+        raise
+    except (OSError, ValueError, RuntimeError, SyntaxError, Image.DecompressionBombError) as exc:
         raise DocumentError(f"图片「{image_id}」无法解码或尺寸超过限制。") from exc
     result = output.getvalue()
     if len(result) > MAX_IMAGE_BYTES:
@@ -130,7 +85,7 @@ def prepare_content(document: DocumentInput, *, for_pdf: bool) -> tuple[Beautifu
         raise DocumentError("文档正文超过 1 MiB。")
     if document.content_format == "markdown":
         try:
-            html = render_markdown_text(document.content, extensions=MARKDOWN_EXTRAS, strict=True).html
+            html = render_content_markdown(document.content, strict=True, document_assets=True).html
         except Exception as exc:
             raise DocumentError("Markdown 正文转换失败。") from exc
     elif document.content_format == "html_fragment":
@@ -141,6 +96,9 @@ def prepare_content(document: DocumentInput, *, for_pdf: bool) -> tuple[Beautifu
     if len(html.encode("utf-8")) > 4 * MAX_CONTENT_BYTES:
         raise DocumentError("转换后的正文超过大小限制。")
     soup = BeautifulSoup(CLEANER.clean(html), "html.parser")
+    # Exported documents display all instructional material, including collapsed answers.
+    for details in soup.find_all("details"):
+        details["open"] = ""
     nodes = soup.find_all(limit=MAX_HTML_NODES + 1)
     if len(nodes) > MAX_HTML_NODES:
         raise DocumentError("正文包含过多 HTML 元素。")
@@ -167,20 +125,15 @@ def prepare_content(document: DocumentInput, *, for_pdf: bool) -> tuple[Beautifu
 
 
 def _prepare_images(soup, assets):
-    if len(assets) > MAX_IMAGES:
-        raise DocumentError("文档最多可提供 20 张图片。")
     if any(not isinstance(asset, DocumentAsset) or not isinstance(asset.content, bytes) for asset in assets.values()):
         raise DocumentError("图片资源必须提供文件字节和媒体类型。")
     sizes = [len(asset.content) for asset in assets.values()]
     if any(size > MAX_IMAGE_BYTES for size in sizes) or sum(sizes) > MAX_IMAGE_TOTAL_BYTES:
         raise DocumentError("图片单张限 5 MiB，总量限 20 MiB。")
 
-    tags = soup.find_all("img", limit=MAX_IMAGES + 1)
-    if len(tags) > MAX_IMAGES:
-        raise DocumentError("正文最多可引用 20 次图片。")
     images = {}
     total_bytes = total_pixels = 0
-    for tag in tags:
+    for tag in soup.find_all("img"):
         src = tag.get("src", "")
         image_id = src.removeprefix("tms-asset:")
         if not src.startswith("tms-asset:") or not ASSET_ID.fullmatch(image_id):

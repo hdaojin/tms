@@ -7,7 +7,10 @@ from typing import Literal
 @dataclass(frozen=True)
 class DocumentAsset:
     content: bytes
-    media_type: Literal["image/png", "image/jpeg", "image/webp"]
+    media_type: Literal[
+        "image/png", "image/jpeg", "image/webp", "image/svg+xml", "image/gif", "image/bmp", "image/tiff", "image/avif",
+        "image/heic", "image/heif", "image/x-icon",
+    ]
 
 
 @dataclass(frozen=True)

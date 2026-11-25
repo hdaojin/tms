@@ -180,6 +180,15 @@ class MyTrainingView(TitleMixin, PermissionRequiredMixin, TemplateView):
         can_view_progress = user.has_perms(("training.view_taskexecution", "training.view_trainingprogress"))
         can_add_log = user.has_perm("training.add_traininglog")
         can_view_log = user.has_perm("training.view_traininglog")
+        log_only_cycle_ids = []
+        if not all_dates and can_add_log and not any(task.schedule_slot_id for task in dated_tasks.get(day, ())):
+            log_only_cycle_ids = [
+                cycle_id for cycle_id, member in members.items() if training_day_is_available(member, day, today)
+            ]
+            if selected_plan and selected_plan.training_cycle_id in log_only_cycle_ids:
+                log_only_cycle_ids = [selected_plan.training_cycle_id]
+            if log_only_cycle_ids:
+                dated_tasks.setdefault(day, [])
         submitted = {
             (cycle_id, log_day): pk
             for cycle_id, log_day, pk in TrainingLog.objects.filter(
@@ -237,7 +246,8 @@ class MyTrainingView(TitleMixin, PermissionRequiredMixin, TemplateView):
                         result = "未开始"
                     row["completion"] = [("", result)]
             actions = []
-            cycle_ids = dict.fromkeys(task.training_plan.training_cycle_id for task in group if task.schedule_slot_id)
+            official_cycles = dict.fromkeys(task.training_plan.training_cycle_id for task in group if task.schedule_slot_id)
+            cycle_ids = official_cycles or log_only_cycle_ids
             for cycle_id in cycle_ids:
                 member = members.get(cycle_id)
                 available = training_day_is_available(member, current_day, today)
@@ -250,7 +260,8 @@ class MyTrainingView(TitleMixin, PermissionRequiredMixin, TemplateView):
                     "cycle": cycle.name if len(cycle_ids) > 1 else "",
                     "log_blocked": LOG_COMPLETION_REQUIRED if pending else "",
                     "completion": training_day_url("training:daily_progress", cycle_id, current_day)
-                    if available and can_view_progress and member.role == member.Role.COMPETITOR and not coach_view else "",
+                    if available and can_view_progress and (official_cycles or pending)
+                    and member.role == member.Role.COMPETITOR and not coach_view else "",
                     "log": training_day_url("training:log_ai_start", cycle_id, current_day)
                     if available and not log_id and can_add_log and can_view_progress else "",
                     "upload": training_upload_url(cycle_id, current_day) if available and not log_id and can_add_log else "",

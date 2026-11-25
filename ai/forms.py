@@ -10,7 +10,7 @@ from core.uploads import AI_PROVIDER_LOGO_UPLOAD_SPEC
 from core.utils.forms import StyledFormMixin
 from meetings.widgets import RecipientSelect
 
-from .catalog import MAX_PROVIDER_ORDER, matching_option, provider_catalog
+from .catalog import MAX_PROVIDER_ORDER, configurable_presets, matching_option, provider_catalog
 from .models import ReasoningEffort, ShareAudience, ThinkingMode
 from .parameters import EFFORT_HELP, SAMPLING_PARAMETERS, THINKING_HELP
 from .providers import ADAPTERS, PROVIDERS, adapter_protocol, provider_definition, validate_base_url, validate_model_id
@@ -100,7 +100,7 @@ class AIModelForm(ThinkingForm):
         current_address = self["base_url"].value() or self.effective_default
         self.option = matching_option(entry, current_address, self["model_id"].value())
         self.presets = self.option["presets"] if self.option else {}
-        self.advanced_presets = self.presets if self.option and not self.option.get("builtin") else {}
+        self.advanced_presets = configurable_presets(self.option)
         self.sampling_fields = [
             (name, self[name], name in self.advanced_presets)
             for name in SAMPLING_PARAMETERS

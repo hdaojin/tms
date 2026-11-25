@@ -6,6 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
+from urllib.parse import urljoin
 
 import pytest
 from django.contrib.auth.models import Permission
@@ -17,15 +18,16 @@ from django.urls import reverse
 from django.utils import timezone
 from pypdf import PdfReader, PdfWriter
 
-from ai.models import AIModel
+from ai.models import AIModel, AIModelOption, AIModelPreference
 from bs4 import BeautifulSoup
 from core.documents.service import generate_document_pdf, render_document_html
 from core.documents.types import DocumentRenderError
+from notes.models import NoteRepo
 
 from . import log_generation, process
 from .log_documents import document_input, draft_document, source_digest, submit_draft
 from .log_references import read_reference
-from .log_sources import COACH, FIELDS, STUDENT, collect_sources, validate_body
+from .log_sources import COACH, FIELDS, STUDENT, collect_sources, editor_fields, validate_body
 from .log_web_references import fetch_reference_pages
 from .models import TrainingLog, TrainingLogDraft, TrainingLogGeneration, TrainingLogPrompt
 from .test_process_refactor import ProcessFixture
@@ -106,6 +108,140 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         log_generation.resolve_generation(draft, job.pk, apply=True, revision=draft.revision)
         draft.refresh_from_db()
         return draft
+
+    def test_reasoning_controls_follow_explicit_model_settings(self):
+        self.fill()
+        self.client.force_login(self.student)
+        url = reverse("training:log_ai_start")
+        preference = AIModelPreference.objects.create(user=self.student, model=self.model)
+
+        def page():
+            return BeautifulSoup(self.client.get(url).content, "html.parser")
+
+        self.assertTrue(page().select_one("[data-log-reasoning]").has_attr("hidden"))
+        option = AIModelOption.objects.create(
+            provider=self.model.provider, model_id=self.model.model_id, name="日志模型",
+            parameter_presets={"thinking": ""},
+        )
+        rendered = page()
+        self.assertFalse(rendered.select_one("[data-log-thinking]").has_attr("disabled"))
+        self.assertTrue(rendered.select_one("[data-log-effort]").has_attr("disabled"))
+
+        option.parameter_presets["reasoning_effort"] = ""
+        option.save(update_fields=["parameter_presets"])
+        self.assertTrue(page().select_one("[data-log-effort]").has_attr("hidden"))
+        self.model.thinking = "enabled"
+        self.model.save(update_fields=["thinking"])
+        rendered = page()
+        self.assertFalse(rendered.select_one("[data-log-effort]").has_attr("hidden"))
+        settings = json.loads(rendered.select_one("#training-log-reasoning-settings").string)
+        self.assertEqual(settings, {str(self.model.pk): {"effort": True, "default_thinking": "enabled"}})
+
+        preference.model = None
+        preference.save(update_fields=["model"])
+        self.assertTrue(page().select_one("[data-log-reasoning]").has_attr("hidden"))
+        preference.model = self.model
+        preference.save(update_fields=["model"])
+        self.model.base_url = "https://gateway.example.test"
+        self.model.save(update_fields=["base_url"])
+        self.assertTrue(page().select_one("[data-log-reasoning]").has_attr("hidden"))
+
+    def test_reasoning_overrides_require_enabled_catalog_controls(self):
+        self.fill()
+        self.client.force_login(self.student)
+        url = reverse("training:log_ai_start")
+        request_data = {"action": "prepare", "model": self.model.pk}
+        response = self.client.post(url, {**request_data, "thinking": "enabled"})
+        self.assertContains(response, "所选模型未开放思考设置")
+        option = AIModelOption.objects.create(
+            provider=self.model.provider, model_id=self.model.model_id, name="日志模型",
+            parameter_presets={"thinking": ""},
+        )
+        response = self.client.post(url, {**request_data, "thinking": "enabled", "effort": "high"})
+        self.assertContains(response, "所选模型未开放思考强度设置")
+        option.parameter_presets["reasoning_effort"] = ""
+        option.save(update_fields=["parameter_presets"])
+        response = self.client.post(url, {**request_data, "effort": "high"})
+        self.assertContains(response, "请先开启思考模式")
+        self.assertFalse(TrainingLogGeneration.objects.exists())
+
+        response = self.client.post(url, {**request_data, "thinking": "enabled", "effort": "high"})
+        self.assertEqual(response.status_code, 302)
+        job = TrainingLogGeneration.objects.get()
+        self.assertEqual((job.thinking, job.effort), ("enabled", "high"))
+        self.model.refresh_from_db()
+        self.assertEqual((self.model.thinking, self.model.reasoning_effort), ("disabled", ""))
+
+    def test_manual_editor_previews_and_submits_without_official_tasks(self):
+        self.client.force_login(self.other)
+        start = reverse("training:log_ai_start")
+        board = self.client.get(reverse("training:my_training"))
+        self.assertContains(board, "编写训练日志")
+        page = self.client.get(start)
+        self.assertContains(page, "支持 Markdown。")
+        self.assertNotContains(page, 'name="generate_section"')
+        data = dict.fromkeys(dict(editor_fields(COACH)), "")
+        data.update(editor="1", revision=0, process="**自主复盘**")
+        preview = self.client.post(start, {**data, "action": "preview"})
+        self.assertContains(preview, "<strong>自主复盘</strong>", html=True)
+        self.assertFalse(TrainingLogDraft.objects.exists())
+
+        response = self.client.post(start, {**data, "action": "edit"}, follow=True)
+        self.assertContains(response, "已保存草稿正文")
+        draft = TrainingLogDraft.objects.get(author=self.other)
+        self.assertEqual(draft.body["process"], "**自主复盘**")
+        self.assertEqual(draft.body["goals_md"], "")
+        url = reverse("training:log_ai_draft", args=[draft.pk])
+        data.update(action="submit", revision=draft.revision, source_digest=response.context["source_digest"])
+        incomplete = self.client.post(url, data)
+        self.assertContains(incomplete, "请填写「训练目标」")
+        rendered = BeautifulSoup(incomplete.content, "html.parser")
+        self.assertIsNotNone(rendered.select_one("#id_goals_md_error"))
+        self.assertIsNone(rendered.select_one("#site-messages .alert-error"))
+        self.assertFalse(TrainingLog.objects.exists())
+        data.update(goals_md="复核运行状态", outline_md="- 自主检查", achievement="待核实",
+                    shortcomings="待核实", improvement="复核记录")
+        with patch("training.log_documents.generate_document_pdf", return_value=b"%PDF-1.4\n"):
+            self.assertEqual(self.client.post(url, data).status_code, 302)
+        log = TrainingLog.objects.get(author=self.other)
+        self.assertEqual(log.online_document["source"]["tasks"], [])
+        self.assertEqual(log.online_document["body"]["process"], "**自主复盘**")
+
+    def test_generate_all_from_author_material_and_apply_only_selected_sections(self):
+        self.model.owner = self.other
+        self.model.save(update_fields=["owner"])
+        self.other.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai"))
+        self.client.force_login(self.other)
+        start = reverse("training:log_ai_start")
+        source = dict.fromkeys(dict(editor_fields(COACH)), "")
+        source.update(editor="1", revision=0, process="手写过程")
+        review = self.client.post(start, {
+            **source, "generate_section": "all", "model": self.model.pk, "include_body": "on",
+        }, follow=True)
+        self.assertContains(review, "确认发送并生成")
+        draft = TrainingLogDraft.objects.get(author=self.other)
+        job = draft.generation
+        self.assertEqual(job.status, Status.REVIEW)
+        self.assertEqual(json.loads(job.message)["作者当前正文"], {"过程记录": "手写过程"})
+        self.assertCountEqual(job.source["generated_sections"], dict(editor_fields(COACH)))
+        url = reverse("training:log_ai_draft", args=[draft.pk])
+        source["revision"] = draft.revision
+        self.client.post(url, {**source, "action": "confirm", "generation": job.pk})
+        sections = {key: f"候选{label}" for key, label in editor_fields(COACH)}
+        with patch("training.log_generation.generate_text", return_value=json.dumps(sections)):
+            self.assertTrue(log_generation.run_generation())
+        ready = self.client.get(url)
+        self.assertContains(ready, "采用所选区块")
+        response = self.client.post(url, {
+            **source, "action": "apply", "generation": job.pk, "candidate_sections": ["outline_md"],
+        }, follow=True)
+        self.assertContains(response, "采用所选区块")
+        draft.refresh_from_db()
+        job.refresh_from_db()
+        self.assertEqual(draft.body["outline_md"], sections["outline_md"])
+        self.assertEqual(draft.body["process"], "手写过程")
+        self.assertNotIn("outline_md", job.result)
+        self.assertIn("process", job.result)
 
     def test_daily_page_derives_status_and_preserves_old_record(self):
         old = process.save_progress(self.execution, self.student, completed="旧填报", problems="")
@@ -238,6 +374,144 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         self.assertFalse(missing)
         self.assertEqual(source["goal_task_ids"], [str(self.task_obj.pk)])
 
+    def grant_coach_model(self):
+        self.coach.user_permissions.add(*Permission.objects.filter(content_type__app_label="ai"))
+        self.model.owner = self.coach
+        self.model.save(update_fields=["owner"])
+
+    def note_summary_draft(self):
+        from .note_log_sources import build_note_draft
+
+        self.grant_coach_model()
+        source, materials, _ = collect_sources(self.coach, self.cycle_obj, self.day)
+        source, body, _ = build_note_draft(self.coach, source)
+        body.update({
+            "goals_md": "核验路由连通性", "outline_md": "配置地址并核对路由表", "process": "教练手写课堂实况",
+            "achievement": "原手写达成情况", "shortcomings": "", "improvement": "",
+        })
+        draft = TrainingLogDraft.objects.create(
+            author=self.coach, cycle=self.cycle_obj, training_date=self.day, source=source, body=body,
+        )
+        return draft, log_generation.summary_materials(source, body, materials)
+
+    def test_note_summary_only_sends_aggregates_and_adopts_three_fields(self):
+        self.fill(completed="带有学生姓名的原始记录", problems="带有身份信息的问题说明")
+        draft, payload = self.note_summary_draft()
+        digest = log_generation.summary_digest(payload)
+        queued = log_generation.queue_note_summary(draft, self.model, digest, revision=draft.revision)
+        outbound = json.loads(queued.message)
+        self.assertEqual(outbound["各任务完成情况"], [{
+            "任务": self.task_obj.title, "应填人数": 2, "已填人数": 1, "未填人数": 1,
+            "子任务勾选人数": {key: {"已勾选完成": 1, "填报未完成": 0} for key in ["配置地址", "核对路由表"]},
+        }])
+        for private in (self.student.first_name, "原始记录", "问题说明", "教练手写课堂实况", "原手写达成情况"):
+            self.assertNotIn(private, queued.message)
+
+        generated = {"achievement": "1 人填报完成", "shortcomings": "另 1 人尚未填报", "improvement": "下次复核"}
+        with patch("training.log_generation.generate_text", return_value=json.dumps(generated)):
+            self.assertTrue(log_generation.run_generation())
+        queued.refresh_from_db()
+        self.assertEqual(queued.result, generated)
+        draft.refresh_from_db()
+        self.assertEqual(draft.body["achievement"], "原手写达成情况")
+        original = draft.body.copy()
+        log_generation.resolve_generation(draft, queued.pk, apply=True, revision=draft.revision)
+        draft.refresh_from_db()
+        self.assertEqual(draft.body, {**original, **generated})
+        self.assertNotIn("summary_only", draft.source)
+
+    def test_note_summary_requires_review_of_current_progress_and_keeps_draft_on_failure(self):
+        draft, before = self.note_summary_draft()
+        digest = log_generation.summary_digest(before)
+        original = draft.body.copy()
+        empty_job = log_generation.queue_note_summary(draft, self.model, digest, revision=draft.revision)
+        self.assertEqual(empty_job.status, Status.QUEUED)
+        self.assertIn("待教练核实", empty_job.prompt)
+        self.fill()
+        with self.assertRaisesMessage(ValidationError, "素材已变化"):
+            log_generation.queue_note_summary(draft, self.model, digest, revision=draft.revision)
+        self.assertTrue(log_generation.run_generation())
+        current, materials, _ = log_generation.source_for(draft)
+        after = log_generation.summary_materials(current, draft.body, materials)
+        queued = log_generation.queue_note_summary(
+            draft, self.model, log_generation.summary_digest(after), revision=draft.revision,
+        )
+        with patch("training.log_generation.generate_text", return_value=json.dumps(example_body(COACH))):
+            self.assertTrue(log_generation.run_generation())
+        queued.refresh_from_db()
+        draft.refresh_from_db()
+        self.assertEqual(queued.status, Status.FAILED)
+        self.assertEqual(draft.body, original)
+
+    def test_imported_note_can_be_combined_with_single_section_ai(self):
+        self.grant_coach_model()
+        self.coach.user_permissions.add(Permission.objects.get(codename="view_noterepo"))
+        repo = NoteRepo.objects.create(slug="linux", relative_path="linux", title="命令行笔记")
+        directory = Path(self.media.name) / repo.relative_path
+        directory.mkdir()
+        (directory / "route.md").write_text(
+            "# 配置路由\n\n## 训练目标\n\n识别路由条目\n\n## 核对路由表\n\n现场对照两次查询结果。",
+            encoding="utf-8",
+        )
+        self.task_obj.coach_link = "/notes/linux/route/"
+        self.task_obj.save(update_fields=["coach_link"])
+        self.client.force_login(self.coach)
+        with override_settings(NOTES_ROOT=self.media.name):
+            start = reverse("training:log_ai_start")
+            response = self.client.get(start)
+            note_button = BeautifulSoup(response.content, "html.parser").select_one("[aria-controls=log-note-candidates]")
+            preview_url = urljoin(start, note_button["hx-get"])
+            preview = self.client.get(preview_url)
+            self.assertContains(preview, "识别路由条目")
+            values = dict.fromkeys(dict(editor_fields(COACH)), "")
+            values.update(editor="1", revision=0, process="手写课堂记录")
+            self.client.post(start, {
+                **values, "action": "note_apply", "note_sections": ["goals_md", "outline_md"],
+                "note_digest": preview.context["note_digest"],
+            })
+            draft = TrainingLogDraft.objects.get(author=self.coach)
+            self.assertEqual(draft.body["goals_md"], "识别路由条目")
+            self.assertEqual(draft.body["process"], "手写课堂记录")
+            self.assertEqual(draft.body["achievement"], "")
+            edit_url = reverse("training:log_ai_draft", args=[draft.pk])
+            values.update(draft.body, revision=draft.revision)
+            response = self.client.post(edit_url, {
+                **values, "generate_section": "achievement", "model": self.model.pk,
+            }, follow=True)
+            self.assertContains(response, "确认发送并生成")
+            job = draft.generation
+            self.assertEqual(job.source["generated_sections"], ["achievement"])
+            payload = json.loads(job.message)
+            self.assertEqual(payload["训练目标"], "识别路由条目")
+            self.assertEqual(payload["各任务完成情况"][0]["已填人数"], 0)
+            self.assertNotIn("手写课堂记录", job.message)
+            self.client.post(edit_url, {**values, "action": "confirm", "generation": job.pk})
+            job.refresh_from_db()
+            self.assertEqual(job.status, Status.QUEUED)
+            generated = {"achievement": "预期能识别路由条目，理解程度待核实。"}
+            with patch("training.log_generation.generate_text", return_value=json.dumps(generated)):
+                self.assertTrue(log_generation.run_generation())
+            ready = self.client.get(edit_url)
+            self.assertContains(ready, "采用所选区块")
+            self.assertEqual([label for _, label, _ in ready.context["result"]], ["训练目标达成情况"])
+            self.client.post(edit_url, {
+                **values, "action": "apply", "generation": job.pk, "candidate_sections": ["achievement"],
+            })
+            draft.refresh_from_db()
+            self.assertEqual(draft.body["achievement"], generated["achievement"])
+            self.assertEqual(draft.body["process"], "手写课堂记录")
+
+            process.save_progress(
+                self.task_obj.executions.get(user=self.student2), self.student2,
+                training_date=self.day, completed="补填", problems="",
+                checklist=[{**item, "done": True} for item in self.task_obj.subtasks],
+            )
+            changed = self.client.get(edit_url)
+            self.assertContains(changed, "填报人数由 0 人变为 1 人")
+            self.assertContains(changed, "AI 生成训练目标达成情况")
+            draft.refresh_from_db()
+            self.assertEqual(draft.body["achievement"], generated["achievement"])
+
     def test_coach_reference_is_scoped_and_hidden_in_student_preview(self):
         self.fill()
         source, _, _ = collect_sources(self.coach, self.cycle_obj, self.day)
@@ -335,9 +609,23 @@ class TrainingLogAITests(ProcessFixture, TestCase):
         url = reverse("training:log_ai_start")
         editor = reverse("training:task_edit", args=[self.task_obj.pk])
         response = self.client.get(url)
-        self.assertContains(response, "训练目标由 AI 拟写")
+        self.assertContains(response, 'name="goals_md"')
         self.assertContains(response, f'href="{editor}?focus=goal#id_requirements"')
-        self.assertContains(response, "预览发送内容")
+        self.assertContains(response, "AI 生成本篇")
+        rendered = BeautifulSoup(response.content, "html.parser")
+        all_button = rendered.select_one('button[name="generate_section"][value="all"]')
+        self.assertEqual(all_button["form"], "log-generation-form")
+        self.assertIsNone(all_button.find_parent("form"))
+        goals_label = rendered.select_one('label[for="id_goals_md"]')
+        self.assertEqual(goals_label.parent.select_one('button[value="goals_md"]').get_text(strip=True), "AI 生成本栏")
+        for key, _ in editor_fields(COACH):
+            help_text = rendered.select_one(f"#id_{key}_helptext")
+            self.assertIn("支持 Markdown。", help_text.get_text())
+            self.assertIn(help_text["id"], rendered.select_one(f"#id_{key}")["aria-describedby"].split())
+        self.assertIn(
+            "所有已填写的正文都会列入本次发送预览",
+            rendered.select_one("#id_include_body_helptext").get_text(),
+        )
         self.assertContains(response, "扩展信息")
         self.assertContains(self.client.get(f"{editor}?focus=goal"), "<details open>")
         self.coach.user_permissions.remove(
@@ -346,7 +634,7 @@ class TrainingLogAITests(ProcessFixture, TestCase):
                 codename="change_trainingtask",
             )
         )
-        self.assertNotContains(self.client.get(url), "编辑训练目标")
+        self.assertNotContains(self.client.get(url), "编辑任务的训练目标")
 
     def test_coach_generates_only_missing_goals_and_preserves_them_on_draft_edit(self):
         task = self.task(slot=self.other_slot(), title="配置防火墙", subtask_titles=["核对访问规则"], assign_all=True)
@@ -444,6 +732,22 @@ class TrainingLogAITests(ProcessFixture, TestCase):
             self.assertNotContains(response, "当日任务与完成情况")
             self.assertEqual(draft.body["notes"], notes)
         self.assertContains(self.client.get(reverse("training:log_ai_preview", args=[draft.pk])), "第二次修改")
+
+    def test_stale_draft_error_uses_site_messages_and_retains_posted_input(self):
+        draft = self.ready_draft()
+        self.client.force_login(self.student)
+        url = reverse("training:log_ai_draft", args=[draft.pk])
+        values = {**draft.body, "action": "edit", "revision": draft.revision - 1, "notes": "尚未保存的学习笔记"}
+        for htmx in (False, True):
+            with self.subTest(htmx=htmx):
+                response = self.client.post(url, values, headers={"HX-Request": "true"} if htmx else {})
+                rendered = BeautifulSoup(response.content, "html.parser")
+                messages = rendered.select_one("#site-messages")
+                self.assertIn("草稿已更新", messages.select_one(".alert-error").get_text())
+                self.assertEqual(messages.get("hx-swap-oob"), "beforeend" if htmx else None)
+                self.assertEqual(rendered.select_one("#id_notes").get_text(strip=True), values["notes"])
+        draft.refresh_from_db()
+        self.assertNotEqual(draft.body["notes"], values["notes"])
 
     def test_multiple_tasks_use_summary_title_and_bounded_suggested_content(self):
         second = self.task(slot=self.other_slot(), title="验证连通", requirements="验证访问", assign_all=True)

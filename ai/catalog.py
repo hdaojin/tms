@@ -141,3 +141,7 @@ def matching_option(entry, base_url, model_id):
     if base_url.rstrip("/") in entry.get("trusted", ()):
         return next((option for option in entry["models"] if option["id"] == model_id), None)
     return None
+
+
+def configurable_presets(option):
+    return option["presets"] if option and not option.get("builtin") else {}

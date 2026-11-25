@@ -70,7 +70,7 @@
       <span class="label-text">{{ field.label }}{% if field.field.required %}<span class="text-error">*</span>{% endif %}</span>
     </label>
     {% if show_help|default:True and field.help_text %}
-      <p class="label text-xs text-base-content/60">{{ field.help_text }}</p>
+      <p {% if field.auto_id %}id="{{ field.auto_id }}_helptext"{% endif %} class="label whitespace-normal text-xs text-base-content/60">{{ field.help_text }}</p>
     {% endif %}
   </fieldset>
 {% elif field|is_file_input %}
@@ -88,14 +88,14 @@
   </fieldset>
 {% elif field|is_textarea_input %}
   <fieldset class="fieldset md:col-span-2 {{ wrapper_class }}">
-    {% if show_label|default:True %}
+    {% if show_label != False %}
       <legend class="fieldset-legend">
         {{ field.label }}{% if field.field.required %}<span class="text-error">*</span>{% endif %}
       </legend>
     {% endif %}
     {{ field }}
     {% if show_help|default:True and field.help_text %}
-      <p class="label text-xs text-base-content/60">{{ field.help_text }}</p>
+      <p {% if field.auto_id %}id="{{ field.auto_id }}_helptext"{% endif %} class="label whitespace-normal text-xs text-base-content/60">{{ field.help_text }}</p>
     {% endif %}
   </fieldset>
 {% else %}

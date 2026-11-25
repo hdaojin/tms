@@ -132,7 +132,7 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
     class Meta:
         model = TrainingTask
         fields = ["title", "requirements", "overview", "coach_link", "order", "assign_all"]
-        help_texts = {"coach_link": "可填以 / 开头的站内路径，或完整的 HTTP(S) 地址。"}
+        help_texts = {"coach_link": "可填站内路径或完整的 HTTP(S) 地址。填写本站教学笔记链接后，可用该笔记生成教练训练日志。"}
         widgets = {
             "requirements": forms.Textarea(attrs={"rows": 3}),
             "overview": forms.Textarea(attrs={"rows": 3}),

@@ -40,7 +40,17 @@ pdf_bytes = generate_document_pdf(document)
 
 正文支持标题、段落、引用、列表、表格、代码、链接和受控图片。样式、脚本、表单和嵌入对象由 HTML 白名单过滤。PDF 链接只保留 HTTP、HTTPS、mailto 和文档锚点。渲染进程只接受调用方提供并由服务重新编码的图片资源，其他资源请求会终止渲染。
 
-图片支持静态 PNG、JPEG 和 WebP。处理时按 EXIF 校正方向，重新编码并清除元数据。图片引用使用 `tms-asset:ID`，ID 允许 1–64 个 ASCII 字母、数字、下划线或连字符。缺图、动画、格式不符或超限会报错。正文上限为 UTF-8 1 MiB，图片最多提供 20 张、引用 20 次，单张限 5 MiB 与 800 万像素，总量限 20 MiB 与 2,400 万像素。
+### 公共渲染与业务职责
+
+笔记页面与文档正文共用 `core.documents.markdown.render_content_markdown()`，统一 Markdown 扩展、折叠内容解析和受控 HTML 清理。完整文件由调用方显式启用 `metadata=True`；正文片段默认关闭元数据解析，避免图片地址中的冒号被识别为文件头。笔记保留折叠交互，文档预览与 PDF 展开折叠内容。两者共享 `static/css/documents/content.css` 的正文样式，纸张、页眉和分页样式由文档模板提供。
+
+`core.documents.images.DocumentImages` 接收调用方提供的资源解析函数，负责图片解码、去重和容量限制。`notes.documents` 负责笔记仓库内的路径解析与资源地址；读取前由业务入口检查当前仓库权限。公共文档模块不依赖 `notes` 或 `training` 的模型。
+
+`training` 继续负责日志日期、周期、任务范围、讲义栏目组装、AI 总结、草稿和归档。`core.documents` 只处理渲染与转换，不保存业务文件。现有日志草稿的图片快照仍由训练日志管理，下载教学笔记的业务入口可复用公共转换接口。
+
+文档图片支持 JPEG、PNG、WebP、GIF、SVG、AVIF、HEIC／HEIF、BMP、TIFF 和 ICO。位图按 EXIF 校正方向，重新编码并清除元数据。动图取首帧，TIFF 取首页，HEIF 使用主图。SVG 保留常见矢量图形、文字和渐变，并清除脚本、事件、外部资源引用等内容。HEIC／HEIF 由 Pillow-Heif 解码。
+
+图片引用使用 `tms-asset:ID`，ID 允许 1–64 个 ASCII 字母、数字、下划线或连字符。正文上限为 UTF-8 1 MiB。图片单张限 5 MiB 与 800 万像素，总量限 20 MiB 与 2,400 万像素。
 
 ## Debian 13 验收
 

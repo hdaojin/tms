@@ -5,6 +5,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Prefetch
 
 from accounts.services.users import get_user_display_name
+from core.documents.limits import MAX_CONTENT_BYTES
 from standards.models import Skill, TechnicalDomain
 
 from .checklists import completion_counts
@@ -195,9 +196,9 @@ def collect_sources(user, cycle, day):
         }
         if member.role == COACH:
             material.update({"训练目标": entry["goal"], "已填人数": entry["filled"], "应填人数": entry["expected"]})
+            material["任务编号"] = str(task.pk)
             if not entry["goal"]:
                 goal_task_ids.append(str(task.pk))
-                material["任务编号"] = str(task.pk)
         entries.append(entry)
         key = (task.training_plan_id, slot.kind, slot.primary_domain_id, task.title)
         if member.role == STUDENT and key in grouped_materials:
@@ -253,6 +254,11 @@ def check_source_access(old, current):
         if task["id"] not in allowed or not set(task["execution_ids"]).issubset(allowed[task["id"]]):
             raise ValidationError("部分任务或选手执行记录已不在可用范围，请按当前素材重新生成。")
     current_tasks = {task["id"]: task for task in current["tasks"]}
+    if old.get("teaching_notes") and any(
+        task.get("note_ref") and task["note_ref"] != current_tasks[task["id"]].get("note_ref")
+        for task in old["tasks"]
+    ):
+        raise ValidationError("部分教学笔记已不在可用范围，请按当前素材重新生成。")
     if any(
         not task.get("reference_files", {}).keys() <= current_tasks[task["id"]].get("reference_files", {}).keys()
         for task in old["tasks"]
@@ -268,11 +274,14 @@ def check_source_access(old, current):
 def changed_sources(old, current):
     previous = {task["id"]: task for task in old.get("tasks", [])}
     new = {task["id"]: task for task in current["tasks"]}
-    changed = [
-        f"{task['plan']} · {task['period']} · {task['title']}"
-        for pk, task in (previous | new).items()
-        if previous.get(pk, {}).get("version") != new.get(pk, {}).get("version")
-    ]
+    changed = []
+    for pk, task in (previous | new).items():
+        before, after = previous.get(pk, {}), new.get(pk, {})
+        if before.get("version") != after.get("version"):
+            label = f"{task['plan']} · {task['period']} · {task['title']}"
+            if old.get("teaching_notes") and before and after and before["filled"] != after["filled"]:
+                label += f"（填报人数由 {before['filled']} 人变为 {after['filled']} 人）"
+            changed.append(label)
     if old.get("header") != current["header"]:
         changed.append("训练周期、授课老师或填写人信息")
     if old.get("coach_logs", []) != current.get("coach_logs", []):
@@ -283,8 +292,69 @@ def changed_sources(old, current):
 INLINE_DOCUMENT_FORMAT = 3
 
 
-def validate_body(role, body, source=None):
+def editor_fields(role):
+    goals = (("goals_md", "训练目标"),) if role == COACH else ()
+    return (*goals, ("outline_md", "训练内容"), *FIELDS[role])
+
+
+def editor_body(role, source, body):
+    """Expose structured and legacy generated fields as editable Markdown."""
+    result = {key: body.get(key, "") for key, _ in editor_fields(role)}
+    tasks = source["tasks"]
+    if "goals_md" in result and "goals_md" not in body:
+        suggestions = body.get("suggested_goals", {})
+        result["goals_md"] = "\n\n".join(
+            goal for task in tasks if (goal := task.get("goal") or suggestions.get(str(task.get("id"))))
+        )
+    if "outline_md" not in body:
+        items = [item for task in tasks for item in task.get("outline", ())] + body.get("suggested_items", [])
+        result["outline_md"] = "\n".join(f"{index}. {item}" for index, item in enumerate(items, 1))
+    if body.get("task_title"):
+        result["task_title"] = body["task_title"]
+    return result
+
+
+def validate_editor_body(role, body, source, *, partial=False, fields=None):
+    labels = dict(editor_fields(role))
+    optional = {"task_title"} if fields is None else set()
+    fields = labels.keys() if fields is None else fields
+    if not isinstance(body, dict) or not set(fields) <= body.keys() or body.keys() - set(fields) - optional:
+        raise ValidationError("日志正文栏目不完整，请重新载入。")
+    errors = {}
+    for key in fields:
+        value = body[key]
+        if not isinstance(value, str) or (not partial and not value.strip()):
+            errors[key] = f"请填写「{labels[key]}」。"
+        elif len(value) > FIELD_LIMIT and (
+            not source.get("teaching_notes") or key not in {"goals_md", "outline_md", "process"}
+        ):
+            errors[key] = f"「{labels[key]}」最多可填写 {FIELD_LIMIT} 字。"
+    if errors:
+        raise ValidationError(errors)
+    if "task_title" in body and not isinstance(body["task_title"], str):
+        raise ValidationError("训练任务标题无效。")
+    if sum(len(value.encode("utf-8")) for value in body.values()) > MAX_CONTENT_BYTES:
+        raise ValidationError("日志正文超过 1 MiB，请精简后重试。")
+    return {key: value.strip("\r\n") for key, value in body.items()}
+
+
+def validate_body(role, body, source=None, *, partial=False):
+    if source and source.get("editor"):
+        return validate_editor_body(role, body, source, partial=partial)
     fields = dict(FIELDS[role])
+    if source and source.get("teaching_notes"):
+        fields.update(goals_md="训练目标", outline_md="训练内容")
+        if role != COACH or not isinstance(body, dict) or body.keys() != fields.keys():
+            raise ValidationError("教学笔记日志的正文栏目不完整。")
+        for key, label in fields.items():
+            value = body[key]
+            if not isinstance(value, str) or (not partial and not value.strip()):
+                raise ValidationError(f"请填写「{label}」。")
+            if key in {"achievement", "shortcomings", "improvement"} and len(value) > FIELD_LIMIT:
+                raise ValidationError(f"「{label}」最多可填写 {FIELD_LIMIT} 字。")
+        if sum(len(value.encode("utf-8")) for value in body.values()) > MAX_CONTENT_BYTES:
+            raise ValidationError("日志正文超过 1 MiB，请精简后重试。")
+        return {key: value.strip("\r\n") for key, value in body.items()}
     current_format = bool(source and source.get("format") == 2)
     needs_title = current_format and len(source["tasks"]) > 1
     needs_content = current_format and any(not task["outline"] for task in source["tasks"])

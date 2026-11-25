@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./documents/content.css";
 @source "../..";
 @source not "../../.git";
 @source not "../../.github";
@@ -76,7 +77,7 @@
     }
   }
 
-  #log-generation-status:has(.training-log-generation-active) ~ #draft-editor .training-log-submit {
+  #draft-editor:has(.training-log-generation-active) button[value="submit"] {
     display: none;
   }
 

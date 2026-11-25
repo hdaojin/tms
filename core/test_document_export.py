@@ -20,9 +20,92 @@ from core.documents import (
     render_document_html,
 )
 from core.documents.limits import MAX_CONTENT_BYTES
+from core.documents.content import normalize_document_image, prepare_content
 from core.documents.renderer import render_slot
 from core.documents.sample import sample_document, topology_asset
 from core.utils.markdown import render_markdown_text
+from core.documents.markdown import render_content_markdown
+
+
+@pytest.mark.parametrize(
+    ("format_name", "mime"),
+    [
+        ("GIF", "image/gif"), ("PNG", "image/png"), ("WebP", "image/webp"),
+        ("BMP", "image/bmp"), ("TIFF", "image/tiff"),
+        ("AVIF", "image/avif"), ("HEIF", "image/heic"), ("ICO", "image/x-icon"),
+    ],
+)
+def test_additional_raster_formats(format_name, mime):
+    output = BytesIO()
+    first = Image.new("RGB", (32, 32), "red")
+    if format_name in {"GIF", "PNG", "WebP", "TIFF"}:
+        first.save(output, format=format_name, save_all=True, append_images=[Image.new("RGB", first.size, "blue")])
+    else:
+        first.save(output, format=format_name)
+    content, media_type, _ = normalize_document_image(DocumentAsset(output.getvalue(), mime), "图片")
+    with Image.open(BytesIO(content)) as image:
+        assert media_type == "image/png" and image.n_frames == 1
+        red, green, blue = image.getpixel((0, 0))
+        assert red > 220 and green < 35 and blue < 35
+
+
+def test_svg_removes_active_and_external_content_from_document_asset():
+    source = b'''<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" onload="alert(1)">
+      <script>alert(1)</script><image href="https://example.com/a.png"/>
+      <defs><linearGradient id="local"><stop offset="1" stop-color="red"/></linearGradient></defs>
+      <rect width="32" height="32" style="fill:url(#local);stroke:url(https://example.com/b)"/>
+    </svg>'''
+    document = DocumentInput(
+        title="矢量图", content="![示意图](tms-asset:vector)", assets={"vector": DocumentAsset(source, "image/svg+xml")},
+    )
+    _, images = prepare_content(document, for_pdf=True)
+    clean, mime = images["tms-asset:vector"]
+    assert mime == "image/svg+xml"
+    assert b'fill="url(#local)"' in clean
+    assert not any(token in clean for token in (b"example.com", b"onload", b"<script", b"<image"))
+    assert "data:image/svg+xml;base64," in render_document_html(document)
+
+
+@pytest.mark.parametrize("source", [
+    b'<!DOCTYPE svg [<!ENTITY x "text">]><svg xmlns="http://www.w3.org/2000/svg"><text>&x;</text></svg>',
+    b'<svg xmlns="http://www.w3.org/2000/svg" width="3000" height="3000"/>',
+    b'<svg xmlns="http://www.w3.org/2000/svg"><linearGradient id="x" href="#x"/></svg>',
+])
+def test_svg_rejects_unsupported_xml_and_excessive_resources(source):
+    with pytest.raises(DocumentError, match="SVG"):
+        normalize_document_image(DocumentAsset(source, "image/svg+xml"), "图片")
+
+
+def test_shared_content_preserves_details_and_filters_active_markup(tmp_path):
+    from notes.utils import render_note_markdown
+
+    source = """# 教学单元
+
+<details>
+<summary>操作步骤</summary>
+
+| 命令 | 用途 |
+| --- | --- |
+| help | 查询帮助 |
+
+</details>
+
+<script>alert(1)</script>
+"""
+    path = tmp_path / "lesson.md"
+    path.write_text(source, encoding="utf-8")
+    notebook = render_note_markdown(path, "linux", tmp_path, "lesson")
+    shared = render_content_markdown(source, metadata=True)
+    assert notebook.html == shared.html
+    exported = BeautifulSoup(render_document_html(DocumentInput(title="教学单元", content=source)), "html.parser")
+    assert exported.select_one("details[open] table td").text == "help"
+    assert exported.select_one("summary").text == "操作步骤"
+    assert not exported.select("script")
+
+
+def test_shared_markdown_keeps_asset_only_content():
+    rendered = render_content_markdown("![插图](tms-asset:demo)", document_assets=True)
+    assert BeautifulSoup(rendered.html, "html.parser").img["src"] == "tms-asset:demo"
 
 
 def test_template_registry_and_markdown_structure():
@@ -145,15 +228,9 @@ def test_orients_jpeg_and_strips_metadata():
         assert not output.getexif()
 
 
-@pytest.mark.parametrize("kind", ["animation", "mime", "invalid", "pixels", "bytes"])
+@pytest.mark.parametrize("kind", ["mime", "invalid", "pixels", "bytes"])
 def test_rejects_unsafe_image_assets(kind):
-    if kind == "animation":
-        buffer = BytesIO()
-        first = Image.new("RGB", (8, 8), "red")
-        second = Image.new("RGB", (8, 8), "blue")
-        first.save(buffer, format="PNG", save_all=True, append_images=[second])
-        asset = DocumentAsset(buffer.getvalue(), "image/png")
-    elif kind == "pixels":
+    if kind == "pixels":
         buffer = BytesIO()
         Image.new("L", (3000, 3000)).save(buffer, format="PNG")
         asset = DocumentAsset(buffer.getvalue(), "image/png")
@@ -165,6 +242,18 @@ def test_rejects_unsafe_image_assets(kind):
         }[kind]
     with pytest.raises(DocumentError, match="图片"):
         _render_asset(asset)
+
+
+@pytest.mark.document_pdf_native
+@pytest.mark.skipif(sys.platform != "linux", reason="PDF rendering requires Linux and Noto CJK")
+def test_renders_svg_in_pdf():
+    source = b'<svg xmlns="http://www.w3.org/2000/svg" width="160" height="80"><text y="35">SVG proof</text></svg>'
+    document = DocumentInput(
+        title="矢量图", content="![示意图](tms-asset:vector)", assets={"vector": DocumentAsset(source, "image/svg+xml")},
+    )
+    from pypdf import PdfReader
+
+    assert "SVG proof" in PdfReader(BytesIO(generate_document_pdf(document))).pages[0].extract_text()
 
 
 @pytest.mark.document_pdf_native

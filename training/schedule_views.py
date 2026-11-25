@@ -563,7 +563,7 @@ def _render_day_tasks(request, plan, day_id, *, written_files=None, saved_messag
     if bound and not error:
         form = common if applying else editable[selected[0]]["form"]
         if form.is_valid():
-            values = _task_form_values(form)
+            values = _task_form_values(form, request)
             if applying:
                 values["replace_attachments"] = True
                 values["confirm_shared_content"] = request.POST.get("overwrite") == "on"
@@ -606,8 +606,11 @@ def _render_day_tasks(request, plan, day_id, *, written_files=None, saved_messag
     })
 
 
-def _task_form_values(form):
+def _task_form_values(form, request):
+    from .teaching_notes import normalize_task_note_link
+
     values = dict(form.cleaned_data)
+    values["coach_link"] = normalize_task_note_link(values["coach_link"], request)
     values["skills"] = list(values["skills"].values_list("pk", flat=True))
     values["competitors"] = list(values["competitors"].values_list("pk", flat=True))
     if values["assign_all"]:
@@ -640,7 +643,7 @@ def task_edit(request, slot_pk=None, pk=None):
     form = SlotTaskForm(request.POST if request.method == "POST" else None, request.FILES if request.method == "POST" else None, instance=task, slot=slot, initial=initial)
     if request.method == "POST" and form.is_valid():
         try:
-            values = _task_form_values(form)
+            values = _task_form_values(form, request)
             if task and "assignment_configured" not in request.POST:
                 # 精简提交仅更新明确提供的字段，不能清空原技能或重取全体名单。
                 values = {key: value for key, value in values.items() if key in request.POST or key in request.FILES}
