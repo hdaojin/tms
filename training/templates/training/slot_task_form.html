@@ -18,6 +18,7 @@
   </div>
 </details>
 {% if form.reason %}{% include 'components/field.html' with field=form.reason %}{% endif %}
-<div class="flex flex-wrap items-center gap-3"><button class="btn btn-primary" name="action" value="save">{% if slot.is_locked and task.status == 'published' and not direct_adjustment %}提交修改审批{% else %}保存{% endif %}</button>{% if not task or task.status == 'draft' %}<button class="btn btn-primary" name="action" value="publish">发布</button>{% endif %}</div></form>
+{% if approval_required %}{% include 'training/consultation_confirmation.html' with checked=consultation_confirmed only %}{% endif %}
+<div class="flex flex-wrap items-center gap-3"><button class="btn btn-primary" name="action" value="save">{% if approval_required %}提交修改审批{% else %}保存{% endif %}</button>{% if not task or task.status == 'draft' %}<button class="btn btn-primary" name="action" value="publish">发布</button>{% endif %}</div></form>
 {% if task and task.status == 'published' and user.is_superuser %}<p class="mt-3"><a class="link" href="{% url 'training:withdraw_task' slot.day.training_plan_id task.pk %}">撤回任务发布</a></p>{% endif %}{% if task %}<p class="mt-3"><a class="link" href="{% url 'training:task_detail' task.pk %}">查看任务、执行与修改历史</a></p>{% endif %}{% if next_entry %}<p class="mt-3"><a class="btn btn-outline" href="{{ next_entry.url }}" hx-get="{{ next_entry.url }}" hx-target="#{{ editor_target }}">继续下一天（{{ next_entry.day.date|date:'Y-m-d' }}）</a></p>{% endif %}{% if not is_fragment %}</div>{% endif %}{% endblock %}
 {% block extra_js %}{{ form.media }}{% endblock %}

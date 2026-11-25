@@ -208,8 +208,15 @@ class TrainingProcessTests(ProcessFixture, TestCase):
         self.assertFalse(scheduling.can_fill(self.other, self.slot))
         task = self.task()
         with patch("django.utils.timezone.now", return_value=self.slot.ends_at):
-            change = scheduling.set_task_skills(task, self.coach, [], reason="补正历史技能")
+            self.client.force_login(self.coach)
+            url = reverse("training:task_skills", args=[task.pk])
+            data = {"reason": "补正历史技能"}
+            self.assertContains(self.client.get(url), 'name="consultation_confirmed"')
+            self.assertEqual(self.client.post(url, data).status_code, 302)
+            change = self.plan.schedule_changes.get()
             self.assertEqual(change.status, "pending")
+            self.assertEqual(change.confirmations, [])
+            self.assertIsNone(change.consultation_confirmed_at)
             scheduling.review_change(change, self.admin, approve=True)
             self.assertTrue(task.change_records.filter(action="保存任务").exists())
 

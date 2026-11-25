@@ -665,7 +665,7 @@ def was_filled(obj):
 
 
 @transaction.atomic
-def save_schedule(plan, user, payload, reason=""):
+def save_schedule(plan, user, payload, reason="", *, consultation_confirmed=False):
     plan = TrainingPlan.objects.select_for_update().get(pk=plan.pk)
     if not can_schedule(user, plan):
         raise PermissionDenied
@@ -690,7 +690,7 @@ def save_schedule(plan, user, payload, reason=""):
             raise ValidationError("修改已填写的排班或日级信息时，请填写调整原因。")
         from .change_workflow import create_change
 
-        return create_change(plan, user, payload, reason)
+        return create_change(plan, user, payload, reason, consultation_confirmed=consultation_confirmed)
     _apply_changes(plan, payload, user, approved=True)
     audit(plan, user, "首次填写排班" if initial else "保存排班", after={"调整": payload}, reason=reason)
 
@@ -742,9 +742,9 @@ def publish_schedule(plan, user):
     audit(plan, user, "发布排班")
 
 
-def review_change(change, user, *, approve, note=""):
+def review_change(change, user, *, approve, note="", stage=None):
     from .change_workflow import review
-    return review(change, user, approve=approve, note=note)
+    return review(change, user, approve=approve, note=note, stage=stage)
 
 
 def validate_skills(task, skill_ids, domain_ids=None):
@@ -777,8 +777,32 @@ def matching_day_tasks(slot, title):
 SHARED_TASK_FIELDS = ("overview", "requirements", "subtask_titles", "skills", "attachments", "coach_link")
 
 
+def shared_task_versions(tasks):
+    return [
+        {
+            "id": task.pk, "updated_at": task.updated_at.isoformat(),
+            "slot": task.schedule_slot_id, "revision": task.schedule_slot.revision,
+        }
+        for task in tasks
+    ]
+
+
+def task_edit_requires_approval(user, task, *, title=None):
+    if not task or not task.schedule_slot_id or privileged(user):
+        return False
+    if task.status == "published" and task.schedule_slot.is_locked:
+        return True
+    if title is not None and task.title != title:
+        return False
+    peers = matching_day_tasks(task.schedule_slot, task.title).exclude(pk=task.pk)
+    if peers.filter(pk__lt=task.pk).exists():
+        return False
+    return any(peer.schedule_slot.is_locked for peer in peers.filter(status="published").select_related("schedule_slot"))
+
+
 @transaction.atomic
-def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=False, _approved=False, written_files=None):
+def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=False, _approved=False,
+                   consultation_confirmed=False, written_files=None, _expected_shared_tasks=None):
     from pathlib import Path
     from .models import TrainingTaskAttachment
     plan = TrainingPlan.objects.select_for_update().get(pk=slot.day.training_plan_id)
@@ -839,6 +863,8 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
             list(peer.executions.select_for_update().order_by("pk").values_list("pk", flat=True))
     else:
         shared_peers = []
+    if _expected_shared_tasks is not None and shared_task_versions(shared_peers) != _expected_shared_tasks:
+        raise ValidationError("关联时段的任务或排班已经变化，请重新申请。")
     if titles is not None:
         for peer in shared_peers:
             validate_subtask_change(peer, titles)
@@ -849,7 +875,10 @@ def save_slot_task(slot, user, values, *, task=None, _importing=False, publish=F
         from .change_workflow import request_task_change
         if titles is not None:
             validate_subtask_change(task, titles)
-        return request_task_change(plan, slot, task if task.pk else None, user, values, publish, written_files=written_files)
+        return request_task_change(
+            plan, slot, task if task.pk else None, user, values, publish,
+            consultation_confirmed=consultation_confirmed, shared_tasks=shared_peers, written_files=written_files,
+        )
     task._definition_approved = _approved
     before = task_snapshot(task) if task.pk else {}
     if titles is not None:
@@ -923,7 +952,7 @@ def _set_skills(task, skill_ids):
 
 
 @transaction.atomic
-def set_task_skills(task, user, skill_ids, *, reason=""):
+def set_task_skills(task, user, skill_ids, *, reason="", consultation_confirmed=False):
     plan = TrainingPlan.objects.select_for_update().get(pk=task.training_plan_id)
     task = TrainingTask.objects.select_for_update(of=("self",)).select_related("schedule_slot__day__training_plan").get(pk=task.pk)
     allowed = (
@@ -934,11 +963,17 @@ def set_task_skills(task, user, skill_ids, *, reason=""):
     if not allowed:
         raise PermissionDenied
     if task.schedule_slot_id and matching_day_tasks(task.schedule_slot, task.title).exclude(pk=task.pk).exists():
-        return save_slot_task(task.schedule_slot, user, {"skills": skill_ids, "reason": reason}, task=task)
+        return save_slot_task(
+            task.schedule_slot, user, {"skills": skill_ids, "reason": reason}, task=task,
+            consultation_confirmed=consultation_confirmed,
+        )
     direct = task.status == "draft" or privileged(user)
     if task.schedule_slot_id and task.schedule_slot.is_locked and not direct:
         from .change_workflow import request_task_change
-        return request_task_change(plan, task.schedule_slot, task, user, {"skills": skill_ids, "reason": reason}, False)
+        return request_task_change(
+            plan, task.schedule_slot, task, user, {"skills": skill_ids, "reason": reason}, False,
+            consultation_confirmed=consultation_confirmed,
+        )
     task._definition_approved = direct
     before = task_snapshot(task)
     _set_skills(task, skill_ids)
@@ -947,7 +982,8 @@ def set_task_skills(task, user, skill_ids, *, reason=""):
 
 
 @transaction.atomic
-def assign_competitors(task, user, *, selected=None, _publishing=False, reason="", _importing=False, _approved=False):
+def assign_competitors(task, user, *, selected=None, _publishing=False, reason="", _importing=False, _approved=False,
+                       consultation_confirmed=False):
     from .models import TrainingAssignmentCoach
     plan = TrainingPlan.objects.select_for_update().get(pk=task.training_plan_id)
     task = TrainingTask.objects.select_for_update(of=("self",)).select_related("schedule_slot__day__training_plan").get(pk=task.pk)
@@ -957,7 +993,11 @@ def assign_competitors(task, user, *, selected=None, _publishing=False, reason="
     _approved = _approved or privileged(user)
     if task.schedule_slot.is_locked and not _approved:
         from .change_workflow import request_task_change
-        return request_task_change(plan, task.schedule_slot, task, user, {"assign_all": selected is None, "competitors": list(selected or []), "reason": reason}, False)
+        return request_task_change(
+            plan, task.schedule_slot, task, user,
+            {"assign_all": selected is None, "competitors": list(selected or []), "reason": reason}, False,
+            consultation_confirmed=consultation_confirmed,
+        )
     task._definition_approved = _approved
     if task.status != "published" and not (_publishing and task.status == "draft"):
         raise ValidationError("只有已发布任务可以调整选手分配。")

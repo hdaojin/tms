@@ -1,12 +1,15 @@
-"""排班、时间和过期任务调整：预演、教练依次确认、终审和原子应用。"""
+"""排班和任务调整的线下沟通确认、教练确认及终审。"""
 
 from copy import deepcopy
 from pathlib import Path
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+
+from core.permissions.registry import get_users_with_explicit_permission
 
 from . import scheduling as service
 from .models import TrainingPlan, TrainingScheduleChange, TrainingScheduleSlot, TrainingTask
@@ -63,41 +66,46 @@ def apply_payload(plan, payload, actor):
             if values.get("cancel"):
                 result = service.cancel_task(task, actor, values["reason"], _approved=True)
             else:
-                result = service.save_slot_task(slot, actor, values, task=task, publish=item["publish"], _approved=True)
+                result = service.save_slot_task(
+                    slot, actor, values, task=task, publish=item["publish"], _approved=True,
+                    _expected_shared_tasks=item.get("shared_tasks"),
+                )
     if schedule:
         service._apply_changes(plan, schedule, actor, approved=True)
     return result
 
 
-def confirmation_ids(plan, payload):
-    """按原负责、新负责、值班顺序去重；只收集本次实际受影响的人员。"""
-    original, replacement, duty = [], [], []
+def affected_coach_ids(plan, payload):
+    coach_ids, slot_ids, day_ids = set(), set(), set()
     for item in payload:
-        if item["type"] == "swap":
-            original.extend(TrainingScheduleSlot.objects.filter(pk__in=item["slots"]).order_by("day__date", "pk").values_list("coaches__pk", flat=True))
-        elif item["type"] == "slot":
-            original.extend(item["before"]["coaches"])
-            replacement.extend(
-                service.coach_ids(plan) if item["after"]["coaches_all"] and not item["before"]["coaches_all"]
-                else item["after"]["coaches"]
-            )
-        elif item["type"] == "day":
-            if item["before"]["date"] != item["after"]["date"]:
-                original.extend(TrainingScheduleSlot.objects.filter(day_id=item["id"]).values_list("coaches__pk", flat=True))
-            duty.extend(item["before"]["duty_coaches"])
-            duty.extend(
-                service.duty_ids(plan) if item["after"]["duty_all"] and not item["before"]["duty_all"]
-                else item["after"]["duty_coaches"]
-            )
-        elif item["type"] == "times":
-            slots = TrainingScheduleSlot.objects.filter(day__training_plan=plan, ends_at__gt=timezone.now())
-            original.extend(slots.values_list("coaches__pk", flat=True))
-            duty.extend(slots.values_list("day__duty_coaches__pk", flat=True))
-    return list(dict.fromkeys(pk for pk in [*original, *replacement, *duty] if pk is not None))
+        kind = item["type"]
+        if kind not in {"slot", "day", "task"}:
+            continue
+        before, after = item["before"], item["after"]
+        if kind == "slot":
+            coach_ids.update(before["coaches"])
+            coach_ids.update(item.get("roster", after["coaches"]))
+        elif kind == "day":
+            new_duty = item.get("roster", after["duty_coaches"])
+            date_changed = before["date"] != after["date"]
+            if date_changed or before["duty_all"] != after["duty_all"] or set(before["duty_coaches"]) != set(new_duty):
+                coach_ids.update(before["duty_coaches"])
+                coach_ids.update(new_duty)
+            if date_changed:
+                day_ids.add(item["id"])
+        elif kind == "task":
+            slot_ids.add(item["slot"])
+            slot_ids.update(peer["slot"] for peer in item.get("shared_tasks", ()))
+    if slot_ids or day_ids:
+        coach_ids.update(
+            TrainingScheduleSlot.objects.filter(day__training_plan=plan, coaches__isnull=False)
+            .filter(Q(pk__in=slot_ids) | Q(day_id__in=day_ids)).values_list("coaches", flat=True)
+        )
+    return coach_ids
 
 
 @transaction.atomic
-def create_change(plan, user, payload, reason):
+def create_change(plan, user, payload, reason, *, consultation_confirmed=False):
     if not reason.strip():
         raise ValidationError("请填写调整原因和实际执行情况。")
 
@@ -118,27 +126,47 @@ def create_change(plan, user, payload, reason):
             item["roster"] = sorted(service.duty_ids(plan))
         if item["type"] == "task" and item["after"].get("assign_all"):
             item["roster"] = list(plan.participants.filter(is_active=True).order_by("user_id").values_list("user_id", flat=True))
-    ids = [] if payload_expired(plan, payload) else confirmation_ids(plan, payload)
-    confirmations = [{"user_id": pk, "decision": "approve" if pk == user.pk else "", "note": "申请人提交时同意" if pk == user.pk else "", "at": timezone.now().isoformat() if pk == user.pk else None} for pk in ids]
-    change = TrainingScheduleChange.objects.create(training_plan=plan, requested_by=user, reason=reason, payload=payload, confirmations=confirmations)
-    change.confirmation_users.set(ids)
-    service.audit(plan, user, "提交调整申请", after={"申请": change.pk, "调整": payload, "教练确认": confirmations}, reason=reason)
+    confirmed_at = timezone.now() if consultation_confirmed is True else None
+    required_coaches = sorted(affected_coach_ids(plan, payload) - {user.pk}) if confirmed_at is None else []
+    if required_coaches:
+        active = get_user_model().objects.filter(pk__in=required_coaches, is_active=True)
+        with_permission = get_users_with_explicit_permission("training.view_trainingplan", active)
+        eligible = active.filter(Q(is_superuser=True) | Q(pk__in=with_permission.values("pk")))
+        if eligible.count() != len(required_coaches):
+            raise ValidationError("有相关教练无法在线确认。请先与相关教练线下沟通并取得同意，再勾选确认后提交。")
+    confirmations = [{"user_id": pk, "decision": "", "note": "", "at": None} for pk in required_coaches]
+    change = TrainingScheduleChange.objects.create(
+        training_plan=plan, requested_by=user, reason=reason, payload=payload, consultation_confirmed_at=confirmed_at,
+        confirmations=confirmations,
+    )
+    if required_coaches:
+        change.confirmation_users.set(required_coaches)
+    recorded_confirmation = (
+        {"线下沟通确认时间": confirmed_at.isoformat()} if confirmed_at else {"教练确认": confirmations}
+    )
+    service.audit(
+        plan, user, "提交调整申请", after={"申请": change.pk, "调整": payload, **recorded_confirmation},
+        reason=reason,
+    )
     return change
 
 
-def next_coach(change):
-    return next((step["user_id"] for step in change.confirmations if not step["decision"]), None)
+def pending_coach_ids(change):
+    if change.legacy_consultation_assumed_at:
+        return []
+    return [step["user_id"] for step in change.confirmations if not step["decision"]]
 
 
 def can_review(user, change):
     if change.status != "pending" or not user.is_active or not user.has_perm("training.view_trainingplan"):
         return False
-    coach = next_coach(change)
-    return user.pk == coach if coach else service.can_approve(user, change.training_plan)
+    pending = pending_coach_ids(change)
+    return user.pk in pending if pending else service.can_approve(user, change.training_plan)
 
 
 @transaction.atomic
-def request_task_change(plan, slot, task, user, values, publish, *, written_files=None):
+def request_task_change(plan, slot, task, user, values, publish, *, consultation_confirmed=False,
+                        shared_tasks=(), written_files=None):
     from .models import TrainingChangeAttachment
 
     attachments = values.get("attachments", [])
@@ -146,8 +174,9 @@ def request_task_change(plan, slot, task, user, values, publish, *, written_file
         raise PermissionDenied
     item = {"type": "task", "id": task.pk if task else None, "slot": slot.pk, "revision": slot.revision,
             "before": service.task_snapshot(task) if task else {}, "updated_at": task.updated_at.isoformat() if task else None,
-            "after": {key: value for key, value in values.items() if key != "attachments"}, "publish": publish}
-    change = create_change(plan, user, [item], values.get("reason", ""))
+            "after": {key: [] if key == "attachments" else value for key, value in values.items()}, "publish": publish,
+            "shared_tasks": service.shared_task_versions(shared_tasks)}
+    change = create_change(plan, user, [item], values.get("reason", ""), consultation_confirmed=consultation_confirmed)
     pending_files = []
     for file in attachments:
         attachment = TrainingChangeAttachment(change=change, file=file, original_filename=Path(file.name).name, uploaded_by=user)
@@ -161,11 +190,11 @@ def request_task_change(plan, slot, task, user, values, publish, *, written_file
     return change
 
 
-def review(change, user, *, approve, note=""):
+def review(change, user, *, approve, note="", stage=None):
     written_files = []
     try:
         with transaction.atomic():
-            return _review(change, user, approve=approve, note=note, written_files=written_files)
+            return _review(change, user, approve=approve, note=note, stage=stage, written_files=written_files)
     except Exception:
         # 文件系统不随数据库回滚；只清理本次新复制的正式文件，不触碰申请原件。
         for storage, name in written_files:
@@ -173,15 +202,18 @@ def review(change, user, *, approve, note=""):
         raise
 
 
-def _review(change, user, *, approve, note, written_files):
+def _review(change, user, *, approve, note, stage, written_files):
     plan = TrainingPlan.objects.select_for_update().get(pk=change.training_plan_id)
     change = TrainingScheduleChange.objects.select_for_update().select_related("training_plan").get(pk=change.pk)
     if change.status != "pending":
         raise ValidationError("该申请已经审批，不能重复处理。")
     if not can_review(user, change):
         raise PermissionDenied
-    if next_coach(change):
-        step = next(step for step in change.confirmations if not step["decision"])
+    pending = pending_coach_ids(change)
+    if stage is not None and stage != ("coach" if pending else "final"):
+        raise ValidationError("申请已进入下一审批阶段，请刷新后处理。")
+    if pending:
+        step = next(step for step in change.confirmations if step["user_id"] == user.pk and not step["decision"])
         step.update(decision="approve" if approve else "reject", note=note, at=timezone.now().isoformat())
         if approve:
             change.save(update_fields=["confirmations", "updated_at"])

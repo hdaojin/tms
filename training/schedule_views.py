@@ -320,6 +320,7 @@ def edit_schedule(request, pk):
     if not service.can_schedule(request.user, plan):
         raise PermissionDenied
     source = request.POST if request.method == "POST" else request.GET
+    consultation_confirmed = request.POST.get("consultation_confirmed") == "1"
     day_ids = source.getlist("days")
     if not day_ids or any(not value.isdigit() for value in day_ids):
         return _error(request, plan, ValidationError("请选择要调整的日期。"))
@@ -403,7 +404,10 @@ def edit_schedule(request, pk):
             result = None
             with transaction.atomic():
                 if payload:
-                    result = service.save_schedule(plan, request.user, payload, request.POST.get("reason", ""))
+                    result = service.save_schedule(
+                        plan, request.user, payload, request.POST.get("reason", ""),
+                        consultation_confirmed=consultation_confirmed,
+                    )
                 else:
                     raise ValidationError("没有需要保存的调整。")
         except ValidationError as exc:
@@ -424,6 +428,7 @@ def edit_schedule(request, pk):
                     return response
                 return row_updates(request, response, plan, [slot.pk for slot in slots], [day.pk for day in days])
             return _success(request, plan, "调整申请已提交，批准前原安排保持不变。" if isinstance(result, TrainingScheduleChange) else "排班已保存。")
+    entry_filled = [service.was_filled(obj) for obj in [*editable_days, *slots]] if plan.schedule_published_at else []
     return render(
         request,
         "training/schedule_edit.html",
@@ -441,7 +446,9 @@ def edit_schedule(request, pk):
             "entry_filters": filters_for(request).urlencode(),
             "editor_suffix": editor_suffix(filters_for(request)),
             "reason": source.get("reason", ""),
-            "show_reason": bool(plan.schedule_published_at) and any(service.was_filled(obj) for obj in [*editable_days, *slots]),
+            "consultation_confirmed": consultation_confirmed,
+            "show_reason": any(entry_filled),
+            "approval_depends_on_changes": not all(entry_filled),
             "direct_adjustment": service.privileged(request.user),
             "is_fragment": bool(request.htmx),
         },
@@ -454,9 +461,13 @@ def review(request, pk):
     get_plan(request.user, change.training_plan_id)
     if request.POST.get("decision") not in {"approve", "reject"}:
         return _error(request, change.training_plan, ValidationError("请选择批准或驳回。"))
+    stage = request.POST.get("stage")
+    if stage not in {"coach", "final"}:
+        return _error(request, change.training_plan, ValidationError("请刷新页面后处理该申请。"))
     try:
         service.review_change(
-            change, request.user, approve=request.POST["decision"] == "approve", note=request.POST.get("note", "")
+            change, request.user, approve=request.POST["decision"] == "approve", note=request.POST.get("note", ""),
+            stage=stage,
         )
     except ValidationError as exc:
         return _error(request, change.training_plan, exc)
@@ -528,6 +539,7 @@ def _render_day_tasks(request, plan, day_id, *, written_files=None, saved_messag
     applying = request.POST.get("action") == "apply"
     selected = request.POST.getlist("targets") if applying else [request.POST.get("slot", "")]
     bound = request.method == "POST" and not saved_message
+    consultation_confirmed = bound and request.POST.get("consultation_confirmed") == "1"
     error = ""
     version = _day_task_version(rows)
     if bound:
@@ -555,10 +567,15 @@ def _render_day_tasks(request, plan, day_id, *, written_files=None, saved_messag
         )
     for key, row in editable.items():
         editing = bound and not applying and key in selected
+        prefix = f"slot-{key}"
+        row["approval_required"] = service.task_edit_requires_approval(
+            request.user, row["task"], title=request.POST.get(f"{prefix}-title", "").strip() if editing else None,
+        )
         row["form"] = DayTaskForm(
             request.POST if editing else None, request.FILES if editing else None,
-            prefix=f"slot-{key}", instance=copy(row["task"]), slot=row["slot"],
+            prefix=prefix, instance=copy(row["task"]), slot=row["slot"], approval_required=row["approval_required"],
         )
+        row["consultation_confirmed"] = editing and consultation_confirmed
         row["selected"] = not bound or not applying or key in selected
     if bound and not error:
         form = common if applying else editable[selected[0]]["form"]
@@ -575,6 +592,7 @@ def _render_day_tasks(request, plan, day_id, *, written_files=None, saved_messag
                         try:
                             result = service.save_slot_task(
                                 row["slot"], request.user, values, task=row["task"], written_files=written_files,
+                                consultation_confirmed=consultation_confirmed,
                             )
                         except ValidationError as exc:
                             raise ValidationError([f'{row["slot"].get_period_display()}：{message}' for message in exc.messages]) from exc
@@ -600,7 +618,8 @@ def _render_day_tasks(request, plan, day_id, *, written_files=None, saved_messag
     return render(request, "training/day_task_edit.html", {
         "plan": plan, "day": day, "rows": rows, "common": common, "error": error, "saved_message": saved_message,
         "has_existing": any(row["task"] for row in editable.values()),
-        "direct_adjustment": service.privileged(request.user),
+        "common_approval_possible": any(row["approval_required"] for row in editable.values()),
+        "common_consultation_confirmed": applying and consultation_confirmed,
         "version": signing.dumps({"user": request.user.pk, "day": day.pk, "slots": version}, salt="training.day-tasks"),
         "is_fragment": bool(request.htmx),
     })
@@ -632,15 +651,22 @@ def task_edit(request, slot_pk=None, pk=None):
         raise PermissionDenied
     if task is None and slot.tasks.exclude(status="cancelled").exists():
         return _error(request, slot.day.training_plan, ValidationError("该时段已有任务，请编辑已有任务。"))
+    title = request.POST.get("title", "").strip() if request.method == "POST" else None
+    approval_required = service.task_edit_requires_approval(request.user, task, title=title)
+    consultation_confirmed = request.POST.get("consultation_confirmed") == "1"
     navigation = {
         "entry_filters": filters_for(request).urlencode(),
         "editor_suffix": editor_suffix(filters_for(request)),
-        "direct_adjustment": service.privileged(request.user),
+        "approval_required": approval_required,
+        "consultation_confirmed": consultation_confirmed,
     }
     initial = {}
     if not task and request.GET.get("skill", "").isdigit():
         initial["skills"] = [int(request.GET["skill"])]
-    form = SlotTaskForm(request.POST if request.method == "POST" else None, request.FILES if request.method == "POST" else None, instance=task, slot=slot, initial=initial)
+    form = SlotTaskForm(
+        request.POST if request.method == "POST" else None, request.FILES if request.method == "POST" else None,
+        instance=task, slot=slot, initial=initial, approval_required=approval_required,
+    )
     if request.method == "POST" and form.is_valid():
         try:
             values = _task_form_values(form, request)
@@ -649,7 +675,10 @@ def task_edit(request, slot_pk=None, pk=None):
                 values = {key: value for key, value in values.items() if key in request.POST or key in request.FILES}
             if values.get("assign_all"):
                 values.pop("competitors", None)
-            result = service.save_slot_task(slot, request.user, values, task=task, publish=request.POST.get("action") == "publish")
+            result = service.save_slot_task(
+                slot, request.user, values, task=task, publish=request.POST.get("action") == "publish",
+                consultation_confirmed=consultation_confirmed,
+            )
             if isinstance(result, TrainingScheduleChange):
                 return _success(request, slot.day.training_plan, "任务调整申请已提交，审批前原内容保持不变。")
             task = result
@@ -657,12 +686,15 @@ def task_edit(request, slot_pk=None, pk=None):
             form.add_error(None, exc)
         else:
             if request.htmx:
-                form = SlotTaskForm(instance=task, slot=slot)
+                approval_required = service.task_edit_requires_approval(request.user, task)
+                form = SlotTaskForm(instance=task, slot=slot, approval_required=approval_required)
                 response = render(
                     request,
                     "training/slot_task_form.html",
                     {
                         **navigation,
+                        "approval_required": approval_required,
+                        "consultation_confirmed": False,
                         "next_entry": next_entry(request, slot.day.training_plan, slot.day, period=slot.period, task=True),
                         "form": form,
                         "slot": slot,
@@ -688,14 +720,20 @@ def task_action(request, pk):
     task = get_object_or_404(visible_training_tasks_for(request.user), pk=pk)
     try:
         if request.POST.get("action") == "publish":
-            service.save_slot_task(task.schedule_slot, request.user, {"reason": request.POST.get("reason", "")}, task=task, publish=True)
+            service.save_slot_task(
+                task.schedule_slot, request.user, {"reason": request.POST.get("reason", "")}, task=task, publish=True,
+                consultation_confirmed=request.POST.get("consultation_confirmed") == "1",
+            )
         elif request.POST.get("action") == "cancel":
             service.cancel_task(task, request.user, request.POST.get("reason", ""))
         elif request.POST.get("action") == "assign":
             ids = request.POST.getlist("competitors")
             if any(not value.isdigit() for value in ids):
                 raise ValidationError("选手名单不正确。")
-            service.assign_competitors(task, request.user, selected={int(value) for value in ids}, reason=request.POST.get("reason", ""))
+            service.assign_competitors(
+                task, request.user, selected={int(value) for value in ids}, reason=request.POST.get("reason", ""),
+                consultation_confirmed=request.POST.get("consultation_confirmed") == "1",
+            )
         else:
             raise ValidationError("不支持的任务操作。")
     except ValidationError as exc:
@@ -746,10 +784,15 @@ def task_skills(request, pk):
     )
     if not allowed:
         raise PermissionDenied
-    form = SkillCorrectionForm(request.POST if request.method == "POST" else None, task=task)
+    approval_required = service.task_edit_requires_approval(request.user, task)
+    consultation_confirmed = request.POST.get("consultation_confirmed") == "1"
+    form = SkillCorrectionForm(request.POST if request.method == "POST" else None, task=task, approval_required=approval_required)
     if request.method == "POST" and form.is_valid():
         try:
-            result = service.set_task_skills(task, request.user, list(form.cleaned_data["skills"].values_list("pk", flat=True)), reason=form.cleaned_data.get("reason", ""))
+            result = service.set_task_skills(
+                task, request.user, list(form.cleaned_data["skills"].values_list("pk", flat=True)),
+                reason=form.cleaned_data.get("reason", ""), consultation_confirmed=consultation_confirmed,
+            )
         except ValidationError as exc:
             form.add_error(None, exc)
         else:
@@ -758,7 +801,10 @@ def task_skills(request, pk):
     return render(
         request,
         "training/task_skills.html",
-        {"form": form, "task": task, "plan": task.training_plan, "is_fragment": bool(request.htmx)},
+        {
+            "form": form, "task": task, "plan": task.training_plan, "is_fragment": bool(request.htmx),
+            "approval_required": approval_required, "consultation_confirmed": consultation_confirmed,
+        },
     )
 
 

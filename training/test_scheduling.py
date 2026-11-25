@@ -248,6 +248,7 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
             self.scheduler,
             [self.change_slot(coaches=[self.collaborator.pk])],
             "调班",
+            consultation_confirmed=True,
         )
         with self.assertRaises(PermissionDenied):
             service.review_change(change, outsider, approve=True)
@@ -260,10 +261,15 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
             self.scheduler,
             [self.change_slot(coaches=[self.collaborator.pk])],
             "人员交接",
+            consultation_confirmed=True,
         )
         self.slot.refresh_from_db()
         self.assertIn(self.coach.pk, self.slot.coaches.values_list("pk", flat=True))
-        self.confirm_change_coaches(change)
+        self.assertEqual(change.confirmations, [])
+        self.assertFalse(change.confirmation_users.exists())
+        self.assertIsNotNone(change.consultation_confirmed_at)
+        submitted = self.plan.change_records.get(action="提交调整申请")
+        self.assertEqual(submitted.after["线下沟通确认时间"], change.consultation_confirmed_at.isoformat())
         service.review_change(change, self.approver, approve=True)
         self.slot.refresh_from_db()
         self.assertIn(self.collaborator.pk, self.slot.coaches.values_list("pk", flat=True))
@@ -274,23 +280,93 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         self.assertEqual(task.coach_links.get().user_id, self.collaborator.pk)
         self.assertTrue(self.plan.change_records.filter(action="批准调整").exists())
         with self.assertRaisesMessage(ValidationError, "重复"):
-            self.confirm_change_coaches(change)
             service.review_change(change, self.approver, approve=True)
+
+    def test_unchecked_schedule_change_allows_parallel_confirmation_then_separate_final_review(self):
+        self.ready()
+        change = service.save_schedule(
+            self.plan, self.scheduler, [self.change_slot(coaches=[self.approver.pk])], "换负责教练",
+        )
+        self.assertIsNone(change.consultation_confirmed_at)
+        self.assertSetEqual(
+            set(change.confirmation_users.values_list("pk", flat=True)),
+            {self.coach.pk, self.collaborator.pk, self.approver.pk},
+        )
+        with self.assertRaises(PermissionDenied):
+            service.review_change(change, self.admin, approve=True, stage="final")
+        self.client.force_login(self.collaborator)
+        detail = reverse("training:plan_detail", args=[self.plan.pk])
+        self.assertContains(self.client.get(detail), "待教练确认")
+        url = reverse("training:schedule_review", args=[change.pk])
+        self.assertEqual(self.client.post(url, {"stage": "coach", "decision": "approve"}).status_code, 302)
+        service.review_change(change, self.coach, approve=True, stage="coach")
+        with self.assertRaisesMessage(ValidationError, "下一审批阶段"):
+            service.review_change(change, self.approver, approve=True, stage="final")
+        service.review_change(change, self.approver, approve=True, stage="coach")
+        with self.assertRaisesMessage(ValidationError, "下一审批阶段"):
+            service.review_change(change, self.approver, approve=True, stage="coach")
+        self.slot.refresh_from_db()
+        self.assertIn(self.coach.pk, self.slot.coaches.values_list("pk", flat=True))
+        self.client.force_login(self.approver)
+        self.assertContains(self.client.get(detail), "待终审")
+        self.assertEqual(self.client.post(url, {"stage": "final", "decision": "approve"}).status_code, 302)
+        self.assertEqual(list(self.slot.coaches.values_list("pk", flat=True)), [self.approver.pk])
+
+    def test_unchecked_duty_change_can_be_rejected_by_any_affected_coach(self):
+        self.ready()
+        before = service.day_snapshot(self.day)
+        change = service.save_schedule(self.plan, self.scheduler, [{
+            "type": "day", "id": self.day.pk, "revision": self.day.revision, "before": before,
+            "after": before | {"duty_all": False, "duty_coaches": [self.scheduler.pk]},
+        }], "调整值班")
+        self.assertSetEqual(
+            set(change.confirmation_users.values_list("pk", flat=True)),
+            set(before["duty_coaches"]) - {self.scheduler.pk},
+        )
+        service.review_change(change, self.approver, approve=False, stage="coach", note="无法到岗")
+        change.refresh_from_db()
+        self.day.refresh_from_db()
+        self.assertEqual(change.status, "rejected")
+        self.assertEqual(change.review_note, "无法到岗")
+        self.assertEqual(service.day_snapshot(self.day), before)
+
+    def test_unchecked_expired_shared_task_change_covers_all_affected_slots(self):
+        self.ready(general=True)
+        later_slot = self.day.slots.get(period="afternoon")
+        later_slot.kind = "general"
+        later_slot.save()
+        later_slot.coaches.set([self.approver])
+        task = service.save_slot_task(self.slot, self.scheduler, {"title": "共同任务", "overview": "原内容"}, publish=True)
+        later_task = service.save_slot_task(later_slot, self.scheduler, {"title": task.title}, publish=True)
+        with patch("django.utils.timezone.now", return_value=later_slot.ends_at):
+            change = service.save_slot_task(
+                self.slot, self.scheduler, {"overview": "补记", "reason": "补充实际训练内容"}, task=task,
+            )
+            self.assertSetEqual(
+                set(change.confirmation_users.values_list("pk", flat=True)),
+                {self.coach.pk, self.collaborator.pk, self.approver.pk},
+            )
+            for coach in (self.approver, self.collaborator, self.coach):
+                service.review_change(change, coach, approve=True, stage="coach")
+            service.save_schedule(
+                self.plan, self.admin, [self.change_slot(later_slot, coaches=[self.coach.pk])],
+            )
+            with self.assertRaisesMessage(ValidationError, "关联时段的任务或排班已经变化"):
+                service.review_change(change, self.approver, approve=True, stage="final")
+        later_task.refresh_from_db()
+        self.assertEqual(later_task.overview, "原内容")
 
     def test_rejection_and_stale_approval_never_apply(self):
         self.ready()
         payload = [self.change_slot(coaches=[self.collaborator.pk])]
-        rejected = service.save_schedule(self.plan, self.scheduler, payload, "申请一")
-        stale = service.save_schedule(self.plan, self.scheduler, payload, "申请二")
-        self.confirm_change_coaches(rejected)
+        rejected = service.save_schedule(self.plan, self.scheduler, payload, "申请一", consultation_confirmed=True)
+        stale = service.save_schedule(self.plan, self.scheduler, payload, "申请二", consultation_confirmed=True)
         service.review_change(rejected, self.approver, approve=False, note="不调整")
         self.slot.refresh_from_db()
         self.assertIn(self.coach.pk, self.slot.coaches.values_list("pk", flat=True))
-        actual = service.save_schedule(self.plan, self.scheduler, payload, "申请三")
-        self.confirm_change_coaches(actual)
+        actual = service.save_schedule(self.plan, self.scheduler, payload, "申请三", consultation_confirmed=True)
         service.review_change(actual, self.approver, approve=True)
         with self.assertRaisesMessage(ValidationError, "已经变化"):
-            self.confirm_change_coaches(stale)
             service.review_change(stale, self.approver, approve=True)
         stale.refresh_from_db()
         self.assertEqual(stale.status, "pending")
@@ -299,11 +375,11 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         self.ready()
         change = service.save_schedule(
             self.plan, self.scheduler, [self.change_slot(coaches=[self.collaborator.pk])], "待审交接",
+            consultation_confirmed=True,
         )
         self.assertIsNone(service.save_schedule(
             self.plan, self.admin, [self.change_slot(coaches=[self.coach.pk])],
         ))
-        self.confirm_change_coaches(change)
         with self.assertRaisesMessage(ValidationError, "已经变化"):
             service.review_change(change, self.approver, approve=True)
         self.assertEqual(list(self.slot.coaches.values_list("pk", flat=True)), [self.coach.pk])
@@ -338,10 +414,10 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
             self.scheduler,
             [self.change_slot(coaches=[self.collaborator.pk])],
             "待审交接",
+            consultation_confirmed=True,
         )
         self.plan.schedulers.remove(self.scheduler)
         with self.assertRaisesMessage(ValidationError, "申请人已无"):
-            self.confirm_change_coaches(change)
             service.review_change(change, self.approver, approve=True)
         self.slot.refresh_from_db()
         self.assertIn(self.coach.pk, self.slot.coaches.values_list("pk", flat=True))
@@ -371,8 +447,8 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
             self.scheduler,
             [self.change_slot(coaches=[self.collaborator.pk])],
             "本人申请并审批",
+            consultation_confirmed=True,
         )
-        self.confirm_change_coaches(change)
         service.review_change(change, self.scheduler, approve=True)
         change.refresh_from_db()
         self.assertEqual(change.requested_by_id, change.reviewed_by_id)
@@ -381,14 +457,17 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         self.ready()
         task = self.new_task()
         service.publish_slot_task(task, self.coach)
-        change = service.save_schedule(self.plan, self.scheduler, [self.change_slot(kind="general")], "改活动")
+        change = service.save_schedule(
+            self.plan, self.scheduler, [self.change_slot(kind="general")], "改活动", consultation_confirmed=True,
+        )
         execution = task.executions.get(user=self.student)
         update_execution_facts(execution, user=self.student, status="in_progress")
         with patch("django.utils.timezone.now", return_value=self.slot.ends_at):
-            self.confirm_change_coaches(change)
             service.review_change(change, self.approver, approve=True)
-        handoff = service.save_schedule(self.plan, self.scheduler, [self.change_slot(coaches=[self.collaborator.pk])], "结束前换教练")
-        self.confirm_change_coaches(handoff)
+        handoff = service.save_schedule(
+            self.plan, self.scheduler, [self.change_slot(coaches=[self.collaborator.pk])], "结束前换教练",
+            consultation_confirmed=True,
+        )
         service.review_change(handoff, self.approver, approve=True)
         task.refresh_from_db()
         self.assertEqual(task.title, "部署服务")
@@ -460,11 +539,13 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         service.save_slot_task(afternoon, self.coach, {"title": "机密草稿"})
         service.publish_slot_task(first, self.coach)
         rest = self.day.slots.get(period="evening")
-        change = service.save_schedule(self.plan, self.scheduler, [self.change_slot(rest, kind="rest")], "晚间休息")
-        self.confirm_change_coaches(change)
+        change = service.save_schedule(
+            self.plan, self.scheduler, [self.change_slot(rest, kind="rest")], "晚间休息", consultation_confirmed=True,
+        )
         service.review_change(change, self.approver, approve=True)
         service.save_schedule(
-            self.plan, self.scheduler, [self.change_slot(coaches=[self.collaborator.pk])], "待审批改主教练"
+            self.plan, self.scheduler, [self.change_slot(coaches=[self.collaborator.pk])], "待审批改主教练",
+            consultation_confirmed=True,
         )
         sheet = load_workbook(BytesIO(build_plan_workbook(self.plan)))["训练计划"]
         self.assertEqual(
@@ -596,6 +677,7 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         self.client.force_login(self.scheduler)
         url = reverse("training:schedule_edit", args=[self.plan.pk])
         response = self.client.get(url, {"days": self.day.pk, "day_only": "1"}, HTTP_HX_REQUEST="true")
+        self.assertNotContains(response, 'name="consultation_confirmed"')
         data = {"days": self.day.pk, "day_only": "1", "reason": "更新备注"}
         for key in ("day", "slot"):
             formset = response.context[f"{key}_forms"]
@@ -612,6 +694,25 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         self.assertNotContains(response, "<html")
         self.day.refresh_from_db()
         self.assertEqual(self.day.note, "测试备注保留")
+        self.assertFalse(self.plan.schedule_changes.exists())
+
+        service.publish_schedule(self.plan, self.scheduler)
+        response = self.client.get(url, {"days": self.day.pk, "day_only": "1"}, HTTP_HX_REQUEST="true")
+        self.assertContains(response, 'name="consultation_confirmed"')
+        for key in ("day", "slot"):
+            for form in response.context[f"{key}_forms"]:
+                data[f"{form.prefix}-revision"] = form.initial["revision"]
+        data["day-0-note"] = "已发布排班调整"
+        response = self.client.post(url, data, HTTP_HX_REQUEST="true")
+        self.assertContains(response, "调整申请已提交")
+        change = self.plan.schedule_changes.get()
+        self.assertEqual(change.confirmations, [])
+        self.assertIsNone(change.consultation_confirmed_at)
+        self.day.refresh_from_db()
+        self.assertEqual(self.day.note, "测试备注保留")
+        service.review_change(change, self.approver, approve=True)
+        self.day.refresh_from_db()
+        self.assertEqual(self.day.note, "已发布排班调整")
 
     def test_snapshot_does_not_refresh_on_unrelated_day_edit(self):
         self.ready(all_coaches=True)
@@ -627,8 +728,7 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
                 "after": before | {"note": "只改备注"},
             }
         ]
-        change = service.save_schedule(self.plan, self.scheduler, payload, "修改备注")
-        self.confirm_change_coaches(change)
+        change = service.save_schedule(self.plan, self.scheduler, payload, "修改备注", consultation_confirmed=True)
         service.review_change(change, self.approver, approve=True)
         self.assertSetEqual(set(self.day.duty_coaches.values_list("pk", flat=True)), original)
 
@@ -830,6 +930,7 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         response = self.client.get(url)
         self.assertContains(response, "编辑全天任务")
         self.assertContains(response, 'name="targets"', count=3)
+        self.assertNotContains(response, 'name="consultation_confirmed"')
         data = {
             "version": response.context["version"], "action": "apply",
             "targets": [slot.pk for slot in slots],
@@ -858,6 +959,23 @@ class ScheduleTests(TrainingFixtureMixin, TestCase):
         task.refresh_from_db()
         self.assertEqual(task.title, "仅修改上午")
         self.assertEqual(self.plan.tasks.filter(title="统一训练").count(), 2)
+
+        with patch("django.utils.timezone.now", return_value=self.slot.ends_at):
+            response = self.client.get(url)
+            self.assertContains(response, 'name="consultation_confirmed"', count=2)
+            data = {
+                "version": response.context["version"], "action": "apply", "targets": [self.slot.pk],
+                "overwrite": "on", "common-title": "补改上午", "common-reason": "补记实际执行情况",
+                "common-assign_all": "on", "common-assignment_configured": "True",
+            }
+            self.assertRedirects(self.client.post(url, data), url)
+            task.refresh_from_db()
+            self.assertEqual(task.title, "仅修改上午")
+            change = self.plan.schedule_changes.get()
+            self.assertEqual(change.confirmations, [])
+            service.review_change(change, self.approver, approve=True)
+            task.refresh_from_db()
+            self.assertEqual(task.title, "补改上午")
 
     def test_day_task_editor_requires_common_coach_and_checks_early_separately(self):
         self.ready(general=True)

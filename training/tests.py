@@ -44,15 +44,6 @@ def configure_test_periods():
 
 
 class TrainingFixtureMixin:
-    def confirm_change_coaches(self, change):
-        from .change_workflow import next_coach
-        from .scheduling import review_change
-        while True:
-            change.refresh_from_db()
-            if change.status != "pending" or not (coach_id := next_coach(change)):
-                break
-            review_change(change, User.objects.get(pk=coach_id), approve=True)
-
     def setUp(self):
         super().setUp()
         self.project = SkillProject.objects.create(code="NS", name="网络系统管理", is_default=True)

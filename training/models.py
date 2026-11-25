@@ -530,6 +530,8 @@ class TrainingScheduleChange(TimestampedModel):
     reviewed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name="training_schedule_reviews", verbose_name="审批人")
     reviewed_at = models.DateTimeField("审批时间", null=True, blank=True)
     review_note = models.TextField("审批意见", blank=True)
+    consultation_confirmed_at = models.DateTimeField("申请人线下沟通确认时间", null=True, blank=True)
+    legacy_consultation_assumed_at = models.DateTimeField("系统将旧申请视同完成线下沟通的时间", null=True, blank=True)
     confirmations = models.JSONField("教练依次确认记录", default=list, blank=True)
     confirmation_users = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="training_change_confirmations", verbose_name="涉及教练")
 

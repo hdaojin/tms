@@ -138,7 +138,7 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
             "overview": forms.Textarea(attrs={"rows": 3}),
         }
 
-    def __init__(self, *args, slot, **kwargs):
+    def __init__(self, *args, slot, approval_required=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.slot = slot
         self.shared_task = None
@@ -160,7 +160,7 @@ class SlotTaskForm(StyledFormMixin, forms.ModelForm):
                     subtask_titles=[item["title"] for item in source.subtasks],
                     skills=list(source.skill_links.values_list("skill_id", flat=True)),
                 )
-        if not self.instance.pk or self.instance.status == "draft":
+        if not approval_required and (not self.instance.pk or self.instance.status == "draft"):
             self.fields.pop("reason")
         self.fields["order"].required = False
         plan = slot.day.training_plan
@@ -243,9 +243,9 @@ class SkillCorrectionForm(StyledFormMixin, forms.Form):
     reason = forms.CharField(label="过期修改原因和实际执行情况", required=False)
     skills = forms.ModelMultipleChoiceField(label="关联技能", queryset=Skill.objects.none(), required=False)
 
-    def __init__(self, *args, task, **kwargs):
+    def __init__(self, *args, task, approval_required=False, **kwargs):
         super().__init__(*args, **kwargs)
-        if task.status == "draft":
+        if task.status == "draft" and not approval_required:
             self.fields.pop("reason")
         self.fields["skills"].queryset = Skill.objects.filter(skill_project=task.skill_project)
         self.initial["skills"] = list(task.skill_links.values_list("skill_id", flat=True))

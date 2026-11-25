@@ -137,7 +137,10 @@ class PlanStagesTests(ProcessFixture, TestCase):
         self.publish_plan()
         change_state(execution, self.student, "in_progress")
         with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 3, tzinfo=dt_timezone.utc)):
-            change = scheduling.save_slot_task(self.slot, self.coach, {"title": "补正内容", "reason": "实际已经执行，补记"}, task=task)
+            change = scheduling.save_slot_task(
+                self.slot, self.coach, {"title": "补正内容", "reason": "实际已经执行，补记"},
+                task=task, consultation_confirmed=True,
+            )
             self.assertIsInstance(change, TrainingScheduleChange)
             task.refresh_from_db()
             self.assertEqual(task.title, "原内容")
@@ -149,20 +152,30 @@ class PlanStagesTests(ProcessFixture, TestCase):
             self.assertEqual(execution.status, "in_progress")
             self.assertEqual(task.executions.get(user=self.student).pk, execution.pk)
 
-    def test_coaches_confirm_in_order_before_final_review(self):
+    def test_converted_legacy_request_goes_to_final_review_with_original_steps(self):
         self.plan.approvers.add(self.other)
         before = scheduling.slot_snapshot(self.slot)
         payload = [{"type": "slot", "id": self.slot.pk, "revision": self.slot.revision, "before": before,
                     "after": before | {"coaches": [self.other.pk]}}]
-        change = scheduling.save_schedule(self.plan, self.coach, payload, "交接负责教练")
-        with self.assertRaises(PermissionDenied):
-            review(change, self.admin, approve=True)
-        review(change, self.other, approve=True)
-        self.slot.refresh_from_db()
-        self.assertIn(self.coach.pk, self.slot.coaches.values_list("pk", flat=True))
-        review(change, self.other, approve=True)  # 同一人须另外履行终审职责。
+        confirmations = [
+            {"user_id": self.coach.pk, "decision": "approve", "note": "此前确认", "at": timezone.now().isoformat()},
+            {"user_id": self.other.pk, "decision": "", "note": "", "at": None},
+        ]
+        change = TrainingScheduleChange.objects.create(
+            training_plan=self.plan, requested_by=self.coach, payload=payload, reason="旧申请交接负责教练",
+            confirmations=confirmations, legacy_consultation_assumed_at=timezone.now(),
+        )
+        change.confirmation_users.add(self.other)
+        self.assertIsNone(change.consultation_confirmed_at)
+        self.client.force_login(self.other)
+        response = self.client.get(reverse("training:plan_detail", args=[self.plan.pk]))
+        self.assertContains(response, "系统已将旧申请视同完成线下沟通")
+        self.assertContains(response, "此前确认")
+        review(change, self.other, approve=True, stage="final")
+        change.refresh_from_db()
         self.slot.refresh_from_db()
         self.assertIn(self.other.pk, self.slot.coaches.values_list("pk", flat=True))
+        self.assertEqual(change.confirmations, confirmations)
         with self.assertRaises(ValidationError):
             review(change, self.other, approve=True)
 
@@ -172,8 +185,7 @@ class PlanStagesTests(ProcessFixture, TestCase):
         change = scheduling.save_schedule(self.plan, self.coach, [{
             "type": "day", "id": day.pk, "revision": day.revision, "before": before,
             "after": before | {"duty_all": True, "duty_coaches": []},
-        }], "安排全员值班")
-        self.confirm_change_coaches(change)
+        }], "安排全员值班", consultation_confirmed=True)
         self.plan.duty_personnel.add(self.student)
         with self.assertRaisesMessage(ValidationError, "计划人员名单已变化"):
             review(change, self.admin, approve=True)
@@ -187,8 +199,12 @@ class PlanStagesTests(ProcessFixture, TestCase):
     def test_stale_request_does_not_overwrite_task(self):
         task = scheduling.save_slot_task(self.slot, self.coach, {"title": "原内容"}, publish=True)
         with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 3, tzinfo=dt_timezone.utc)):
-            first = scheduling.save_slot_task(self.slot, self.coach, {"title": "第一份", "reason": "补记"}, task=task)
-            second = scheduling.save_slot_task(self.slot, self.coach, {"title": "第二份", "reason": "补记"}, task=task)
+            first = scheduling.save_slot_task(
+                self.slot, self.coach, {"title": "第一份", "reason": "补记"}, task=task, consultation_confirmed=True,
+            )
+            second = scheduling.save_slot_task(
+                self.slot, self.coach, {"title": "第二份", "reason": "补记"}, task=task, consultation_confirmed=True,
+            )
             review(first, self.admin, approve=True)
             with self.assertRaises(ValidationError):
                 review(second, self.admin, approve=True)
@@ -204,23 +220,13 @@ class PlanStagesTests(ProcessFixture, TestCase):
         before = scheduling.slot_snapshot(self.slot)
         payload = [{"type": "slot", "id": self.slot.pk, "revision": self.slot.revision, "before": before,
                     "after": before | {"coaches": [self.other.pk]}}]
-        change = scheduling.save_schedule(self.plan, self.coach, payload, "申请交接")
-        review(change, self.other, approve=False, note="仍按原安排")
+        change = scheduling.save_schedule(self.plan, self.coach, payload, "申请交接", consultation_confirmed=True)
+        review(change, self.admin, approve=False, note="仍按原安排")
         change.refresh_from_db()
         self.slot.refresh_from_db()
         self.assertEqual(change.status, "rejected")
         self.assertIn(self.coach.pk, self.slot.coaches.values_list("pk", flat=True))
-        self.assertEqual(change.confirmations[1]["decision"], "reject")
-
-    def test_new_responsible_coach_can_view_and_confirm_request_before_handoff(self):
-        before = scheduling.slot_snapshot(self.slot)
-        payload = [{"type": "slot", "id": self.slot.pk, "revision": self.slot.revision, "before": before,
-                    "after": before | {"coaches": [self.other.pk]}}]
-        change = scheduling.save_schedule(self.plan, self.coach, payload, "交接给另一位教练")
-        self.client.force_login(self.other)
-        response = self.client.get(reverse("training:plan_detail", args=[self.plan.pk]))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, reverse("training:schedule_review", args=[change.pk]))
+        self.assertEqual(change.review_note, "仍按原安排")
 
     def test_empty_and_unpublished_task_cells_are_blank_for_student(self):
         self.publish_plan()
@@ -245,7 +251,11 @@ class PlanStagesTests(ProcessFixture, TestCase):
             self.publish_plan()
             with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 3, tzinfo=dt_timezone.utc)):
                 from .change_workflow import request_task_change
-                change = request_task_change(self.plan, self.slot, None, self.coach, {"title": "补录历史任务", "reason": "已线下完成，补录", "attachments": [SimpleUploadedFile("指导.txt", b"private guide")]}, True)
+                change = request_task_change(
+                    self.plan, self.slot, None, self.coach,
+                    {"title": "补录历史任务", "reason": "已线下完成，补录", "attachments": [SimpleUploadedFile("指导.txt", b"private guide")]},
+                    True, consultation_confirmed=True,
+                )
                 self.assertFalse(self.plan.tasks.exists())
                 attachment = change.attachments.get()
                 url = reverse("training:attachment_download", args=["change", attachment.pk])
@@ -306,8 +316,19 @@ class PlanStagesTests(ProcessFixture, TestCase):
         self.plan.approvers.add(self.other)
         task = scheduling.save_slot_task(self.slot, self.coach, {"title": "原任务"}, publish=True)
         with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 3, tzinfo=dt_timezone.utc)):
-            change = scheduling.save_slot_task(self.slot, self.coach, {"title": "历史补记", "reason": "已完成，补录"}, task=task)
-            review(change, self.other, approve=True)
+            self.client.force_login(self.coach)
+            url = reverse("training:task_edit", args=[task.pk])
+            data = {"title": "历史补记", "reason": "已完成，补录"}
+            self.assertContains(self.client.get(url), 'name="consultation_confirmed"')
+            self.assertEqual(self.client.post(url, data | {"consultation_confirmed": "1"}).status_code, 302)
+            change = self.plan.schedule_changes.get()
+            self.assertIsNotNone(change.consultation_confirmed_at)
+            self.assertEqual(change.confirmations, [])
+            self.client.force_login(self.other)
+            self.assertContains(self.client.get(reverse("training:plan_detail", args=[self.plan.pk])), "申请人已确认线下沟通")
+            self.assertEqual(self.client.post(
+                reverse("training:schedule_review", args=[change.pk]), {"decision": "approve", "stage": "final"},
+            ).status_code, 302)
             self.assertEqual(self.plan.tasks.get().title, "历史补记")
 
     def test_attachment_copy_is_cleaned_if_final_audit_fails(self):
@@ -316,7 +337,11 @@ class PlanStagesTests(ProcessFixture, TestCase):
         with TemporaryDirectory() as directory, override_settings(PRIVATE_MEDIA_ROOT=directory):
             with patch("django.utils.timezone.now", return_value=datetime(2026, 1, 3, tzinfo=dt_timezone.utc)):
                 from .change_workflow import request_task_change
-                change = request_task_change(self.plan, self.slot, None, self.coach, {"title": "补记", "reason": "实际执行补记", "attachments": [SimpleUploadedFile("指导.txt", b"guide")]}, False)
+                change = request_task_change(
+                    self.plan, self.slot, None, self.coach,
+                    {"title": "补记", "reason": "实际执行补记", "attachments": [SimpleUploadedFile("指导.txt", b"guide")]},
+                    False, consultation_confirmed=True,
+                )
                 before = {path for path in Path(directory).rglob("*") if path.is_file()}
                 original = TrainingChangeRecord.objects.create
 

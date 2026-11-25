@@ -130,13 +130,15 @@ def plan_context(view, context):
 
     history_page = Paginator(history, 10).get_page(view.request.GET.get("history_page"))
     history, changes = decorate_history(history_page.object_list, change_query[:50])
-    from .change_workflow import can_review, next_coach
+    from .change_workflow import can_review, pending_coach_ids
     from django.contrib.auth import get_user_model
     names = {person.pk: get_user_display_name(person) for person in get_user_model().objects.filter(pk__in={step["user_id"] for change in changes for step in change.confirmations})}
     for change in changes:
         change.training_plan = plan
         change.can_review = can_review(user, change)
-        change.waiting_for = names.get(next_coach(change), "计划审批人员或超级管理员")
+        pending = pending_coach_ids(change)
+        change.review_stage = "coach" if pending else "final"
+        change.waiting_for = "、".join(names.get(pk, "教练") for pk in pending) if pending else "计划审批人员或超级管理员"
         for step in change.confirmations:
             step["display_name"] = names.get(step["user_id"], "教练")
     configured_periods = set(TrainingScheduleSlot.Period.values)

@@ -11,6 +11,8 @@ LABELS = {
     "day_id": "日期记录",
     "slots": "交换时段",
     "tasks": "随排班交换的任务",
+    "shared_tasks": "关联任务版本",
+    "attachments": "附件",
     "slot": "时段记录",
     "updated_at": "最后保存时间",
     "publish": "发布任务",

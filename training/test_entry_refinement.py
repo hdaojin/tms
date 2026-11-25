@@ -63,7 +63,7 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
             reason,
         )
 
-    def save_day(self, day=None, note="备注", reason="", *, user=None):
+    def save_day(self, day=None, note="备注", reason="", *, user=None, consultation_confirmed=False):
         day = day or self.day
         day.refresh_from_db()
         before = service.day_snapshot(day)
@@ -80,6 +80,7 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
                 }
             ],
             reason,
+            consultation_confirmed=consultation_confirmed,
         )
 
     def complete_schedule(self):
@@ -128,6 +129,8 @@ class EntryRefinementTests(TrainingFixtureMixin, TestCase):
                 self.save_day(note="第二次", user=self.coach)
             change = self.save_day(note="第二次", reason="补正", user=self.coach)
             self.assertEqual(change.status, "pending")
+            self.assertEqual(change.confirmations, [])
+            self.assertIsNone(change.consultation_confirmed_at)
             self.day.refresh_from_db()
             self.assertEqual(self.day.note, "草稿再次修改")
             service.review_change(change, self.admin, approve=True)

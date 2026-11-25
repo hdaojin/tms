@@ -38,6 +38,9 @@
             <input type="checkbox" name="overwrite" class="checkbox checkbox-sm">确认覆盖选中时段的已有任务
           </label>
         {% endif %}
+        {% if common_approval_possible %}
+          {% include 'training/consultation_confirmation.html' with checked=common_consultation_confirmed only %}
+        {% endif %}
         <button class="btn btn-primary">应用到选定的时段</button>
       </form>
     </details>
@@ -53,7 +56,10 @@
           <input type="hidden" name="version" value="{{ version }}">
           <input type="hidden" name="slot" value="{{ row.slot.pk }}">
           {% include 'training/day_task_fields.html' with form=row.form task=row.task %}
-          <button class="btn btn-primary">{% if row.slot.is_locked and row.task.status == 'published' and not direct_adjustment %}提交调整{% else %}保存{% endif %}</button>
+          {% if row.approval_required %}
+            {% include 'training/consultation_confirmation.html' with checked=row.consultation_confirmed only %}
+          {% endif %}
+          <button class="btn btn-primary">{% if row.approval_required %}提交调整{% else %}保存{% endif %}</button>
         </form>
       {% elif row.task %}
         <a class="link" href="{% url 'training:task_detail' row.task.pk %}">查看任务</a>
