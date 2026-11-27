@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum, auto
 from typing import TYPE_CHECKING
 
 from .models import NoteRepo
@@ -38,3 +39,25 @@ def can_access_note_content(user, note_content: NoteContent | None) -> bool:
     if note_content is None:
         return False
     return can_access_note_repo(user, note_content.repo)
+
+
+class NoteRepoReadAccess(Enum):
+    ALLOWED = auto()
+    LOGIN_REQUIRED = auto()
+    FORBIDDEN = auto()
+    PUBLIC_ACCESS_BLOCKED = auto()
+
+
+def get_note_repo_read_access(user, note_repo: NoteRepo) -> NoteRepoReadAccess:
+    """判断 Notes 只读入口的访问结果，不用于其他业务入口。"""
+    if note_repo.is_visible and note_repo.allow_anonymous_access:
+        if not note_repo.anonymous_access_block_reason():
+            return NoteRepoReadAccess.ALLOWED
+        if not user.is_authenticated:
+            return NoteRepoReadAccess.PUBLIC_ACCESS_BLOCKED
+
+    if not user.is_authenticated:
+        return NoteRepoReadAccess.LOGIN_REQUIRED
+    if user.has_perm("notes.view_noterepo") and can_access_note_repo(user, note_repo.slug, note_repo=note_repo):
+        return NoteRepoReadAccess.ALLOWED
+    return NoteRepoReadAccess.FORBIDDEN

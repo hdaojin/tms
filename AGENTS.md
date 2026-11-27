@@ -181,6 +181,7 @@ TMS 继续保持 Django 单体，不为“分层”而引入额外框架；但�
 
 - APP URL 使用 `app_name` namespace，并由 `tmsproject/urls.py` `include()`。
 - 导航的唯一配置入口是 `core/config/navigation.yml`；不要恢复旧 `core/config/menus/*.yml` / `menus.yml` 体系。
+- 前台「笔记仓库管理」仅限超级管理员登记和编辑仓库。开启匿名访问、恢复已开启匿名访问仓库的可见性，或更改公开仓库的目录及访问标识，须预览实际目录和链接并在保存时复核。撤销登记沿用 Django 后台。
 - 「训练计划」列表默认显示「我的计划」，可切换至「全部可见」，两种范围均受计划可见权限约束。旧「我的计划」地址重定向至统一列表的默认范围。
 - 页面按用途扩展：`templates/layouts/app.html`、`minimal.html`、`auth.html`、`print.html`、`htmx.html`；`templates/base.html` 仅作为兼容/薄入口，不应成为新页面首选布局。
 - 优先复用 `templates/components/`，尤其是表单、字段和表格包装组件。

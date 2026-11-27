@@ -2,8 +2,11 @@
 {% block right_sidebar %}{% endblock %}
 
 {% block content %}
- 
-
+  {% if user.is_superuser %}
+    <div class="mb-4">
+      <a class="btn btn-outline" href="{% url 'notes:repo_manage_list' %}">笔记仓库管理</a>
+    </div>
+  {% endif %}
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {% for repo in repos %}
       <a href="{% url 'notes:note_repo_index' repo=repo.slug %}" class="card bg-base-100 shadow hover:shadow-lg transition-shadow">
@@ -23,38 +26,4 @@
     {% endfor %}
   </div>
 
- {% if user.is_superuser %}
-    <div class="mt-6 space-y-4">
-      <div class="text-xl font-semibold">笔记库目录统计</div>
-      <div class="overflow-x-auto">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>统计项</th>
-            <th>数量</th>
-            <th>笔记库/目录列表</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in repo_stats_rows %}
-            <tr>
-              <td>{{ row.label }}</td>
-              <td>{{ row.count|default:0 }}</td>
-              <td>
-                {% if row.names %}
-                  <div class="flex flex-wrap gap-1 text-xs">
-                    {% for name in row.names %}
-                      <span class="badge badge-ghost">{{ name }}</span>
-                    {% endfor %}
-                  </div>
-                {% else %}
-                  <span class="text-base-content/50">-</span>
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% endif %}
 {% endblock %}

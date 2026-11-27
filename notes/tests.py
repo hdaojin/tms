@@ -1,18 +1,22 @@
+from contextlib import closing
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 from bs4 import BeautifulSoup
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group, Permission
-from django.core.exceptions import ValidationError
+from django.contrib import admin
+from django.contrib.auth.models import AnonymousUser, Group, Permission
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TestCase, TransactionTestCase, override_settings
+from django.test import RequestFactory, TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from PIL import Image
 
+from notes.admin import NoteRepoAdmin
 from notes.models import NoteRepo
 from notes.paths import (
     InvalidNotePathError,
@@ -20,7 +24,7 @@ from notes.paths import (
     resolve_note_repo_root,
     resolve_repo_relative_path,
 )
-from notes.permissions import can_access_note_content, can_access_note_repo
+from notes.permissions import NoteRepoReadAccess, can_access_note_content, can_access_note_repo, get_note_repo_read_access
 from notes.utils import NoteContent, get_readme_navigation, render_note_markdown
 
 
@@ -29,7 +33,7 @@ User = get_user_model()
 
 class NoteRepoMigrationTests(TransactionTestCase):
     migrate_from = ("notes", "0001_initial")
-    migrate_to = ("notes", "0002_noterepo_relative_path")
+    migrate_to = ("notes", "0004_noterepo_allow_anonymous_access")
 
     def setUp(self):
         super().setUp()
@@ -41,9 +45,10 @@ class NoteRepoMigrationTests(TransactionTestCase):
         executor.migrate([self.migrate_to])
         self.apps = executor.loader.project_state([self.migrate_to]).apps
 
-    def test_migration_copies_slug_to_relative_path(self):
+    def test_migration_copies_slug_to_relative_path_and_keeps_old_repo_private(self):
         repo = self.apps.get_model("notes", "NoteRepo").objects.get(slug="legacy-notes")
         self.assertEqual(repo.relative_path, "legacy-notes")
+        self.assertIs(repo.allow_anonymous_access, False)
 
     def tearDown(self):
         # 归还最新迁移状态，避免后续历史迁移测试混合前进和回退计划。
@@ -53,6 +58,47 @@ class NoteRepoMigrationTests(TransactionTestCase):
 
 
 class NoteRepoPathTests(TestCase):
+    def test_new_and_changed_paths_cannot_overlap_on_segment_boundaries(self):
+        parent = NoteRepo.objects.create(slug="parent", relative_path="a/b", title="笔记")
+        sibling = NoteRepo.objects.create(slug="sibling", relative_path="a/bc", title="笔记")
+        self.assertIs(parent.allow_anonymous_access, False)
+        for repo in (
+            NoteRepo(slug="child", relative_path=r"a\b\c", title="笔记"),
+            NoteRepo(slug="ancestor", relative_path="a", title="笔记"),
+            sibling,
+        ):
+            if repo is sibling:
+                repo.relative_path = "a/b/another"
+            for validate in (repo.full_clean, repo.save):
+                with (
+                    self.subTest(repo=repo.slug, validate=validate.__name__),
+                    self.assertRaises(ValidationError) as exc,
+                ):
+                    validate()
+                self.assertIn("relative_path", exc.exception.message_dict)
+
+    def test_legacy_parent_can_edit_title_but_cannot_enable_anonymous_access(self):
+        parent, child = NoteRepo.objects.bulk_create(
+            [
+                NoteRepo(slug="parent", relative_path="a/b", title="原名"),
+                NoteRepo(slug="child", relative_path="a/b/c", title="子仓库"),
+            ]
+        )
+        parent.title = "新名称"
+        parent.full_clean()
+        parent.save()
+        parent.allow_anonymous_access = True
+        with self.assertRaises(ValidationError):
+            parent.full_clean()
+        with self.assertRaises(ValidationError):
+            parent.save(update_fields=["allow_anonymous_access"])
+        parent.refresh_from_db()
+        self.assertEqual(parent.title, "新名称")
+        self.assertFalse(parent.allow_anonymous_access)
+        child.allow_anonymous_access = True
+        child.save(update_fields=["allow_anonymous_access"])
+        self.assertEqual(child.anonymous_access_block_reason(), "")
+
     def test_model_normalizes_windows_separator(self):
         repo = NoteRepo.objects.create(
             slug="nested-notes",
@@ -118,6 +164,34 @@ class NotePermissionTests(TestCase):
         self.assertFalse(can_access_note_repo(self.allowed_user, "private-repo"))
         self.assertTrue(can_access_note_repo(self.superuser, "private-repo"))
 
+    def test_public_read_keeps_original_repo_authorization_separate(self):
+        anonymous = AnonymousUser()
+        no_permission = self.allowed_user
+        self.denied_user.user_permissions.add(
+            Permission.objects.get(content_type__app_label="notes", codename="view_noterepo")
+        )
+        for user, expected in (
+            (anonymous, NoteRepoReadAccess.LOGIN_REQUIRED),
+            (no_permission, NoteRepoReadAccess.FORBIDDEN),
+            (self.denied_user, NoteRepoReadAccess.FORBIDDEN),
+        ):
+            with self.subTest(user=user):
+                self.assertIs(get_note_repo_read_access(user, self.note_repo), expected)
+        self.note_repo.allow_anonymous_access = True
+        self.note_repo.save(update_fields=["allow_anonymous_access"])
+        for user in (anonymous, no_permission, self.denied_user):
+            with self.subTest(user=user):
+                self.assertIs(get_note_repo_read_access(user, self.note_repo), NoteRepoReadAccess.ALLOWED)
+        self.assertFalse(can_access_note_repo(anonymous, self.note_repo.slug))
+        self.assertFalse(can_access_note_repo(self.denied_user, self.note_repo.slug))
+
+    def test_hidden_repo_with_public_flag_still_requires_private_authorization(self):
+        self.note_repo.allow_anonymous_access = True
+        self.note_repo.is_visible = False
+        self.assertIs(get_note_repo_read_access(AnonymousUser(), self.note_repo), NoteRepoReadAccess.LOGIN_REQUIRED)
+        self.assertIs(get_note_repo_read_access(self.allowed_user, self.note_repo), NoteRepoReadAccess.FORBIDDEN)
+        self.assertIs(get_note_repo_read_access(self.superuser, self.note_repo), NoteRepoReadAccess.ALLOWED)
+
 
 class NotePathBoundaryTests(TestCase):
     def setUp(self):
@@ -147,6 +221,84 @@ class NotePathBoundaryTests(TestCase):
 
     def test_normalizer_accepts_both_separators(self):
         self.assertEqual(normalize_note_relative_path(r"parent\child"), "parent/child")
+
+
+class NoteRepoAdminTests(TestCase):
+    def setUp(self):
+        self.repo = NoteRepo.objects.create(slug="course", relative_path="a/course", title="课程")
+        self.url = reverse("admin:notes_noterepo_change", args=[self.repo.pk])
+        self.staff = User.objects.create_user(username="note-staff", is_staff=True)
+        self.staff.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="notes",
+                codename__in=["add_noterepo", "change_noterepo"],
+            )
+        )
+        self.superuser = User.objects.create_superuser(username="note-superuser")
+        self.data = {
+            "slug": self.repo.slug,
+            "relative_path": self.repo.relative_path,
+            "title": "更新课程名称",
+            "description": "课程简介",
+            "tags": "教案",
+            "order": 0,
+            "is_visible": "on",
+            "allow_anonymous_access": "on",
+        }
+
+    def test_superuser_can_toggle_and_get_public_link(self):
+        self.client.force_login(self.superuser)
+        self.assertContains(self.client.get(self.url), 'name="allow_anonymous_access"')
+        self.assertEqual(self.client.post(self.url, self.data).status_code, 302)
+        self.repo.refresh_from_db()
+        self.assertTrue(self.repo.allow_anonymous_access)
+        public_url = reverse("notes:note_repo_index", args=[self.repo.slug])
+        self.assertContains(self.client.get(self.url), f'href="{public_url}"')
+        self.data.pop("allow_anonymous_access")
+        self.assertEqual(self.client.post(self.url, self.data).status_code, 302)
+        self.repo.refresh_from_db()
+        self.assertFalse(self.repo.allow_anonymous_access)
+
+    def test_ordinary_admin_can_edit_other_fields_but_cannot_forge_public_flag(self):
+        self.client.force_login(self.staff)
+        self.assertNotContains(self.client.get(self.url), 'name="allow_anonymous_access"')
+        self.assertEqual(self.client.post(self.url, self.data).status_code, 302)
+        self.repo.refresh_from_db()
+        self.assertFalse(self.repo.allow_anonymous_access)
+        self.assertEqual((self.repo.title, self.repo.description, self.repo.tags), ("更新课程名称", "课程简介", "教案"))
+
+        add_url = reverse("admin:notes_noterepo_add")
+        self.assertEqual(
+            self.client.post(add_url, {**self.data, "slug": "new", "relative_path": "new"}).status_code, 302
+        )
+        self.assertFalse(NoteRepo.objects.get(slug="new").allow_anonymous_access)
+
+    def test_save_model_rejects_non_superuser_changing_or_setting_public_flag(self):
+        model_admin = NoteRepoAdmin(NoteRepo, admin.site)
+        request = RequestFactory().post(self.url)
+        request.user = self.staff
+        self.repo.allow_anonymous_access = True
+        new_repo = NoteRepo(slug="new", relative_path="new", title="新课程", allow_anonymous_access=True)
+        for repo, change in ((self.repo, True), (new_repo, False)):
+            with self.subTest(change=change), self.assertRaises(PermissionDenied):
+                model_admin.save_model(request, repo, None, change)
+
+    def test_public_link_is_hidden_for_blocked_legacy_parent(self):
+        child = NoteRepo(slug="child", relative_path=f"{self.repo.relative_path}/child", title="子仓库")
+        NoteRepo.objects.bulk_create([child])
+        self.client.force_login(self.superuser)
+        response = self.client.post(self.url, self.data)
+        self.assertContains(response, "请先调整目录结构")
+        self.repo.refresh_from_db()
+        self.assertFalse(self.repo.allow_anonymous_access)
+
+        NoteRepo.objects.filter(pk=self.repo.pk).update(allow_anonymous_access=True)
+        public_url = reverse("notes:note_repo_index", args=[self.repo.slug])
+        for url in (self.url, reverse("admin:notes_noterepo_changelist")):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, "公开配置因目录问题暂未生效")
+                self.assertNotContains(response, f'href="{public_url}"')
 
 
 class NoteViewTests(TestCase):
@@ -218,6 +370,109 @@ class NoteViewTests(TestCase):
         self.settings_override = override_settings(NOTES_ROOT=self.temp_dir)
         self.settings_override.enable()
         self.addCleanup(self.settings_override.disable)
+
+    def _read_urls(self):
+        return (
+            reverse("notes:note_repo_index", args=["course"]),
+            reverse("notes:note_detail", args=["course", "one"]),
+            reverse("notes:note_print", args=["course", "one"]),
+            reverse("note_asset", args=["course", "assets/diagram.png"]),
+        )
+
+    def test_anonymous_public_read_and_immediate_revocation(self):
+        self.note_repo.allow_anonymous_access = True
+        self.note_repo.save(update_fields=["allow_anonymous_access"])
+        index, detail, print_url, image = self._read_urls()
+        (self.repo_root / "assets" / "guide.pdf").write_bytes(b"%PDF-1.4\n")
+        (self.repo_root / "assets" / "guide.txt").write_bytes(b"guide")
+        (self.repo_root / "one.md").write_text(
+            "# 文档标题\n\n## 第二级标题\n\n![图示](assets/diagram.png)\n\n[讲义](assets/guide.pdf)\n",
+            encoding="utf-8",
+        )
+        for url, content_type, disposition in (
+            (index, "text/html", None),
+            (detail, "text/html", None),
+            (print_url, "text/html", None),
+            (image, "image/png", "inline"),
+            (reverse("note_asset", args=["course", "assets/guide.pdf"]), "application/pdf", "inline"),
+            (reverse("note_asset", args=["course", "assets/guide.txt"]), "application/octet-stream", "attachment"),
+        ):
+            with self.subTest(url=url):
+                with closing(self.client.get(url)) as response:
+                    self.assertEqual(response.status_code, 200)
+                    self.assertEqual(response["X-Robots-Tag"], "noindex, nofollow")
+                    self.assertIn("private", response["Cache-Control"])
+                    self.assertIn("no-store", response["Cache-Control"])
+                    self.assertTrue(response["Content-Type"].startswith(content_type))
+                    if disposition:
+                        self.assertEqual(response["Cache-Control"], "private, no-store")
+                        self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+                        self.assertTrue(response["Content-Disposition"].startswith(f"{disposition};"))
+                    if url == detail:
+                        self.assertContains(response, f'src="{image}"')
+                        self.assertContains(response, "第二级标题")
+                        self.assertContains(response, "第二课")
+                        self.assertContains(response, f'href="{print_url}"')
+                        self.assertNotContains(response, f'href="{reverse("notes:repo_list")}"')
+                        self.assertEqual(response.context["prev_note"]["url"], index)
+                        self.assertEqual(response.context["next_note"]["title"], "第二课")
+
+        user_without_permission = User.objects.create_user(username="public-note-reader")
+        self.client.force_login(user_without_permission)
+        self.assertEqual(self.client.get(detail).status_code, 200)
+        self.assertEqual(self.client.get(reverse("notes:repo_list")).status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("notes:repo_list")).status_code, 302)
+        self.note_repo.allow_anonymous_access = False
+        self.note_repo.save(update_fields=["allow_anonymous_access"])
+        for url in self._read_urls():
+            with self.subTest(url=url):
+                response = self.client.get(f"{url}?test=1")
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(parse_qs(urlsplit(response.url).query)["next"], [f"{url}?test=1"])
+
+    def test_hidden_public_repo_and_unregistered_repo_are_not_anonymously_readable(self):
+        NoteRepo.objects.filter(pk=self.note_repo.pk).update(allow_anonymous_access=True, is_visible=False)
+        for url in self._read_urls():
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 302)
+                self.assertEqual(self.client.get(url.replace("/course/", "/unregistered/")).status_code, 404)
+
+    def test_public_parent_with_legacy_child_falls_back_to_private_permissions(self):
+        child_path = f"{self.note_repo.relative_path}/assets"
+        NoteRepo.objects.bulk_create([NoteRepo(slug="child", relative_path=child_path, title="私有子仓库")])
+        NoteRepo.objects.filter(pk=self.note_repo.pk).update(allow_anonymous_access=True)
+        for user, status in ((None, 404), (self.denied_user, 403), (self.allowed_user, 200)):
+            if user is not None:
+                self.client.force_login(user)
+            for url in self._read_urls():
+                with self.subTest(user=user, url=url), closing(self.client.get(url)) as response:
+                    self.assertEqual(response.status_code, status)
+
+    def test_public_repo_blocks_other_registered_roots_resolved_through_symlinks(self):
+        self.note_repo.allow_anonymous_access = True
+        self.note_repo.save(update_fields=["allow_anonymous_access"])
+        alias = self.temp_dir / "alias"
+        try:
+            alias.symlink_to(self.repo_root / "assets", target_is_directory=True)
+        except OSError as exc:
+            self.skipTest(f"当前平台不允许创建目录软链接：{exc}")
+        NoteRepo.objects.create(slug="alias", relative_path="alias", title="私有子仓库")
+        for url in self._read_urls():
+            with self.subTest(url=url):
+                self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_registered_child_remains_public_below_parent_with_different_path_casing(self):
+        if Path("container") != Path("CONTAINER") or not (self.temp_dir / "CONTAINER").is_dir():
+            self.skipTest("此测试需要大小写不敏感的笔记目录")
+        parent = NoteRepo(slug="parent", relative_path="CONTAINER", title="私有父仓库")
+        with self.assertRaises(ValidationError):
+            parent.save()
+        NoteRepo.objects.bulk_create([parent])
+        self.assertIn("重叠", parent.anonymous_access_block_reason())
+        self.note_repo.allow_anonymous_access = True
+        self.note_repo.save(update_fields=["allow_anonymous_access"])
+        self.assertEqual(self.client.get(self._read_urls()[0]).status_code, 200)
 
     def test_unregistered_physical_directory_is_not_accessible(self):
         unregistered = self.temp_dir / "unregistered"
@@ -338,14 +593,16 @@ class NoteViewTests(TestCase):
         self.assertNotIn("private-source-canary", logs.output[0])
 
     def test_asset_rejects_missing_directory_and_parent_traversal(self):
-        self.client.force_login(self.allowed_user)
+        self.note_repo.allow_anonymous_access = True
+        self.note_repo.save(update_fields=["allow_anonymous_access"])
         for path in ("assets/missing.png", "assets", "%2e%2e/outside.md"):
             with self.subTest(path=path):
                 url = reverse("note_asset", kwargs={"repo": "course", "asset_path": path})
                 self.assertEqual(self.client.get(url).status_code, 404)
 
     def test_asset_symlink_cannot_escape_its_repository(self):
-        self.client.force_login(self.allowed_user)
+        self.note_repo.allow_anonymous_access = True
+        self.note_repo.save(update_fields=["allow_anonymous_access"])
         try:
             (self.repo_root / "assets" / "escape.md").symlink_to(self.temp_dir / "container" / "outside.md")
         except OSError:
@@ -576,10 +833,3 @@ flowchart TD
             src=lambda value: value and value.endswith("/js/notes-mermaid.js"),
         )
         self.assertTrue(mermaid_script.get("data-csp-nonce"))
-
-    def test_superuser_stats_treat_registered_subdirectory_as_covering_top_level(self):
-        self.client.force_login(self.superuser)
-        response = self.client.get(reverse("notes:repo_list"))
-        self.assertEqual(response.status_code, 200)
-        self.assertNotIn("container", response.context["unregistered_repos"])
-        self.assertIn(self.note_repo, response.context["repos"])

@@ -1,0 +1,33 @@
+{% extends "common/table_page.html" %}
+
+{% block list_filters %}
+  <div class="flex flex-wrap gap-3">
+    <a class="btn btn-primary" href="{% url 'notes:repo_manage_add' %}">登记笔记仓库</a>
+    <a class="btn btn-ghost" href="{% url 'notes:repo_list' %}">返回笔记仓库</a>
+  </div>
+{% endblock %}
+
+{% block list_results %}
+  {{ block.super }}
+  <section aria-labelledby="repo-directory-stats-title" class="mt-6 space-y-3">
+    <h2 id="repo-directory-stats-title" class="text-lg font-semibold">笔记库目录统计</h2>
+    <div class="grid grid-cols-1 items-start gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      {% for label, names in repo_stats_rows %}
+        <details class="collapse collapse-arrow rounded-box border border-base-300 bg-base-100 shadow-sm">
+          <summary class="collapse-title flex flex-wrap items-center gap-2 text-sm font-medium">
+            {{ label }} <span class="badge badge-ghost tabular-nums">{{ names|length }}</span>
+          </summary>
+          <div class="collapse-content">
+            {% if names %}
+              <ul class="space-y-1 text-sm">
+                {% for name in names %}<li class="break-all">{{ name }}</li>{% endfor %}
+              </ul>
+            {% else %}
+              <p class="text-sm text-base-content/60">暂无记录</p>
+            {% endif %}
+          </div>
+        </details>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

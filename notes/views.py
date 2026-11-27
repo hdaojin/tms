@@ -9,13 +9,14 @@ from typing import Any
 from urllib.parse import unquote
 
 from django.conf import settings
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_not_required, login_required
 from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.views import redirect_to_login
 from django.core.cache import cache
-from django.db.models import Prefetch
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden, HttpResponseNotFound
 from django.shortcuts import render
 from django.urls import reverse
+from django.views.decorators.cache import never_cache
 
 from core.file_preview import build_inline_preview_response
 from core.utils.breadcrumbs import breadcrumb_link, build_breadcrumbs
@@ -24,11 +25,11 @@ from .models import NoteRepo
 from .paths import (
     InvalidNotePathError,
     NoteNotFoundError,
-    normalize_note_relative_path,
     resolve_note_repo_root,
     resolve_repo_relative_path,
 )
-from .permissions import can_access_note_repo
+from .permissions import NoteRepoReadAccess, can_access_note_repo, get_note_repo_read_access
+from .selectors import note_repo_directory_exists
 from .utils import (
     get_readme_navigation,
     normalize_repo_name,
@@ -48,6 +49,23 @@ def _get_registered_repo(repo: str) -> tuple[str, NoteRepo]:
     if note_repo is None:
         raise Http404("Note repository not registered")
     return safe_repo, note_repo
+
+
+def _note_read_response(response: HttpResponse) -> HttpResponse:
+    response.headers.setdefault("Cache-Control", "private, no-store")
+    response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
+
+def _check_note_read_access(request: HttpRequest, note_repo: NoteRepo) -> HttpResponse | None:
+    access = get_note_repo_read_access(request.user, note_repo)
+    if access is NoteRepoReadAccess.ALLOWED:
+        return None
+    if access is NoteRepoReadAccess.LOGIN_REQUIRED:
+        return _note_read_response(redirect_to_login(request.get_full_path()))
+    if access is NoteRepoReadAccess.PUBLIC_ACCESS_BLOCKED:
+        return _note_read_response(HttpResponseNotFound("未找到笔记仓库。"))
+    return _note_read_response(HttpResponseForbidden())
 
 
 def _normalize_slug_for_nav(slug: str | None) -> str:
@@ -80,98 +98,33 @@ def _cache_key(repo: NoteRepo, slug: str, path: Path) -> str:
 def notes_repo_list_view(request: HttpRequest) -> HttpResponse:
     """列出已登记且目录存在的笔记仓库。"""
 
-    notes_root = Path(settings.NOTES_ROOT)
-    top_level_dirs = {
-        child.name for child in notes_root.iterdir() if child.is_dir()
-    } if notes_root.exists() else set()
-    note_repos_all = list(
-        NoteRepo.objects.prefetch_related(Prefetch("allowed_groups")).order_by("order", "slug")
-    )
-
-    existing_repos: list[NoteRepo] = []
-    missing_repos: list[NoteRepo] = []
-    covered_top_level_dirs: set[str] = set()
-    for repo in note_repos_all:
-        try:
-            normalized = normalize_note_relative_path(repo.relative_path)
-            covered_top_level_dirs.add(PurePosixPath(normalized).parts[0])
-            resolve_note_repo_root(normalized)
-        except (InvalidNotePathError, NoteNotFoundError, OSError):
-            missing_repos.append(repo)
-            continue
-        existing_repos.append(repo)
-
-    visible_repos: list[NoteRepo] = []
-    invisible_repos: list[NoteRepo] = []
-    for repo in existing_repos:
-        if repo.is_visible and can_access_note_repo(request.user, repo.slug, note_repo=repo):
-            visible_repos.append(repo)
-        else:
-            invisible_repos.append(repo)
+    repos = NoteRepo.objects.filter(is_visible=True).prefetch_related("allowed_groups")
+    visible_repos = [
+        repo
+        for repo in repos
+        if can_access_note_repo(request.user, repo.slug, note_repo=repo)
+        and note_repo_directory_exists(repo.relative_path)
+    ]
 
     context: dict[str, Any] = {
         "title": "黄老师的笔记列表",
         "title_icon": "icon-[tabler--book]",
         "repos": visible_repos,
-        "invisible_repos": [],
-        "unregistered_repos": [],
-        "missing_repos": [],
-        "repo_stats_rows": [],
     }
-    if request.user.is_superuser:
-        unregistered_repos = sorted(top_level_dirs - covered_top_level_dirs)
-        display_name = lambda repo: f"{repo.slug} → {repo.relative_path}"  # noqa: E731
-        repo_stats_rows = [
-            {"label": "顶层目录数", "count": len(top_level_dirs), "names": sorted(top_level_dirs)},
-            {
-                "label": "已显示的笔记库",
-                "count": len(visible_repos),
-                "names": [display_name(repo) for repo in visible_repos],
-            },
-            {
-                "label": "设置为不可见或无权访问的笔记库",
-                "count": len(invisible_repos),
-                "names": [display_name(repo) for repo in invisible_repos],
-            },
-            {
-                "label": "未在后台注册的顶层目录",
-                "count": len(unregistered_repos),
-                "names": unregistered_repos,
-            },
-            {
-                "label": "已注册但目录缺失的笔记库",
-                "count": len(missing_repos),
-                "names": [display_name(repo) for repo in missing_repos],
-            },
-        ]
-        context.update(
-            {
-                "total_repo_dirs": len(top_level_dirs),
-                "visible_repo_count": len(visible_repos),
-                "invisible_repos": invisible_repos,
-                "invisible_repo_count": len(invisible_repos),
-                "unregistered_repos": unregistered_repos,
-                "unregistered_repo_count": len(unregistered_repos),
-                "missing_repos": missing_repos,
-                "missing_repo_count": len(missing_repos),
-                "repo_stats_rows": repo_stats_rows,
-            }
-        )
     context["breadcrumbs"] = build_breadcrumbs(request, context["title"])
     return render(request, "notes/repo_list.html", context)
 
 
-@login_required
-@permission_required("notes.view_noterepo", raise_exception=True)
+@login_not_required
+@never_cache
 def note_detail_view(
     request: HttpRequest, repo: str, slug: str | None = None, *args: Any, **kwargs: Any
 ) -> HttpResponse:
     """渲染已登记笔记仓库内的单篇 Markdown。"""
 
     safe_repo, repo_obj = _get_registered_repo(repo)
-    if not can_access_note_repo(request.user, safe_repo, note_repo=repo_obj):
-        logger.warning("Permission denied for user=%s repo=%s slug=%s", request.user, repo, slug)
-        return HttpResponseForbidden()
+    if denial := _check_note_read_access(request, repo_obj):
+        return denial
 
     try:
         repo_root = resolve_note_repo_root(repo_obj.relative_path)
@@ -234,19 +187,16 @@ def note_detail_view(
         "show_right_sidebar": True,
         "wide_sidebars": True,
     }
-    context["breadcrumbs"] = build_breadcrumbs(
-        request,
-        context["title"],
-        [
-            breadcrumb_link("笔记仓库", "notes:repo_list"),
-            breadcrumb_link(repo_obj.title or safe_repo, "notes:note_repo_index", kwargs={"repo": safe_repo}),
-        ],
+    parents = [breadcrumb_link("笔记仓库", "notes:repo_list")] if request.user.is_authenticated else []
+    parents.append(
+        breadcrumb_link(repo_obj.title or safe_repo, "notes:note_repo_index", kwargs={"repo": safe_repo}),
     )
-    return render(request, "notes/note_detail.html", context)
+    context["breadcrumbs"] = build_breadcrumbs(request, context["title"], parents)
+    return _note_read_response(render(request, "notes/note_detail.html", context))
 
 
-@login_required
-@permission_required("notes.view_noterepo", raise_exception=True)
+@login_not_required
+@never_cache
 def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
     """渲染适合打印的训练日志页面。"""
 
@@ -261,8 +211,8 @@ def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
         return {"is_list": False, "item": str(value).strip()}
 
     safe_repo, repo_obj = _get_registered_repo(repo)
-    if not can_access_note_repo(request.user, safe_repo, note_repo=repo_obj):
-        return HttpResponseForbidden()
+    if denial := _check_note_read_access(request, repo_obj):
+        return denial
     try:
         repo_root = resolve_note_repo_root(repo_obj.relative_path)
         path = resolve_note_markdown_path(repo_root, slug)
@@ -298,17 +248,16 @@ def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
         "title": meta.get("task", note.slug),
         "title_icon": "icon-[tabler--printer]",
     }
-    return render(request, "notes/print_note.html", context)
+    return _note_read_response(render(request, "notes/print_note.html", context))
 
 
-@login_required
-@permission_required("notes.view_noterepo", raise_exception=True)
+@login_not_required
 def note_asset_view(request: HttpRequest, repo: str, asset_path: str) -> HttpResponse:
     """在已登记仓库根目录内安全提供图片和附件。"""
 
-    safe_repo, repo_obj = _get_registered_repo(repo)
-    if not can_access_note_repo(request.user, safe_repo, note_repo=repo_obj):
-        return HttpResponseForbidden()
+    _, repo_obj = _get_registered_repo(repo)
+    if denial := _check_note_read_access(request, repo_obj):
+        return denial
     try:
         repo_root = resolve_note_repo_root(repo_obj.relative_path)
         decoded_path = unquote(asset_path).replace("\\", "/")
@@ -322,4 +271,4 @@ def note_asset_view(request: HttpRequest, repo: str, asset_path: str) -> HttpRes
     if not resolved.is_relative_to(repo_root.resolve()) or not resolved.is_file():
         raise Http404("File not found")
 
-    return build_inline_preview_response(resolved, resolved.name, download_unsupported=True)
+    return _note_read_response(build_inline_preview_response(resolved, resolved.name, download_unsupported=True))

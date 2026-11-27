@@ -285,6 +285,11 @@ sections:
             url_name: notes:repo_list
             icon_class: icon-[tabler--book] size-5 text-warning
             permissions: [notes.view_noterepo]
+          - key: notes_management
+            label: 笔记仓库管理
+            url_name: notes:repo_manage_list
+            icon_class: icon-[tabler--book] size-5 text-warning
+            superuser_required: true
 
   - key: meetings
     label: 会议

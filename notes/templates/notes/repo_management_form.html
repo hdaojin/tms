@@ -1,0 +1,30 @@
+{% extends "common/form.html" %}
+
+{% block form_content %}
+  {% if preview %}
+    <section class="alert alert-warning" aria-labelledby="public-preview-title">
+      <div class="min-w-0 space-y-2">
+        <h2 id="public-preview-title" class="font-semibold">确认匿名访问范围</h2>
+        {% if preview.visible %}
+          <p>保存后，知道链接的人可以阅读目录内的笔记、图片和附件。</p>
+        {% else %}
+          <p>此仓库当前设为隐藏。匿名访问会在仓库重新可见时生效。</p>
+        {% endif %}
+        <p class="break-all">登记目录 {{ preview.path }}</p>
+        {% if preview.target != preview.path %}<p class="break-all">实际目录 {{ preview.target }}</p>{% endif %}
+        <p class="break-all">公开链接 {{ preview.url }}</p>
+      </div>
+    </section>
+    {% include "components/form.html" with form=form action=request.path submit_label="确认并保存" %}
+  {% else %}
+    {% if public_status %}
+      <p>匿名访问状态 {{ public_status.0 }}
+        {% if public_status.1 %}<a class="link break-all" href="{{ public_status.1 }}">{{ public_status.1 }}</a>{% endif %}
+      </p>
+    {% endif %}
+    {{ block.super }}
+  {% endif %}
+  <div class="flex flex-wrap gap-3">
+    <a class="btn btn-ghost" href="{% url 'notes:repo_manage_list' %}">返回笔记仓库管理</a>
+  </div>
+{% endblock %}

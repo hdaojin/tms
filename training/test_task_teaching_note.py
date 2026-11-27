@@ -2,7 +2,7 @@ from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from django.contrib.auth.models import Group, Permission
+from django.contrib.auth.models import AnonymousUser, Group, Permission
 from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -43,6 +43,10 @@ class TaskTeachingNoteTests(ProcessFixture, TestCase):
         task = TrainingTask.objects.get(schedule_slot=self.slot)
         self.assertEqual(task.coach_link, self.link + "#goal")
         self.assertEqual(read_task_note(task, self.coach), (f"{self.repo.pk}/命令行.md", "# 命令行"))
+        self.repo.allow_anonymous_access = True
+        self.repo.save(update_fields=["allow_anonymous_access"])
+        with self.assertRaises(ValidationError):
+            read_task_note(task, AnonymousUser())
         with self.assertRaises(ValidationError):
             read_task_note(task, self.student)
         self.repo.allowed_groups.add(Group.objects.create(name="其他教师"))
