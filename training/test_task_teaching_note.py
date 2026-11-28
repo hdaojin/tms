@@ -62,10 +62,10 @@ class TaskTeachingNoteTests(ProcessFixture, TestCase):
         task = TrainingTask.objects.get(schedule_slot=self.slot)
         self.assertEqual(task.coach_link, first)
         self.assertIsNone(task_note_route(task.coach_link))
-        for value in ("", "//other.example/notes/debian/lesson/", "/training/", "/notes/debian/a/print/"):
+        for value in ("", "//other.example/notes/debian/lesson/", "/training/"):
             with self.subTest(value=value):
                 self.assertIsNone(task_note_route(value))
-        for value in ("../debian/命令行", "未找到", "%252e%252e/secret", ".git/secret"):
+        for value in ("../debian/命令行", "未找到", "%252e%252e/secret", ".git/secret", "a/print"):
             with self.subTest(value=value), self.assertRaises(ValidationError):
                 read_task_note(TrainingTask(coach_link=f"/notes/debian/{value}/"), self.coach)
 

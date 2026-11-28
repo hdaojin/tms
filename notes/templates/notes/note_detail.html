@@ -70,27 +70,13 @@
     </details>
 
     <div class="tms-note-content min-w-0 space-y-4">
-      <div class="space-y-1">
-
-        <div class="flex items-center justify-between gap-4">
-          <div class="space-x-4 text-sm text-base-content/70">
-            {% with author=meta.author created=meta.created_at updated=meta.updated_at module=meta.module %}
-              {% if author %}<span>作者：{{ author }}</span>{% endif %}
-              {% if created %}<span>创建：{{ created }}</span>{% endif %}
-              {% if updated %}<span>更新：{{ updated }}</span>{% endif %}
-              {% if module %}<span>模块：{{ module }}</span>{% endif %}
-            {% endwith %}
-          </div>
-          {% if slug %}
-            <div class="print:hidden">
-              <a
-                class="btn btn-sm btn-primary"
-                href="{% url 'notes:note_print' repo=repo slug=slug %}"
-                >生成训练日志</a
-              >
-            </div>
-          {% endif %}
-        </div>
+      <div class="space-x-4 text-sm text-base-content/70">
+        {% with author=meta.author created=meta.created_at updated=meta.updated_at module=meta.module %}
+          {% if author %}<span>作者：{{ author }}</span>{% endif %}
+          {% if created %}<span>创建：{{ created }}</span>{% endif %}
+          {% if updated %}<span>更新：{{ updated }}</span>{% endif %}
+          {% if module %}<span>模块：{{ module }}</span>{% endif %}
+        {% endwith %}
       </div>
 
       <hr />

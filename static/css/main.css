@@ -497,8 +497,7 @@
     overflow-x: auto;
   }
 
-  .tms-note-content .mermaid-pre,
-  [data-note-print-page] .mermaid-pre {
+  .tms-note-content .mermaid-pre {
     color-scheme: light;
     border: 1px solid #e5e7eb;
     border-radius: 0.5rem;
@@ -510,16 +509,14 @@
     white-space: normal;
   }
 
-  .tms-note-content .mermaid:not(.mermaid-render-error),
-  [data-note-print-page] .mermaid:not(.mermaid-render-error) {
+  .tms-note-content .mermaid:not(.mermaid-render-error) {
     display: flex;
     width: max-content;
     min-width: 100%;
     justify-content: center;
   }
 
-  .tms-note-content .mermaid svg,
-  [data-note-print-page] .mermaid svg {
+  .tms-note-content .mermaid svg {
     flex: none;
     display: block;
     height: auto;
@@ -528,14 +525,11 @@
   }
 
   .tms-note-content .mermaid svg text.actor,
-  .tms-note-content .mermaid svg text.actor tspan,
-  [data-note-print-page] .mermaid svg text.actor,
-  [data-note-print-page] .mermaid svg text.actor tspan {
+  .tms-note-content .mermaid svg text.actor tspan {
     text-anchor: middle !important;
   }
 
-  .tms-note-content .mermaid svg text,
-  [data-note-print-page] .mermaid svg text {
+  .tms-note-content .mermaid svg text {
     font-family:
       ui-sans-serif,
       system-ui,
@@ -622,12 +616,11 @@
     --input-color: var(--tms-border-color);
   }
 
-  .table:not(.tms-print-table) :where(tfoot tr:first-child :is(td, th)) {
+  .table :where(tfoot tr:first-child :is(td, th)) {
     border-top-color: var(--tms-table-border-color);
   }
 
-  .table:not(.tms-print-table)
-    :where(thead tr :is(td, th), tbody tr:not(:last-child) :is(td, th)) {
+  .table :where(thead tr :is(td, th), tbody tr:not(:last-child) :is(td, th)) {
     border-bottom-color: var(--tms-table-border-color);
   }
 
@@ -637,11 +630,6 @@
 
   .tabs-border {
     --tab-border-color: var(--tms-border-color);
-  }
-
-  .tms-print-table,
-  .tms-print-table :is(th, td) {
-    border-color: var(--color-black);
   }
 
   .menu .menu-active {

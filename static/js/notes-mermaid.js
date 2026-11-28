@@ -5,7 +5,6 @@
     : "";
   const diagramFontFamily =
     'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif';
-  let renderQueue = Promise.resolve();
   let renderSequence = 0;
 
   function diagramSource(diagram) {
@@ -144,19 +143,5 @@
     }
   }
 
-  function queueRender() {
-    renderQueue = renderQueue
-      .catch(function () {})
-      .then(function () {
-        return renderAll();
-      });
-    window.tmsMermaidReady = renderQueue;
-    return renderQueue;
-  }
-
-  window.tmsPreparePrint = function () {
-    return queueRender();
-  };
-
-  queueRender();
+  renderAll();
 })();

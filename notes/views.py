@@ -175,7 +175,6 @@ def note_detail_view(
         "repo_title": repo_obj.title or safe_repo,
         "notes_root_name": Path(settings.NOTES_ROOT).name,
         "current_note_title": current_note_title,
-        "slug": current_slug,
         "meta_parse_error": bool(meta.get("_parse_error")),
         "meta_parse_error_message": meta.get("_parse_error_message"),
         "prev_note": prev_note,
@@ -193,62 +192,6 @@ def note_detail_view(
     )
     context["breadcrumbs"] = build_breadcrumbs(request, context["title"], parents)
     return _note_read_response(render(request, "notes/note_detail.html", context))
-
-
-@login_not_required
-@never_cache
-def note_print_view(request: HttpRequest, repo: str, slug: str) -> HttpResponse:
-    """渲染适合打印的训练日志页面。"""
-
-    def as_lines(value: Any) -> dict[str, Any]:
-        if not value:
-            return {"is_list": False, "item": ""}
-        if isinstance(value, (list, tuple)):
-            return {
-                "is_list": True,
-                "items": [str(item) for item in value if item is not None and str(item).strip()],
-            }
-        return {"is_list": False, "item": str(value).strip()}
-
-    safe_repo, repo_obj = _get_registered_repo(repo)
-    if denial := _check_note_read_access(request, repo_obj):
-        return denial
-    try:
-        repo_root = resolve_note_repo_root(repo_obj.relative_path)
-        path = resolve_note_markdown_path(repo_root, slug)
-        note = render_note_markdown(path, safe_repo, repo_root, _normalize_slug_for_nav(slug))
-    except (InvalidNotePathError, NoteNotFoundError) as exc:
-        raise Http404("Note not found") from exc
-
-    meta = note.meta if isinstance(note.meta, dict) else {}
-    summary = meta.get("summary") if isinstance(meta.get("summary"), dict) else {}
-    print_meta = {
-        "class": meta.get("class"),
-        "document": meta.get("document"),
-        "role": meta.get("role"),
-        "updated_at": meta.get("updated_at"),
-        "author": meta.get("author"),
-        "module": meta.get("module"),
-        "task": meta.get("task"),
-        "objectives": as_lines(meta.get("objectives")),
-        "contents": as_lines(meta.get("contents")),
-        "summary": {
-            "objective_achievement": as_lines(summary.get("objective_achievement")),
-            "shortcomings": as_lines(summary.get("shortcomings")),
-            "improvement_plan": as_lines(summary.get("improvement_plan")),
-        },
-    }
-    context = {
-        "note": note,
-        "meta": meta,
-        "print_meta": print_meta,
-        "html": note.html,
-        "repo": safe_repo,
-        "slug": note.slug,
-        "title": meta.get("task", note.slug),
-        "title_icon": "icon-[tabler--printer]",
-    }
-    return _note_read_response(render(request, "notes/print_note.html", context))
 
 
 @login_not_required

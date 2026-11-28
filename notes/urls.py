@@ -1,7 +1,7 @@
 from django.urls import path
 
 from .management_views import NoteRepoManagementForm, NoteRepoManagementList
-from .views import note_detail_view, note_print_view, notes_repo_list_view
+from .views import note_detail_view, notes_repo_list_view
 
 app_name = "notes"
 
@@ -12,6 +12,5 @@ urlpatterns = [
     path("@manage/add/", NoteRepoManagementForm.as_view(), name="repo_manage_add"),
     path("@manage/<int:pk>/edit/", NoteRepoManagementForm.as_view(), name="repo_manage_edit"),
     path("<str:repo>/", note_detail_view, name="note_repo_index"),
-    path("<str:repo>/<path:slug>/print/", note_print_view, name="note_print"),
     path("<str:repo>/<path:slug>/", note_detail_view, name="note_detail"),
 ]

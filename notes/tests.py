@@ -310,7 +310,6 @@ class NoteViewTests(TestCase):
             reverse("notes:repo_list"),
             reverse("notes:note_repo_index", kwargs={"repo": "course"}),
             reverse("notes:note_detail", kwargs={"repo": "course", "slug": "one"}),
-            reverse("notes:note_print", kwargs={"repo": "course", "slug": "one"}),
             reverse("note_asset", kwargs={"repo": "course", "asset_path": "assets/diagram.png"}),
         ):
             with self.subTest(url=url):
@@ -375,14 +374,13 @@ class NoteViewTests(TestCase):
         return (
             reverse("notes:note_repo_index", args=["course"]),
             reverse("notes:note_detail", args=["course", "one"]),
-            reverse("notes:note_print", args=["course", "one"]),
             reverse("note_asset", args=["course", "assets/diagram.png"]),
         )
 
     def test_anonymous_public_read_and_immediate_revocation(self):
         self.note_repo.allow_anonymous_access = True
         self.note_repo.save(update_fields=["allow_anonymous_access"])
-        index, detail, print_url, image = self._read_urls()
+        index, detail, image = self._read_urls()
         (self.repo_root / "assets" / "guide.pdf").write_bytes(b"%PDF-1.4\n")
         (self.repo_root / "assets" / "guide.txt").write_bytes(b"guide")
         (self.repo_root / "one.md").write_text(
@@ -392,7 +390,6 @@ class NoteViewTests(TestCase):
         for url, content_type, disposition in (
             (index, "text/html", None),
             (detail, "text/html", None),
-            (print_url, "text/html", None),
             (image, "image/png", "inline"),
             (reverse("note_asset", args=["course", "assets/guide.pdf"]), "application/pdf", "inline"),
             (reverse("note_asset", args=["course", "assets/guide.txt"]), "application/octet-stream", "attachment"),
@@ -412,7 +409,6 @@ class NoteViewTests(TestCase):
                         self.assertContains(response, f'src="{image}"')
                         self.assertContains(response, "第二级标题")
                         self.assertContains(response, "第二课")
-                        self.assertContains(response, f'href="{print_url}"')
                         self.assertNotContains(response, f'href="{reverse("notes:repo_list")}"')
                         self.assertEqual(response.context["prev_note"]["url"], index)
                         self.assertEqual(response.context["next_note"]["title"], "第二课")
@@ -490,7 +486,6 @@ class NoteViewTests(TestCase):
         )
         self.assertEqual(note_response.status_code, 403)
         self.assertEqual(asset_response.status_code, 403)
-        self.assertEqual(self.client.get(reverse("notes:note_print", kwargs={"repo": "course", "slug": "one"})).status_code, 403)
 
     def test_asset_view_serves_file_inside_nested_repo(self):
         self.client.force_login(self.allowed_user)
@@ -550,7 +545,7 @@ class NoteViewTests(TestCase):
         self.assertTrue(soup.select_one('input[type="checkbox"]').has_attr("disabled"))
         self.assertIn(f'#{soup.h2["id"]}"', note.toc_tokens)
 
-    def test_note_and_print_strip_active_content_including_details(self):
+    def test_note_detail_strips_active_content_including_details(self):
         (self.repo_root / "one.md").write_text(
             """## 安全示例
 
@@ -569,13 +564,11 @@ class NoteViewTests(TestCase):
             encoding="utf-8",
         )
         self.client.force_login(self.allowed_user)
-        for route in ("notes:note_detail", "notes:note_print"):
-            with self.subTest(route=route):
-                response = self.client.get(reverse(route, kwargs={"repo": "course", "slug": "one"}))
-                self.assertContains(response, "教学折叠内容")
-                for marker in ("script_payload", "<iframe", 'onerror="alert', 'onload="alert',
-                               "data:text/html", "javascript:alert", 'hx-get="/accounts/"'):
-                    self.assertNotContains(response, marker)
+        response = self.client.get(reverse("notes:note_detail", kwargs={"repo": "course", "slug": "one"}))
+        self.assertContains(response, "教学折叠内容")
+        for marker in ("script_payload", "<iframe", 'onerror="alert', 'onload="alert',
+                       "data:text/html", "javascript:alert", 'hx-get="/accounts/"'):
+            self.assertNotContains(response, marker)
 
     def test_note_render_failure_is_visible_without_logging_input(self):
         (self.repo_root / "README.md").write_text("# Course", encoding="utf-8")
@@ -817,19 +810,17 @@ flowchart TD
         self.assertNotIn("window.mermaid.run", script)
         self.assertNotIn('"tms:theme-changed"', script)
 
-    def test_print_page_loads_mermaid_and_marks_light_theme_rendering_scope(self):
+    def test_note_detail_no_longer_offers_training_log_print(self):
         self.client.force_login(self.allowed_user)
-        response = self.client.get(
-            reverse("notes:note_print", kwargs={"repo": "course", "slug": "one"})
-        )
+        detail_url = reverse("notes:note_detail", args=["course", "one"])
+        retired_url = f"{detail_url}print/"
+        response = self.client.get(detail_url)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "data-note-print-page")
-        self.assertContains(response, "js/mermaid.min.js")
-        self.assertContains(response, "js/notes-mermaid.js")
-        page = BeautifulSoup(response.content, "lxml")
-        mermaid_script = page.find(
-            "script",
-            src=lambda value: value and value.endswith("/js/notes-mermaid.js"),
-        )
-        self.assertTrue(mermaid_script.get("data-csp-nonce"))
+        self.assertNotContains(response, "生成训练日志")
+        self.assertNotContains(response, f'href="{retired_url}"')
+        self.assertEqual(self.client.get(retired_url).status_code, 404)
+
+        nested_note = self.repo_root / "one" / "print.md"
+        nested_note.parent.mkdir()
+        nested_note.write_text("# 普通的嵌套笔记", encoding="utf-8")
+        self.assertContains(self.client.get(retired_url), "普通的嵌套笔记")
